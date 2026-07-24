@@ -1,0 +1,128 @@
+<section class="grid gap-4">
+  <header>
+    <h1 class="page-title">Demande de commande</h1>
+    <p class="page-subtitle">Ajoutez plusieurs pièces, modifiez la liste, puis envoyez</p>
+  </header>
+
+  <mat-card class="!rounded-xl !border !border-line !shadow-soft">
+    <mat-card-content class="!pt-5">
+      <div class="grid gap-1 sm:grid-cols-2 sm:gap-x-4" [formGroup]="picker">
+        <div class="sm:col-span-2 flex flex-col gap-2 sm:flex-row sm:items-start">
+          <mat-form-field appearance="outline" class="w-full flex-1">
+            <mat-label>Pièce existante</mat-label>
+            <mat-select formControlName="deviceId">
+              <mat-option [value]="null">— Sélectionner une pièce —</mat-option>
+              @for (d of devices(); track d.id) {
+                <mat-option [value]="d.id">{{ d.nom }} ({{ d.reference }})</mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+          <a
+            mat-stroked-button
+            color="primary"
+            class="shrink-0 sm:!mt-1"
+            routerLink="/devices/new"
+            [queryParams]="{ forOrderRequest: 1 }"
+          >
+            Créer pièce détachée
+          </a>
+        </div>
+
+        <div class="sm:col-span-2 flex flex-col gap-3 sm:flex-row sm:items-start">
+          <mat-form-field appearance="outline" class="w-full sm:max-w-xs">
+            <mat-label>Quantité</mat-label>
+            <input matInput type="number" min="1" formControlName="quantite" />
+          </mat-form-field>
+
+          <div class="piece-thumb" [class.has-piece]="!!selectedDevice()">
+            @if (selectedDevice(); as device) {
+              @if (photoUrl(device)) {
+                <img [src]="photoUrl(device)" [alt]="device.nom" />
+              } @else {
+                <div class="thumb-fallback"><mat-icon>precision_manufacturing</mat-icon></div>
+              }
+              <div class="thumb-meta">
+                <span class="thumb-title">{{ device.nom }}</span>
+                <span class="thumb-ref">{{ device.reference }}</span>
+              </div>
+            } @else {
+              <div class="thumb-fallback"><mat-icon>image_not_supported</mat-icon></div>
+              <div class="thumb-meta">
+                <span class="thumb-title">Aucune pièce</span>
+                <span class="thumb-ref">Sélectionnez une pièce à ajouter</span>
+              </div>
+            }
+          </div>
+
+          <button mat-flat-button color="primary" type="button" class="shrink-0 sm:!mt-1" (click)="addLine()">
+            <mat-icon>add</mat-icon>
+            Ajouter à la liste
+          </button>
+        </div>
+      </div>
+
+      <div class="mt-5">
+        <h2 class="m-0 mb-3 text-base font-semibold text-ink">
+          Pièces de la demande ({{ lines().length }})
+        </h2>
+        @if (lines().length === 0) {
+          <p class="m-0 rounded-lg border border-dashed border-line px-3 py-4 text-sm text-ink-soft">
+            Aucune pièce ajoutée. Sélectionnez une pièce puis cliquez sur « Ajouter à la liste ».
+          </p>
+        } @else {
+          <div class="grid gap-2">
+            @for (line of lines(); track line.deviceId) {
+              <div class="line-row">
+                @if (photoUrl(line)) {
+                  <img [src]="photoUrl(line)" [alt]="line.nom" class="line-thumb" />
+                } @else {
+                  <div class="line-thumb fallback"><mat-icon>precision_manufacturing</mat-icon></div>
+                }
+                <div class="min-w-0 flex-1">
+                  <div class="truncate text-sm font-semibold text-ink">{{ line.nom }}</div>
+                  <div class="text-xs text-ink-soft">{{ line.reference }}</div>
+                </div>
+                <mat-form-field appearance="outline" class="qty-field">
+                  <mat-label>Qté</mat-label>
+                  <input
+                    matInput
+                    type="number"
+                    min="1"
+                    [value]="line.quantite"
+                    (change)="updateQty(line.deviceId, $any($event.target).value)"
+                  />
+                </mat-form-field>
+                <button mat-icon-button type="button" color="warn" (click)="removeLine(line.deviceId)" aria-label="Retirer">
+                  <mat-icon>delete</mat-icon>
+                </button>
+              </div>
+            }
+          </div>
+        }
+      </div>
+
+      <form class="mt-4 grid gap-1" [formGroup]="form" (ngSubmit)="submit()">
+        <mat-form-field appearance="outline">
+          <mat-label>Message pour l'administrateur</mat-label>
+          <textarea matInput rows="4" formControlName="message"></textarea>
+        </mat-form-field>
+
+        @if (success()) {
+          <p class="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+            Demande enregistrée avec {{ lastSentCount }} pièce(s) et envoyée à l'administrateur.
+          </p>
+        }
+        @if (error()) {
+          <p class="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{{ error() }}</p>
+        }
+
+        <div class="mt-2 grid grid-cols-2 gap-3">
+          <a mat-stroked-button routerLink="/devices">Retour</a>
+          <button mat-flat-button color="primary" type="submit" [disabled]="saving()">
+            {{ saving() ? 'Envoi…' : 'Envoyer la demande' }}
+          </button>
+        </div>
+      </form>
+    </mat-card-content>
+  </mat-card>
+</section>

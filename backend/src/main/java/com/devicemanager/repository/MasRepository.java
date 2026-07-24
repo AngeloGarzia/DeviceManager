@@ -1,0 +1,44 @@
+package com.devicemanager.repository;
+
+import com.devicemanager.entity.Mas;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
+import java.util.List;
+import java.util.Optional;
+
+public interface MasRepository extends JpaRepository<Mas, Long> {
+
+    @Query("""
+            SELECT m FROM Mas m
+            JOIN FETCH m.marque
+            WHERE m.atelier.id = :atelierId
+              AND (
+                   LOWER(m.numero) LIKE LOWER(CONCAT('%', :q, '%'))
+                OR LOWER(m.marque.label) LIKE LOWER(CONCAT('%', :q, '%'))
+                OR LOWER(m.marque.code) LIKE LOWER(CONCAT('%', :q, '%'))
+              )
+            ORDER BY m.numero
+            """)
+    List<Mas> search(@Param("atelierId") Long atelierId, @Param("q") String q);
+
+    @Query("""
+            SELECT m FROM Mas m
+            JOIN FETCH m.marque
+            WHERE m.atelier.id = :atelierId
+            ORDER BY m.numero
+            """)
+    List<Mas> findAllByAtelierId(@Param("atelierId") Long atelierId);
+
+    @Query("""
+            SELECT m FROM Mas m
+            JOIN FETCH m.marque
+            WHERE m.id = :id AND m.atelier.id = :atelierId
+            """)
+    Optional<Mas> findByIdAndAtelierId(@Param("id") Long id, @Param("atelierId") Long atelierId);
+
+    boolean existsByNumeroIgnoreCaseAndAtelierId(String numero, Long atelierId);
+
+    boolean existsByNumeroIgnoreCaseAndAtelierIdAndIdNot(String numero, Long atelierId, Long id);
+}

@@ -1,0 +1,86 @@
+<section class="grid gap-4">
+  <header class="flex flex-wrap items-start justify-between gap-3">
+    <div>
+      <h1 class="page-title">Machines à sous</h1>
+      <p class="page-subtitle">Référentiel MAS du casino</p>
+    </div>
+    <a mat-flat-button color="primary" routerLink="/mas/new"><mat-icon>add</mat-icon> Nouvelle MAS</a>
+  </header>
+
+  <div class="grid grid-cols-2 gap-3 sm:max-w-md">
+    <div class="panel !p-3"><div class="text-xs uppercase tracking-wide text-ink-faint">Total</div><div class="mt-1 text-2xl font-semibold text-brand">{{ total }}</div></div>
+    <div class="panel !p-3"><div class="text-xs uppercase tracking-wide text-ink-faint">Utilisées</div><div class="mt-1 text-2xl font-semibold text-ink">{{ usedCount }}</div></div>
+  </div>
+
+  <div class="panel !py-2">
+    <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
+      <mat-form-field appearance="outline" class="flex-1 !mb-[-1.25em]">
+        <mat-label>Rechercher</mat-label>
+        <input matInput [(ngModel)]="query" (keyup.enter)="load()" placeholder="Numéro ou marque…" />
+        <mat-icon matSuffix>search</mat-icon>
+      </mat-form-field>
+      <button mat-stroked-button type="button" color="primary" class="!h-14" (click)="load()">Filtrer</button>
+    </div>
+  </div>
+
+  @if (error()) { <p class="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{{ error() }}</p> }
+
+  @if (loading()) {
+    <div class="flex justify-center py-10"><mat-spinner diameter="36"></mat-spinner></div>
+  } @else if (items().length === 0) {
+    <div class="panel"><h2 class="m-0 text-lg font-semibold">Aucune MAS</h2><p class="mt-2 text-sm text-ink-soft">Ajoutez une machine pour rattacher des pièces.</p></div>
+  } @else {
+    <div class="grid gap-3 md:hidden">
+      @for (item of items(); track item.id) {
+        <mat-card class="!rounded-xl !border !border-line !shadow-soft">
+          <mat-card-content class="!pt-4">
+            <div class="flex items-start justify-between gap-2">
+              <h2 class="m-0 text-base font-semibold">{{ item.numero }}</h2>
+              @if (item.utilise) {
+                <span class="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">Utilisée</span>
+              } @else {
+                <span class="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800">Non utilisée</span>
+              }
+            </div>
+            <p class="mt-2 text-sm text-brand">{{ item.marqueLabel || item.marque }}</p>
+            <div class="mt-4 flex flex-wrap gap-2">
+              <a mat-stroked-button [routerLink]="['/mas', item.id]">Voir</a>
+              <a mat-button [routerLink]="['/mas', item.id, 'edit']">Éditer</a>
+              <button mat-button color="warn" type="button" (click)="askDelete(item)">Suppr.</button>
+            </div>
+          </mat-card-content>
+        </mat-card>
+      }
+    </div>
+
+    <div class="panel hidden overflow-auto !p-0 md:block">
+      <table mat-table [dataSource]="items()" class="w-full">
+        <ng-container matColumnDef="numero"><th mat-header-cell *matHeaderCellDef>Numéro</th><td mat-cell *matCellDef="let item">{{ item.numero }}</td></ng-container>
+        <ng-container matColumnDef="marque"><th mat-header-cell *matHeaderCellDef>Marque</th><td mat-cell *matCellDef="let item">{{ item.marqueLabel || item.marque }}</td></ng-container>
+        <ng-container matColumnDef="statut">
+          <th mat-header-cell *matHeaderCellDef>Statut</th>
+          <td mat-cell *matCellDef="let item">
+            @if (item.utilise) { <span class="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">Utilisée</span> }
+            @else { <span class="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800">Non utilisée</span> }
+          </td>
+        </ng-container>
+        <ng-container matColumnDef="actions">
+          <th mat-header-cell *matHeaderCellDef></th>
+          <td mat-cell *matCellDef="let item">
+            <div class="flex justify-end gap-1">
+              <a mat-button [routerLink]="['/mas', item.id]">Voir</a>
+              <a mat-button [routerLink]="['/mas', item.id, 'edit']">Éditer</a>
+              <button mat-button color="warn" type="button" (click)="askDelete(item)">Suppr.</button>
+            </div>
+          </td>
+        </ng-container>
+        <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+        <tr mat-row *matRowDef="let row; columns: displayedColumns"></tr>
+      </table>
+    </div>
+  }
+
+  <app-confirm-dialog [open]="confirmOpen()" title="Supprimer la MAS"
+    [message]="pendingDelete ? 'Confirmer la suppression de « ' + pendingDelete.numero + ' » ?' : ''"
+    (confirm)="confirmDelete()" (cancel)="cancelDelete()" />
+</section>

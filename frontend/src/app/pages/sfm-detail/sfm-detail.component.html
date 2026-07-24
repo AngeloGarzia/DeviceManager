@@ -1,0 +1,51 @@
+<section class="grid gap-4">
+  <a mat-button routerLink="/sfm" class="!justify-self-start !pl-0"><mat-icon>arrow_back</mat-icon> Retour</a>
+  @if (loading()) { <div class="flex justify-center py-10"><mat-spinner diameter="36"></mat-spinner></div> }
+  @else if (error() && !item()) { <p class="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{{ error() }}</p> }
+  @else {
+    @if (item(); as sfm) {
+      <header class="flex flex-wrap items-start justify-between gap-3">
+        <div><h1 class="page-title">{{ sfm.nom }}</h1><p class="page-subtitle">Fiche SFM · {{ sfm.contacts?.length || 0 }} contact(s)</p></div>
+        <div class="flex gap-2">
+          <a mat-stroked-button [routerLink]="['/sfm', sfm.id, 'edit']">Modifier</a>
+          <button mat-flat-button color="warn" type="button" (click)="askDelete()">Supprimer</button>
+        </div>
+      </header>
+      @if (error()) { <p class="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{{ error() }}</p> }
+
+      <mat-card class="!rounded-xl !border !border-line !shadow-soft">
+        <mat-card-content class="!pt-5">
+          <dl class="mb-4 grid gap-3 sm:grid-cols-2">
+            <div><dt class="text-xs uppercase tracking-wide text-ink-faint">Nom</dt><dd class="mt-1 m-0 text-base">{{ sfm.nom }}</dd></div>
+            <div>
+              <dt class="text-xs uppercase tracking-wide text-ink-faint">Marques</dt>
+              <dd class="mt-1 m-0 text-base">
+                @if (sfm.marques?.length) {
+                  {{ sfm.marques!.map(m => m.label).join(', ') }}
+                } @else {
+                  —
+                }
+              </dd>
+            </div>
+          </dl>
+
+          <h2 class="m-0 mb-3 text-base font-semibold">Contacts</h2>
+          <div class="grid gap-3">
+            @for (c of sfm.contacts; track c.id || c.email) {
+              <div class="rounded-xl border border-line px-3 py-3">
+                <div class="font-medium text-ink">{{ c.nom }}</div>
+                <div class="mt-1 text-sm"><a class="text-brand no-underline" [href]="'tel:' + c.telephone">{{ c.telephone }}</a></div>
+                <div class="mt-1 text-sm"><a class="text-brand no-underline" [href]="'mailto:' + c.email">{{ c.email }}</a></div>
+              </div>
+            } @empty {
+              <p class="m-0 text-sm text-ink-soft">{{ sfm.responsable }} · {{ sfm.telephone }} · {{ sfm.email }}</p>
+            }
+          </div>
+        </mat-card-content>
+      </mat-card>
+    }
+  }
+  <app-confirm-dialog [open]="confirmOpen()" title="Supprimer le SFM"
+    [message]="item() ? 'Confirmer la suppression de « ' + item()!.nom + ' » ?' : ''"
+    (confirm)="confirmDelete()" (cancel)="confirmOpen.set(false)" />
+</section>

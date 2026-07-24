@@ -1,0 +1,83 @@
+import { Component, OnInit, inject, signal } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { RouterLink } from '@angular/router';
+import { MatButtonModule } from '@angular/material/button';
+import { MatIconModule } from '@angular/material/icon';
+import { MatCardModule } from '@angular/material/card';
+import { MatTableModule } from '@angular/material/table';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { AppUser } from '../../models/models';
+import { UserService } from '../../services/user.service';
+import { AuthService } from '../../services/auth.service';
+import { ConfirmDialogComponent } from '../../shared/confirm-dialog.component';
+
+@Component({
+  selector: 'app-user-list',
+  standalone: true,
+  imports: [
+    CommonModule,
+    RouterLink,
+    MatButtonModule,
+    MatIconModule,
+    MatCardModule,
+    MatTableModule,
+    MatProgressSpinnerModule,
+    ConfirmDialogComponent
+  ],
+  templateUrl: './user-list.component.html',
+  styleUrl: './user-list.component.scss'
+})
+export class UserListComponent implements OnInit {
+  private readonly userService = inject(UserService);
+  readonly auth = inject(AuthService);
+  readonly items = signal<AppUser[]>([]);
+  readonly loading = signal(false);
+  readonly error = signal<string | null>(null);
+  readonly confirmOpen = signal(false);
+  pendingDelete: AppUser | null = null;
+  readonly displayedColumns = ['username', 'role', 'createdAt', 'actions'];
+
+  ngOnInit(): void {
+    this.load();
+  }
+
+  load(): void {
+    this.loading.set(true);
+    this.error.set(null);
+    this.userService.list().subscribe({
+      next: (data) => {
+        this.items.set(data);
+        this.loading.set(false);
+      },
+      error: (err) => {
+        this.loading.set(false);
+        this.error.set(err?.error?.message || 'Chargement impossible.');
+      }
+    });
+  }
+
+  roleLabel(role: string): string {
+    if (role === 'ADMIN') return 'Administrateur';
+    if (role === 'TECHNICIEN' || role === 'TECH') return 'Technicien';
+    return role;
+  }
+
+  askDelete(user: AppUser): void {
+    this.pendingDelete = user;
+    this.confirmOpen.set(true);
+  }
+
+  confirmDelete(ok: boolean): void {
+    this.confirmOpen.set(false);
+    if (!ok || !this.pendingDelete) {
+      this.pendingDelete = null;
+      return;
+    }
+    const id = this.pendingDelete.id;
+    this.pendingDelete = null;
+    this.userService.delete(id).subscribe({
+      next: () => this.load(),
+      error: (err) => this.error.set(err?.error?.message || 'Suppression impossible.')
+    });
+  }
+}

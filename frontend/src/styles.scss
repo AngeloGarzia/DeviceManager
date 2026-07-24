@@ -1,0 +1,65 @@
+@use '@angular/material' as mat;
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: 'IBM Plex Sans', 'Segoe UI', sans-serif;
+  color: #1f2933;
+  background: #f4f6f8;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+button,
+input,
+textarea,
+select,
+a {
+  font: inherit;
+}
+
+html {
+  @include mat.theme(
+    (
+      color: (
+        theme-type: light,
+        primary: mat.$azure-palette,
+        tertiary: mat.$cyan-palette
+      ),
+      typography: IBM Plex Sans,
+      density: 0
+    )
+  );
+}
+
+.mat-mdc-form-field {
+  width: 100%;
+}
+
+.page-shell {
+  @apply mx-auto w-full max-w-6xl px-4 pb-24 pt-4 sm:px-6 sm:pb-8;
+}
+
+.page-title {
+  @apply text-2xl font-semibold tracking-tight text-ink;
+}
+
+.page-subtitle {
+  @apply mt-1 text-sm text-ink-soft;
+}
+
+.panel {
+  @apply rounded-xl border border-line bg-surface-card p-4 shadow-soft sm:p-5;
+}

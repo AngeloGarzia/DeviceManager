@@ -1,0 +1,85 @@
+<section class="grid gap-4">
+  <button mat-button type="button" class="!justify-self-start !pl-0" (click)="cancel()">
+    <mat-icon>arrow_back</mat-icon> Annuler
+  </button>
+  <header>
+    <h1 class="page-title">{{ isEdit ? 'Modifier le SFM' : 'Nouveau SFM' }}</h1>
+    <p class="page-subtitle">Nom, marques couvertes et contacts</p>
+  </header>
+
+  @if (loading()) {
+    <div class="flex justify-center py-10"><mat-spinner diameter="36"></mat-spinner></div>
+  } @else {
+    <mat-card class="!rounded-xl !border !border-line !shadow-soft">
+      <mat-card-content class="!pt-5">
+        <form class="grid gap-4" [formGroup]="form" (ngSubmit)="submit()">
+          <mat-form-field appearance="outline">
+            <mat-label>Nom du SFM</mat-label>
+            <input matInput formControlName="nom" />
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>Marques couvertes</mat-label>
+            <mat-select formControlName="marqueIds" multiple>
+              @for (m of marques(); track m.id) {
+                <mat-option [value]="m.id">{{ m.label }}</mat-option>
+              }
+            </mat-select>
+            <mat-hint>Les MAS de ces marques seront rattachables à ce SFM</mat-hint>
+            @if (form.controls.marqueIds.invalid && form.controls.marqueIds.touched) {
+              <mat-error>Sélectionnez au moins une marque</mat-error>
+            }
+          </mat-form-field>
+
+          <div>
+            <div class="mb-3 flex items-center justify-between gap-2">
+              <h2 class="m-0 text-base font-semibold text-ink">Contacts ({{ contacts.length }})</h2>
+              <button mat-stroked-button type="button" (click)="addContact()">
+                <mat-icon>person_add</mat-icon>
+                Ajouter un contact
+              </button>
+            </div>
+
+            <div class="grid gap-3" formArrayName="contacts">
+              @for (ctrl of contacts.controls; track $index; let i = $index) {
+                <div class="rounded-xl border border-line p-3" [formGroupName]="i">
+                  <div class="mb-2 flex items-center justify-between">
+                    <span class="text-sm font-medium text-ink-soft">Contact {{ i + 1 }}</span>
+                    <button mat-icon-button type="button" color="warn" (click)="removeContact(i)" [disabled]="contacts.length <= 1">
+                      <mat-icon>delete</mat-icon>
+                    </button>
+                  </div>
+                  <div class="grid gap-1 sm:grid-cols-2 sm:gap-x-4">
+                    <mat-form-field appearance="outline" class="sm:col-span-2">
+                      <mat-label>Nom</mat-label>
+                      <input matInput formControlName="nom" />
+                    </mat-form-field>
+                    <mat-form-field appearance="outline">
+                      <mat-label>Téléphone</mat-label>
+                      <input matInput type="tel" formControlName="telephone" />
+                    </mat-form-field>
+                    <mat-form-field appearance="outline">
+                      <mat-label>Email</mat-label>
+                      <input matInput type="email" formControlName="email" />
+                    </mat-form-field>
+                  </div>
+                </div>
+              }
+            </div>
+          </div>
+
+          @if (error()) {
+            <p class="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{{ error() }}</p>
+          }
+
+          <div class="grid grid-cols-2 gap-3">
+            <button mat-stroked-button type="button" (click)="cancel()">Annuler</button>
+            <button mat-flat-button color="primary" type="submit" [disabled]="saving()">
+              {{ saving() ? 'Enregistrement…' : 'Enregistrer' }}
+            </button>
+          </div>
+        </form>
+      </mat-card-content>
+    </mat-card>
+  }
+</section>

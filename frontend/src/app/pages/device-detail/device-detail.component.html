@@ -1,0 +1,93 @@
+<section class="grid gap-4">
+  <a mat-button routerLink="/devices" class="!justify-self-start !pl-0">
+    <mat-icon>arrow_back</mat-icon>
+    Retour à la liste
+  </a>
+
+  @if (loading()) {
+    <div class="flex justify-center py-10"><mat-spinner diameter="36"></mat-spinner></div>
+  } @else if (error() && !item()) {
+    <p class="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{{ error() }}</p>
+  } @else {
+    @if (item(); as device) {
+      <header class="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 class="page-title">{{ device.nom }}</h1>
+          <p class="page-subtitle">Fiche pièce détachée</p>
+        </div>
+        <div class="flex flex-wrap gap-2">
+          <a mat-stroked-button [routerLink]="['/devices', device.id, 'edit']">Modifier</a>
+          <button mat-flat-button color="warn" type="button" (click)="askDelete()">Supprimer</button>
+          <a mat-flat-button color="primary" routerLink="/order-request" [queryParams]="{ deviceId: device.id }">
+            Demander une commande
+          </a>
+        </div>
+      </header>
+
+      @if (error()) {
+        <p class="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{{ error() }}</p>
+      }
+
+      <mat-card class="!rounded-xl !border !border-line !shadow-soft">
+        <mat-card-content class="!pt-5">
+          @if (device.photoUrl) {
+            <img
+              [src]="photoUrl(device)"
+              [alt]="device.nom"
+              class="mb-4 max-h-72 w-full rounded-xl object-cover"
+            />
+          }
+          <div class="mb-4">
+            @if (device.obsolete) {
+              <span class="rounded-full bg-rose-50 px-2.5 py-1 text-xs font-medium text-rose-700">Obsolète</span>
+            } @else {
+              <span class="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">Active</span>
+            }
+          </div>
+          <dl class="grid gap-4 sm:grid-cols-2">
+            <div>
+              <dt class="text-xs uppercase tracking-wide text-ink-faint">Référence</dt>
+              <dd class="mt-1 m-0 text-base text-ink">{{ device.reference }}</dd>
+            </div>
+            <div class="sm:col-span-2">
+              <dt class="text-xs uppercase tracking-wide text-ink-faint">Usage</dt>
+              <dd class="mt-1 m-0 whitespace-pre-wrap text-base text-ink">{{ device.usage }}</dd>
+            </div>
+            <div>
+              <dt class="text-xs uppercase tracking-wide text-ink-faint">Date d'acquisition</dt>
+              <dd class="mt-1 m-0 text-base text-ink">{{ device.dateAcquisition | date: 'dd/MM/yyyy' }}</dd>
+            </div>
+            <div>
+              <dt class="text-xs uppercase tracking-wide text-ink-faint">SFM</dt>
+              <dd class="mt-1 m-0">
+                <a class="text-brand no-underline hover:underline" [routerLink]="['/sfm', device.sfmId]">
+                  {{ device.sfmNom }}
+                </a>
+              </dd>
+            </div>
+            <div>
+              <dt class="text-xs uppercase tracking-wide text-ink-faint">MAS</dt>
+              <dd class="mt-1 m-0">
+                <a class="text-brand no-underline hover:underline" [routerLink]="['/mas', device.masId]">
+                  {{ device.masNumero }}
+                </a>
+              </dd>
+            </div>
+            <div>
+              <dt class="text-xs uppercase tracking-wide text-ink-faint">Marque</dt>
+              <dd class="mt-1 m-0 text-base text-ink">{{ device.marqueLabel || device.masMarque || '—' }}</dd>
+            </div>
+          </dl>
+        </mat-card-content>
+      </mat-card>
+    }
+  }
+
+  <app-confirm-dialog
+    [open]="confirmOpen()"
+    title="Supprimer la pièce"
+    [message]="item() ? 'Confirmer la suppression de « ' + item()!.nom + ' » ?' : ''"
+    (confirm)="confirmDelete()"
+    (cancel)="confirmOpen.set(false)"
+  />
+</section>

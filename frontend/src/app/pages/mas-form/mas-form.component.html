@@ -1,0 +1,82 @@
+<section class="grid gap-4">
+  <button mat-button type="button" class="!justify-self-start !pl-0" (click)="cancel()">
+    <mat-icon>arrow_back</mat-icon> Annuler
+  </button>
+  <header>
+    <h1 class="page-title">{{ isEdit ? 'Modifier la MAS' : 'Nouvelle MAS' }}</h1>
+    <p class="page-subtitle">Numéro, marque et statut d'utilisation</p>
+  </header>
+  @if (loading()) {
+    <div class="flex justify-center py-10"><mat-spinner diameter="36"></mat-spinner></div>
+  } @else {
+    <mat-card class="!rounded-xl !border !border-line !shadow-soft">
+      <mat-card-content class="!pt-5">
+        <form class="grid gap-1" [formGroup]="form" (ngSubmit)="submit()">
+          <mat-form-field appearance="outline">
+            <mat-label>Numéro</mat-label>
+            <input matInput formControlName="numero" />
+          </mat-form-field>
+
+          <div class="flex flex-col gap-2 sm:flex-row sm:items-start">
+            <mat-form-field appearance="outline" class="w-full flex-1">
+              <mat-label>Marque</mat-label>
+              <mat-select formControlName="marqueId">
+                @for (m of marques(); track m.id) {
+                  <mat-option [value]="m.id">{{ m.label }}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+            <button
+              mat-stroked-button
+              color="primary"
+              type="button"
+              class="shrink-0 sm:!mt-1"
+              (click)="openNewMarque()"
+            >
+              <mat-icon>add</mat-icon>
+              Nouvelle marque
+            </button>
+          </div>
+
+          @if (showNewMarque()) {
+            <div class="mb-3 rounded-xl border border-line bg-slate-50 p-3" [formGroup]="newMarqueForm">
+              <p class="m-0 mb-2 text-sm font-medium text-ink">Créer une marque</p>
+              <mat-form-field appearance="outline" class="w-full">
+                <mat-label>Nom de la marque</mat-label>
+                <input matInput formControlName="label" placeholder="Ex. Playtech" />
+              </mat-form-field>
+              @if (marqueError()) {
+                <p class="mb-2 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{{ marqueError() }}</p>
+              }
+              <div class="flex flex-wrap gap-2">
+                <button mat-button type="button" (click)="cancelNewMarque()">Annuler</button>
+                <button
+                  mat-flat-button
+                  color="primary"
+                  type="button"
+                  [disabled]="savingMarque()"
+                  (click)="createMarque()"
+                >
+                  {{ savingMarque() ? 'Création…' : 'Créer la marque' }}
+                </button>
+              </div>
+            </div>
+          }
+
+          <mat-checkbox formControlName="utilise" class="mb-3">Machine utilisée</mat-checkbox>
+
+          @if (error()) {
+            <p class="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{{ error() }}</p>
+          }
+
+          <div class="mt-2 grid grid-cols-2 gap-3">
+            <button mat-stroked-button type="button" (click)="cancel()">Annuler</button>
+            <button mat-flat-button color="primary" type="submit" [disabled]="saving()">
+              {{ saving() ? 'Enregistrement…' : 'Enregistrer' }}
+            </button>
+          </div>
+        </form>
+      </mat-card-content>
+    </mat-card>
+  }
+</section>

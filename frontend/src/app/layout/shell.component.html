@@ -1,0 +1,85 @@
+<div class="min-h-dvh bg-surface text-ink">
+  <mat-toolbar class="!sticky top-0 z-20 !h-auto !min-h-14 !bg-white !px-3 !py-2 border-b border-line sm:!px-6">
+    <div class="flex w-full flex-wrap items-center justify-between gap-3">
+      <div class="min-w-0">
+        <div class="text-base font-semibold tracking-tight text-brand">DeviceManager</div>
+        <div class="truncate text-xs text-ink-soft">
+          {{ auth.username() }} · {{ auth.roleLabel() }}
+          @if (auth.groupeNom()) {
+            · {{ auth.groupeNom() }}
+          }
+        </div>
+      </div>
+
+      <div class="flex flex-wrap items-center gap-2">
+        @if (auth.ateliers().length > 0) {
+          <mat-form-field appearance="outline" class="atelier-select !mb-[-1.25em]">
+            <mat-label>Atelier</mat-label>
+            <mat-select
+              [value]="auth.atelierId()"
+              (selectionChange)="auth.switchAtelier($event.value)"
+            >
+              @for (a of auth.ateliers(); track a.id) {
+                <mat-option [value]="a.id">{{ a.label }}</mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+        }
+
+        @if (auth.isAdmin()) {
+          <a mat-icon-button routerLink="/users" routerLinkActive="admin-active" matTooltip="Comptes">
+            <mat-icon>manage_accounts</mat-icon>
+          </a>
+          <a mat-icon-button routerLink="/setup" routerLinkActive="admin-active" matTooltip="Setup">
+            <mat-icon>settings</mat-icon>
+          </a>
+        }
+        <button mat-stroked-button type="button" color="primary" (click)="auth.logout()">
+          <mat-icon>logout</mat-icon>
+          Déconnexion
+        </button>
+      </div>
+    </div>
+  </mat-toolbar>
+
+  <main class="page-shell">
+    <router-outlet />
+  </main>
+
+  <nav
+    class="fixed bottom-0 left-0 right-0 z-30 border-t border-line bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/90"
+    aria-label="Navigation principale"
+  >
+    <div class="mx-auto grid max-w-6xl grid-flow-col auto-cols-fr gap-1 px-1 pb-[max(0.35rem,env(safe-area-inset-bottom))] pt-1">
+      <a
+        routerLink="/devices"
+        routerLinkActive="active-nav"
+        [routerLinkActiveOptions]="{ exact: false }"
+        class="nav-link"
+      >
+        <mat-icon>build</mat-icon>
+        <span>Pièces</span>
+      </a>
+
+      <a routerLink="/order-request" routerLinkActive="active-nav" class="nav-link">
+        <mat-icon>mail</mat-icon>
+        <span>Commande</span>
+      </a>
+
+      <a routerLink="/order-requests" routerLinkActive="active-nav" class="nav-link">
+        <mat-icon>inbox</mat-icon>
+        <span>Demandes</span>
+      </a>
+
+      <a routerLink="/mas" routerLinkActive="active-nav" [routerLinkActiveOptions]="{ exact: false }" class="nav-link">
+        <mat-icon>casino</mat-icon>
+        <span>MAS</span>
+      </a>
+
+      <a routerLink="/sfm" routerLinkActive="active-nav" [routerLinkActiveOptions]="{ exact: false }" class="nav-link">
+        <mat-icon>apartment</mat-icon>
+        <span>SFM</span>
+      </a>
+    </div>
+  </nav>
+</div>

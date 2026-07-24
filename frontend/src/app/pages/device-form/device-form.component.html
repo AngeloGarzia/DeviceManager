@@ -1,0 +1,216 @@
+<section class="grid gap-4">
+  <button mat-button type="button" class="!justify-self-start !pl-0" (click)="cancel()">
+    <mat-icon>arrow_back</mat-icon>
+    Annuler
+  </button>
+
+  <header>
+    <h1 class="page-title">{{ isEdit ? 'Modifier la pièce' : 'Nouvelle pièce' }}</h1>
+    <p class="page-subtitle">
+      {{
+        forOrderRequest
+          ? 'Création pour une demande de commande — photo, infos et rattachement SFM / MAS'
+          : 'Photo caméra, informations et rattachement SFM / MAS'
+      }}
+    </p>
+  </header>
+
+  @if (loading()) {
+    <div class="flex justify-center py-10"><mat-spinner diameter="36"></mat-spinner></div>
+  } @else {
+    <mat-card class="!rounded-xl !border !border-line !shadow-soft">
+      <mat-card-content class="!pt-5">
+        <form class="grid gap-1 sm:grid-cols-2 sm:gap-x-4" [formGroup]="form" (ngSubmit)="submit()">
+          <div class="camera-block sm:col-span-2 mb-3">
+            <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
+              <h2 class="m-0 text-base font-semibold text-ink">Caméra</h2>
+              <button mat-stroked-button type="button" (click)="startCamera(selectedCameraId())">
+                <mat-icon>videocam</mat-icon>
+                Relancer
+              </button>
+            </div>
+
+            @if (cameras().length > 0) {
+              <mat-form-field appearance="outline" class="mb-3 w-full sm:max-w-md">
+                <mat-label>Source caméra</mat-label>
+                <mat-select
+                  [value]="selectedCameraId()"
+                  (selectionChange)="onCameraSourceChange($event.value)"
+                >
+                  @for (cam of cameras(); track cam.deviceId; let i = $index) {
+                    <mat-option [value]="cam.deviceId">{{ cameraLabel(cam, i) }}</mat-option>
+                  }
+                </mat-select>
+                <mat-hint>Par défaut : caméra arrière</mat-hint>
+              </mat-form-field>
+            }
+
+            <div class="relative overflow-hidden rounded-xl border border-line bg-slate-900">
+              <video
+                #videoEl
+                class="block max-h-[420px] w-full object-cover"
+                playsinline
+                muted
+                autoplay
+              ></video>
+              <canvas #canvasEl class="hidden"></canvas>
+
+              @if (!cameraReady()) {
+                <div class="absolute inset-0 flex items-center justify-center bg-slate-900/70 p-4 text-center text-sm text-white">
+                  {{ cameraError() || 'Initialisation de la caméra…' }}
+                </div>
+              }
+            </div>
+
+            <div class="mt-3 flex flex-wrap gap-2">
+              <button
+                mat-flat-button
+                color="primary"
+                type="button"
+                (click)="capturePhoto()"
+                [disabled]="!cameraReady()"
+              >
+                <mat-icon>photo_camera</mat-icon>
+                Acquisition image
+              </button>
+
+              <button mat-stroked-button type="button" (click)="openGallery()">
+                <mat-icon>image</mat-icon>
+                Galerie / appareil
+              </button>
+              <input
+                #fileInput
+                type="file"
+                accept="image/*"
+                capture="environment"
+                class="hidden"
+                (change)="onGallerySelected($event)"
+              />
+
+              @if (previewUrl()) {
+                <button mat-button type="button" color="warn" (click)="clearPhoto()">
+                  Effacer la prise
+                </button>
+              }
+            </div>
+
+            @if (previewUrl() || existingPhotoUrl()) {
+              <div class="mt-3">
+                <p class="mb-2 text-sm text-ink-soft">
+                  {{ previewUrl() ? 'Image acquise' : 'Photo actuelle' }}
+                </p>
+                <img
+                  [src]="previewUrl() || existingPhotoUrl()"
+                  alt="Aperçu pièce"
+                  class="max-h-56 w-full rounded-xl border border-line object-cover"
+                />
+              </div>
+            }
+          </div>
+
+          <mat-form-field appearance="outline">
+            <mat-label>Nom</mat-label>
+            <input matInput formControlName="nom" />
+            @if (form.controls.nom.invalid && form.controls.nom.touched) {
+              <mat-error>Obligatoire</mat-error>
+            }
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>Référence</mat-label>
+            <input matInput formControlName="reference" />
+            @if (form.controls.reference.invalid && form.controls.reference.touched) {
+              <mat-error>Obligatoire</mat-error>
+            }
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" class="sm:col-span-2">
+            <mat-label>Usage</mat-label>
+            <textarea
+              matInput
+              rows="5"
+              formControlName="usage"
+              maxlength="500"
+              placeholder="Décrivez l'usage de la pièce (max. 500 caractères)"
+            ></textarea>
+            <mat-hint align="end">{{ usageLength }} / 500</mat-hint>
+            @if (form.controls.usage.invalid && form.controls.usage.touched) {
+              <mat-error>Obligatoire (500 caractères max)</mat-error>
+            }
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>Date d'acquisition</mat-label>
+            <input matInput type="date" formControlName="dateAcquisition" />
+            @if (form.controls.dateAcquisition.invalid && form.controls.dateAcquisition.touched) {
+              <mat-error>Obligatoire</mat-error>
+            }
+          </mat-form-field>
+
+          <div class="flex items-center pb-4">
+            <mat-checkbox formControlName="obsolete">Pièce obsolète</mat-checkbox>
+          </div>
+
+          <mat-form-field appearance="outline">
+            <mat-label>SFM</mat-label>
+            <mat-select formControlName="sfmId">
+              @for (sfm of sfms(); track sfm.id) {
+                <mat-option [value]="sfm.id">{{ sfm.nom }}</mat-option>
+              }
+            </mat-select>
+            @if (form.controls.sfmId.invalid && form.controls.sfmId.touched) {
+              <mat-error>Obligatoire</mat-error>
+            }
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>MAS</mat-label>
+            <mat-select formControlName="masId" [disabled]="!selectedSfmId()">
+              @for (mas of filteredMasses(); track mas.id) {
+                <mat-option [value]="mas.id">{{ mas.numero }} — {{ mas.marqueLabel || mas.marque }}</mat-option>
+              }
+            </mat-select>
+            @if (!selectedSfmId()) {
+              <mat-hint>Choisissez d'abord un SFM</mat-hint>
+            } @else if (filteredMasses().length === 0) {
+              <mat-hint>Aucune MAS pour les marques de ce SFM</mat-hint>
+            }
+            @if (form.controls.masId.invalid && form.controls.masId.touched) {
+              <mat-error>Obligatoire</mat-error>
+            }
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>Marque (héritée de la MAS)</mat-label>
+            <input matInput [value]="selectedMasMarque()" readonly />
+            <mat-hint>Même catalogue que les MAS</mat-hint>
+          </mat-form-field>
+
+          @if (sfms().length === 0) {
+            <p class="sm:col-span-2 text-sm text-ink-soft">
+              Aucun SFM —
+              <a routerLink="/sfm/new" class="text-brand">en créer un</a>
+            </p>
+          }
+          @if (masses().length === 0) {
+            <p class="sm:col-span-2 text-sm text-ink-soft">
+              Aucune MAS —
+              <a routerLink="/mas/new" class="text-brand">en créer une</a>
+            </p>
+          }
+
+          @if (error()) {
+            <p class="sm:col-span-2 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{{ error() }}</p>
+          }
+
+          <div class="sm:col-span-2 mt-2 grid grid-cols-2 gap-3">
+            <button mat-stroked-button type="button" (click)="cancel()">Annuler</button>
+            <button mat-flat-button color="primary" type="submit" [disabled]="saving()">
+              {{ saving() ? 'Enregistrement…' : 'Enregistrer' }}
+            </button>
+          </div>
+        </form>
+      </mat-card-content>
+    </mat-card>
+  }
+</section>

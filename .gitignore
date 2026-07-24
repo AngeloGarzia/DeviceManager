@@ -1,0 +1,33 @@
+# Maven backend
+backend/target/
+backend/uploads/
+backend/.mvn/wrapper/maven-wrapper.jar
+
+# Env secrets backend (les .example restent versionnés)
+backend/.env
+backend/.env.development
+backend/.env.production
+backend/.env.local
+
+# Frontend — pas de fichiers .env secrets
+frontend/node_modules/
+frontend/dist/
+frontend/.angular/
+frontend/.env
+frontend/.env.local
+frontend/.env.development
+frontend/.env.production
+
+# IDE / OS
+.idea/
+.vscode/
+*.iml
+.classpath
+.project
+.settings/
+.DS_Store
+Thumbs.db
+
+# Secrets divers
+*.pem
+.env

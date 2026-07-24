@@ -1,0 +1,31 @@
+.nav-link {
+  @apply flex min-h-14 flex-col items-center justify-center gap-0.5 rounded-lg px-1 text-[0.7rem] font-medium text-ink-soft no-underline transition-colors;
+}
+
+.nav-link mat-icon {
+  font-size: 1.25rem;
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.nav-link.active-nav {
+  @apply bg-brand-faint text-brand;
+}
+
+a.admin-active mat-icon {
+  color: #0b6bcb;
+}
+
+.atelier-select {
+  width: min(100%, 18rem);
+}
+
+.atelier-select .mat-mdc-form-field-subscript-wrapper {
+  display: none;
+}
+
+@media (min-width: 768px) {
+  nav[aria-label='Navigation principale'] {
+    position: sticky;
+  }
+}

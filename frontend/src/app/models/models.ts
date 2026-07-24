@@ -1,0 +1,161 @@
+export interface LoginRequest {
+  username: string;
+  password: string;
+}
+
+export interface AuthResponse {
+  token: string;
+  tokenType: string;
+  expiresInMs: number;
+  username: string;
+  role: string;
+  groupeId?: number;
+  groupeNom?: string;
+  atelierId?: number;
+  ateliers?: AtelierSummary[];
+}
+
+export interface AtelierSummary {
+  id: number;
+  nom: string;
+  casinoId: number;
+  casinoNom: string;
+  groupeId: number;
+  groupeNom: string;
+  label: string;
+}
+
+export interface SfmContact {
+  id?: number;
+  nom: string;
+  telephone: string;
+  email: string;
+}
+
+export interface MarqueMasOption {
+  id: number;
+  code?: string;
+  label: string;
+  value?: number;
+}
+
+export interface Sfm {
+  id: number;
+  nom: string;
+  responsable: string;
+  telephone: string;
+  email: string;
+  contacts: SfmContact[];
+  marqueIds?: number[];
+  marques?: MarqueMasOption[];
+}
+
+export interface SfmForm {
+  nom: string;
+  contacts: SfmContact[];
+  marqueIds: number[];
+}
+
+export interface Mas {
+  id: number;
+  numero: string;
+  marqueId: number;
+  marque?: string;
+  marqueLabel?: string;
+  utilise: boolean;
+}
+
+export interface MasForm {
+  numero: string;
+  marqueId: number | null;
+  utilise: boolean;
+}
+
+export interface Device {
+  id: number;
+  nom: string;
+  reference: string;
+  usage: string;
+  dateAcquisition: string;
+  obsolete: boolean;
+  photoUrl?: string;
+  contentType?: string;
+  fileSize?: number;
+  sfmId: number;
+  sfmNom: string;
+  masId: number;
+  masNumero: string;
+  masMarque: string;
+  marqueId?: number;
+  marque?: string;
+  marqueLabel?: string;
+}
+
+export interface DeviceForm {
+  nom: string;
+  reference: string;
+  usage: string;
+  dateAcquisition: string;
+  obsolete: boolean;
+  sfmId: number | null;
+  masId: number | null;
+}
+
+export interface OrderRequestLineForm {
+  deviceId: number;
+  quantite: number;
+}
+
+export interface OrderRequestForm {
+  message: string;
+  lignes: OrderRequestLineForm[];
+}
+
+export interface OrderRequestLine {
+  id?: number;
+  deviceId: number;
+  pieceNom?: string;
+  reference?: string;
+  quantite: number;
+  photoUrl?: string;
+}
+
+export interface OrderRequest {
+  id: number;
+  requestedBy: string;
+  technicienNom?: string;
+  pieceNom?: string;
+  reference?: string;
+  quantite: number;
+  totalPieces?: number;
+  totalQuantite?: number;
+  message: string;
+  deviceId?: number;
+  photoUrl?: string;
+  status: string;
+  dateDemande?: string;
+  createdAt: string;
+  lignes?: OrderRequestLine[];
+}
+
+export interface AppUser {
+  id: number;
+  username: string;
+  role: string;
+  createdAt: string;
+}
+
+export interface AppUserForm {
+  username: string;
+  password?: string;
+  role: string;
+}
+
+export interface AppSetting {
+  key: string;
+  value: string;
+  label: string;
+  category: string;
+  secret: boolean;
+}
+

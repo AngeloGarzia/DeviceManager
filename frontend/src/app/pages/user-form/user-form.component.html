@@ -1,0 +1,50 @@
+<section class="grid gap-4">
+  <a mat-button routerLink="/users" class="!justify-self-start !pl-0">
+    <mat-icon>arrow_back</mat-icon>
+    Retour
+  </a>
+
+  <header>
+    <h1 class="page-title">{{ isEdit ? 'Modifier le compte' : 'Nouveau compte' }}</h1>
+    <p class="page-subtitle">Identifiant, mot de passe et rôle applicatif</p>
+  </header>
+
+  @if (loading()) {
+    <div class="flex justify-center py-10"><mat-spinner diameter="36"></mat-spinner></div>
+  } @else {
+    <mat-card class="!rounded-xl !border !border-line !shadow-soft">
+      <mat-card-content class="!pt-5">
+        <form class="grid gap-1 sm:grid-cols-2 sm:gap-x-4" [formGroup]="form" (ngSubmit)="submit()">
+          <mat-form-field appearance="outline" class="sm:col-span-2">
+            <mat-label>Identifiant</mat-label>
+            <input matInput formControlName="username" autocomplete="username" />
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" class="sm:col-span-2">
+            <mat-label>{{ isEdit ? 'Nouveau mot de passe (optionnel)' : 'Mot de passe' }}</mat-label>
+            <input matInput type="password" formControlName="password" autocomplete="new-password" />
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" class="sm:col-span-2">
+            <mat-label>Rôle</mat-label>
+            <mat-select formControlName="role">
+              <mat-option value="ADMIN">Administrateur</mat-option>
+              <mat-option value="TECHNICIEN">Technicien</mat-option>
+            </mat-select>
+          </mat-form-field>
+
+          @if (error()) {
+            <p class="sm:col-span-2 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{{ error() }}</p>
+          }
+
+          <div class="sm:col-span-2 mt-2 grid grid-cols-2 gap-3">
+            <a mat-stroked-button routerLink="/users">Annuler</a>
+            <button mat-flat-button color="primary" type="submit" [disabled]="saving()">
+              {{ saving() ? 'Enregistrement…' : 'Enregistrer' }}
+            </button>
+          </div>
+        </form>
+      </mat-card-content>
+    </mat-card>
+  }
+</section>

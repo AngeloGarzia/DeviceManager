@@ -1,0 +1,41 @@
+<section class="flex min-h-dvh items-center justify-center bg-surface px-4 py-8">
+  <mat-card class="w-full max-w-md !rounded-2xl !border !border-line !shadow-soft">
+    <mat-card-header class="!mb-2 !block">
+      <div class="text-sm font-semibold uppercase tracking-[0.08em] text-brand">DeviceManager</div>
+      <mat-card-title class="!mt-2 !text-2xl !font-semibold !text-ink">Connexion</mat-card-title>
+      <mat-card-subtitle class="!mt-1 !text-ink-soft">
+        Espace de travail pièces détachées casino
+      </mat-card-subtitle>
+    </mat-card-header>
+
+    <mat-card-content>
+      <form class="mt-4 grid gap-1" [formGroup]="form" (ngSubmit)="submit()">
+        <mat-form-field appearance="outline">
+          <mat-label>Identifiant</mat-label>
+          <input matInput formControlName="username" autocomplete="username" />
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Mot de passe</mat-label>
+          <input matInput type="password" formControlName="password" autocomplete="current-password" />
+        </mat-form-field>
+
+        @if (error()) {
+          <p class="mb-3 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{{ error() }}</p>
+        }
+
+        <button mat-flat-button color="primary" class="!h-12 !text-base" type="submit" [disabled]="loading()">
+          @if (loading()) {
+            <mat-spinner diameter="22" class="!inline-block"></mat-spinner>
+          } @else {
+            Se connecter
+          }
+        </button>
+      </form>
+
+      <p class="mt-4 text-xs leading-relaxed text-ink-faint">
+        admin / admin123 (Administrateur) · tech / tech123 (Technicien)
+      </p>
+    </mat-card-content>
+  </mat-card>
+</section>
