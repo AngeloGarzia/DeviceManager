@@ -1,0 +1,120 @@
+# Blueprint Render — DeviceManager (API + Front + MySQL)
+# Docs: https://render.com/docs/blueprint-spec
+# Déploiement: Dashboard Render → New → Blueprint → ce dépôt
+
+services:
+  # ---------- MySQL (privé, interne) ----------
+  - type: pserv
+    name: device-manager-mysql
+    runtime: docker
+    plan: starter
+    dockerfilePath: ./docker/mysql/Dockerfile
+    dockerContext: .
+    autoDeployTrigger: commit
+    disk:
+      name: device-manager-mysql-data
+      mountPath: /var/lib/mysql
+      sizeGB: 10
+    envVars:
+      - key: MYSQL_DATABASE
+        value: device_manager
+      - key: MYSQL_USER
+        value: device_manager
+      - key: MYSQL_PASSWORD
+        generateValue: true
+      - key: MYSQL_ROOT_PASSWORD
+        generateValue: true
+
+  # ---------- API Spring Boot ----------
+  - type: web
+    name: device-manager-api
+    runtime: docker
+    plan: starter
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    autoDeployTrigger: commit
+    healthCheckPath: /actuator/health
+    disk:
+      name: device-manager-uploads
+      mountPath: /var/data/uploads
+      sizeGB: 5
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: SERVER_PORT
+        value: "8080"
+      - key: SPRING_DATASOURCE_URL
+        value: jdbc:mysql://device-manager-mysql:3306/device_manager?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+      - key: SPRING_DATASOURCE_USERNAME
+        value: device_manager
+      - key: SPRING_DATASOURCE_PASSWORD
+        fromService:
+          name: device-manager-mysql
+          type: pserv
+          envVarKey: MYSQL_PASSWORD
+      - key: SPRING_JPA_HIBERNATE_DDL_AUTO
+        value: update
+      - key: SPRING_JPA_SHOW_SQL
+        value: "false"
+      - key: APP_JWT_SECRET
+        generateValue: true
+      - key: APP_JWT_EXPIRATION_MS
+        value: "43200000"
+      - key: APP_CORS_ALLOWED_ORIGINS
+        sync: false
+      - key: APP_MAIL_ENABLED
+        value: "false"
+      - key: APP_MAIL_FROM
+        value: noreply@devicemanager.local
+      - key: APP_MAIL_ADMIN_EMAIL
+        value: admin@devicemanager.local
+      - key: MAIL_HOST
+        value: ""
+      - key: MAIL_PORT
+        value: "587"
+      - key: MAIL_USERNAME
+        value: ""
+      - key: MAIL_PASSWORD
+        value: ""
+      - key: APP_S3_ENABLED
+        value: "false"
+      - key: APP_S3_BUCKET
+        value: ""
+      - key: APP_S3_REGION
+        value: eu-west-3
+      - key: AWS_ACCESS_KEY_ID
+        value: ""
+      - key: AWS_SECRET_ACCESS_KEY
+        value: ""
+      - key: AWS_S3_ENDPOINT
+        value: ""
+      - key: APP_S3_LOCAL_FALLBACK_DIR
+        value: /var/data/uploads
+      - key: LOGGING_LEVEL_COM_DEVICEMANAGER
+        value: INFO
+
+  # ---------- Frontend Angular (CDN static) ----------
+  - type: web
+    name: device-manager-web
+    runtime: static
+    rootDir: frontend
+    buildCommand: npm ci && node scripts/inject-api-url.mjs && npm run build -- --configuration=production
+    staticPublishPath: dist/frontend/browser
+    autoDeployTrigger: commit
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    headers:
+      - path: /*
+        name: X-Frame-Options
+        value: DENY
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+    envVars:
+      - key: API_URL
+        fromService:
+          name: device-manager-api
+          type: web
+          property: host

@@ -22,7 +22,9 @@ public final class DotEnvLoader {
         String filename = "production".equals(profile) ? ".env.production" : ".env.development";
         Path envFile = resolveEnvFile(filename);
         if (envFile == null) {
-            System.err.println("[dotenv] Fichier introuvable: " + filename);
+            // Sur Render / Docker les variables viennent de l'environnement plateforme
+            System.out.println("[dotenv] Pas de fichier " + filename
+                    + " — utilisation des variables d'environnement système");
             return Map.of();
         }
 
@@ -64,8 +66,7 @@ public final class DotEnvLoader {
         Path cwd = Path.of("").toAbsolutePath().normalize();
         Path[] candidates = new Path[] {
                 cwd.resolve(filename),
-                cwd.resolve("backend").resolve(filename),
-                Path.of("c:/Users/dell/device-manager/DeviceManager/backend").resolve(filename)
+                cwd.resolve("backend").resolve(filename)
         };
         for (Path candidate : candidates) {
             if (candidate != null && Files.isRegularFile(candidate)) {

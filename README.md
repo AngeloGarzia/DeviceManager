@@ -6,14 +6,12 @@ Application **mobile-first** pour inventorier les pièces détachées des machin
 
 ```
 DeviceManager/
-├── backend/
-│   ├── .env.development      ← secrets DEV (gitignored)
-│   ├── .env.production       ← secrets PROD (gitignored)
-│   ├── .env.*.example        ← modèles versionnés
-│   ├── pom.xml
-│   └── src/
-├── frontend/                 ← aucune variable secrète
+├── backend/          ← API Spring Boot (+ Dockerfile)
+├── frontend/         ← Angular (+ inject-api-url pour Render)
+├── docker/mysql/     ← image MySQL pour Render
 ├── sql/init.sql
+├── render.yaml       ← Blueprint Render
+├── RENDER.md         ← guide déploiement production
 └── docker-compose.yml
 ```
 
@@ -82,12 +80,14 @@ cd frontend
 npm start
 ```
 
-Production :
+Production locale :
 ```powershell
 cd backend
 $env:APP_ENV="production"
 mvn spring-boot:run
 ```
+
+**Production Render** : voir [`RENDER.md`](./RENDER.md) (Blueprint `render.yaml`).
 
 - App : http://localhost:4200  
 - API : http://localhost:8080  
