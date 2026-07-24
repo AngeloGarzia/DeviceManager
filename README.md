@@ -87,7 +87,7 @@ $env:APP_ENV="production"
 mvn spring-boot:run
 ```
 
-**Production Render** : voir [`RENDER.md`](./RENDER.md) (Blueprint `render.yaml`).
+**Production Render (gratuit, sans CB)** : voir [`RENDER.md`](./RENDER.md) — Blueprint `render.yaml` + MySQL Aiven Free.
 
 - App : http://localhost:4200  
 - API : http://localhost:8080  

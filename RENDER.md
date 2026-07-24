@@ -1,83 +1,98 @@
-# Déploiement production sur Render
+# Déploiement Render — 100 % gratuit (sans carte bancaire)
 
 ## Architecture
 
-| Service Render | Rôle |
-|----------------|------|
-| `device-manager-mysql` | MySQL 8.4 (private service + disque) |
-| `device-manager-api` | API Spring Boot (Docker) |
-| `device-manager-web` | Front Angular (static CDN) |
+| Service | Plan | Rôle |
+|---------|------|------|
+| `device-manager-api` | **Free** | API Spring Boot (Docker) |
+| `device-manager-web` | **Free** | Front Angular (static) |
+| MySQL | **Aiven Free** (externe) | Base de données — sans CB |
 
-Fichier Blueprint : [`render.yaml`](./render.yaml)
+Blueprint : [`render.yaml`](./render.yaml)
 
-## Prérequis
+> L’API free **s’endort** après ~15 min d’inactivité (1er appel un peu lent).  
+> Les photos sont stockées sur disque éphémère (peuvent disparaître au redéploiement).
 
-1. Compte [Render](https://dashboard.render.com)
-2. Dépôt GitHub connecté (`AngeloGarzia/DeviceManager`)
-3. Plan **Starter** (ou supérieur) — MySQL privé + disque ne sont pas sur le free tier
+---
 
-## Déploiement Blueprint (recommandé)
+## 1) Créer MySQL gratuit (Aiven — sans CB)
 
-1. Dashboard Render → **New** → **Blueprint**
-2. Sélectionner le dépôt `DeviceManager`, branche `main`
-3. Valider `render.yaml`
-4. Après le premier déploiement de l’API et du front :
-   - Copier l’URL du front (`https://device-manager-web.onrender.com`)
-   - Dans **device-manager-api** → Environment → renseigner :
-     - `APP_CORS_ALLOWED_ORIGINS` = URL du front (sans slash final)
-5. Redéployer l’API si besoin pour appliquer le CORS
+1. Compte : https://console.aiven.io/signup (GitHub OK, **pas de CB**)
+2. **Create service** → **MySQL** → plan **Free**
+3. Attendre que le service soit `Running`
+4. Onglet **Overview** / **Connection information** → noter :
+   - Host
+   - Port (souvent `18306` ou similaire, pas 3306)
+   - User
+   - Password
+   - Database name
 
-Les variables `MYSQL_PASSWORD`, `MYSQL_ROOT_PASSWORD` et `APP_JWT_SECRET` sont générées automatiquement.
+URL JDBC à construire :
 
-## URLs typiques
+```text
+jdbc:mysql://HOST:PORT/DATABASE?sslMode=REQUIRED&serverTimezone=UTC&allowPublicKeyRetrieval=true
+```
+
+Exemple :
+
+```text
+jdbc:mysql://mysql-xxxxx.a.aivencloud.com:18306/defaultdb?sslMode=REQUIRED&serverTimezone=UTC&allowPublicKeyRetrieval=true
+```
+
+---
+
+## 2) Déployer le Blueprint Render
+
+1. https://dashboard.render.com → **New** → **Blueprint**
+2. Dépôt `AngeloGarzia/DeviceManager`, branche `main`
+3. Render demande de renseigner (Generate / coller) :
+
+| Variable | Valeur |
+|----------|--------|
+| `APP_JWT_SECRET` | bouton **Generate** |
+| `SPRING_DATASOURCE_URL` | URL JDBC Aiven ci-dessus |
+| `SPRING_DATASOURCE_USERNAME` | user Aiven |
+| `SPRING_DATASOURCE_PASSWORD` | password Aiven |
+| `APP_CORS_ALLOWED_ORIGINS` | laisser pour l’instant `https://device-manager-web.onrender.com` (ajuster après) |
+
+4. Lancer le déploiement
+
+---
+
+## 3) CORS après le 1er deploy
+
+1. Copier l’URL réelle du front (ex. `https://device-manager-web.onrender.com`)
+2. API → **Environment** → `APP_CORS_ALLOWED_ORIGINS` = cette URL (sans `/` final)
+3. **Manual Deploy** de l’API
+
+---
+
+## URLs
 
 - Front : `https://device-manager-web.onrender.com`
 - API : `https://device-manager-api.onrender.com`
 - Health : `https://device-manager-api.onrender.com/actuator/health`
 
-Comptes seed (à changer en prod) : `admin` / `admin123` · `tech` / `tech123`
+Comptes seed : `admin` / `admin123` · `tech` / `tech123`
 
-## Photos
+---
 
-Par défaut les uploads partent sur le **disque Render** monté en `/var/data/uploads`.
+## Limites du gratuit
 
-Pour la production durable, activer S3 dans l’API :
+| Sujet | Comportement |
+|-------|----------------|
+| Cold start API | ~30–60 s au réveil |
+| Photos | Éphémères sans S3 / Cloudflare R2 |
+| MySQL Aiven Free | 1 Go, peut s’éteindre si inactif longtemps |
+| Pas de CB Render | OK avec plan `free` uniquement |
 
-```
-APP_S3_ENABLED=true
-APP_S3_BUCKET=...
-APP_S3_REGION=...
-AWS_ACCESS_KEY_ID=...
-AWS_SECRET_ACCESS_KEY=...
-```
-
-## Mail
-
-`APP_MAIL_ENABLED=false` par défaut (logs simulés).  
-Pour activer SMTP, renseigner `MAIL_*` et `APP_MAIL_ENABLED=true`.
-
-## Build local des images
-
-```powershell
-# API
-docker build -t device-manager-api ./backend
-
-# MySQL (contexte racine)
-docker build -f docker/mysql/Dockerfile -t device-manager-mysql .
-```
-
-## Vérifications post-déploiement
-
-1. `GET /actuator/health` → `{"status":"UP"}`
-2. Login front avec `admin` / `admin123`
-3. Créer une pièce (photo) et vérifier l’affichage
-4. Contrôler CORS (pas d’erreur navigateur sur `/api/...`)
+---
 
 ## Dépannage
 
 | Symptôme | Action |
 |----------|--------|
-| API ne démarre pas | Logs : attendre MySQL ready ; vérifier `SPRING_DATASOURCE_*` |
-| CORS bloqué | `APP_CORS_ALLOWED_ORIGINS` = URL exacte du front |
-| Front appelle localhost | Rebuild front : `API_URL` doit pointer vers l’host API Render |
-| Photos perdues au redeploy | Activer S3 (disque local OK tant que le Disk Render est attaché) |
+| Render demande une CB | Ancien Blueprint Starter — utiliser la branche `main` à jour (plan `free`) |
+| API down / timeout DB | Vérifier Aiven Running + URL JDBC + SSL |
+| CORS | `APP_CORS_ALLOWED_ORIGINS` = URL exacte du front |
+| Front → mauvaise API | Rebuild du static (variable `API_URL`) |
