@@ -19,8 +19,8 @@ public class UploadBlob {
     @Column(name = "object_key", length = 512)
     private String objectKey;
 
+    /** Eager : les LAZY @Lob byte[] sont peu fiables sans enhancement (prod Render). */
     @Lob
-    @Basic(fetch = FetchType.LAZY)
     @Column(name = "data", nullable = false, columnDefinition = "LONGBLOB")
     private byte[] data;
 

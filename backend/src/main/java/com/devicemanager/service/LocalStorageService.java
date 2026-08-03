@@ -1,10 +1,10 @@
 package com.devicemanager.service;
 
-import com.devicemanager.entity.UploadBlob;
-import com.devicemanager.repository.UploadBlobRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.dao.EmptyResultDataAccessException;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -18,6 +18,7 @@ import java.util.UUID;
 
 /**
  * Stockage local + copie durable en MySQL (Aiven) pour survivre au disque éphémère Render.
+ * Lecture/écriture blob via JDBC (plus fiable que @Lob LAZY Hibernate sur LONGBLOB).
  */
 @Service
 @ConditionalOnProperty(name = "app.s3.enabled", havingValue = "false", matchIfMissing = true)
@@ -25,13 +26,13 @@ import java.util.UUID;
 public class LocalStorageService implements StorageService {
 
     private final Path root;
-    private final UploadBlobRepository uploadBlobRepository;
+    private final JdbcTemplate jdbcTemplate;
 
     public LocalStorageService(
             @Value("${app.s3.local-fallback-dir:uploads}") String dir,
-            UploadBlobRepository uploadBlobRepository) {
+            JdbcTemplate jdbcTemplate) {
         this.root = resolveWritableRoot(dir);
-        this.uploadBlobRepository = uploadBlobRepository;
+        this.jdbcTemplate = jdbcTemplate;
         log.info("Uploads locaux: dossier={}", root.toAbsolutePath());
     }
 
@@ -72,15 +73,9 @@ public class LocalStorageService implements StorageService {
             byte[] bytes = file.getBytes();
             Path target = root.resolve(filename);
             Files.write(target, bytes);
-
-            uploadBlobRepository.save(UploadBlob.builder()
-                    .objectKey(filename)
-                    .data(bytes)
-                    .contentType(file.getContentType())
-                    .fileSize(file.getSize())
-                    .build());
-
-            return new StoredObject(filename, "/uploads/" + filename, file.getContentType(), file.getSize());
+            persistBlob(filename, bytes, file.getContentType(), (long) bytes.length);
+            log.info("Upload stocké: key={} bytes={} (disque + MySQL)", filename, bytes.length);
+            return new StoredObject(filename, "/uploads/" + filename, file.getContentType(), (long) bytes.length);
         } catch (IOException e) {
             throw new IllegalStateException("Échec stockage local", e);
         }
@@ -89,17 +84,20 @@ public class LocalStorageService implements StorageService {
     @Override
     @Transactional
     public void delete(String key) {
+        if (!isSafeKey(key)) {
+            return;
+        }
         try {
             Files.deleteIfExists(root.resolve(key));
         } catch (IOException e) {
             throw new IllegalStateException("Échec suppression locale", e);
         }
-        uploadBlobRepository.deleteById(key);
+        jdbcTemplate.update("DELETE FROM upload_blob WHERE object_key = ?", key);
     }
 
     @Transactional(readOnly = true)
     public Optional<StoredObjectBytes> load(String key) {
-        if (key == null || key.isBlank() || key.contains("..") || key.contains("/") || key.contains("\\")) {
+        if (!isSafeKey(key)) {
             return Optional.empty();
         }
         Path file = root.resolve(key).normalize();
@@ -112,10 +110,62 @@ public class LocalStorageService implements StorageService {
                 return Optional.of(new StoredObjectBytes(Files.readAllBytes(file), contentType, Files.size(file)));
             }
         } catch (IOException ignored) {
-            // fallback DB
+            // fallback MySQL
         }
-        return uploadBlobRepository.findById(key)
-                .map(b -> new StoredObjectBytes(b.getData(), b.getContentType(), b.getFileSize()));
+
+        Optional<StoredObjectBytes> fromDb = loadFromDatabase(key);
+        fromDb.ifPresent(obj -> rehydrateDisk(key, obj.data()));
+        if (fromDb.isEmpty()) {
+            log.warn("Upload introuvable (disque + MySQL): {}", key);
+        }
+        return fromDb;
+    }
+
+    private void persistBlob(String key, byte[] data, String contentType, long size) {
+        jdbcTemplate.update("""
+                INSERT INTO upload_blob (object_key, data, content_type, file_size)
+                VALUES (?, ?, ?, ?)
+                ON DUPLICATE KEY UPDATE
+                  data = VALUES(data),
+                  content_type = VALUES(content_type),
+                  file_size = VALUES(file_size)
+                """,
+                key, data, contentType, size);
+    }
+
+    private Optional<StoredObjectBytes> loadFromDatabase(String key) {
+        try {
+            return Optional.ofNullable(jdbcTemplate.queryForObject(
+                    "SELECT data, content_type, file_size FROM upload_blob WHERE object_key = ?",
+                    (rs, rowNum) -> {
+                        byte[] data = rs.getBytes("data");
+                        if (data == null || data.length == 0) {
+                            return null;
+                        }
+                        Long size = rs.getObject("file_size") == null ? (long) data.length : rs.getLong("file_size");
+                        return new StoredObjectBytes(data, rs.getString("content_type"), size);
+                    },
+                    key));
+        } catch (EmptyResultDataAccessException ex) {
+            return Optional.empty();
+        }
+    }
+
+    private void rehydrateDisk(String key, byte[] data) {
+        try {
+            Files.write(root.resolve(key), data);
+            log.info("Upload rehydraté sur disque depuis MySQL: {}", key);
+        } catch (IOException ex) {
+            log.warn("Impossible de rehydrater {} sur disque: {}", key, ex.getMessage());
+        }
+    }
+
+    private static boolean isSafeKey(String key) {
+        return key != null
+                && !key.isBlank()
+                && !key.contains("..")
+                && !key.contains("/")
+                && !key.contains("\\");
     }
 
     private String sanitize(String name) {

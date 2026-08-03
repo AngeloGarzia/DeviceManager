@@ -21,12 +21,12 @@ public class UploadController {
     public ResponseEntity<byte[]> get(@PathVariable String filename) {
         return localStorageService.load(filename)
                 .map(obj -> {
-                    MediaType mediaType = MediaType.APPLICATION_OCTET_STREAM;
+                    MediaType mediaType = MediaType.IMAGE_JPEG;
                     if (obj.contentType() != null && !obj.contentType().isBlank()) {
                         try {
                             mediaType = MediaType.parseMediaType(obj.contentType());
                         } catch (Exception ignored) {
-                            // keep octet-stream
+                            // keep image/jpeg
                         }
                     }
                     return ResponseEntity.ok()

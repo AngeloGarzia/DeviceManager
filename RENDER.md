@@ -130,10 +130,10 @@ Sur Render, tu peux aussi mettre ces variables dans l’**Environment** de l’A
 ## Photos en production
 
 Sur le plan **free** Render, le disque du conteneur est **éphémère** (perdu à chaque deploy).  
-DeviceManager enregistre donc aussi les images dans MySQL (`upload_blob`) et les sert via `/uploads/...`.
+DeviceManager enregistre donc aussi les images dans MySQL (`upload_blob`, via JDBC) et les sert via `/uploads/...` (rehydratation disque au besoin).
 
-- **Nouvelles photos** : OK après ce correctif (survivent aux redéploiements).
-- **Anciennes photos** perdues du disque : à **re-uploader** une fois (éditer la pièce).
+- **Nouvelles photos** : durables (disque + MySQL).
+- **Anciennes photos** absentes de `upload_blob` : à **re-uploader** une fois (éditer la pièce → remplacer l’image).
 
 ---
 
@@ -142,7 +142,7 @@ DeviceManager enregistre donc aussi les images dans MySQL (`upload_blob`) et les
 | Sujet | Comportement |
 |-------|----------------|
 | Cold start API | ~30–60 s au réveil |
-| Photos | Éphémères sans S3 / Cloudflare R2 |
+| Photos | Durables en MySQL (`upload_blob`) ; disque Render = cache |
 | MySQL Aiven Free | 1 Go, peut s’éteindre si inactif longtemps |
 | Pas de CB Render | OK avec plan `free` uniquement |
 
