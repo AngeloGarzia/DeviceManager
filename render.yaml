@@ -65,7 +65,7 @@ services:
         value: ""
       # Disque éphémère sur free : les photos peuvent disparaître au redémarrage
       - key: APP_S3_LOCAL_FALLBACK_DIR
-        value: uploads
+        value: /app/uploads
       - key: LOGGING_LEVEL_COM_DEVICEMANAGER
         value: INFO
 

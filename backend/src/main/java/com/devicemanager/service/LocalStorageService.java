@@ -12,7 +12,7 @@ import java.nio.file.Paths;
 import java.util.UUID;
 
 /**
- * Stockage local de secours quand S3 est désactivé (dev).
+ * Stockage local de secours quand S3 est désactivé.
  */
 @Service
 @ConditionalOnProperty(name = "app.s3.enabled", havingValue = "false", matchIfMissing = true)
@@ -20,9 +20,33 @@ public class LocalStorageService implements StorageService {
 
     private final Path root;
 
-    public LocalStorageService(@Value("${app.s3.local-fallback-dir:uploads}") String dir) throws IOException {
-        this.root = Paths.get(dir).toAbsolutePath().normalize();
-        Files.createDirectories(root);
+    public LocalStorageService(@Value("${app.s3.local-fallback-dir:uploads}") String dir) {
+        this.root = resolveWritableRoot(dir);
+    }
+
+    private static Path resolveWritableRoot(String dir) {
+        Path[] candidates = new Path[] {
+                Paths.get(dir),
+                Paths.get("/app/uploads"),
+                Paths.get(System.getProperty("java.io.tmpdir"), "device-manager-uploads"),
+                Paths.get("/tmp", "device-manager-uploads")
+        };
+        IOException last = null;
+        for (Path candidate : candidates) {
+            try {
+                Path absolute = candidate.toAbsolutePath().normalize();
+                Files.createDirectories(absolute);
+                Path probe = absolute.resolve(".write-test");
+                Files.writeString(probe, "ok");
+                Files.deleteIfExists(probe);
+                return absolute;
+            } catch (IOException ex) {
+                last = ex;
+            }
+        }
+        throw new IllegalStateException(
+                "Aucun dossier d'uploads accessible en écriture (vérifier droits Docker / APP_S3_LOCAL_FALLBACK_DIR)",
+                last);
     }
 
     @Override
