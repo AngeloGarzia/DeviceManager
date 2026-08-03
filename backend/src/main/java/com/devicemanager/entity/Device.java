@@ -2,8 +2,11 @@ package com.devicemanager.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.BatchSize;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(
@@ -27,7 +30,7 @@ public class Device {
     @Column(nullable = false, length = 120)
     private String nom;
 
-    @Column(nullable = false, length = 80)
+    @Column(length = 80)
     private String reference;
 
     @Column(name = "usage_text", nullable = false, length = 500)
@@ -39,6 +42,7 @@ public class Device {
     @Column(nullable = false)
     private boolean obsolete;
 
+    /** Photo principale (1re) — synchronisée pour listes / commandes. */
     @Column(name = "photo_key", length = 512)
     private String photoKey;
 
@@ -51,20 +55,26 @@ public class Device {
     @Column(name = "file_size")
     private Long fileSize;
 
-    @ManyToOne(optional = false, fetch = FetchType.LAZY)
-    @JoinColumn(name = "sfm_id", nullable = false)
+    @OneToMany(mappedBy = "device", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("position ASC")
+    @BatchSize(size = 50)
+    @Builder.Default
+    private List<DevicePhoto> photos = new ArrayList<>();
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "sfm_id")
     private Sfm sfm;
 
-    @ManyToOne(optional = false, fetch = FetchType.LAZY)
-    @JoinColumn(name = "mas_id", nullable = false)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "mas_id")
     private Mas mas;
 
     /**
      * Marque de la pièce — même catalogue que la MAS ({@code marque_mas}).
-     * Héritée de la MAS liée (peut donc être identique à {@code mas.marque}).
+     * Héritée de la MAS liée lorsqu'elle est renseignée.
      */
-    @ManyToOne(optional = false, fetch = FetchType.EAGER)
-    @JoinColumn(name = "marque_id", nullable = false,
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "marque_id",
             foreignKey = @ForeignKey(name = "fk_device_marque"))
     private MarqueMas marque;
 

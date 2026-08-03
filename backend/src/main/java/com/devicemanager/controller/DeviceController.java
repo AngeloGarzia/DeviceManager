@@ -11,6 +11,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.Arrays;
 import java.util.List;
 
 @RestController
@@ -33,16 +34,19 @@ public class DeviceController {
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<DeviceResponse> create(
             @Valid @RequestPart("data") DeviceRequest data,
-            @RequestPart("photo") MultipartFile photo) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(deviceService.create(data, photo));
+            @RequestPart(value = "photos", required = false) MultipartFile[] photos) {
+        List<MultipartFile> list = photos == null ? List.of() : Arrays.asList(photos);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(deviceService.create(data, list));
     }
 
     @PutMapping(value = "/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<DeviceResponse> update(
             @PathVariable Long id,
             @Valid @RequestPart("data") DeviceRequest data,
-            @RequestPart(value = "photo", required = false) MultipartFile photo) {
-        return ResponseEntity.ok(deviceService.update(id, data, photo));
+            @RequestPart(value = "photos", required = false) MultipartFile[] photos) {
+        List<MultipartFile> list = photos == null ? List.of() : Arrays.asList(photos);
+        return ResponseEntity.ok(deviceService.update(id, data, list));
     }
 
     @DeleteMapping("/{id}")

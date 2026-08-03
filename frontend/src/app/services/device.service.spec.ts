@@ -37,7 +37,7 @@ describe('DeviceService', () => {
 
   it('should create multipart payload', () => {
     const photo = new File([new Uint8Array([1])], 'a.jpg', { type: 'image/jpeg' });
-    service.create(form, photo).subscribe((d) => expect(d.id).toBe(1));
+    service.create(form, [photo]).subscribe((d) => expect(d.id).toBe(1));
     const req = http.expectOne('/api/devices');
     expect(req.request.method).toBe('POST');
     expect(req.request.body instanceof FormData).toBeTrue();

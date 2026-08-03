@@ -1,27 +1,38 @@
 package com.devicemanager.service;
 
+import com.devicemanager.dto.DevicePhotoResponse;
 import com.devicemanager.dto.DeviceRequest;
 import com.devicemanager.dto.DeviceResponse;
 import com.devicemanager.entity.Device;
+import com.devicemanager.entity.DevicePhoto;
 import com.devicemanager.entity.MarqueMas;
 import com.devicemanager.entity.Mas;
 import com.devicemanager.entity.Sfm;
 import com.devicemanager.repository.DeviceRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.hibernate.Hibernate;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 @Transactional
 @Slf4j
 public class DeviceService {
+
+    public static final int MAX_PHOTOS = 5;
 
     private final DeviceRepository deviceRepository;
     private final SfmService sfmService;
@@ -36,6 +47,7 @@ public class DeviceService {
         List<Device> list = (q == null || q.isBlank())
                 ? deviceRepository.findAllWithRelations(atelierId)
                 : deviceRepository.search(atelierId, q.trim());
+        list.forEach(d -> Hibernate.initialize(d.getPhotos()));
         return list.stream().map(this::toResponse).toList();
     }
 
@@ -44,19 +56,22 @@ public class DeviceService {
         return toResponse(getEntity(id));
     }
 
-    public DeviceResponse create(DeviceRequest request, MultipartFile photo) {
-        validatePhoto(photo, true);
+    public DeviceResponse create(DeviceRequest request, List<MultipartFile> photos) {
+        List<MultipartFile> files = normalizeFiles(photos);
+        ensurePhotoCount(files.size(), true);
+        files.forEach(this::validateImageFile);
+
         var atelier = atelierService.requireCurrentAtelier();
         String nom = request.getNom().trim();
-        String reference = request.getReference().trim();
+        String reference = normalizeOptionalText(request.getReference());
         ensureUniqueNom(nom, atelier.getId(), null);
         ensureUniqueReference(reference, atelier.getId(), null);
-        Sfm sfm = sfmService.getEntity(request.getSfmId());
-        Mas mas = masService.getEntity(request.getMasId());
-        ensureSfmCoversMas(sfm, mas);
-        var marque = inheritMarqueFromMas(mas);
-        MultipartFile optimizedPhoto = imageOptimizationService.optimize(photo);
-        StorageService.StoredObject stored = storageService.store(optimizedPhoto);
+        Sfm sfm = resolveOptionalSfm(request.getSfmId());
+        Mas mas = resolveOptionalMas(request.getMasId());
+        if (sfm != null && mas != null) {
+            ensureSfmCoversMas(sfm, mas);
+        }
+        MarqueMas marque = mas != null ? inheritMarqueFromMas(mas) : null;
 
         Device entity = Device.builder()
                 .nom(nom)
@@ -64,24 +79,26 @@ public class DeviceService {
                 .usage(request.getUsage().trim())
                 .dateAcquisition(request.getDateAcquisition())
                 .obsolete(Boolean.TRUE.equals(request.getObsolete()))
-                .photoKey(stored.key())
-                .photoUrl(stored.url())
-                .contentType(stored.contentType())
-                .fileSize(stored.size())
+                .photos(new ArrayList<>())
                 .sfm(sfm)
                 .mas(mas)
                 .marque(marque)
                 .atelier(atelier)
                 .build();
+
+        addNewPhotos(entity, files);
+        syncPrimaryPhoto(entity);
+
         Device saved = deviceRepository.save(entity);
-        log.info("Pièce créée: {} / {} (atelier={})", saved.getNom(), saved.getReference(), atelier.getId());
+        log.info("Pièce créée: {} / {} ({} photo(s), atelier={})",
+                saved.getNom(), saved.getReference(), saved.getPhotos().size(), atelier.getId());
         return toResponse(saved);
     }
 
-    public DeviceResponse update(Long id, DeviceRequest request, MultipartFile photo) {
+    public DeviceResponse update(Long id, DeviceRequest request, List<MultipartFile> photos) {
         Device entity = getEntity(id);
         String nom = request.getNom().trim();
-        String reference = request.getReference().trim();
+        String reference = normalizeOptionalText(request.getReference());
         ensureUniqueNom(nom, entity.getAtelier().getId(), entity.getId());
         ensureUniqueReference(reference, entity.getAtelier().getId(), entity.getId());
         entity.setNom(nom);
@@ -89,44 +106,127 @@ public class DeviceService {
         entity.setUsage(request.getUsage().trim());
         entity.setDateAcquisition(request.getDateAcquisition());
         entity.setObsolete(Boolean.TRUE.equals(request.getObsolete()));
-        Sfm sfm = sfmService.getEntity(request.getSfmId());
-        Mas mas = masService.getEntity(request.getMasId());
-        ensureSfmCoversMas(sfm, mas);
+        Sfm sfm = resolveOptionalSfm(request.getSfmId());
+        Mas mas = resolveOptionalMas(request.getMasId());
+        if (sfm != null && mas != null) {
+            ensureSfmCoversMas(sfm, mas);
+        }
         entity.setSfm(sfm);
         entity.setMas(mas);
-        entity.setMarque(inheritMarqueFromMas(mas));
+        entity.setMarque(mas != null ? inheritMarqueFromMas(mas) : null);
 
-        if (photo != null && !photo.isEmpty()) {
-            validatePhoto(photo, false);
-            if (entity.getPhotoKey() != null) {
-                storageService.delete(entity.getPhotoKey());
+        List<MultipartFile> newFiles = normalizeFiles(photos);
+        newFiles.forEach(this::validateImageFile);
+
+        List<Long> keepOrder = request.getKeepPhotoIds() == null
+                ? List.of()
+                : request.getKeepPhotoIds().stream().filter(Objects::nonNull).toList();
+        Set<Long> keepIds = new HashSet<>(keepOrder);
+
+        Map<Long, DevicePhoto> byId = entity.getPhotos().stream()
+                .filter(p -> p.getId() != null)
+                .collect(Collectors.toMap(DevicePhoto::getId, p -> p, (a, b) -> a));
+
+        List<DevicePhoto> kept = new ArrayList<>();
+        for (Long keepId : keepOrder) {
+            DevicePhoto photo = byId.get(keepId);
+            if (photo != null) {
+                kept.add(photo);
             }
-            MultipartFile optimizedPhoto = imageOptimizationService.optimize(photo);
-            StorageService.StoredObject stored = storageService.store(optimizedPhoto);
-            entity.setPhotoKey(stored.key());
-            entity.setPhotoUrl(stored.url());
-            entity.setContentType(stored.contentType());
-            entity.setFileSize(stored.size());
         }
+
+        int total = kept.size() + newFiles.size();
+        ensurePhotoCount(total, true);
+
+        for (DevicePhoto photo : List.copyOf(entity.getPhotos())) {
+            if (!keepIds.contains(photo.getId())) {
+                if (photo.getPhotoKey() != null) {
+                    storageService.delete(photo.getPhotoKey());
+                }
+                entity.getPhotos().remove(photo);
+            }
+        }
+
+        entity.getPhotos().clear();
+        int position = 0;
+        for (DevicePhoto photo : kept) {
+            photo.setPosition(position++);
+            photo.setDevice(entity);
+            entity.getPhotos().add(photo);
+        }
+        addNewPhotos(entity, newFiles);
+        syncPrimaryPhoto(entity);
 
         return toResponse(deviceRepository.save(entity));
     }
 
     public void delete(Long id) {
         Device entity = getEntity(id);
-        if (entity.getPhotoKey() != null) {
+        for (DevicePhoto photo : entity.getPhotos()) {
+            if (photo.getPhotoKey() != null) {
+                storageService.delete(photo.getPhotoKey());
+            }
+        }
+        if (entity.getPhotoKey() != null
+                && entity.getPhotos().stream().noneMatch(p -> Objects.equals(p.getPhotoKey(), entity.getPhotoKey()))) {
             storageService.delete(entity.getPhotoKey());
         }
         deviceRepository.delete(entity);
     }
 
-    private void validatePhoto(MultipartFile photo, boolean required) {
-        if (photo == null || photo.isEmpty()) {
-            if (required) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La photo est obligatoire");
-            }
+    private void addNewPhotos(Device entity, List<MultipartFile> files) {
+        int position = entity.getPhotos().size();
+        for (MultipartFile file : files) {
+            MultipartFile optimized = imageOptimizationService.optimize(file);
+            StorageService.StoredObject stored = storageService.store(optimized);
+            DevicePhoto photo = DevicePhoto.builder()
+                    .device(entity)
+                    .photoKey(stored.key())
+                    .photoUrl(stored.url())
+                    .contentType(stored.contentType())
+                    .fileSize(stored.size())
+                    .position(position++)
+                    .build();
+            entity.getPhotos().add(photo);
+        }
+    }
+
+    private void syncPrimaryPhoto(Device entity) {
+        if (entity.getPhotos() == null || entity.getPhotos().isEmpty()) {
+            entity.setPhotoKey(null);
+            entity.setPhotoUrl(null);
+            entity.setContentType(null);
+            entity.setFileSize(null);
             return;
         }
+        DevicePhoto first = entity.getPhotos().getFirst();
+        entity.setPhotoKey(first.getPhotoKey());
+        entity.setPhotoUrl(first.getPhotoUrl());
+        entity.setContentType(first.getContentType());
+        entity.setFileSize(first.getFileSize());
+    }
+
+    private List<MultipartFile> normalizeFiles(List<MultipartFile> photos) {
+        if (photos == null) {
+            return List.of();
+        }
+        return photos.stream()
+                .filter(Objects::nonNull)
+                .filter(f -> !f.isEmpty())
+                .toList();
+    }
+
+    private void ensurePhotoCount(int count, boolean requireAtLeastOne) {
+        if (requireAtLeastOne && count < 1) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Ajoutez au moins une image");
+        }
+        if (count > MAX_PHOTOS) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Maximum " + MAX_PHOTOS + " images par pièce détachée");
+        }
+    }
+
+    private void validateImageFile(MultipartFile photo) {
         String contentType = photo.getContentType();
         if (contentType == null || !contentType.startsWith("image/")) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Le fichier doit être une image");
@@ -135,8 +235,10 @@ public class DeviceService {
 
     private Device getEntity(Long id) {
         Long atelierId = atelierService.requireCurrentAtelier().getId();
-        return deviceRepository.findByIdWithRelations(id, atelierId)
+        Device entity = deviceRepository.findByIdWithRelations(id, atelierId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Device introuvable"));
+        Hibernate.initialize(entity.getPhotos());
+        return entity;
     }
 
     private void ensureUniqueNom(String nom, Long atelierId, Long excludeId) {
@@ -149,12 +251,37 @@ public class DeviceService {
     }
 
     private void ensureUniqueReference(String reference, Long atelierId, Long excludeId) {
+        if (reference == null || reference.isBlank()) {
+            return;
+        }
         boolean exists = excludeId == null
                 ? deviceRepository.existsByReferenceIgnoreCaseAndAtelierId(reference, atelierId)
                 : deviceRepository.existsByReferenceIgnoreCaseAndAtelierIdAndIdNot(reference, atelierId, excludeId);
         if (exists) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Référence déjà utilisée dans cet atelier");
         }
+    }
+
+    private String normalizeOptionalText(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private Sfm resolveOptionalSfm(Long sfmId) {
+        if (sfmId == null) {
+            return null;
+        }
+        return sfmService.getEntity(sfmId);
+    }
+
+    private Mas resolveOptionalMas(Long masId) {
+        if (masId == null) {
+            return null;
+        }
+        return masService.getEntity(masId);
     }
 
     private MarqueMas inheritMarqueFromMas(Mas mas) {
@@ -182,10 +309,30 @@ public class DeviceService {
     }
 
     private DeviceResponse toResponse(Device entity) {
-        MarqueMas marque = entity.getMarque() != null
-                ? entity.getMarque()
-                : (entity.getMas().getMarque());
+        Mas mas = entity.getMas();
+        MarqueMas marque = entity.getMarque();
+        if (marque == null && mas != null) {
+            marque = mas.getMarque();
+        }
         String marqueLabel = marque != null ? marque.getLabel() : null;
+
+        List<DevicePhotoResponse> photos = entity.getPhotos() == null
+                ? List.of()
+                : entity.getPhotos().stream()
+                .map(p -> DevicePhotoResponse.builder()
+                        .id(p.getId())
+                        .photoUrl(p.getPhotoUrl())
+                        .contentType(p.getContentType())
+                        .fileSize(p.getFileSize())
+                        .position(p.getPosition())
+                        .build())
+                .toList();
+
+        String primaryUrl = entity.getPhotoUrl();
+        if ((primaryUrl == null || primaryUrl.isBlank()) && !photos.isEmpty()) {
+            primaryUrl = photos.getFirst().getPhotoUrl();
+        }
+
         return DeviceResponse.builder()
                 .id(entity.getId())
                 .nom(entity.getNom())
@@ -193,14 +340,15 @@ public class DeviceService {
                 .usage(entity.getUsage())
                 .dateAcquisition(entity.getDateAcquisition())
                 .obsolete(entity.isObsolete())
-                .photoUrl(entity.getPhotoUrl())
+                .photoUrl(primaryUrl)
                 .contentType(entity.getContentType())
                 .fileSize(entity.getFileSize())
-                .sfmId(entity.getSfm().getId())
-                .sfmNom(entity.getSfm().getNom())
-                .masId(entity.getMas().getId())
-                .masNumero(entity.getMas().getNumero())
-                .masMarque(entity.getMas().getMarque() != null ? entity.getMas().getMarque().getLabel() : marqueLabel)
+                .photos(photos)
+                .sfmId(entity.getSfm() != null ? entity.getSfm().getId() : null)
+                .sfmNom(entity.getSfm() != null ? entity.getSfm().getNom() : null)
+                .masId(mas != null ? mas.getId() : null)
+                .masNumero(mas != null ? mas.getNumero() : null)
+                .masMarque(mas != null && mas.getMarque() != null ? mas.getMarque().getLabel() : marqueLabel)
                 .marqueId(marque != null ? marque.getId() : null)
                 .marque(marque != null ? marque.getCode() : null)
                 .marqueLabel(marqueLabel)

@@ -58,6 +58,17 @@ export class DeviceDetailComponent implements OnInit {
     return this.deviceService.resolvePhotoUrl(device.photoUrl);
   }
 
+  galleryUrls(device: Device): string[] {
+    if (device.photos && device.photos.length > 0) {
+      return [...device.photos]
+        .sort((a, b) => a.position - b.position)
+        .map((p) => this.deviceService.resolvePhotoUrl(p.photoUrl))
+        .filter((url) => !!url);
+    }
+    const primary = this.photoUrl(device);
+    return primary ? [primary] : [];
+  }
+
   confirmDelete(): void {
     const current = this.item();
     if (!current) {

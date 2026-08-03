@@ -81,7 +81,7 @@ CREATE TABLE IF NOT EXISTS mas (
 CREATE TABLE IF NOT EXISTS device (
   id BIGINT AUTO_INCREMENT PRIMARY KEY,
   nom VARCHAR(120) NOT NULL,
-  reference VARCHAR(80) NOT NULL,
+  reference VARCHAR(80),
   usage_text VARCHAR(500) NOT NULL,
   date_acquisition DATE NOT NULL,
   obsolete BOOLEAN NOT NULL DEFAULT FALSE,
@@ -89,9 +89,9 @@ CREATE TABLE IF NOT EXISTS device (
   photo_url VARCHAR(1024),
   content_type VARCHAR(100),
   file_size BIGINT,
-  sfm_id BIGINT NOT NULL,
-  mas_id BIGINT NOT NULL,
-  marque_id BIGINT NOT NULL,
+  sfm_id BIGINT NULL,
+  mas_id BIGINT NULL,
+  marque_id BIGINT NULL,
   atelier_id BIGINT NOT NULL,
   CONSTRAINT fk_device_sfm FOREIGN KEY (sfm_id) REFERENCES sfm(id),
   CONSTRAINT fk_device_mas FOREIGN KEY (mas_id) REFERENCES mas(id),
@@ -99,6 +99,17 @@ CREATE TABLE IF NOT EXISTS device (
   CONSTRAINT fk_device_atelier FOREIGN KEY (atelier_id) REFERENCES atelier(id),
   CONSTRAINT uk_device_nom_atelier UNIQUE (nom, atelier_id),
   CONSTRAINT uk_device_reference_atelier UNIQUE (reference, atelier_id)
+);
+
+CREATE TABLE IF NOT EXISTS device_photo (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  device_id BIGINT NOT NULL,
+  photo_key VARCHAR(512) NOT NULL,
+  photo_url VARCHAR(1024) NOT NULL,
+  content_type VARCHAR(100),
+  file_size BIGINT,
+  position INT NOT NULL DEFAULT 0,
+  CONSTRAINT fk_device_photo_device FOREIGN KEY (device_id) REFERENCES device(id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS commande (

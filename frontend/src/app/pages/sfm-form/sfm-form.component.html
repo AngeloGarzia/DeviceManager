@@ -4,7 +4,13 @@
   </button>
   <header>
     <h1 class="page-title">{{ isEdit ? 'Modifier le SFM' : 'Nouveau SFM' }}</h1>
-    <p class="page-subtitle">Nom, marques couvertes et contacts</p>
+    <p class="page-subtitle">
+      {{
+        returnDevice
+          ? 'Création depuis une pièce — retour automatique à la saisie après enregistrement'
+          : 'Nom, marques couvertes et contacts'
+      }}
+    </p>
   </header>
 
   @if (loading()) {

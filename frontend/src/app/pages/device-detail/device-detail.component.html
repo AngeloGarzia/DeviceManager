@@ -30,12 +30,26 @@
 
       <mat-card class="!rounded-xl !border !border-line !shadow-soft">
         <mat-card-content class="!pt-5">
-          @if (device.photoUrl) {
-            <img
-              [src]="photoUrl(device)"
-              [alt]="device.nom"
-              class="mb-4 max-h-72 w-full rounded-xl object-cover"
-            />
+          @if (galleryUrls(device); as urls) {
+            @if (urls.length === 1) {
+              <img
+                [src]="urls[0]"
+                [alt]="device.nom"
+                class="mb-4 max-h-72 w-full rounded-xl object-cover"
+              />
+            } @else if (urls.length > 1) {
+              <div class="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                @for (url of urls; track url; let i = $index) {
+                  <img
+                    [src]="url"
+                    [alt]="device.nom + ' — image ' + (i + 1)"
+                    class="max-h-48 w-full rounded-xl object-cover"
+                    [class.sm:col-span-2]="i === 0"
+                    [class.max-h-72]="i === 0"
+                  />
+                }
+              </div>
+            }
           }
           <div class="mb-4">
             @if (device.obsolete) {
@@ -47,7 +61,7 @@
           <dl class="grid gap-4 sm:grid-cols-2">
             <div>
               <dt class="text-xs uppercase tracking-wide text-ink-faint">Référence</dt>
-              <dd class="mt-1 m-0 text-base text-ink">{{ device.reference }}</dd>
+              <dd class="mt-1 m-0 text-base text-ink">{{ device.reference || '—' }}</dd>
             </div>
             <div class="sm:col-span-2">
               <dt class="text-xs uppercase tracking-wide text-ink-faint">Usage</dt>
@@ -60,17 +74,25 @@
             <div>
               <dt class="text-xs uppercase tracking-wide text-ink-faint">SFM</dt>
               <dd class="mt-1 m-0">
-                <a class="text-brand no-underline hover:underline" [routerLink]="['/sfm', device.sfmId]">
-                  {{ device.sfmNom }}
-                </a>
+                @if (device.sfmId) {
+                  <a class="text-brand no-underline hover:underline" [routerLink]="['/sfm', device.sfmId]">
+                    {{ device.sfmNom }}
+                  </a>
+                } @else {
+                  —
+                }
               </dd>
             </div>
             <div>
               <dt class="text-xs uppercase tracking-wide text-ink-faint">MAS</dt>
               <dd class="mt-1 m-0">
-                <a class="text-brand no-underline hover:underline" [routerLink]="['/mas', device.masId]">
-                  {{ device.masNumero }}
-                </a>
+                @if (device.masId) {
+                  <a class="text-brand no-underline hover:underline" [routerLink]="['/mas', device.masId]">
+                    {{ device.masNumero }}
+                  </a>
+                } @else {
+                  —
+                }
               </dd>
             </div>
             <div>

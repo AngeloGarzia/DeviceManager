@@ -24,6 +24,9 @@ public class SchemaMigrationRunner implements CommandLineRunner {
         migrateMasMarqueToTable();
         migrateDeviceMarqueInheritance();
         migrateSfmMarques();
+        migrateDevicePhotos();
+        repairOrphanAtelierAndMarqueIds();
+        softenDeviceOptionalColumns();
     }
 
     private void softenCommandeLegacyColumns() {
@@ -253,6 +256,134 @@ public class SchemaMigrationRunner implements CommandLineRunner {
             log.info("Migration SFM: liaison multi-marques (sfm_marque)");
         } catch (Exception ex) {
             log.warn("Migration sfm_marque: {}", ex.getMessage());
+        }
+    }
+
+    /**
+     * Table device_photo (max 5 images / pièce) + backfill depuis la photo principale legacy.
+     */
+    private void migrateDevicePhotos() {
+        try {
+            Integer deviceTable = jdbcTemplate.queryForObject(
+                    """
+                    SELECT COUNT(*) FROM information_schema.TABLES
+                    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'device'
+                    """,
+                    Integer.class);
+            if (deviceTable == null || deviceTable == 0) {
+                return;
+            }
+
+            jdbcTemplate.execute("""
+                    CREATE TABLE IF NOT EXISTS device_photo (
+                      id BIGINT AUTO_INCREMENT PRIMARY KEY,
+                      device_id BIGINT NOT NULL,
+                      photo_key VARCHAR(512) NOT NULL,
+                      photo_url VARCHAR(1024) NOT NULL,
+                      content_type VARCHAR(100),
+                      file_size BIGINT,
+                      position INT NOT NULL DEFAULT 0,
+                      CONSTRAINT fk_device_photo_device FOREIGN KEY (device_id) REFERENCES device(id) ON DELETE CASCADE
+                    )
+                    """);
+
+            jdbcTemplate.update("""
+                    INSERT INTO device_photo (device_id, photo_key, photo_url, content_type, file_size, position)
+                    SELECT d.id, d.photo_key, d.photo_url, d.content_type, d.file_size, 0
+                    FROM device d
+                    WHERE d.photo_key IS NOT NULL
+                      AND d.photo_url IS NOT NULL
+                      AND NOT EXISTS (
+                        SELECT 1 FROM device_photo p WHERE p.device_id = d.id
+                      )
+                    """);
+
+            log.info("Migration device: table device_photo (multi-images)");
+        } catch (Exception ex) {
+            log.warn("Migration device_photo: {}", ex.getMessage());
+        }
+    }
+
+    /**
+     * Répare les lignes legacy avec atelier_id/marque_id = 0 (ou orphelins),
+     * qui cassent les FK Hibernate et excluent les pièces de tous les ateliers.
+     */
+    private void repairOrphanAtelierAndMarqueIds() {
+        try {
+            Long fallbackAtelier = jdbcTemplate.query(
+                    "SELECT id FROM atelier ORDER BY id LIMIT 1",
+                    rs -> rs.next() ? rs.getLong(1) : null);
+            Long fallbackMarque = jdbcTemplate.query(
+                    "SELECT id FROM marque_mas ORDER BY id LIMIT 1",
+                    rs -> rs.next() ? rs.getLong(1) : null);
+            if (fallbackAtelier == null || fallbackMarque == null) {
+                return;
+            }
+
+            int masAtelier = jdbcTemplate.update("""
+                    UPDATE mas
+                    SET atelier_id = ?
+                    WHERE atelier_id = 0
+                       OR atelier_id NOT IN (SELECT id FROM (SELECT id FROM atelier) a)
+                    """, fallbackAtelier);
+            int masMarque = jdbcTemplate.update("""
+                    UPDATE mas
+                    SET marque_id = ?
+                    WHERE marque_id = 0
+                       OR marque_id NOT IN (SELECT id FROM (SELECT id FROM marque_mas) m)
+                    """, fallbackMarque);
+            int sfmAtelier = jdbcTemplate.update("""
+                    UPDATE sfm
+                    SET atelier_id = ?
+                    WHERE atelier_id = 0
+                       OR atelier_id NOT IN (SELECT id FROM (SELECT id FROM atelier) a)
+                    """, fallbackAtelier);
+            int deviceAtelier = jdbcTemplate.update("""
+                    UPDATE device d
+                    JOIN mas m ON m.id = d.mas_id
+                    SET d.atelier_id = m.atelier_id
+                    WHERE d.atelier_id = 0
+                       OR d.atelier_id NOT IN (SELECT id FROM (SELECT id FROM atelier) a)
+                    """);
+            int deviceMarque = jdbcTemplate.update("""
+                    UPDATE device d
+                    JOIN mas m ON m.id = d.mas_id
+                    SET d.marque_id = m.marque_id
+                    WHERE d.marque_id = 0
+                       OR d.marque_id NOT IN (SELECT id FROM (SELECT id FROM marque_mas) mm)
+                    """);
+
+            if (masAtelier + masMarque + sfmAtelier + deviceAtelier + deviceMarque > 0) {
+                log.info(
+                        "Migration réparation orphelins: mas(atelier={}, marque={}), sfm(atelier={}), device(atelier={}, marque={})",
+                        masAtelier, masMarque, sfmAtelier, deviceAtelier, deviceMarque);
+            }
+        } catch (Exception ex) {
+            log.warn("Migration réparation orphelins: {}", ex.getMessage());
+        }
+    }
+
+    /**
+     * Référence, MAS et marque de pièce optionnelles.
+     */
+    private void softenDeviceOptionalColumns() {
+        try {
+            Integer deviceTable = jdbcTemplate.queryForObject(
+                    """
+                    SELECT COUNT(*) FROM information_schema.TABLES
+                    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'device'
+                    """,
+                    Integer.class);
+            if (deviceTable == null || deviceTable == 0) {
+                return;
+            }
+            jdbcTemplate.execute("ALTER TABLE device MODIFY COLUMN reference VARCHAR(80) NULL");
+            jdbcTemplate.execute("ALTER TABLE device MODIFY COLUMN sfm_id BIGINT NULL");
+            jdbcTemplate.execute("ALTER TABLE device MODIFY COLUMN mas_id BIGINT NULL");
+            jdbcTemplate.execute("ALTER TABLE device MODIFY COLUMN marque_id BIGINT NULL");
+            log.info("Migration device: reference / sfm_id / mas_id / marque_id rendus optionnels");
+        } catch (Exception ex) {
+            log.warn("Migration device champs optionnels: {}", ex.getMessage());
         }
     }
 }

@@ -39,6 +39,10 @@ export class SfmListComponent implements OnInit {
   ngOnInit(): void { this.load(); }
   get total(): number { return this.items().length; }
 
+  marquesLabel(item: Sfm): string {
+    return item.marques?.map((m) => m.label).join(', ') || '—';
+  }
+
   load(): void {
     this.loading.set(true); this.error.set(null);
     this.sfmService.list(this.query).subscribe({

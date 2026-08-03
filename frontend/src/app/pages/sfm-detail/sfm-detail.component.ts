@@ -33,6 +33,10 @@ export class SfmDetailComponent implements OnInit {
       error: () => { this.error.set('SFM introuvable.'); this.loading.set(false); }
     });
   }
+  marquesLabel(sfm: Sfm): string {
+    return sfm.marques?.map((m) => m.label).join(', ') || '—';
+  }
+
   askDelete(): void { this.confirmOpen.set(true); }
   confirmDelete(): void {
     const current = this.item();

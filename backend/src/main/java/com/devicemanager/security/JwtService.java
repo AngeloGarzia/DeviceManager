@@ -20,10 +20,19 @@ public class JwtService {
     private final AppSettingsService appSettingsService;
 
     public JwtService(
-            @Value("${app.jwt.secret}") String secret,
+            @Value("${app.jwt.secret:}") String secret,
             @Value("${app.jwt.expiration-ms}") long expirationMs,
             @Lazy AppSettingsService appSettingsService) {
-        this.key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
+        if (secret == null || secret.isBlank()) {
+            throw new IllegalStateException(
+                    "APP_JWT_SECRET manquant. Définis une clé d'au moins 32 caractères dans les variables d'environnement.");
+        }
+        byte[] bytes = secret.getBytes(StandardCharsets.UTF_8);
+        if (bytes.length < 32) {
+            throw new IllegalStateException(
+                    "APP_JWT_SECRET trop court (" + bytes.length + " octets). Minimum 32 caractères.");
+        }
+        this.key = Keys.hmacShaKeyFor(bytes);
         this.defaultExpirationMs = expirationMs;
         this.appSettingsService = appSettingsService;
     }

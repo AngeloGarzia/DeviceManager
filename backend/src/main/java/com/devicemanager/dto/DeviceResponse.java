@@ -4,6 +4,7 @@ import lombok.Builder;
 import lombok.Data;
 
 import java.time.LocalDate;
+import java.util.List;
 
 @Data
 @Builder
@@ -14,9 +15,11 @@ public class DeviceResponse {
     private String usage;
     private LocalDate dateAcquisition;
     private boolean obsolete;
+    /** Photo principale (compat listes / commandes). */
     private String photoUrl;
     private String contentType;
     private Long fileSize;
+    private List<DevicePhotoResponse> photos;
     private Long sfmId;
     private String sfmNom;
     private Long masId;

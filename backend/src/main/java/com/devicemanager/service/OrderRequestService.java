@@ -71,11 +71,11 @@ public class OrderRequestService {
                     .quantite(entry.getValue())
                     .build();
             commande.addLigne(ligne);
-            linesBody.append("- ")
-                    .append(device.getNom())
-                    .append(" (réf. ").append(device.getReference()).append(")")
-                    .append(" × ").append(entry.getValue())
-                    .append('\n');
+            linesBody.append("- ").append(device.getNom());
+            if (device.getReference() != null && !device.getReference().isBlank()) {
+                linesBody.append(" (réf. ").append(device.getReference()).append(")");
+            }
+            linesBody.append(" × ").append(entry.getValue()).append('\n');
         }
 
         Commande saved = commandeRepository.save(commande);

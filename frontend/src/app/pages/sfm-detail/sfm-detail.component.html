@@ -19,13 +19,7 @@
             <div><dt class="text-xs uppercase tracking-wide text-ink-faint">Nom</dt><dd class="mt-1 m-0 text-base">{{ sfm.nom }}</dd></div>
             <div>
               <dt class="text-xs uppercase tracking-wide text-ink-faint">Marques</dt>
-              <dd class="mt-1 m-0 text-base">
-                @if (sfm.marques?.length) {
-                  {{ sfm.marques!.map(m => m.label).join(', ') }}
-                } @else {
-                  —
-                }
-              </dd>
+              <dd class="mt-1 m-0 text-base">{{ marquesLabel(sfm) }}</dd>
             </div>
           </dl>
 

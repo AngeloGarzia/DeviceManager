@@ -11,7 +11,7 @@ import {
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -21,9 +21,15 @@ import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatCardModule } from '@angular/material/card';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { DeviceService } from '../../services/device.service';
+import { DeviceFormDraftService } from '../../services/device-form-draft.service';
 import { SfmService } from '../../services/sfm.service';
 import { MasService } from '../../services/mas.service';
-import { DeviceForm, Mas, Sfm } from '../../models/models';
+import { DeviceForm, DevicePhoto, Mas, Sfm } from '../../models/models';
+
+interface NewPhotoItem {
+  file: File;
+  previewUrl: string;
+}
 
 @Component({
   selector: 'app-device-form',
@@ -31,7 +37,6 @@ import { DeviceForm, Mas, Sfm } from '../../models/models';
   imports: [
     CommonModule,
     ReactiveFormsModule,
-    RouterLink,
     MatButtonModule,
     MatIconModule,
     MatFormFieldModule,
@@ -45,6 +50,8 @@ import { DeviceForm, Mas, Sfm } from '../../models/models';
   styleUrl: './device-form.component.scss'
 })
 export class DeviceFormComponent implements OnInit, AfterViewInit, OnDestroy {
+  static readonly MAX_PHOTOS = 5;
+
   @ViewChild('videoEl') videoEl?: ElementRef<HTMLVideoElement>;
   @ViewChild('canvasEl') canvasEl?: ElementRef<HTMLCanvasElement>;
   @ViewChild('fileInput') fileInput?: ElementRef<HTMLInputElement>;
@@ -53,6 +60,7 @@ export class DeviceFormComponent implements OnInit, AfterViewInit, OnDestroy {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly deviceService = inject(DeviceService);
+  private readonly draftService = inject(DeviceFormDraftService);
   private readonly sfmService = inject(SfmService);
   private readonly masService = inject(MasService);
 
@@ -67,12 +75,11 @@ export class DeviceFormComponent implements OnInit, AfterViewInit, OnDestroy {
   readonly masses = signal<Mas[]>([]);
   readonly selectedMasId = signal<number | null>(null);
   readonly selectedSfmId = signal<number | null>(null);
-  readonly previewUrl = signal<string | null>(null);
-  readonly existingPhotoUrl = signal<string | null>(null);
+  readonly existingPhotos = signal<DevicePhoto[]>([]);
+  readonly newPhotos = signal<NewPhotoItem[]>([]);
 
   private mediaStream: MediaStream | null = null;
-  private photoFile: File | null = null;
-  private viewReady = false;
+  private keepDraftOnDestroy = false;
   forOrderRequest = false;
   private readonly onDeviceChange = (): void => {
     void this.refreshCameraList();
@@ -81,18 +88,24 @@ export class DeviceFormComponent implements OnInit, AfterViewInit, OnDestroy {
 
   readonly form = this.fb.group({
     nom: ['', [Validators.required, Validators.maxLength(120)]],
-    reference: ['', [Validators.required, Validators.maxLength(80)]],
+    reference: ['', [Validators.maxLength(80)]],
     usage: ['', [Validators.required, Validators.maxLength(500)]],
-    dateAcquisition: ['', Validators.required],
+    dateAcquisition: [this.todayIso(), Validators.required],
     obsolete: [false],
-    sfmId: [null as number | null, Validators.required],
-    masId: [null as number | null, Validators.required]
+    sfmId: [null as number | null],
+    masId: [null as number | null]
   });
+
+  readonly photoCount = computed(
+    () => this.existingPhotos().length + this.newPhotos().length
+  );
+
+  readonly canAddPhoto = computed(() => this.photoCount() < DeviceFormComponent.MAX_PHOTOS);
 
   readonly selectedMasMarque = computed(() => {
     const masId = this.selectedMasId();
     if (masId == null) {
-      return 'Sélectionnez une MAS';
+      return '—';
     }
     const mas = this.masses().find((m) => m.id === masId);
     return mas?.marqueLabel || mas?.marque || '—';
@@ -101,7 +114,7 @@ export class DeviceFormComponent implements OnInit, AfterViewInit, OnDestroy {
   readonly filteredMasses = computed(() => {
     const sfmId = this.selectedSfmId();
     if (sfmId == null) {
-      return [] as Mas[];
+      return this.masses();
     }
     const sfm = this.sfms().find((s) => s.id === sfmId);
     const marqueIds = new Set(sfm?.marqueIds ?? sfm?.marques?.map((m) => m.id) ?? []);
@@ -119,13 +132,18 @@ export class DeviceFormComponent implements OnInit, AfterViewInit, OnDestroy {
     return this.form.controls.usage.value?.length ?? 0;
   }
 
+  get maxPhotos(): number {
+    return DeviceFormComponent.MAX_PHOTOS;
+  }
+
   ngOnInit(): void {
     this.forOrderRequest = this.route.snapshot.queryParamMap.get('forOrderRequest') === '1';
-    this.sfmService.list().subscribe({ next: (data) => this.sfms.set(data) });
-    this.masService.list().subscribe({ next: (data) => this.masses.set(data) });
     this.form.controls.masId.valueChanges.subscribe((masId) => this.selectedMasId.set(masId));
     this.form.controls.sfmId.valueChanges.subscribe((sfmId) => {
       this.selectedSfmId.set(sfmId);
+      if (sfmId == null) {
+        return;
+      }
       const currentMasId = this.form.controls.masId.value;
       if (currentMasId == null || this.sfms().length === 0 || this.masses().length === 0) {
         return;
@@ -137,26 +155,52 @@ export class DeviceFormComponent implements OnInit, AfterViewInit, OnDestroy {
       }
     });
 
+    const draft = this.draftService.take();
+    const querySfmId = this.parseOptionalId(this.route.snapshot.queryParamMap.get('sfmId'));
+    const queryMasId = this.parseOptionalId(this.route.snapshot.queryParamMap.get('masId'));
+
     const rawId = this.route.snapshot.paramMap.get('id');
     if (rawId) {
       this.id = Number(rawId);
+    }
+
+    if (draft) {
+      this.id = draft.editId;
+      this.forOrderRequest = draft.forOrderRequest || this.forOrderRequest;
+      this.form.patchValue(draft.form);
+      this.selectedSfmId.set(draft.form.sfmId);
+      this.selectedMasId.set(draft.form.masId);
+      this.existingPhotos.set(draft.existingPhotos);
+      this.newPhotos.set(draft.newPhotos);
+    } else if (this.id != null) {
       this.loading.set(true);
       this.deviceService.get(this.id).subscribe({
         next: (device) => {
           this.form.patchValue({
             nom: device.nom,
-            reference: device.reference,
+            reference: device.reference ?? '',
             usage: device.usage,
             dateAcquisition: device.dateAcquisition,
             obsolete: device.obsolete,
-            sfmId: device.sfmId,
-            masId: device.masId
+            sfmId: device.sfmId ?? null,
+            masId: device.masId ?? null
           });
-          this.selectedSfmId.set(device.sfmId);
-          this.selectedMasId.set(device.masId);
-          if (device.photoUrl) {
-            this.existingPhotoUrl.set(this.deviceService.resolvePhotoUrl(device.photoUrl));
-          }
+          this.selectedSfmId.set(device.sfmId ?? null);
+          this.selectedMasId.set(device.masId ?? null);
+          const photos =
+            device.photos && device.photos.length > 0
+              ? [...device.photos].sort((a, b) => a.position - b.position)
+              : device.photoUrl
+                ? [
+                    {
+                      id: -1,
+                      photoUrl: device.photoUrl,
+                      position: 0
+                    } as DevicePhoto
+                  ]
+                : [];
+          this.existingPhotos.set(photos);
+          this.applyQuerySelections(querySfmId, queryMasId);
           this.loading.set(false);
           setTimeout(() => void this.startCamera(), 0);
         },
@@ -166,12 +210,30 @@ export class DeviceFormComponent implements OnInit, AfterViewInit, OnDestroy {
         }
       });
     }
+
+    this.sfmService.list().subscribe({
+      next: (data) => {
+        this.sfms.set(data);
+        this.applyQuerySelections(querySfmId, queryMasId);
+      }
+    });
+    this.masService.list().subscribe({
+      next: (data) => {
+        this.masses.set(data);
+        this.applyQuerySelections(querySfmId, queryMasId);
+      }
+    });
+
+    if (!draft && this.id == null) {
+      this.applyQuerySelections(querySfmId, queryMasId);
+    } else if (draft) {
+      this.applyQuerySelections(querySfmId, queryMasId);
+    }
   }
 
   ngAfterViewInit(): void {
-    this.viewReady = true;
     navigator.mediaDevices?.addEventListener?.('devicechange', this.onDeviceChange);
-    if (!this.isEdit) {
+    if (!this.loading()) {
       void this.startCamera();
     }
   }
@@ -179,10 +241,22 @@ export class DeviceFormComponent implements OnInit, AfterViewInit, OnDestroy {
   ngOnDestroy(): void {
     navigator.mediaDevices?.removeEventListener?.('devicechange', this.onDeviceChange);
     this.stopCamera();
-    const preview = this.previewUrl();
-    if (preview) {
-      URL.revokeObjectURL(preview);
+    if (!this.keepDraftOnDestroy) {
+      this.revokeNewPreviews();
+      this.draftService.clear();
     }
+  }
+
+  goCreateSfm(): void {
+    this.persistDraft();
+    this.keepDraftOnDestroy = true;
+    this.router.navigate(['/sfm/new'], { queryParams: this.returnDeviceQuery() });
+  }
+
+  goCreateMas(): void {
+    this.persistDraft();
+    this.keepDraftOnDestroy = true;
+    this.router.navigate(['/mas/new'], { queryParams: this.returnDeviceQuery() });
   }
 
   cameraLabel(device: MediaDeviceInfo, index: number): string {
@@ -190,6 +264,10 @@ export class DeviceFormComponent implements OnInit, AfterViewInit, OnDestroy {
       return device.label;
     }
     return `Caméra ${index + 1}`;
+  }
+
+  resolveExistingUrl(photo: DevicePhoto): string {
+    return this.deviceService.resolvePhotoUrl(photo.photoUrl);
   }
 
   async onCameraSourceChange(deviceId: string): Promise<void> {
@@ -231,7 +309,6 @@ export class DeviceFormComponent implements OnInit, AfterViewInit, OnDestroy {
       });
     }
 
-    // Priorité: caméra arrière (environment), sinon n'importe quelle caméra.
     try {
       return await navigator.mediaDevices.getUserMedia({
         video: { facingMode: { exact: 'environment' } },
@@ -272,6 +349,10 @@ export class DeviceFormComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   async capturePhoto(): Promise<void> {
+    if (!this.canAddPhoto()) {
+      this.error.set(`Maximum ${this.maxPhotos} images par pièce.`);
+      return;
+    }
     const video = this.videoEl?.nativeElement;
     const canvas = this.canvasEl?.nativeElement;
     if (!video || !canvas || !this.cameraReady()) {
@@ -295,28 +376,45 @@ export class DeviceFormComponent implements OnInit, AfterViewInit, OnDestroy {
       return;
     }
 
-    this.setPhotoFile(new File([blob], `piece-${Date.now()}.jpg`, { type: 'image/jpeg' }));
+    this.addNewPhoto(new File([blob], `piece-${Date.now()}.jpg`, { type: 'image/jpeg' }));
   }
 
   openGallery(): void {
+    if (!this.canAddPhoto()) {
+      this.error.set(`Maximum ${this.maxPhotos} images par pièce.`);
+      return;
+    }
     this.fileInput?.nativeElement.click();
   }
 
   onGallerySelected(event: Event): void {
     const input = event.target as HTMLInputElement;
-    const file = input.files?.[0];
-    if (file) {
-      this.setPhotoFile(file);
+    const files = Array.from(input.files ?? []);
+    input.value = '';
+    for (const file of files) {
+      if (!this.canAddPhoto()) {
+        this.error.set(`Maximum ${this.maxPhotos} images par pièce.`);
+        break;
+      }
+      if (!file.type.startsWith('image/')) {
+        this.error.set('Seules les images sont acceptées.');
+        continue;
+      }
+      this.addNewPhoto(file);
     }
   }
 
-  clearPhoto(): void {
-    const preview = this.previewUrl();
-    if (preview) {
-      URL.revokeObjectURL(preview);
+  removeExistingPhoto(photoId: number): void {
+    this.existingPhotos.update((list) => list.filter((p) => p.id !== photoId));
+  }
+
+  removeNewPhoto(index: number): void {
+    const list = [...this.newPhotos()];
+    const [removed] = list.splice(index, 1);
+    if (removed) {
+      URL.revokeObjectURL(removed.previewUrl);
     }
-    this.previewUrl.set(null);
-    this.photoFile = null;
+    this.newPhotos.set(list);
   }
 
   submit(): void {
@@ -324,17 +422,30 @@ export class DeviceFormComponent implements OnInit, AfterViewInit, OnDestroy {
       this.form.markAllAsTouched();
       return;
     }
-    if (!this.isEdit && !this.photoFile) {
-      this.error.set("Acquérez une image avant d'enregistrer.");
+    if (this.photoCount() < 1) {
+      this.error.set("Ajoutez au moins une image avant d'enregistrer.");
+      return;
+    }
+    if (this.photoCount() > this.maxPhotos) {
+      this.error.set(`Maximum ${this.maxPhotos} images par pièce.`);
       return;
     }
 
-    const payload = this.form.getRawValue() as DeviceForm;
+    const keepPhotoIds = this.existingPhotos()
+      .map((p) => p.id)
+      .filter((id) => id > 0);
+    const payload = {
+      ...(this.form.getRawValue() as DeviceForm),
+      keepPhotoIds
+    };
+    const files = this.newPhotos().map((p) => p.file);
+
     this.saving.set(true);
     this.error.set(null);
+    this.draftService.clear();
     const req$ = this.id
-      ? this.deviceService.update(this.id, payload, this.photoFile)
-      : this.deviceService.create(payload, this.photoFile!);
+      ? this.deviceService.update(this.id, payload, files)
+      : this.deviceService.create(payload, files);
     req$.subscribe({
       next: (saved) => {
         if (this.forOrderRequest) {
@@ -351,6 +462,7 @@ export class DeviceFormComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   cancel(): void {
+    this.draftService.clear();
     if (this.forOrderRequest) {
       this.router.navigate(['/order-request']);
       return;
@@ -362,14 +474,78 @@ export class DeviceFormComponent implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 
-  private setPhotoFile(file: File): void {
-    const previous = this.previewUrl();
-    if (previous) {
-      URL.revokeObjectURL(previous);
+  private persistDraft(): void {
+    const raw = this.form.getRawValue();
+    this.draftService.save({
+      editId: this.id,
+      forOrderRequest: this.forOrderRequest,
+      form: {
+        nom: raw.nom ?? '',
+        reference: raw.reference ?? '',
+        usage: raw.usage ?? '',
+        dateAcquisition: raw.dateAcquisition || this.todayIso(),
+        obsolete: !!raw.obsolete,
+        sfmId: raw.sfmId ?? null,
+        masId: raw.masId ?? null
+      },
+      existingPhotos: [...this.existingPhotos()],
+      newPhotos: [...this.newPhotos()]
+    });
+  }
+
+  private returnDeviceQuery(): Record<string, string> {
+    const query: Record<string, string> = {
+      returnDevice: this.id != null ? String(this.id) : 'new'
+    };
+    if (this.forOrderRequest) {
+      query['forOrderRequest'] = '1';
     }
-    this.photoFile = file;
-    this.previewUrl.set(URL.createObjectURL(file));
+    return query;
+  }
+
+  private applyQuerySelections(sfmId: number | null, masId: number | null): void {
+    const patch: { sfmId?: number | null; masId?: number | null } = {};
+    if (sfmId != null) {
+      patch.sfmId = sfmId;
+      this.selectedSfmId.set(sfmId);
+    }
+    if (masId != null) {
+      patch.masId = masId;
+      this.selectedMasId.set(masId);
+    }
+    if (Object.keys(patch).length > 0) {
+      this.form.patchValue(patch);
+    }
+  }
+
+  private parseOptionalId(raw: string | null): number | null {
+    if (raw == null || raw === '') {
+      return null;
+    }
+    const value = Number(raw);
+    return Number.isFinite(value) ? value : null;
+  }
+
+  private todayIso(): string {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
+
+  private addNewPhoto(file: File): void {
+    this.newPhotos.update((list) => [
+      ...list,
+      { file, previewUrl: URL.createObjectURL(file) }
+    ]);
     this.error.set(null);
+  }
+
+  private revokeNewPreviews(): void {
+    for (const item of this.newPhotos()) {
+      URL.revokeObjectURL(item.previewUrl);
+    }
   }
 
   private stopCamera(clearSelection = true): void {

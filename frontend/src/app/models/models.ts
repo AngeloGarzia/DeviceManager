@@ -71,34 +71,44 @@ export interface MasForm {
   utilise: boolean;
 }
 
+export interface DevicePhoto {
+  id: number;
+  photoUrl: string;
+  contentType?: string;
+  fileSize?: number;
+  position: number;
+}
+
 export interface Device {
   id: number;
   nom: string;
-  reference: string;
+  reference?: string | null;
   usage: string;
   dateAcquisition: string;
   obsolete: boolean;
   photoUrl?: string;
   contentType?: string;
   fileSize?: number;
-  sfmId: number;
-  sfmNom: string;
-  masId: number;
-  masNumero: string;
-  masMarque: string;
-  marqueId?: number;
-  marque?: string;
-  marqueLabel?: string;
+  photos?: DevicePhoto[];
+  sfmId?: number | null;
+  sfmNom?: string | null;
+  masId?: number | null;
+  masNumero?: string | null;
+  masMarque?: string | null;
+  marqueId?: number | null;
+  marque?: string | null;
+  marqueLabel?: string | null;
 }
 
 export interface DeviceForm {
   nom: string;
-  reference: string;
+  reference?: string | null;
   usage: string;
   dateAcquisition: string;
   obsolete: boolean;
   sfmId: number | null;
   masId: number | null;
+  keepPhotoIds?: number[];
 }
 
 export interface OrderRequestLineForm {

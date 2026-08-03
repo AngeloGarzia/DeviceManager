@@ -16,6 +16,17 @@ management:
     health:
       probes:
         enabled: true
+  health:
+    # Render free : éviter 503 sur /actuator/health si MySQL est lent/indispo
+    # (sinon redémarrages en boucle / page « almost online »)
+    db:
+      enabled: false
+    diskspace:
+      enabled: false
+    livenessstate:
+      enabled: true
+    readinessstate:
+      enabled: true
 
 spring:
   application:
@@ -32,7 +43,6 @@ spring:
     properties:
       hibernate:
         format_sql: true
-        dialect: org.hibernate.dialect.MySQLDialect
   servlet:
     multipart:
       max-file-size: 15MB
@@ -51,18 +61,18 @@ spring:
 
 app:
   jwt:
-    secret: ${APP_JWT_SECRET}
+    secret: ${APP_JWT_SECRET:}
     expiration-ms: ${APP_JWT_EXPIRATION_MS:86400000}
   cors:
-    allowed-origins: ${APP_CORS_ALLOWED_ORIGINS}
+    allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:}
   mail:
     enabled: ${APP_MAIL_ENABLED:false}
-    from: ${APP_MAIL_FROM}
-    admin-email: ${APP_MAIL_ADMIN_EMAIL}
+    from: ${APP_MAIL_FROM:noreply@devicemanager.local}
+    admin-email: ${APP_MAIL_ADMIN_EMAIL:admin@devicemanager.local}
   s3:
     enabled: ${APP_S3_ENABLED:false}
-    bucket: ${APP_S3_BUCKET}
-    region: ${APP_S3_REGION}
+    bucket: ${APP_S3_BUCKET:}
+    region: ${APP_S3_REGION:eu-west-3}
     access-key: ${AWS_ACCESS_KEY_ID:}
     secret-key: ${AWS_SECRET_ACCESS_KEY:}
     endpoint: ${AWS_S3_ENDPOINT:}

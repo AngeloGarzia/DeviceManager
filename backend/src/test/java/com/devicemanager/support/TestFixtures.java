@@ -47,7 +47,7 @@ public final class TestFixtures {
     }
 
     public static Device device() {
-        return Device.builder()
+        Device device = Device.builder()
                 .id(40L)
                 .nom("Carte mère")
                 .reference("REF-001")
@@ -58,11 +58,23 @@ public final class TestFixtures {
                 .photoUrl("/uploads/key")
                 .contentType("image/jpeg")
                 .fileSize(10L)
+                .photos(new java.util.ArrayList<>())
                 .sfm(sfm())
                 .mas(mas())
                 .marque(marque())
                 .atelier(atelier())
                 .build();
+        DevicePhoto photo = DevicePhoto.builder()
+                .id(1L)
+                .device(device)
+                .photoKey("key")
+                .photoUrl("/uploads/key")
+                .contentType("image/jpeg")
+                .fileSize(10L)
+                .position(0)
+                .build();
+        device.getPhotos().add(photo);
+        return device;
     }
 
     public static User user(String username, String role) {

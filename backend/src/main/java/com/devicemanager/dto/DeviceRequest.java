@@ -6,6 +6,8 @@ import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
 
 @Data
 public class DeviceRequest {
@@ -14,7 +16,6 @@ public class DeviceRequest {
     @Size(max = 120)
     private String nom;
 
-    @NotBlank
     @Size(max = 80)
     private String reference;
 
@@ -28,9 +29,12 @@ public class DeviceRequest {
     @NotNull
     private Boolean obsolete;
 
-    @NotNull
+    /** Optionnel. */
     private Long sfmId;
 
-    @NotNull
+    /** Optionnel — la marque est héritée de la MAS si renseignée. */
     private Long masId;
+
+    /** Photos existantes à conserver lors d'une mise à jour (ids). */
+    private List<Long> keepPhotoIds = new ArrayList<>();
 }

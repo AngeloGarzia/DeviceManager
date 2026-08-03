@@ -45,6 +45,8 @@ export class MasFormComponent implements OnInit {
   readonly marqueError = signal<string | null>(null);
   readonly marques = signal<MarqueMasOption[]>([]);
   id: number | null = null;
+  returnDevice: string | null = null;
+  private returnForOrderRequest = false;
 
   readonly form = this.fb.group({
     numero: ['', [Validators.required, Validators.maxLength(80)]],
@@ -61,6 +63,8 @@ export class MasFormComponent implements OnInit {
   }
 
   ngOnInit(): void {
+    this.returnDevice = this.route.snapshot.queryParamMap.get('returnDevice');
+    this.returnForOrderRequest = this.route.snapshot.queryParamMap.get('forOrderRequest') === '1';
     this.loadMarques();
 
     const rawId = this.route.snapshot.paramMap.get('id');
@@ -142,7 +146,7 @@ export class MasFormComponent implements OnInit {
     };
     const req$ = this.id ? this.masService.update(this.id, payload) : this.masService.create(payload);
     req$.subscribe({
-      next: (saved) => this.router.navigate(['/mas', saved.id]),
+      next: (saved) => this.navigateAfterSave(saved.id),
       error: (err) => {
         this.saving.set(false);
         this.error.set(err?.error?.message || 'Enregistrement impossible.');
@@ -151,6 +155,32 @@ export class MasFormComponent implements OnInit {
   }
 
   cancel(): void {
+    if (this.returnToDeviceForm()) {
+      return;
+    }
     this.id ? this.router.navigate(['/mas', this.id]) : this.router.navigate(['/mas']);
+  }
+
+  private navigateAfterSave(masId: number): void {
+    if (this.returnToDeviceForm({ masId })) {
+      return;
+    }
+    this.router.navigate(['/mas', masId]);
+  }
+
+  private returnToDeviceForm(extra: Record<string, string | number> = {}): boolean {
+    if (!this.returnDevice) {
+      return false;
+    }
+    const queryParams: Record<string, string | number> = { ...extra };
+    if (this.returnForOrderRequest) {
+      queryParams['forOrderRequest'] = '1';
+    }
+    if (this.returnDevice === 'new') {
+      void this.router.navigate(['/devices/new'], { queryParams });
+    } else {
+      void this.router.navigate(['/devices', this.returnDevice, 'edit'], { queryParams });
+    }
+    return true;
   }
 }

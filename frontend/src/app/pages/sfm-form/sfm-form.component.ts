@@ -42,6 +42,8 @@ export class SfmFormComponent implements OnInit {
   readonly error = signal<string | null>(null);
   readonly marques = signal<MarqueMasOption[]>([]);
   id: number | null = null;
+  returnDevice: string | null = null;
+  private returnForOrderRequest = false;
 
   readonly form = this.fb.group({
     nom: ['', [Validators.required, Validators.maxLength(120)]],
@@ -58,6 +60,8 @@ export class SfmFormComponent implements OnInit {
   }
 
   ngOnInit(): void {
+    this.returnDevice = this.route.snapshot.queryParamMap.get('returnDevice');
+    this.returnForOrderRequest = this.route.snapshot.queryParamMap.get('forOrderRequest') === '1';
     this.masService.listMarques().subscribe({
       next: (data) => this.marques.set(data),
       error: () => this.error.set('Impossible de charger les marques.')
@@ -136,7 +140,7 @@ export class SfmFormComponent implements OnInit {
     };
     const req$ = this.id ? this.sfmService.update(this.id, payload) : this.sfmService.create(payload);
     req$.subscribe({
-      next: (saved) => this.router.navigate(['/sfm', saved.id]),
+      next: (saved) => this.navigateAfterSave(saved.id),
       error: (err) => {
         this.saving.set(false);
         this.error.set(err?.error?.message || 'Enregistrement impossible.');
@@ -145,6 +149,32 @@ export class SfmFormComponent implements OnInit {
   }
 
   cancel(): void {
+    if (this.returnToDeviceForm()) {
+      return;
+    }
     this.id ? this.router.navigate(['/sfm', this.id]) : this.router.navigate(['/sfm']);
+  }
+
+  private navigateAfterSave(sfmId: number): void {
+    if (this.returnToDeviceForm({ sfmId })) {
+      return;
+    }
+    this.router.navigate(['/sfm', sfmId]);
+  }
+
+  private returnToDeviceForm(extra: Record<string, string | number> = {}): boolean {
+    if (!this.returnDevice) {
+      return false;
+    }
+    const queryParams: Record<string, string | number> = { ...extra };
+    if (this.returnForOrderRequest) {
+      queryParams['forOrderRequest'] = '1';
+    }
+    if (this.returnDevice === 'new') {
+      void this.router.navigate(['/devices/new'], { queryParams });
+    } else {
+      void this.router.navigate(['/devices', this.returnDevice, 'edit'], { queryParams });
+    }
+    return true;
   }
 }

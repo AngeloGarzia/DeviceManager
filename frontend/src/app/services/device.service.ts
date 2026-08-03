@@ -22,12 +22,12 @@ export class DeviceService {
     return this.http.get<Device>(`${this.base}/${id}`);
   }
 
-  create(payload: DeviceForm, photo: File): Observable<Device> {
-    return this.http.post<Device>(this.base, this.toFormData(payload, photo));
+  create(payload: DeviceForm, photos: File[]): Observable<Device> {
+    return this.http.post<Device>(this.base, this.toFormData(payload, photos));
   }
 
-  update(id: number, payload: DeviceForm, photo?: File | null): Observable<Device> {
-    return this.http.put<Device>(`${this.base}/${id}`, this.toFormData(payload, photo ?? undefined));
+  update(id: number, payload: DeviceForm, photos: File[] = []): Observable<Device> {
+    return this.http.put<Device>(`${this.base}/${id}`, this.toFormData(payload, photos));
   }
 
   delete(id: number): Observable<void> {
@@ -44,14 +44,14 @@ export class DeviceService {
     return `${environment.apiUrl}${photoUrl}`;
   }
 
-  private toFormData(payload: DeviceForm, photo?: File): FormData {
+  private toFormData(payload: DeviceForm, photos: File[] = []): FormData {
     const formData = new FormData();
     formData.append(
       'data',
       new Blob([JSON.stringify(payload)], { type: 'application/json' })
     );
-    if (photo) {
-      formData.append('photo', photo, photo.name || 'photo.jpg');
+    for (const photo of photos) {
+      formData.append('photos', photo, photo.name || 'photo.jpg');
     }
     return formData;
   }
