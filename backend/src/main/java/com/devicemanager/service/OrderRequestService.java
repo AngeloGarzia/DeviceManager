@@ -15,6 +15,7 @@ import com.devicemanager.repository.CommandeRepository;
 import com.devicemanager.repository.DeviceRepository;
 import com.devicemanager.repository.UserRepository;
 import com.devicemanager.security.OrderStatuses;
+import com.devicemanager.security.Roles;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.hibernate.Hibernate;
@@ -231,8 +232,9 @@ public class OrderRequestService {
                 .body(adminBody)
                 .sfmNom(null)
                 .build());
-        // Aperçu SFM : signature admin encore inconnue à la création
-        previews.addAll(buildSfmMailPreviews(draft, null));
+        // Aperçu SFM : si l'auteur est admin, on montre sa signature ; sinon placeholders admin
+        User validatorPreview = Roles.ADMIN.equalsIgnoreCase(technicien.getRole()) ? technicien : null;
+        previews.addAll(buildSfmMailPreviews(draft, validatorPreview));
         return previews;
     }
 
@@ -358,6 +360,15 @@ public class OrderRequestService {
         return "Demande de devis #" + commande.getId();
     }
 
+    /**
+     * Corps e-mail SFM — signature :
+     * <pre>
+     * Merci, bien à vous.
+     * {Prénom Nom de l'admin validant}
+     * {e-mail admin}
+     * {e-mail demandeur}
+     * </pre>
+     */
     private String buildSfmOrderMailBody(Commande commande, List<CommandeLigne> lignes, User validator) {
         StringBuilder linesBody = new StringBuilder();
         for (CommandeLigne ligne : lignes) {
@@ -375,17 +386,16 @@ public class OrderRequestService {
         String adminEmail = resolveUserEmail(validator, "(e-mail de l'administrateur)");
         String requesterEmail = resolveUserEmail(commande.getTechnicien(), "(e-mail du demandeur)");
 
-        return """
-                Bonjour,
-
-                Pouvez-vous nous faire un devis pour les pièces détachées suivantes :
-
-                %s
-                Merci, bien à vous.
-                %s
-                %s
-                %s
-                """.formatted(linesBody, adminName, adminEmail, requesterEmail);
+        StringBuilder body = new StringBuilder();
+        body.append("Bonjour,\n\n");
+        body.append("Pouvez-vous nous faire un devis pour les pièces détachées suivantes :\n\n");
+        body.append(linesBody);
+        body.append('\n');
+        body.append("Merci, bien à vous.\n");
+        body.append(adminName).append('\n');
+        body.append(adminEmail).append('\n');
+        body.append(requesterEmail).append('\n');
+        return body.toString();
     }
 
     private static String resolveUserEmail(User user, String fallback) {
