@@ -70,7 +70,16 @@ public class SecurityConfig {
                 .map(String::trim)
                 .filter(s -> !s.isBlank())
                 .toList();
-        config.setAllowedOrigins(origins);
+        if (origins.isEmpty()) {
+            // Fallback prod/demo : autorise les fronts Render si la variable n'est pas renseignée
+            config.setAllowedOriginPatterns(List.of(
+                    "https://*.onrender.com",
+                    "http://localhost:*",
+                    "http://127.0.0.1:*"
+            ));
+        } else {
+            config.setAllowedOrigins(origins);
+        }
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
         config.setAllowCredentials(true);
