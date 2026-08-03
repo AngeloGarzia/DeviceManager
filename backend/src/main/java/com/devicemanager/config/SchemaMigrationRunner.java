@@ -27,6 +27,46 @@ public class SchemaMigrationRunner implements CommandLineRunner {
         migrateDevicePhotos();
         repairOrphanAtelierAndMarqueIds();
         softenDeviceOptionalColumns();
+        migrateUserPreferredAtelier();
+    }
+
+    /** Colonne users.preferred_atelier_id (atelier mémorisé par compte). */
+    private void migrateUserPreferredAtelier() {
+        try {
+            Integer usersTable = jdbcTemplate.queryForObject(
+                    """
+                    SELECT COUNT(*) FROM information_schema.TABLES
+                    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users'
+                    """,
+                    Integer.class);
+            if (usersTable == null || usersTable == 0) {
+                return;
+            }
+            Integer hasCol = jdbcTemplate.queryForObject(
+                    """
+                    SELECT COUNT(*) FROM information_schema.COLUMNS
+                    WHERE TABLE_SCHEMA = DATABASE()
+                      AND TABLE_NAME = 'users'
+                      AND COLUMN_NAME = 'preferred_atelier_id'
+                    """,
+                    Integer.class);
+            if (hasCol != null && hasCol > 0) {
+                return;
+            }
+            jdbcTemplate.execute("ALTER TABLE users ADD COLUMN preferred_atelier_id BIGINT NULL");
+            try {
+                jdbcTemplate.execute("""
+                        ALTER TABLE users
+                        ADD CONSTRAINT fk_user_preferred_atelier
+                        FOREIGN KEY (preferred_atelier_id) REFERENCES atelier(id)
+                        """);
+            } catch (Exception ignored) {
+                // contrainte déjà présente ou table atelier absente
+            }
+            log.info("Migration users: colonne preferred_atelier_id");
+        } catch (Exception ex) {
+            log.warn("Migration preferred_atelier_id: {}", ex.getMessage());
+        }
     }
 
     private void softenCommandeLegacyColumns() {

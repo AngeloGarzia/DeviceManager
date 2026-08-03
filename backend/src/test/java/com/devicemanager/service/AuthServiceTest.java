@@ -62,6 +62,32 @@ class AuthServiceTest {
     }
 
     @Test
+    void login_usesPreferredAtelierWhenStillAllowed() {
+        var preferred = TestFixtures.atelier();
+        preferred.setId(200L);
+        preferred.setNom("Atelier Préféré");
+        var user = TestFixtures.user("admin", Roles.ADMIN);
+        user.setPreferredAtelier(preferred);
+
+        when(userRepository.findByUsername("admin")).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("admin123", "encoded")).thenReturn(true);
+        when(atelierService.listForUser("admin")).thenReturn(List.of(
+                AtelierSummary.builder().id(100L).nom("Autre").label("Autre").build(),
+                AtelierSummary.builder().id(200L).nom("Atelier Préféré").label("Atelier Préféré").build()
+        ));
+        when(jwtService.generateToken("admin", Roles.ADMIN)).thenReturn("jwt-token");
+        when(jwtService.getExpirationMs()).thenReturn(86_400_000L);
+
+        LoginRequest request = new LoginRequest();
+        request.setUsername("admin");
+        request.setPassword("admin123");
+
+        AuthResponse response = authService.login(request);
+
+        assertThat(response.getAtelierId()).isEqualTo(200L);
+    }
+
+    @Test
     void login_rejectsUnknownUser() {
         when(userRepository.findByUsername("ghost")).thenReturn(Optional.empty());
 

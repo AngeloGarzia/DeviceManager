@@ -9,14 +9,62 @@
       <div class="grid gap-1 sm:grid-cols-2 sm:gap-x-4" [formGroup]="picker">
         <div class="sm:col-span-2 flex flex-col gap-2 sm:flex-row sm:items-start">
           <mat-form-field appearance="outline" class="w-full flex-1">
-            <mat-label>Pièce existante</mat-label>
-            <mat-select formControlName="deviceId">
-              <mat-option [value]="null">— Sélectionner une pièce —</mat-option>
-              @for (d of devices(); track d.id) {
-                <mat-option [value]="d.id">{{ d.nom }} ({{ d.reference }})</mat-option>
-              }
-            </mat-select>
+            <mat-label>Rechercher une pièce</mat-label>
+            <input
+              matInput
+              [formControl]="searchCtrl"
+              [matAutocomplete]="deviceAuto"
+              placeholder="Nom, référence, marque, MAS, SFM…"
+              autocomplete="off"
+            />
+            @if (searching()) {
+              <mat-spinner matSuffix diameter="18"></mat-spinner>
+            } @else if (searchQueryText() || selectedDevice()) {
+              <button
+                matSuffix
+                mat-icon-button
+                type="button"
+                aria-label="Effacer"
+                (click)="clearSearch()"
+              >
+                <mat-icon>close</mat-icon>
+              </button>
+            } @else {
+              <mat-icon matSuffix>search</mat-icon>
+            }
+            <mat-hint>Tapez pour chercher dans l’inventaire de l’atelier</mat-hint>
           </mat-form-field>
+
+          <mat-autocomplete
+            #deviceAuto="matAutocomplete"
+            [displayWith]="displayDevice"
+            (optionSelected)="onDeviceSelected($event)"
+          >
+            @for (d of suggestions(); track d.id) {
+              <mat-option [value]="d" class="!h-auto !leading-normal !py-2">
+                <div class="suggest-row">
+                  @if (photoUrl(d)) {
+                    <img [src]="photoUrl(d)" [alt]="d.nom" class="suggest-thumb" />
+                  } @else {
+                    <div class="suggest-thumb fallback"><mat-icon>precision_manufacturing</mat-icon></div>
+                  }
+                  <div class="min-w-0 flex-1">
+                    <div class="truncate text-sm font-semibold text-ink">{{ d.nom }}</div>
+                    <div class="truncate text-xs text-ink-soft">
+                      {{ d.reference || 'Sans référence' }}
+                      @if (deviceHint(d)) {
+                        · {{ deviceHint(d) }}
+                      }
+                    </div>
+                  </div>
+                </div>
+              </mat-option>
+            }
+            @if (!searching() && searchQueryText() && !selectedDevice() && suggestions().length === 0) {
+              <mat-option disabled>Aucune pièce trouvée</mat-option>
+            }
+          </mat-autocomplete>
+
           <a
             mat-stroked-button
             color="primary"
@@ -43,13 +91,13 @@
               }
               <div class="thumb-meta">
                 <span class="thumb-title">{{ device.nom }}</span>
-                <span class="thumb-ref">{{ device.reference }}</span>
+                <span class="thumb-ref">{{ device.reference || 'Sans référence' }}</span>
               </div>
             } @else {
               <div class="thumb-fallback"><mat-icon>image_not_supported</mat-icon></div>
               <div class="thumb-meta">
                 <span class="thumb-title">Aucune pièce</span>
-                <span class="thumb-ref">Sélectionnez une pièce à ajouter</span>
+                <span class="thumb-ref">Recherchez puis choisissez une suggestion</span>
               </div>
             }
           </div>
@@ -67,7 +115,7 @@
         </h2>
         @if (lines().length === 0) {
           <p class="m-0 rounded-lg border border-dashed border-line px-3 py-4 text-sm text-ink-soft">
-            Aucune pièce ajoutée. Sélectionnez une pièce puis cliquez sur « Ajouter à la liste ».
+            Aucune pièce ajoutée. Recherchez une pièce puis cliquez sur « Ajouter à la liste ».
           </p>
         } @else {
           <div class="grid gap-2">

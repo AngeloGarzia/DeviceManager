@@ -41,6 +41,25 @@ public class AtelierService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Atelier introuvable"));
     }
 
+    /**
+     * Mémorise l'atelier préféré du compte (utilisé à la prochaine connexion).
+     */
+    @Transactional
+    public AtelierSummary setPreferredAtelier(String username, Long atelierId) {
+        User user = requireUser(username);
+        Atelier atelier = atelierRepository.findByIdWithCasino(atelierId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Atelier introuvable"));
+        if (user.getGroupe() == null
+                || atelier.getCasino() == null
+                || atelier.getCasino().getGroupe() == null
+                || !user.getGroupe().getId().equals(atelier.getCasino().getGroupe().getId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Atelier non autorisé pour ce compte");
+        }
+        user.setPreferredAtelier(atelier);
+        userRepository.save(user);
+        return toSummary(atelier);
+    }
+
     public AtelierSummary toSummary(Atelier atelier) {
         String casinoNom = atelier.getCasino() != null ? atelier.getCasino().getNom() : "";
         String groupeNom = atelier.getCasino() != null && atelier.getCasino().getGroupe() != null

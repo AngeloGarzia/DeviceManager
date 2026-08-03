@@ -22,6 +22,8 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -76,5 +78,20 @@ class AtelierServiceTest {
                 .isInstanceOf(ResponseStatusException.class)
                 .extracting(ex -> ((ResponseStatusException) ex).getReason())
                 .isEqualTo("Utilisateur introuvable");
+    }
+
+    @Test
+    void setPreferredAtelier_persistsOnUser() {
+        var user = TestFixtures.user("admin", Roles.ADMIN);
+        var atelier = TestFixtures.atelier();
+        when(userRepository.findByUsername("admin")).thenReturn(Optional.of(user));
+        when(atelierRepository.findByIdWithCasino(100L)).thenReturn(Optional.of(atelier));
+        when(userRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        AtelierSummary summary = atelierService.setPreferredAtelier("admin", 100L);
+
+        assertThat(summary.getId()).isEqualTo(100L);
+        assertThat(user.getPreferredAtelier()).isEqualTo(atelier);
+        verify(userRepository).save(user);
     }
 }

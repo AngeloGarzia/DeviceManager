@@ -1,13 +1,23 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
-import { MatSelectModule } from '@angular/material/select';
+import { MatAutocompleteModule, MatAutocompleteSelectedEvent } from '@angular/material/autocomplete';
 import { MatCardModule } from '@angular/material/card';
 import { MatIconModule } from '@angular/material/icon';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import {
+  catchError,
+  debounceTime,
+  distinctUntilChanged,
+  finalize,
+  of,
+  switchMap
+} from 'rxjs';
 import { Device, OrderRequestLineForm } from '../../models/models';
 import { DeviceService } from '../../services/device.service';
 import { OrderRequestService } from '../../services/order-request.service';
@@ -30,9 +40,10 @@ interface DraftLine {
     MatButtonModule,
     MatFormFieldModule,
     MatInputModule,
-    MatSelectModule,
+    MatAutocompleteModule,
     MatCardModule,
-    MatIconModule
+    MatIconModule,
+    MatProgressSpinnerModule
   ],
   templateUrl: './order-request-form.component.html',
   styleUrl: './order-request-form.component.scss'
@@ -42,19 +53,18 @@ export class OrderRequestFormComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly deviceService = inject(DeviceService);
   private readonly orderService = inject(OrderRequestService);
+  private readonly destroyRef = inject(DestroyRef);
 
-  readonly devices = signal<Device[]>([]);
+  readonly suggestions = signal<Device[]>([]);
+  readonly searching = signal(false);
+  readonly selectedDevice = signal<Device | null>(null);
   readonly lines = signal<DraftLine[]>([]);
   readonly saving = signal(false);
   readonly success = signal(false);
   readonly error = signal<string | null>(null);
   lastSentCount = 0;
 
-  readonly selectedDevice = computed(() => {
-    const id = this.picker.controls.deviceId.value;
-    if (id == null) return null;
-    return this.devices().find((d) => d.id === id) ?? null;
-  });
+  readonly searchCtrl = this.fb.control<string | Device>('', { nonNullable: true });
 
   readonly picker = this.fb.group({
     deviceId: [null as number | null, Validators.required],
@@ -65,18 +75,82 @@ export class OrderRequestFormComponent implements OnInit {
     message: ['', [Validators.required, Validators.maxLength(1000)]]
   });
 
+  constructor() {
+    this.searchCtrl.valueChanges
+      .pipe(
+        debounceTime(250),
+        distinctUntilChanged(),
+        switchMap((value) => {
+          if (value && typeof value === 'object' && 'id' in value) {
+            return of([] as Device[]);
+          }
+          const q = String(value ?? '').trim();
+          if (this.selectedDevice() && this.displayDevice(this.selectedDevice()) === q) {
+            return of([] as Device[]);
+          }
+          // Nouvelle saisie : invalide la sélection précédente
+          if (this.picker.controls.deviceId.value != null) {
+            this.picker.patchValue({ deviceId: null }, { emitEvent: false });
+            this.selectedDevice.set(null);
+          }
+          if (q.length < 1) {
+            this.suggestions.set([]);
+            return of([] as Device[]);
+          }
+          this.searching.set(true);
+          return this.deviceService.list(q).pipe(
+            catchError(() => of([] as Device[])),
+            finalize(() => this.searching.set(false))
+          );
+        }),
+        takeUntilDestroyed(this.destroyRef)
+      )
+      .subscribe((list) => this.suggestions.set(list));
+  }
+
   ngOnInit(): void {
-    this.deviceService.list().subscribe({
-      next: (data) => {
-        this.devices.set(data);
-        const raw = this.route.snapshot.queryParamMap.get('deviceId');
-        if (raw) {
-          const id = Number(raw);
-          this.picker.patchValue({ deviceId: id });
-          this.addLine();
-        }
+    const raw = this.route.snapshot.queryParamMap.get('deviceId');
+    if (!raw) {
+      return;
+    }
+    const id = Number(raw);
+    if (!Number.isFinite(id)) {
+      return;
+    }
+    this.deviceService.get(id).subscribe({
+      next: (device) => {
+        this.applyDevice(device);
+        this.addLine();
       }
     });
+  }
+
+  displayDevice = (value: Device | string | null): string => {
+    if (!value) {
+      return '';
+    }
+    if (typeof value === 'string') {
+      return value;
+    }
+    const ref = value.reference?.trim();
+    return ref ? `${value.nom} (${ref})` : value.nom;
+  };
+
+  onDeviceSelected(event: MatAutocompleteSelectedEvent): void {
+    const device = event.option.value as Device;
+    this.applyDevice(device);
+  }
+
+  clearSearch(): void {
+    this.searchCtrl.setValue('');
+    this.selectedDevice.set(null);
+    this.picker.patchValue({ deviceId: null });
+    this.suggestions.set([]);
+  }
+
+  searchQueryText(): string {
+    const value = this.searchCtrl.value;
+    return typeof value === 'string' ? value.trim() : '';
   }
 
   photoUrl(device: Device | null | DraftLine): string {
@@ -86,16 +160,26 @@ export class OrderRequestFormComponent implements OnInit {
     return this.deviceService.resolvePhotoUrl(url);
   }
 
+  deviceHint(device: Device): string {
+    const parts = [
+      device.marqueLabel || device.masMarque,
+      device.masNumero ? `MAS ${device.masNumero}` : null,
+      device.sfmNom
+    ].filter(Boolean);
+    return parts.join(' · ');
+  }
+
   addLine(): void {
     if (this.picker.invalid) {
       this.picker.markAllAsTouched();
+      this.error.set('Sélectionnez une pièce dans les suggestions, puis ajoutez-la.');
       return;
     }
     const deviceId = this.picker.controls.deviceId.value!;
     const quantite = Number(this.picker.controls.quantite.value || 1);
-    const device = this.devices().find((d) => d.id === deviceId);
-    if (!device) {
-      this.error.set('Pièce introuvable.');
+    const device = this.selectedDevice();
+    if (!device || device.id !== deviceId) {
+      this.error.set('Pièce introuvable. Relancez la recherche et choisissez une suggestion.');
       return;
     }
 
@@ -118,7 +202,8 @@ export class OrderRequestFormComponent implements OnInit {
         }
       ]);
     }
-    this.picker.patchValue({ deviceId: null, quantite: 1 });
+    this.clearSearch();
+    this.picker.patchValue({ quantite: 1 });
     this.error.set(null);
   }
 
@@ -164,6 +249,7 @@ export class OrderRequestFormComponent implements OnInit {
           this.success.set(true);
           this.form.reset({ message: '' });
           this.lines.set([]);
+          this.clearSearch();
           this.picker.reset({ deviceId: null, quantite: 1 });
           this.error.set(null);
           this.lastSentCount = count;
@@ -173,5 +259,12 @@ export class OrderRequestFormComponent implements OnInit {
           this.error.set(err?.error?.message || 'Envoi impossible.');
         }
       });
+  }
+
+  private applyDevice(device: Device): void {
+    this.selectedDevice.set(device);
+    this.picker.patchValue({ deviceId: device.id });
+    this.searchCtrl.setValue(this.displayDevice(device), { emitEvent: false });
+    this.suggestions.set([]);
   }
 }

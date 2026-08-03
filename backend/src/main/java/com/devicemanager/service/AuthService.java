@@ -36,10 +36,11 @@ public class AuthService {
         }
 
         List<AtelierSummary> ateliers = atelierService.listForUser(user.getUsername());
-        Long atelierId = ateliers.isEmpty() ? null : ateliers.get(0).getId();
+        Long atelierId = resolveLoginAtelierId(user, ateliers);
 
         String token = jwtService.generateToken(user.getUsername(), user.getRole());
-        log.info("Connexion réussie pour utilisateur={} rôle={}", user.getUsername(), user.getRole());
+        log.info("Connexion réussie pour utilisateur={} rôle={} atelier={}",
+                user.getUsername(), user.getRole(), atelierId);
         return AuthResponse.builder()
                 .token(token)
                 .tokenType("Bearer")
@@ -51,5 +52,20 @@ public class AuthService {
                 .atelierId(atelierId)
                 .ateliers(ateliers)
                 .build();
+    }
+
+    /**
+     * Préfère l'atelier mémorisé s'il est encore autorisé pour le groupe ; sinon le premier de la liste.
+     */
+    private Long resolveLoginAtelierId(User user, List<AtelierSummary> ateliers) {
+        if (ateliers.isEmpty()) {
+            return null;
+        }
+        Long preferredId = user.getPreferredAtelier() != null ? user.getPreferredAtelier().getId() : null;
+        if (preferredId != null
+                && ateliers.stream().anyMatch(a -> preferredId.equals(a.getId()))) {
+            return preferredId;
+        }
+        return ateliers.get(0).getId();
     }
 }

@@ -77,6 +77,30 @@ Comptes seed : `admin` / `admin123` · `tech` / `tech123`
 
 ---
 
+## CI/CD GitHub Actions
+
+Workflow : [`.github/workflows/ci-cd.yml`](./.github/workflows/ci-cd.yml)
+
+| Événement | Action |
+|-----------|--------|
+| PR / push `main` | Build + tests backend (Maven) et frontend (Angular) |
+| Push `main` (après CI OK) | Déclenche les **Deploy Hooks** Render |
+
+### Secrets GitHub (Settings → Secrets and variables → Actions)
+
+| Secret | Où le trouver |
+|--------|----------------|
+| `RENDER_DEPLOY_HOOK_API` | Render → service API → Settings → Deploy Hook → Copy |
+| `RENDER_DEPLOY_HOOK_WEB` | Render → Static Site front → Settings → Deploy Hook → Copy |
+
+Optionnel (Variables) : `API_URL` = URL de l’API prod (sinon défaut `https://devicemanager-x5g4.onrender.com`).
+
+### Éviter le double déploiement
+
+Sur Render, désactive **Auto-Deploy** (ou mets-le sur *Commit*) pour API et front si tu utilises les hooks GitHub Actions — sinon un push peut déployer deux fois.
+
+---
+
 ## Limites du gratuit
 
 | Sujet | Comportement |

@@ -31,6 +31,11 @@ public class User {
     @JoinColumn(name = "groupe_id", foreignKey = @ForeignKey(name = "fk_user_groupe"))
     private Groupe groupe;
 
+    /** Dernier atelier sélectionné ; utilisé à la prochaine connexion. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "preferred_atelier_id", foreignKey = @ForeignKey(name = "fk_user_preferred_atelier"))
+    private Atelier preferredAtelier;
+
     @Column(nullable = false, updatable = false)
     private Instant createdAt;
 

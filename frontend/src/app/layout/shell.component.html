@@ -1,17 +1,17 @@
 <div class="min-h-dvh bg-surface text-ink">
   <mat-toolbar class="!sticky top-0 z-20 !h-auto !min-h-14 !bg-white !px-3 !py-2 border-b border-line sm:!px-6">
     <div class="flex w-full flex-wrap items-center justify-between gap-3">
-      <div class="min-w-0">
-        <div class="text-base font-semibold tracking-tight text-brand">DeviceManager</div>
-        <div class="truncate text-xs text-ink-soft">
-          {{ auth.username() }} · {{ auth.roleLabel() }}
-          @if (auth.groupeNom()) {
-            · {{ auth.groupeNom() }}
-          }
+      <div class="flex min-w-0 flex-wrap items-center gap-3">
+        <div class="min-w-0">
+          <div class="text-base font-semibold tracking-tight text-brand">DeviceManager</div>
+          <div class="truncate text-xs text-ink-soft">
+            {{ auth.username() }} · {{ auth.roleLabel() }}
+            @if (auth.groupeNom()) {
+              · {{ auth.groupeNom() }}
+            }
+          </div>
         </div>
-      </div>
 
-      <div class="flex flex-wrap items-center gap-2">
         @if (auth.ateliers().length > 0) {
           <mat-form-field appearance="outline" class="atelier-select !mb-[-1.25em]">
             <mat-label>Atelier</mat-label>
@@ -25,7 +25,9 @@
             </mat-select>
           </mat-form-field>
         }
+      </div>
 
+      <div class="flex flex-wrap items-center gap-2">
         @if (auth.isAdmin()) {
           <a mat-icon-button routerLink="/users" routerLinkActive="admin-active" matTooltip="Comptes">
             <mat-icon>manage_accounts</mat-icon>

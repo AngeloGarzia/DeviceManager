@@ -1,3 +1,31 @@
+.suggest-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+}
+
+.suggest-thumb {
+  width: 40px;
+  height: 40px;
+  border-radius: 0.4rem;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.suggest-thumb.fallback {
+  display: grid;
+  place-items: center;
+  background: #e2e8f0;
+  color: #64748b;
+}
+
+.suggest-thumb.fallback mat-icon {
+  font-size: 20px;
+  width: 20px;
+  height: 20px;
+}
+
 .piece-thumb {
   display: flex;
   align-items: center;

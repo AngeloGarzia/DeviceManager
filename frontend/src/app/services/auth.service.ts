@@ -63,6 +63,12 @@ export class AuthService {
 
   switchAtelier(id: number): void {
     this.setAtelierId(id);
+    // Mémorise l'atelier préféré sur le compte (prochaine connexion)
+    this.http.put(`${environment.apiUrl}/api/ateliers/preferred`, { atelierId: id }).subscribe({
+      error: () => {
+        // Le changement local reste actif même si la persistance échoue
+      },
+    });
     // Recharge la vue courante pour recharger les données de l'atelier
     const url = this.router.url;
     void this.router.navigateByUrl('/', { skipLocationChange: true }).then(() => {

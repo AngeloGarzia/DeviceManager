@@ -44,11 +44,50 @@ public class DeviceService {
     @Transactional(readOnly = true)
     public List<DeviceResponse> findAll(String q) {
         Long atelierId = atelierService.requireCurrentAtelier().getId();
-        List<Device> list = (q == null || q.isBlank())
-                ? deviceRepository.findAllWithRelations(atelierId)
-                : deviceRepository.search(atelierId, q.trim());
+        List<Device> list;
+        if (q == null || q.isBlank()) {
+            list = deviceRepository.findAllWithRelations(atelierId);
+        } else {
+            String[] tokens = java.util.Arrays.stream(q.trim().split("\\s+"))
+                    .map(String::trim)
+                    .filter(t -> !t.isEmpty())
+                    .toArray(String[]::new);
+            list = deviceRepository.search(atelierId, tokens[0]);
+            if (tokens.length > 1) {
+                list = list.stream()
+                        .filter(d -> matchesAllSearchTokens(d, tokens))
+                        .toList();
+            }
+        }
         list.forEach(d -> Hibernate.initialize(d.getPhotos()));
         return list.stream().map(this::toResponse).toList();
+    }
+
+    /** Chaque mot doit apparaître dans nom / référence / usage / SFM / MAS / marque. */
+    private boolean matchesAllSearchTokens(Device d, String[] tokens) {
+        String haystack = String.join(" ",
+                nullToEmpty(d.getNom()),
+                nullToEmpty(d.getReference()),
+                nullToEmpty(d.getUsage()),
+                d.getSfm() != null ? nullToEmpty(d.getSfm().getNom()) : "",
+                d.getMas() != null ? nullToEmpty(d.getMas().getNumero()) : "",
+                d.getMarque() != null ? nullToEmpty(d.getMarque().getLabel()) : "",
+                d.getMarque() != null ? nullToEmpty(d.getMarque().getCode()) : "",
+                d.getMas() != null && d.getMas().getMarque() != null
+                        ? nullToEmpty(d.getMas().getMarque().getLabel()) : "",
+                d.getMas() != null && d.getMas().getMarque() != null
+                        ? nullToEmpty(d.getMas().getMarque().getCode()) : ""
+        ).toLowerCase();
+        for (String token : tokens) {
+            if (!haystack.contains(token.toLowerCase())) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static String nullToEmpty(String value) {
+        return value == null ? "" : value;
     }
 
     @Transactional(readOnly = true)
