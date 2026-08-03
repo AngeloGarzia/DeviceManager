@@ -112,10 +112,12 @@ public class SfmService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Ajoutez au moins un contact SFM");
         }
         for (SfmRequest.SfmContactRequest c : contacts) {
+            boolean receiveMails = c.getReceiveOrderMails() == null || Boolean.TRUE.equals(c.getReceiveOrderMails());
             entity.addContact(SfmContact.builder()
                     .nom(c.getNom().trim())
                     .telephone(c.getTelephone().trim())
                     .email(c.getEmail().trim())
+                    .receiveOrderMails(receiveMails)
                     .build());
         }
     }
@@ -142,6 +144,7 @@ public class SfmService {
                         .nom(c.getNom())
                         .telephone(c.getTelephone())
                         .email(c.getEmail())
+                        .receiveOrderMails(c.isReceiveOrderMails())
                         .build())
                 .toList();
 
@@ -152,6 +155,7 @@ public class SfmService {
                     .nom(entity.getResponsable())
                     .telephone(entity.getTelephone())
                     .email(entity.getEmail())
+                    .receiveOrderMails(true)
                     .build());
         }
 

@@ -29,4 +29,13 @@ public class SfmContact {
 
     @Column(nullable = false, length = 160)
     private String email;
+
+    /** Si true (défaut), ce contact reçoit les e-mails de commande validée. */
+    @Column(name = "receive_order_mails")
+    @Builder.Default
+    private Boolean receiveOrderMails = Boolean.TRUE;
+
+    public boolean isReceiveOrderMails() {
+        return receiveOrderMails == null || receiveOrderMails;
+    }
 }

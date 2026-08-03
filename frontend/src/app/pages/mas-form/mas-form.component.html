@@ -17,14 +17,14 @@
   } @else {
     <mat-card class="!rounded-xl !border !border-line !shadow-soft">
       <mat-card-content class="!pt-5">
-        <form class="grid gap-1" [formGroup]="form" (ngSubmit)="submit()">
+        <form class="grid gap-3" [formGroup]="form" (ngSubmit)="submit()">
           <mat-form-field appearance="outline">
             <mat-label>Numéro</mat-label>
             <input matInput formControlName="numero" />
           </mat-form-field>
 
           <div class="flex flex-col gap-2 sm:flex-row sm:items-start">
-            <mat-form-field appearance="outline" class="w-full flex-1">
+            <mat-form-field appearance="outline" class="w-full min-w-0 flex-1">
               <mat-label>Marque</mat-label>
               <mat-select formControlName="marqueId">
                 @for (m of marques(); track m.id) {
@@ -36,7 +36,7 @@
               mat-stroked-button
               color="primary"
               type="button"
-              class="shrink-0 sm:!mt-1"
+              class="w-full shrink-0 sm:mt-1 sm:w-auto"
               (click)="openNewMarque()"
             >
               <mat-icon>add</mat-icon>
@@ -75,7 +75,7 @@
             <p class="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{{ error() }}</p>
           }
 
-          <div class="mt-2 grid grid-cols-2 gap-3">
+          <div class="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-2">
             <button mat-stroked-button type="button" (click)="cancel()">Annuler</button>
             <button mat-flat-button color="primary" type="submit" [disabled]="saving()">
               {{ saving() ? 'Enregistrement…' : 'Enregistrer' }}

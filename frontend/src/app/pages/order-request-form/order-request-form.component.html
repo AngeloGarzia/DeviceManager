@@ -6,9 +6,9 @@
 
   <mat-card class="!rounded-xl !border !border-line !shadow-soft">
     <mat-card-content class="!pt-5">
-      <div class="grid gap-1 sm:grid-cols-2 sm:gap-x-4" [formGroup]="picker">
-        <div class="sm:col-span-2 flex flex-col gap-2 sm:flex-row sm:items-start">
-          <mat-form-field appearance="outline" class="w-full flex-1">
+      <div class="grid gap-3 sm:grid-cols-2 sm:gap-x-4" [formGroup]="picker">
+        <div class="sm:col-span-2 flex flex-col gap-3 sm:flex-row sm:items-start">
+          <mat-form-field appearance="outline" class="w-full min-w-0 flex-1">
             <mat-label>Rechercher une pièce</mat-label>
             <input
               matInput
@@ -71,7 +71,7 @@
           <a
             mat-stroked-button
             color="primary"
-            class="shrink-0 sm:!mt-1"
+            class="w-full shrink-0 sm:mt-1 sm:w-auto"
             routerLink="/devices/new"
             [queryParams]="{ forOrderRequest: 1 }"
           >
@@ -85,7 +85,7 @@
             <input matInput type="number" min="1" formControlName="quantite" />
           </mat-form-field>
 
-          <div class="piece-thumb" [class.has-piece]="!!selectedDevice()">
+          <div class="piece-thumb w-full min-w-0" [class.has-piece]="!!selectedDevice()">
             @if (selectedDevice(); as device) {
               @if (photoUrl(device)) {
                 <img [src]="photoUrl(device)" [alt]="device.nom" />
@@ -105,7 +105,7 @@
             }
           </div>
 
-          <button mat-flat-button color="primary" type="button" class="shrink-0 sm:!mt-1" (click)="addLine()">
+          <button mat-flat-button color="primary" type="button" class="w-full shrink-0 sm:mt-1 sm:w-auto" (click)="addLine()">
             <mat-icon>add</mat-icon>
             Ajouter à la liste
           </button>
@@ -129,30 +129,32 @@
                 } @else {
                   <div class="line-thumb fallback"><mat-icon>precision_manufacturing</mat-icon></div>
                 }
-                <div class="min-w-0 flex-1">
+                <div class="line-meta min-w-0 flex-1">
                   <div class="truncate text-sm font-semibold text-ink">{{ line.nom }}</div>
                   <div class="text-xs text-ink-soft">{{ line.reference }}</div>
                 </div>
-                <mat-form-field appearance="outline" class="qty-field">
-                  <mat-label>Qté</mat-label>
-                  <input
-                    matInput
-                    type="number"
-                    min="1"
-                    [value]="line.quantite"
-                    (change)="updateQty(line.deviceId, $any($event.target).value)"
-                  />
-                </mat-form-field>
-                <button mat-icon-button type="button" color="warn" (click)="removeLine(line.deviceId)" aria-label="Retirer">
-                  <mat-icon>delete</mat-icon>
-                </button>
+                <div class="line-actions">
+                  <mat-form-field appearance="outline" class="qty-field">
+                    <mat-label>Qté</mat-label>
+                    <input
+                      matInput
+                      type="number"
+                      min="1"
+                      [value]="line.quantite"
+                      (change)="updateQty(line.deviceId, $any($event.target).value)"
+                    />
+                  </mat-form-field>
+                  <button mat-icon-button type="button" color="warn" (click)="removeLine(line.deviceId)" aria-label="Retirer">
+                    <mat-icon>delete</mat-icon>
+                  </button>
+                </div>
               </div>
             }
           </div>
         }
       </div>
 
-      <form class="mt-4 grid gap-1" [formGroup]="form" (ngSubmit)="submit()">
+      <form class="mt-4 grid gap-3" [formGroup]="form" (ngSubmit)="submit()">
         <mat-form-field appearance="outline">
           <mat-label>Message pour l'administrateur</mat-label>
           <textarea matInput rows="4" formControlName="message"></textarea>
@@ -160,19 +162,45 @@
 
         @if (success()) {
           <p class="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
-            Demande enregistrée avec {{ lastSentCount }} pièce(s) et envoyée à l'administrateur.
+            Demande enregistrée avec {{ lastSentCount }} pièce(s). Un e-mail a été envoyé à l'administrateur pour validation.
           </p>
         }
         @if (error()) {
           <p class="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{{ error() }}</p>
         }
 
-        <div class="mt-2 grid grid-cols-2 gap-3">
+        <div class="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-3">
           <a mat-stroked-button routerLink="/devices">Retour</a>
+          <button
+            mat-stroked-button
+            color="primary"
+            type="button"
+            [disabled]="previewing() || lines().length === 0"
+            (click)="loadMailPreview()"
+          >
+            <mat-icon>preview</mat-icon>
+            {{ previewing() ? 'Aperçu…' : 'Aperçu e-mail' }}
+          </button>
           <button mat-flat-button color="primary" type="submit" [disabled]="saving()">
             {{ saving() ? 'Envoi…' : 'Envoyer la demande' }}
           </button>
         </div>
+
+        @if (mailPreviews().length > 0) {
+          <div class="mail-preview-block mt-4">
+            <h3 class="m-0 mb-2 text-sm font-semibold text-ink">Aperçu de l’e-mail qui sera envoyé</h3>
+            @for (mail of mailPreviews(); track $index) {
+              <article class="mail-preview-card" [class.warning]="mail.kind === 'WARNING'">
+                <div class="mail-meta">
+                  <span class="mail-kind">{{ mail.kind === 'ADMIN' ? 'Administrateur' : mail.kind }}</span>
+                  <span><strong>À :</strong> {{ mail.to }}</span>
+                  <span><strong>Objet :</strong> {{ mail.subject }}</span>
+                </div>
+                <pre class="mail-body">{{ mail.body }}</pre>
+              </article>
+            }
+          </div>
+        }
       </form>
     </mat-card-content>
   </mat-card>

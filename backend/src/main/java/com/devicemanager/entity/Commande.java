@@ -56,7 +56,7 @@ public class Commande {
             dateDemande = LocalDateTime.now();
         }
         if (status == null) {
-            status = "SENT";
+            status = "PENDING";
         }
     }
 }

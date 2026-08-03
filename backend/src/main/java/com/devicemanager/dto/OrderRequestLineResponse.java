@@ -12,4 +12,6 @@ public class OrderRequestLineResponse {
     private String reference;
     private Integer quantite;
     private String photoUrl;
+    private Long sfmId;
+    private String sfmNom;
 }

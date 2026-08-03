@@ -30,6 +30,8 @@ export interface SfmContact {
   nom: string;
   telephone: string;
   email: string;
+  /** Si true, reçoit les e-mails de commande validée. */
+  receiveOrderMails?: boolean;
 }
 
 export interface MarqueMasOption {
@@ -128,6 +130,8 @@ export interface OrderRequestLine {
   reference?: string;
   quantite: number;
   photoUrl?: string;
+  sfmId?: number | null;
+  sfmNom?: string | null;
 }
 
 export interface OrderRequest {

@@ -20,6 +20,8 @@ export class AuthService {
   readonly atelierId = signal<number | null>(this.readAtelierId());
   readonly ateliers = signal<AtelierSummary[]>(this.readAteliers());
   readonly groupeNom = signal<string | null>(localStorage.getItem(GROUPE_KEY));
+  /** Incrémenté à chaque changement d'atelier → remount du contenu (rechargement données). */
+  readonly atelierRevision = signal(0);
 
   readonly isAdmin = computed(() => this.role() === 'ADMIN');
   readonly isTechnicien = computed(() => this.role() === 'TECHNICIEN' || this.role() === 'TECH');
@@ -43,37 +45,55 @@ export class AuthService {
         if (res.groupeNom) {
           localStorage.setItem(GROUPE_KEY, res.groupeNom);
         }
-        const ateliers = res.ateliers ?? [];
+        const ateliers = (res.ateliers ?? []).map((a) => ({
+          ...a,
+          id: Number(a.id)
+        }));
         this.ateliers.set(ateliers);
         localStorage.setItem(ATELIERS_KEY, JSON.stringify(ateliers));
-        const atelierId = res.atelierId ?? ateliers[0]?.id ?? null;
+        const preferred = this.toAtelierId(res.atelierId);
+        const atelierId =
+          preferred != null && ateliers.some((a) => a.id === preferred)
+            ? preferred
+            : (ateliers[0]?.id ?? null);
         this.setAtelierId(atelierId);
+        this.atelierRevision.set(0);
       })
     );
   }
 
   setAtelierId(id: number | null): void {
-    this.atelierId.set(id);
-    if (id == null) {
+    const normalized = this.toAtelierId(id);
+    this.atelierId.set(normalized);
+    if (normalized == null) {
       localStorage.removeItem(ATELIER_KEY);
     } else {
-      localStorage.setItem(ATELIER_KEY, String(id));
+      localStorage.setItem(ATELIER_KEY, String(normalized));
     }
   }
 
-  switchAtelier(id: number): void {
-    this.setAtelierId(id);
+  switchAtelier(id: number | string): void {
+    const nextId = this.toAtelierId(id);
+    if (nextId == null) {
+      return;
+    }
+    if (this.atelierId() === nextId) {
+      return;
+    }
+    this.setAtelierId(nextId);
+    // Force le rechargement des écrans (listes / formulaires) pour le nouvel atelier
+    this.atelierRevision.update((v) => v + 1);
     // Mémorise l'atelier préféré sur le compte (prochaine connexion)
-    this.http.put(`${environment.apiUrl}/api/ateliers/preferred`, { atelierId: id }).subscribe({
+    this.http.put(`${environment.apiUrl}/api/ateliers/preferred`, { atelierId: nextId }).subscribe({
       error: () => {
         // Le changement local reste actif même si la persistance échoue
-      },
+      }
     });
-    // Recharge la vue courante pour recharger les données de l'atelier
+    // Réactive la route après remount de <router-outlet>
     const url = this.router.url;
-    void this.router.navigateByUrl('/', { skipLocationChange: true }).then(() => {
+    setTimeout(() => {
       void this.router.navigateByUrl(url);
-    });
+    }, 0);
   }
 
   logout(): void {
@@ -88,6 +108,7 @@ export class AuthService {
     this.atelierId.set(null);
     this.ateliers.set([]);
     this.groupeNom.set(null);
+    this.atelierRevision.set(0);
     this.router.navigate(['/login']);
   }
 
@@ -113,6 +134,14 @@ export class AuthService {
     return this.role() || '';
   }
 
+  private toAtelierId(value: unknown): number | null {
+    if (value == null || value === '') {
+      return null;
+    }
+    const n = Number(value);
+    return Number.isFinite(n) ? n : null;
+  }
+
   private readUser(): string | null {
     return localStorage.getItem(USER_KEY);
   }
@@ -122,14 +151,14 @@ export class AuthService {
   }
 
   private readAtelierId(): number | null {
-    const raw = localStorage.getItem(ATELIER_KEY);
-    return raw ? Number(raw) : null;
+    return this.toAtelierId(localStorage.getItem(ATELIER_KEY));
   }
 
   private readAteliers(): AtelierSummary[] {
     try {
       const raw = localStorage.getItem(ATELIERS_KEY);
-      return raw ? (JSON.parse(raw) as AtelierSummary[]) : [];
+      const list = raw ? (JSON.parse(raw) as AtelierSummary[]) : [];
+      return list.map((a) => ({ ...a, id: Number(a.id) }));
     } catch {
       return [];
     }

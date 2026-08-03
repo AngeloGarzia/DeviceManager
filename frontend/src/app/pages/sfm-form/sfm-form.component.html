@@ -41,7 +41,7 @@
               mat-stroked-button
               color="primary"
               type="button"
-              class="shrink-0 sm:!mt-1"
+              class="w-full shrink-0 sm:mt-1 sm:w-auto"
               (click)="openNewMarque()"
             >
               <mat-icon>add</mat-icon>
@@ -75,9 +75,9 @@
           }
 
           <div>
-            <div class="mb-3 flex items-center justify-between gap-2">
+            <div class="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <h2 class="m-0 text-base font-semibold text-ink">Contacts ({{ contacts.length }})</h2>
-              <button mat-stroked-button type="button" (click)="addContact()">
+              <button mat-stroked-button type="button" class="w-full sm:w-auto" (click)="addContact()">
                 <mat-icon>person_add</mat-icon>
                 Ajouter un contact
               </button>
@@ -92,7 +92,7 @@
                       <mat-icon>delete</mat-icon>
                     </button>
                   </div>
-                  <div class="grid gap-1 sm:grid-cols-2 sm:gap-x-4">
+                  <div class="grid gap-3 sm:grid-cols-2 sm:gap-x-4">
                     <mat-form-field appearance="outline" class="sm:col-span-2">
                       <mat-label>Nom</mat-label>
                       <input matInput formControlName="nom" />
@@ -105,6 +105,14 @@
                       <mat-label>Email</mat-label>
                       <input matInput type="email" formControlName="email" />
                     </mat-form-field>
+                    <div class="sm:col-span-2">
+                      <mat-checkbox formControlName="receiveOrderMails" color="primary">
+                        Recevoir les e-mails de commande
+                      </mat-checkbox>
+                      <p class="m-0 mt-1 text-xs text-ink-soft">
+                        Si décoché, ce contact ne sera pas notifié lors de la validation d’une demande.
+                      </p>
+                    </div>
                   </div>
                 </div>
               }
@@ -115,7 +123,7 @@
             <p class="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{{ error() }}</p>
           }
 
-          <div class="grid grid-cols-2 gap-3">
+          <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <button mat-stroked-button type="button" (click)="cancel()">Annuler</button>
             <button mat-flat-button color="primary" type="submit" [disabled]="saving()">
               {{ saving() ? 'Enregistrement…' : 'Enregistrer' }}

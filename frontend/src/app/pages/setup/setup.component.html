@@ -12,7 +12,7 @@
         <mat-card class="!rounded-xl !border !border-line !shadow-soft">
           <mat-card-content class="!pt-5">
             <h2 class="m-0 mb-4 text-base font-semibold text-ink">{{ entry[0] }}</h2>
-            <div class="grid gap-1 sm:grid-cols-2 sm:gap-x-4">
+            <div class="grid gap-3 sm:grid-cols-2 sm:gap-x-4">
               @for (item of entry[1]; track item.key) {
                 @if (isBooleanSetting(item.key)) {
                   <div class="sm:col-span-2 flex items-center justify-between rounded-lg border border-line px-3 py-3">

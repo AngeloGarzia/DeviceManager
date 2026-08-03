@@ -31,12 +31,19 @@
   align-items: center;
   gap: 0.75rem;
   min-height: 56px;
+  min-width: 0;
   padding: 0.5rem 0.75rem;
   border: 1px solid #d7e0ea;
   border-radius: 0.75rem;
   background: #f8fafc;
-  flex: 1;
-  max-width: 28rem;
+  flex: 1 1 auto;
+  max-width: 100%;
+}
+
+@media (min-width: 640px) {
+  .piece-thumb {
+    max-width: 28rem;
+  }
 }
 
 .piece-thumb.has-piece {
@@ -82,12 +89,25 @@
 
 .line-row {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 0.75rem;
   padding: 0.5rem 0.75rem;
   border: 1px solid #d7e0ea;
   border-radius: 0.75rem;
   background: #fff;
+}
+
+.line-meta {
+  flex: 1 1 8rem;
+  min-width: 0;
+}
+
+.line-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-left: auto;
 }
 
 .line-thumb {
@@ -106,6 +126,57 @@
 }
 
 .qty-field {
-  width: 5.5rem;
-  margin-bottom: -1.25em;
+  width: 4.75rem;
+  margin-bottom: 0;
+}
+
+.mail-preview-block {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.mail-preview-card {
+  border: 1px solid #d7e0ea;
+  border-radius: 0.75rem;
+  background: #f8fafc;
+  overflow: hidden;
+}
+
+.mail-preview-card.warning {
+  border-color: #f59e0b;
+  background: #fffbeb;
+}
+
+.mail-meta {
+  display: grid;
+  gap: 0.25rem;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid #e2e8f0;
+  font-size: 0.8rem;
+  color: #334155;
+}
+
+.mail-kind {
+  display: inline-block;
+  width: fit-content;
+  margin-bottom: 0.15rem;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  background: #dbeafe;
+  color: #1d4ed8;
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+
+.mail-body {
+  margin: 0;
+  padding: 0.75rem 1rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.75rem;
+  line-height: 1.45;
+  color: #0f172a;
+  max-height: 18rem;
+  overflow: auto;
 }

@@ -56,7 +56,7 @@ public class AtelierService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Atelier non autorisé pour ce compte");
         }
         user.setPreferredAtelier(atelier);
-        userRepository.save(user);
+        userRepository.saveAndFlush(user);
         return toSummary(atelier);
     }
 

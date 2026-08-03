@@ -10,4 +10,5 @@ public class SfmContactResponse {
     private String nom;
     private String telephone;
     private String email;
+    private boolean receiveOrderMails;
 }

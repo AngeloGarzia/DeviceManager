@@ -3,21 +3,24 @@ package com.devicemanager.service;
 import com.devicemanager.dto.OrderRequestDto;
 import com.devicemanager.dto.OrderRequestResponse;
 import com.devicemanager.entity.Commande;
+import com.devicemanager.entity.CommandeLigne;
 import com.devicemanager.repository.CommandeRepository;
 import com.devicemanager.repository.DeviceRepository;
 import com.devicemanager.repository.UserRepository;
+import com.devicemanager.security.OrderStatuses;
 import com.devicemanager.security.Roles;
 import com.devicemanager.support.TestFixtures;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -28,8 +31,6 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class OrderRequestServiceTest {
-
-    private static final Logger log = LoggerFactory.getLogger(OrderRequestServiceTest.class);
 
     @Mock private CommandeRepository commandeRepository;
     @Mock private DeviceRepository deviceRepository;
@@ -44,8 +45,7 @@ class OrderRequestServiceTest {
     }
 
     @Test
-    void create_mergesQuantitiesAndSendsMail() {
-        log.info("Test create order request");
+    void create_mergesQuantitiesAndNotifiesAdminWithSfm() {
         when(userRepository.findByUsername("tech")).thenReturn(Optional.of(TestFixtures.user("tech", Roles.TECHNICIEN)));
         when(deviceRepository.findByIdWithRelations(40L, 100L)).thenReturn(Optional.of(TestFixtures.device()));
         when(commandeRepository.save(any(Commande.class))).thenAnswer(inv -> {
@@ -69,8 +69,10 @@ class OrderRequestServiceTest {
 
         assertThat(response.getTotalPieces()).isEqualTo(1);
         assertThat(response.getTotalQuantite()).isEqualTo(5);
-        assertThat(response.getTechnicienNom()).isEqualTo("tech");
-        verify(mailService).sendOrderRequestToAdmin(contains("1 pièce"), contains("Urgent"));
+        assertThat(response.getStatus()).isEqualTo(OrderStatuses.PENDING);
+        ArgumentCaptor<String> bodyCaptor = ArgumentCaptor.forClass(String.class);
+        verify(mailService).sendOrderRequestToAdmin(contains("1 pièce"), bodyCaptor.capture());
+        assertThat(bodyCaptor.getValue()).contains("SFM Nord").contains("Urgent").contains("validation");
     }
 
     @Test
@@ -110,5 +112,51 @@ class OrderRequestServiceTest {
         when(commandeRepository.findAllWithRelationsOrderByDateDesc(100L)).thenReturn(List.of());
 
         assertThat(orderRequestService.findAll()).isEmpty();
+    }
+
+    @Test
+    void validate_sendsOneMailPerSfmAndMarksValidated() {
+        var device = TestFixtures.device();
+        Commande commande = Commande.builder()
+                .id(70L)
+                .technicien(TestFixtures.user("tech", Roles.TECHNICIEN))
+                .technicienNom("tech")
+                .message("Besoin urgent")
+                .dateDemande(LocalDateTime.now())
+                .status(OrderStatuses.PENDING)
+                .atelier(TestFixtures.atelier())
+                .lignes(new ArrayList<>())
+                .build();
+        CommandeLigne ligne = CommandeLigne.builder().id(1L).device(device).quantite(2).build();
+        commande.addLigne(ligne);
+
+        when(commandeRepository.findByIdWithRelations(70L, 100L)).thenReturn(Optional.of(commande));
+        when(commandeRepository.save(any(Commande.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        OrderRequestResponse response = orderRequestService.validate(70L, "admin");
+
+        assertThat(response.getStatus()).isEqualTo(OrderStatuses.VALIDATED);
+        verify(mailService).send(eq("jean@example.com"), contains("Commande validée"), contains("Carte mère"));
+    }
+
+    @Test
+    void validate_rejectsAlreadyValidated() {
+        Commande commande = Commande.builder()
+                .id(71L)
+                .technicien(TestFixtures.user("tech", Roles.TECHNICIEN))
+                .technicienNom("tech")
+                .message("x")
+                .dateDemande(LocalDateTime.now())
+                .status(OrderStatuses.VALIDATED)
+                .atelier(TestFixtures.atelier())
+                .lignes(new ArrayList<>())
+                .build();
+        when(commandeRepository.findByIdWithRelations(71L, 100L)).thenReturn(Optional.of(commande));
+
+        assertThatThrownBy(() -> orderRequestService.validate(71L, "admin"))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getReason())
+                .asString()
+                .contains("déjà validée");
     }
 }

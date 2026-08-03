@@ -69,7 +69,34 @@ class SfmServiceTest {
         assertThat(response.getNom()).isEqualTo("SFM Est");
         assertThat(response.getResponsable()).isEqualTo("Alice");
         assertThat(response.getContacts()).hasSize(1);
+        assertThat(response.getContacts().get(0).isReceiveOrderMails()).isTrue();
         assertThat(response.getMarqueIds()).containsExactly(5L);
+    }
+
+    @Test
+    void create_respectsReceiveOrderMailsFalse() {
+        when(sfmRepository.existsByNomIgnoreCaseAndAtelierId("SFM Ouest", 100L)).thenReturn(false);
+        when(marqueMasRepository.findAllById(anyCollection())).thenReturn(List.of(TestFixtures.marque()));
+        when(sfmRepository.save(any(Sfm.class))).thenAnswer(inv -> {
+            Sfm s = inv.getArgument(0);
+            s.setId(32L);
+            return s;
+        });
+
+        SfmRequest.SfmContactRequest contact = new SfmRequest.SfmContactRequest();
+        contact.setNom("Claire");
+        contact.setTelephone("0600112233");
+        contact.setEmail("claire@example.com");
+        contact.setReceiveOrderMails(false);
+
+        SfmRequest request = new SfmRequest();
+        request.setNom("SFM Ouest");
+        request.setContacts(List.of(contact));
+        request.setMarqueIds(List.of(5L));
+
+        SfmResponse response = sfmService.create(request);
+
+        assertThat(response.getContacts().get(0).isReceiveOrderMails()).isFalse();
     }
 
     @Test

@@ -20,7 +20,7 @@ import {
 } from 'rxjs';
 import { Device, OrderRequestLineForm } from '../../models/models';
 import { DeviceService } from '../../services/device.service';
-import { OrderRequestService } from '../../services/order-request.service';
+import { MailPreviewItem, OrderRequestService } from '../../services/order-request.service';
 
 interface DraftLine {
   deviceId: number;
@@ -28,6 +28,7 @@ interface DraftLine {
   nom: string;
   reference?: string | null;
   photoUrl: string;
+  sfmNom?: string | null;
 }
 
 @Component({
@@ -60,6 +61,8 @@ export class OrderRequestFormComponent implements OnInit {
   readonly selectedDevice = signal<Device | null>(null);
   readonly lines = signal<DraftLine[]>([]);
   readonly saving = signal(false);
+  readonly previewing = signal(false);
+  readonly mailPreviews = signal<MailPreviewItem[]>([]);
   readonly success = signal(false);
   readonly error = signal<string | null>(null);
   lastSentCount = 0;
@@ -88,7 +91,6 @@ export class OrderRequestFormComponent implements OnInit {
           if (this.selectedDevice() && this.displayDevice(this.selectedDevice()) === q) {
             return of([] as Device[]);
           }
-          // Nouvelle saisie : invalide la sélection précédente
           if (this.picker.controls.deviceId.value != null) {
             this.picker.patchValue({ deviceId: null }, { emitEvent: false });
             this.selectedDevice.set(null);
@@ -198,13 +200,15 @@ export class OrderRequestFormComponent implements OnInit {
           quantite,
           nom: device.nom,
           reference: device.reference,
-          photoUrl: device.photoUrl || ''
+          photoUrl: device.photoUrl || '',
+          sfmNom: device.sfmNom
         }
       ]);
     }
     this.clearSearch();
     this.picker.patchValue({ quantite: 1 });
     this.error.set(null);
+    this.mailPreviews.set([]);
   }
 
   updateQty(deviceId: number, value: string | number): void {
@@ -212,10 +216,40 @@ export class OrderRequestFormComponent implements OnInit {
     this.lines.update((list) =>
       list.map((l) => (l.deviceId === deviceId ? { ...l, quantite: qty } : l))
     );
+    this.mailPreviews.set([]);
   }
 
   removeLine(deviceId: number): void {
     this.lines.update((list) => list.filter((l) => l.deviceId !== deviceId));
+    this.mailPreviews.set([]);
+  }
+
+  loadMailPreview(): void {
+    if (this.lines().length === 0) {
+      this.error.set('Ajoutez au moins une pièce pour prévisualiser l’e-mail.');
+      return;
+    }
+    const lignes: OrderRequestLineForm[] = this.lines().map((l) => ({
+      deviceId: l.deviceId,
+      quantite: l.quantite
+    }));
+    this.previewing.set(true);
+    this.error.set(null);
+    this.orderService
+      .previewCreate({
+        message: (this.form.controls.message.value || '').trim() || '(message à compléter)',
+        lignes
+      })
+      .subscribe({
+        next: (previews) => {
+          this.mailPreviews.set(previews);
+          this.previewing.set(false);
+        },
+        error: (err) => {
+          this.previewing.set(false);
+          this.error.set(err?.error?.message || 'Aperçu impossible.');
+        }
+      });
   }
 
   submit(): void {
@@ -251,6 +285,7 @@ export class OrderRequestFormComponent implements OnInit {
           this.lines.set([]);
           this.clearSearch();
           this.picker.reset({ deviceId: null, quantite: 1 });
+          this.mailPreviews.set([]);
           this.error.set(null);
           this.lastSentCount = count;
         },

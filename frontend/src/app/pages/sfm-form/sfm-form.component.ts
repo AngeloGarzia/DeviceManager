@@ -8,6 +8,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatCardModule } from '@angular/material/card';
+import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { SfmService } from '../../services/sfm.service';
 import { MasService } from '../../services/mas.service';
@@ -25,6 +26,7 @@ import { MarqueMasOption, SfmContact, SfmForm } from '../../models/models';
     MatInputModule,
     MatSelectModule,
     MatCardModule,
+    MatCheckboxModule,
     MatProgressSpinnerModule
   ],
   templateUrl: './sfm-form.component.html',
@@ -156,7 +158,8 @@ export class SfmFormComponent implements OnInit {
     return this.fb.group({
       nom: [contact?.nom || '', [Validators.required, Validators.maxLength(120)]],
       telephone: [contact?.telephone || '', [Validators.required, Validators.maxLength(40)]],
-      email: [contact?.email || '', [Validators.required, Validators.email, Validators.maxLength(160)]]
+      email: [contact?.email || '', [Validators.required, Validators.email, Validators.maxLength(160)]],
+      receiveOrderMails: [contact?.receiveOrderMails !== false]
     });
   }
 
@@ -192,7 +195,8 @@ export class SfmFormComponent implements OnInit {
       contacts: (raw.contacts || []).map((c) => ({
         nom: String(c?.nom || '').trim(),
         telephone: String(c?.telephone || '').trim(),
-        email: String(c?.email || '').trim()
+        email: String(c?.email || '').trim(),
+        receiveOrderMails: c?.receiveOrderMails !== false
       }))
     };
     const req$ = this.id ? this.sfmService.update(this.id, payload) : this.sfmService.create(payload);

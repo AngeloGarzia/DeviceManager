@@ -1,8 +1,8 @@
 <div class="min-h-dvh bg-surface text-ink">
   <mat-toolbar class="!sticky top-0 z-20 !h-auto !min-h-14 !bg-white !px-3 !py-2 border-b border-line sm:!px-6">
-    <div class="flex w-full flex-wrap items-center justify-between gap-3">
-      <div class="flex min-w-0 flex-wrap items-center gap-3">
-        <div class="min-w-0">
+    <div class="flex w-full flex-wrap items-center justify-between gap-2 sm:gap-3">
+      <div class="flex min-w-0 flex-1 flex-wrap items-center gap-2 sm:gap-3">
+        <div class="min-w-0 shrink">
           <div class="text-base font-semibold tracking-tight text-brand">DeviceManager</div>
           <div class="truncate text-xs text-ink-soft">
             {{ auth.username() }} · {{ auth.roleLabel() }}
@@ -13,7 +13,7 @@
         </div>
 
         @if (auth.ateliers().length > 0) {
-          <mat-form-field appearance="outline" class="atelier-select !mb-[-1.25em]">
+          <mat-form-field appearance="outline" class="atelier-select !mb-[-1.25em] min-w-0 flex-1 sm:flex-none">
             <mat-label>Atelier</mat-label>
             <mat-select
               [value]="auth.atelierId()"
@@ -27,7 +27,7 @@
         }
       </div>
 
-      <div class="flex flex-wrap items-center gap-2">
+      <div class="flex shrink-0 flex-wrap items-center gap-1 sm:gap-2">
         @if (auth.isAdmin()) {
           <a mat-icon-button routerLink="/users" routerLinkActive="admin-active" matTooltip="Comptes">
             <mat-icon>manage_accounts</mat-icon>
@@ -36,23 +36,33 @@
             <mat-icon>settings</mat-icon>
           </a>
         }
-        <button mat-stroked-button type="button" color="primary" (click)="auth.logout()">
+        <button
+          mat-stroked-button
+          type="button"
+          color="primary"
+          class="!min-w-0"
+          (click)="auth.logout()"
+          aria-label="Déconnexion"
+        >
           <mat-icon>logout</mat-icon>
-          Déconnexion
+          <span class="logout-label">Déconnexion</span>
         </button>
       </div>
     </div>
   </mat-toolbar>
 
   <main class="page-shell">
-    <router-outlet />
+    <!-- track revision : change d'atelier → destroy/recreate outlet → reload des données -->
+    @for (_ of [auth.atelierRevision()]; track _) {
+      <router-outlet />
+    }
   </main>
 
   <nav
     class="fixed bottom-0 left-0 right-0 z-30 border-t border-line bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/90"
     aria-label="Navigation principale"
   >
-    <div class="mx-auto grid max-w-6xl grid-flow-col auto-cols-fr gap-1 px-1 pb-[max(0.35rem,env(safe-area-inset-bottom))] pt-1">
+    <div class="nav-grid">
       <a
         routerLink="/devices"
         routerLinkActive="active-nav"
@@ -63,14 +73,26 @@
         <span>Pièces</span>
       </a>
 
-      <a routerLink="/order-request" routerLinkActive="active-nav" class="nav-link">
+      <a routerLink="/order-request" routerLinkActive="active-nav" class="nav-link" aria-label="Demande de commande">
         <mat-icon>mail</mat-icon>
-        <span>Commande</span>
+        <span>Demande de commande</span>
       </a>
 
-      <a routerLink="/order-requests" routerLinkActive="active-nav" class="nav-link">
-        <mat-icon>inbox</mat-icon>
-        <span>Demandes</span>
+      <a
+        routerLink="/order-requests"
+        routerLinkActive="active-nav"
+        class="nav-link nav-link--badge"
+        aria-label="Demande en cours"
+      >
+        <span class="nav-icon-wrap">
+          <mat-icon>inbox</mat-icon>
+          @if (orders.pendingCount() > 0) {
+            <span class="pending-badge" [attr.aria-label]="orders.pendingCount() + ' demande(s) en attente'">
+              {{ orders.pendingCount() > 99 ? '99+' : orders.pendingCount() }}
+            </span>
+          }
+        </span>
+        <span [class.pending-label-blink]="orders.pendingCount() > 0">Demande en cours</span>
       </a>
 
       <a routerLink="/mas" routerLinkActive="active-nav" [routerLinkActiveOptions]="{ exact: false }" class="nav-link">

@@ -40,5 +40,8 @@ public class SfmRequest {
         @Email
         @Size(max = 160)
         private String email;
+
+        /** Défaut true si absent (compat clients anciens). */
+        private Boolean receiveOrderMails;
     }
 }

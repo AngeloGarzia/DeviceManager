@@ -49,11 +49,11 @@ html {
 }
 
 .page-shell {
-  @apply mx-auto w-full max-w-6xl px-4 pb-24 pt-4 sm:px-6 sm:pb-8;
+  @apply mx-auto w-full max-w-6xl px-3 pb-28 pt-4 sm:px-6 md:pb-8;
 }
 
 .page-title {
-  @apply text-2xl font-semibold tracking-tight text-ink;
+  @apply text-xl font-semibold tracking-tight text-ink sm:text-2xl;
 }
 
 .page-subtitle {
@@ -62,4 +62,27 @@ html {
 
 .panel {
   @apply rounded-xl border border-line bg-surface-card p-4 shadow-soft sm:p-5;
+}
+
+/* Évite le chevauchement des champs outline empilés sur mobile */
+.mat-mdc-form-field + .mat-mdc-form-field {
+  margin-top: 0.15rem;
+}
+
+/* Boutons texte : wrap sur mobile sans casser les icon-buttons */
+.mat-mdc-button:not(.mat-mdc-icon-button),
+.mat-mdc-outlined-button,
+.mat-mdc-unelevated-button,
+.mat-mdc-raised-button,
+a.mat-mdc-button:not(.mat-mdc-icon-button),
+a.mat-mdc-outlined-button,
+a.mat-mdc-unelevated-button,
+a.mat-mdc-raised-button {
+  max-width: 100%;
+  white-space: normal;
+  line-height: 1.25;
+  height: auto !important;
+  min-height: 2.5rem;
+  padding-top: 0.4rem !important;
+  padding-bottom: 0.4rem !important;
 }

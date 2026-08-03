@@ -30,6 +30,9 @@
                 <div class="font-medium text-ink">{{ c.nom }}</div>
                 <div class="mt-1 text-sm"><a class="text-brand no-underline" [href]="'tel:' + c.telephone">{{ c.telephone }}</a></div>
                 <div class="mt-1 text-sm"><a class="text-brand no-underline" [href]="'mailto:' + c.email">{{ c.email }}</a></div>
+                <div class="mt-2 text-xs" [class.text-emerald-700]="c.receiveOrderMails !== false" [class.text-ink-soft]="c.receiveOrderMails === false">
+                  {{ c.receiveOrderMails === false ? 'Ne reçoit pas les e-mails de commande' : 'Reçoit les e-mails de commande' }}
+                </div>
               </div>
             } @empty {
               <p class="m-0 text-sm text-ink-soft">{{ sfm.responsable }} · {{ sfm.telephone }} · {{ sfm.email }}</p>

@@ -23,10 +23,19 @@ describe('OrderRequestService', () => {
     const req = http.expectOne('/api/order-requests');
     expect(req.request.method).toBe('POST');
     req.flush({ id: 1, message: 'Besoin urgent', status: 'SENT', lignes: [] });
+    const countReq = http.expectOne('/api/order-requests/pending-count');
+    countReq.flush({ count: 1 });
   });
 
   it('should list order requests', () => {
     service.list().subscribe((list) => expect(list.length).toBe(0));
     http.expectOne('/api/order-requests').flush([]);
   });
-});
+
+  it('should refresh pending count', () => {
+    service.refreshPendingCount();
+    const req = http.expectOne('/api/order-requests/pending-count');
+    req.flush({ count: 3 });
+    expect(service.pendingCount()).toBe(3);
+  });
+}

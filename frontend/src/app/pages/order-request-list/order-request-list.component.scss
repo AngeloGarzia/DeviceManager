@@ -1,1 +1,50 @@
-/* Material + Tailwind */
+.mail-preview-block {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.mail-preview-card {
+  border: 1px solid #d7e0ea;
+  border-radius: 0.75rem;
+  background: #f8fafc;
+  overflow: hidden;
+}
+
+.mail-preview-card.warning {
+  border-color: #f59e0b;
+  background: #fffbeb;
+}
+
+.mail-meta {
+  display: grid;
+  gap: 0.25rem;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid #e2e8f0;
+  font-size: 0.8rem;
+  color: #334155;
+}
+
+.mail-kind {
+  display: inline-block;
+  width: fit-content;
+  margin-bottom: 0.15rem;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  background: #dbeafe;
+  color: #1d4ed8;
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+
+.mail-body {
+  margin: 0;
+  padding: 0.75rem 1rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.75rem;
+  line-height: 1.45;
+  color: #0f172a;
+  max-height: 16rem;
+  overflow: auto;
+}

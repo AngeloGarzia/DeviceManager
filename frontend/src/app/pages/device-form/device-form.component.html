@@ -20,7 +20,7 @@
   } @else {
     <mat-card class="!rounded-xl !border !border-line !shadow-soft">
       <mat-card-content class="!pt-5">
-        <form class="grid gap-1 sm:grid-cols-2 sm:gap-x-4" [formGroup]="form" (ngSubmit)="submit()">
+        <form class="grid gap-3 sm:grid-cols-2 sm:gap-x-4" [formGroup]="form" (ngSubmit)="submit()">
           <div class="camera-block sm:col-span-2 mb-3">
             <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
               <h2 class="m-0 text-base font-semibold text-ink">
@@ -174,12 +174,12 @@
             }
           </mat-form-field>
 
-          <div class="flex items-center pb-4">
+          <div class="flex items-center py-1 sm:pb-2">
             <mat-checkbox formControlName="obsolete">Pièce obsolète</mat-checkbox>
           </div>
 
-          <div class="sm:col-span-2 grid gap-1 sm:grid-cols-2 sm:gap-x-4">
-            <mat-form-field appearance="outline">
+          <div class="sm:col-span-2 grid gap-3 sm:grid-cols-2 sm:gap-x-4">
+            <mat-form-field appearance="outline" class="min-w-0">
               <mat-label>SFM (optionnel)</mat-label>
               <mat-select formControlName="sfmId">
                 <mat-option [value]="null">— Aucun —</mat-option>
@@ -189,16 +189,16 @@
               </mat-select>
               <mat-hint>Facultatif</mat-hint>
             </mat-form-field>
-            <div class="flex items-start pb-4 sm:pt-1">
-              <button mat-stroked-button type="button" (click)="goCreateSfm()">
+            <div class="flex items-start sm:pt-1">
+              <button mat-stroked-button type="button" class="w-full sm:w-auto" (click)="goCreateSfm()">
                 <mat-icon>add</mat-icon>
                 Créer un SFM
               </button>
             </div>
           </div>
 
-          <div class="sm:col-span-2 grid gap-1 sm:grid-cols-2 sm:gap-x-4">
-            <mat-form-field appearance="outline">
+          <div class="sm:col-span-2 grid gap-3 sm:grid-cols-2 sm:gap-x-4">
+            <mat-form-field appearance="outline" class="min-w-0">
               <mat-label>MAS (optionnel)</mat-label>
               <mat-select formControlName="masId">
                 <mat-option [value]="null">— Aucune —</mat-option>
@@ -212,8 +212,8 @@
                 <mat-hint>Facultatif — la marque en découle</mat-hint>
               }
             </mat-form-field>
-            <div class="flex items-start pb-4 sm:pt-1">
-              <button mat-stroked-button type="button" (click)="goCreateMas()">
+            <div class="flex items-start sm:pt-1">
+              <button mat-stroked-button type="button" class="w-full sm:w-auto" (click)="goCreateMas()">
                 <mat-icon>add</mat-icon>
                 Créer une MAS
               </button>
@@ -230,7 +230,7 @@
             <p class="sm:col-span-2 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{{ error() }}</p>
           }
 
-          <div class="sm:col-span-2 mt-2 grid grid-cols-2 gap-3">
+          <div class="sm:col-span-2 mt-2 grid grid-cols-1 gap-3 sm:grid-cols-2">
             <button mat-stroked-button type="button" (click)="cancel()">Annuler</button>
             <button mat-flat-button color="primary" type="submit" [disabled]="saving()">
               {{ saving() ? 'Enregistrement…' : 'Enregistrer' }}
