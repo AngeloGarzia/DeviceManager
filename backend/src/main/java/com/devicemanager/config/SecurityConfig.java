@@ -66,23 +66,26 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        List<String> origins = List.of(allowedOrigins.split(",")).stream()
+        List<String> configured = List.of(allowedOrigins.split(",")).stream()
                 .map(String::trim)
                 .filter(s -> !s.isBlank())
+                .map(s -> s.endsWith("/") ? s.substring(0, s.length() - 1) : s)
                 .toList();
-        if (origins.isEmpty()) {
-            // Fallback prod/demo : autorise les fronts Render si la variable n'est pas renseignée
-            config.setAllowedOriginPatterns(List.of(
-                    "https://*.onrender.com",
-                    "http://localhost:*",
-                    "http://127.0.0.1:*"
-            ));
-        } else {
-            config.setAllowedOrigins(origins);
-        }
-        config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+
+        // Toujours autoriser les fronts Render (+ locaux), en plus des origines configurées.
+        java.util.LinkedHashSet<String> patterns = new java.util.LinkedHashSet<>();
+        patterns.addAll(configured);
+        patterns.add("https://*.onrender.com");
+        patterns.add("http://localhost:*");
+        patterns.add("http://127.0.0.1:*");
+
+        config.setAllowedOriginPatterns(new java.util.ArrayList<>(patterns));
+        config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
+        config.setExposedHeaders(List.of("Authorization"));
         config.setAllowCredentials(true);
+        config.setMaxAge(3600L);
+
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", config);
         return source;
