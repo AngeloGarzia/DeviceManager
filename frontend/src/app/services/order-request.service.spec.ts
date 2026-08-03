@@ -38,4 +38,4 @@ describe('OrderRequestService', () => {
     req.flush({ count: 3 });
     expect(service.pendingCount()).toBe(3);
   });
-}
+});

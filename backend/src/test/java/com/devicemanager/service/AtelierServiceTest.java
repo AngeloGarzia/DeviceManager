@@ -86,13 +86,13 @@ class AtelierServiceTest {
         var atelier = TestFixtures.atelier();
         when(userRepository.findByUsername("admin")).thenReturn(Optional.of(user));
         when(atelierRepository.findByIdWithCasino(100L)).thenReturn(Optional.of(atelier));
-        when(userRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(userRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
 
         AtelierSummary summary = atelierService.setPreferredAtelier("admin", 100L);
 
         assertThat(summary.getId()).isEqualTo(100L);
         assertThat(user.getPreferredAtelier()).isEqualTo(atelier);
-        verify(userRepository).save(user);
+        verify(userRepository).saveAndFlush(user);
     }
 
     @Test
