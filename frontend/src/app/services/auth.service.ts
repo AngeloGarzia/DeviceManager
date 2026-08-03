@@ -8,6 +8,8 @@ import { AtelierSummary, AuthResponse, LoginRequest } from '../models/models';
 
 const TOKEN_KEY = 'dm_token';
 const USER_KEY = 'dm_user';
+const NOM_KEY = 'dm_nom';
+const PRENOM_KEY = 'dm_prenom';
 const ROLE_KEY = 'dm_role';
 const ATELIER_KEY = 'dm_atelier_id';
 const ATELIERS_KEY = 'dm_ateliers';
@@ -16,6 +18,8 @@ const GROUPE_KEY = 'dm_groupe_nom';
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   readonly username = signal<string | null>(this.readUser());
+  readonly nom = signal<string | null>(localStorage.getItem(NOM_KEY));
+  readonly prenom = signal<string | null>(localStorage.getItem(PRENOM_KEY));
   readonly role = signal<string | null>(this.readRole());
   readonly atelierId = signal<number | null>(this.readAtelierId());
   readonly ateliers = signal<AtelierSummary[]>(this.readAteliers());
@@ -25,6 +29,11 @@ export class AuthService {
 
   readonly isAdmin = computed(() => this.role() === 'ADMIN');
   readonly isTechnicien = computed(() => this.role() === 'TECHNICIEN' || this.role() === 'TECH');
+
+  readonly displayName = computed(() => {
+    const full = `${this.prenom() || ''} ${this.nom() || ''}`.trim();
+    return full || this.username() || '';
+  });
 
   readonly currentAtelier = computed(() => {
     const id = this.atelierId();
@@ -41,6 +50,20 @@ export class AuthService {
         localStorage.setItem(ROLE_KEY, res.role);
         this.username.set(res.username);
         this.role.set(res.role);
+        const nom = res.nom?.trim() || '';
+        const prenom = res.prenom?.trim() || '';
+        this.nom.set(nom || null);
+        this.prenom.set(prenom || null);
+        if (nom) {
+          localStorage.setItem(NOM_KEY, nom);
+        } else {
+          localStorage.removeItem(NOM_KEY);
+        }
+        if (prenom) {
+          localStorage.setItem(PRENOM_KEY, prenom);
+        } else {
+          localStorage.removeItem(PRENOM_KEY);
+        }
         this.groupeNom.set(res.groupeNom ?? null);
         if (res.groupeNom) {
           localStorage.setItem(GROUPE_KEY, res.groupeNom);
@@ -99,11 +122,15 @@ export class AuthService {
   logout(): void {
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
+    localStorage.removeItem(NOM_KEY);
+    localStorage.removeItem(PRENOM_KEY);
     localStorage.removeItem(ROLE_KEY);
     localStorage.removeItem(ATELIER_KEY);
     localStorage.removeItem(ATELIERS_KEY);
     localStorage.removeItem(GROUPE_KEY);
     this.username.set(null);
+    this.nom.set(null);
+    this.prenom.set(null);
     this.role.set(null);
     this.atelierId.set(null);
     this.ateliers.set([]);

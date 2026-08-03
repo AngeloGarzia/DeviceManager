@@ -11,6 +11,14 @@ public class UserRequest {
     @Size(max = 80)
     private String username;
 
+    @NotBlank
+    @Size(max = 80)
+    private String nom;
+
+    @NotBlank
+    @Size(max = 80)
+    private String prenom;
+
     @Size(min = 6, max = 100)
     private String password;
 

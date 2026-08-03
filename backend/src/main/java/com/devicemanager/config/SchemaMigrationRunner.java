@@ -28,47 +28,77 @@ public class SchemaMigrationRunner implements CommandLineRunner {
         repairOrphanAtelierAndMarqueIds();
         softenDeviceOptionalColumns();
         migrateUserPreferredAtelier();
+        migrateUserNomPrenom();
         migrateUploadBlobTable();
         softenMarqueMasAtelierColumn();
+        migrateSfmContactReceiveOrderMails();
     }
 
-    /**
-     * Catalogue marque_mas partagé (pas par atelier) — atelier_id legacy rendu nullable.
-     */
-    private void softenMarqueMasAtelierColumn() {
+    /** Colonnes users.nom / users.prenom. */
+    private void migrateUserNomPrenom() {
         try {
+            Integer usersTable = jdbcTemplate.queryForObject(
+                    """
+                    SELECT COUNT(*) FROM information_schema.TABLES
+                    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users'
+                    """,
+                    Integer.class);
+            if (usersTable == null || usersTable == 0) {
+                return;
+            }
+            addUsersVarcharColumnIfMissing("nom", "VARCHAR(80) NOT NULL DEFAULT ''");
+            addUsersVarcharColumnIfMissing("prenom", "VARCHAR(80) NOT NULL DEFAULT ''");
+            log.info("Migration users: colonnes nom / prenom prêtes");
+        } catch (Exception ex) {
+            log.warn("Migration users.nom/prenom: {}", ex.getMessage());
+        }
+    }
+
+    private void addUsersVarcharColumnIfMissing(String columnName, String definition) {
+        Integer hasCol = jdbcTemplate.queryForObject(
+                """
+                SELECT COUNT(*) FROM information_schema.COLUMNS
+                WHERE TABLE_SCHEMA = DATABASE()
+                  AND TABLE_NAME = 'users'
+                  AND COLUMN_NAME = ?
+                """,
+                Integer.class,
+                columnName);
+        if (hasCol != null && hasCol > 0) {
+            return;
+        }
+        jdbcTemplate.execute("ALTER TABLE users ADD COLUMN " + columnName + " " + definition);
+        log.info("Migration users: colonne {} ajoutée", columnName);
+    }
+
+    /** Colonne sfm_contact.receive_order_mails. */
+    private void migrateSfmContactReceiveOrderMails() {
+        try {
+            Integer table = jdbcTemplate.queryForObject(
+                    """
+                    SELECT COUNT(*) FROM information_schema.TABLES
+                    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'sfm_contact'
+                    """,
+                    Integer.class);
+            if (table == null || table == 0) {
+                return;
+            }
             Integer hasCol = jdbcTemplate.queryForObject(
                     """
                     SELECT COUNT(*) FROM information_schema.COLUMNS
                     WHERE TABLE_SCHEMA = DATABASE()
-                      AND TABLE_NAME = 'marque_mas'
-                      AND COLUMN_NAME = 'atelier_id'
+                      AND TABLE_NAME = 'sfm_contact'
+                      AND COLUMN_NAME = 'receive_order_mails'
                     """,
                     Integer.class);
-            if (hasCol == null || hasCol == 0) {
+            if (hasCol != null && hasCol > 0) {
                 return;
             }
-            jdbcTemplate.execute("ALTER TABLE marque_mas MODIFY COLUMN atelier_id BIGINT NULL");
-            log.info("Migration marque_mas: atelier_id rendu optionnel (catalogue global)");
+            jdbcTemplate.execute(
+                    "ALTER TABLE sfm_contact ADD COLUMN receive_order_mails TINYINT(1) NOT NULL DEFAULT 1");
+            log.info("Migration sfm_contact: colonne receive_order_mails");
         } catch (Exception ex) {
-            log.warn("Migration marque_mas.atelier_id: {}", ex.getMessage());
-        }
-    }
-
-    /** Blobs d'images durables (Render free = disque éphémère). */
-    private void migrateUploadBlobTable() {
-        try {
-            jdbcTemplate.execute("""
-                    CREATE TABLE IF NOT EXISTS upload_blob (
-                      object_key VARCHAR(512) NOT NULL PRIMARY KEY,
-                      data LONGBLOB NOT NULL,
-                      content_type VARCHAR(100) NULL,
-                      file_size BIGINT NULL
-                    )
-                    """);
-            log.info("Migration upload_blob: table prête");
-        } catch (Exception ex) {
-            log.warn("Migration upload_blob: {}", ex.getMessage());
+            log.warn("Migration receive_order_mails: {}", ex.getMessage());
         }
     }
 
@@ -108,6 +138,46 @@ public class SchemaMigrationRunner implements CommandLineRunner {
             log.info("Migration users: colonne preferred_atelier_id");
         } catch (Exception ex) {
             log.warn("Migration preferred_atelier_id: {}", ex.getMessage());
+        }
+    }
+
+    /**
+     * Catalogue marque_mas partagé (pas par atelier) — atelier_id legacy rendu nullable.
+     */
+    private void softenMarqueMasAtelierColumn() {
+        try {
+            Integer hasCol = jdbcTemplate.queryForObject(
+                    """
+                    SELECT COUNT(*) FROM information_schema.COLUMNS
+                    WHERE TABLE_SCHEMA = DATABASE()
+                      AND TABLE_NAME = 'marque_mas'
+                      AND COLUMN_NAME = 'atelier_id'
+                    """,
+                    Integer.class);
+            if (hasCol == null || hasCol == 0) {
+                return;
+            }
+            jdbcTemplate.execute("ALTER TABLE marque_mas MODIFY COLUMN atelier_id BIGINT NULL");
+            log.info("Migration marque_mas: atelier_id rendu optionnel (catalogue global)");
+        } catch (Exception ex) {
+            log.warn("Migration marque_mas.atelier_id: {}", ex.getMessage());
+        }
+    }
+
+    /** Blobs d'images durables (Render free = disque éphémère). */
+    private void migrateUploadBlobTable() {
+        try {
+            jdbcTemplate.execute("""
+                    CREATE TABLE IF NOT EXISTS upload_blob (
+                      object_key VARCHAR(512) NOT NULL PRIMARY KEY,
+                      data LONGBLOB NOT NULL,
+                      content_type VARCHAR(100) NULL,
+                      file_size BIGINT NULL
+                    )
+                    """);
+            log.info("Migration upload_blob: table prête");
+        } catch (Exception ex) {
+            log.warn("Migration upload_blob: {}", ex.getMessage());
         }
     }
 

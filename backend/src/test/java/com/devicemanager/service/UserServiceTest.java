@@ -54,12 +54,16 @@ class UserServiceTest {
 
         UserRequest request = new UserRequest();
         request.setUsername(" tech2 ");
+        request.setNom("Martin");
+        request.setPrenom("Alice");
         request.setPassword("secret1");
         request.setRole("TECH");
 
         UserResponse response = userService.create(request);
 
         assertThat(response.getUsername()).isEqualTo("tech2");
+        assertThat(response.getNom()).isEqualTo("Martin");
+        assertThat(response.getPrenom()).isEqualTo("Alice");
         assertThat(response.getRole()).isEqualTo(Roles.TECHNICIEN);
     }
 
@@ -69,6 +73,8 @@ class UserServiceTest {
 
         UserRequest request = new UserRequest();
         request.setUsername("admin");
+        request.setNom("Admin");
+        request.setPrenom("Sys");
         request.setPassword("secret1");
         request.setRole("ADMIN");
 
@@ -84,6 +90,8 @@ class UserServiceTest {
 
         UserRequest request = new UserRequest();
         request.setUsername("x");
+        request.setNom("X");
+        request.setPrenom("Y");
         request.setRole("ADMIN");
 
         assertThatThrownBy(() -> userService.create(request))
@@ -123,6 +131,8 @@ class UserServiceTest {
 
         UserRequest request = new UserRequest();
         request.setUsername("x");
+        request.setNom("X");
+        request.setPrenom("Y");
         request.setPassword("secret1");
         request.setRole("GUEST");
 

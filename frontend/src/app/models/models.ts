@@ -8,6 +8,8 @@ export interface AuthResponse {
   tokenType: string;
   expiresInMs: number;
   username: string;
+  nom?: string;
+  prenom?: string;
   role: string;
   groupeId?: number;
   groupeNom?: string;
@@ -155,12 +157,16 @@ export interface OrderRequest {
 export interface AppUser {
   id: number;
   username: string;
+  nom: string;
+  prenom: string;
   role: string;
   createdAt: string;
 }
 
 export interface AppUserForm {
   username: string;
+  nom: string;
+  prenom: string;
   password?: string;
   role: string;
 }

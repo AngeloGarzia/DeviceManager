@@ -62,7 +62,7 @@ public class OrderRequestService {
         LocalDateTime dateDemande = LocalDateTime.now();
         Commande commande = Commande.builder()
                 .technicien(technicien)
-                .technicienNom(technicien.getUsername())
+                .technicienNom(displayUserName(technicien))
                 .message(request.getMessage().trim())
                 .dateDemande(dateDemande)
                 .status(OrderStatuses.PENDING)
@@ -126,8 +126,8 @@ public class OrderRequestService {
                 warnings.add("SFM « " + sfm.getNom() + " » sans e-mail — non notifié");
                 continue;
             }
-            String subject = "Commande validée #" + commande.getId() + " — " + sfm.getNom();
-            String body = buildSfmOrderMailBody(commande, sfm, entry.getValue());
+            String subject = buildSfmOrderMailSubject(commande);
+            String body = buildSfmOrderMailBody(commande, entry.getValue());
             for (String to : recipients) {
                 try {
                     mailService.send(to, subject, body);
@@ -146,6 +146,14 @@ public class OrderRequestService {
             log.warn("Demande #{} validation — alertes: {}", id, String.join(" ; ", warnings));
         }
         return toResponse(saved);
+    }
+
+    public void delete(Long id, String adminUsername) {
+        Long atelierId = atelierService.requireCurrentAtelier().getId();
+        Commande commande = commandeRepository.findByIdWithRelations(id, atelierId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Demande introuvable"));
+        commandeRepository.delete(commande);
+        log.info("Demande #{} supprimée par {}", id, adminUsername);
     }
 
     @Transactional(readOnly = true)
@@ -195,24 +203,34 @@ public class OrderRequestService {
                 : request.getMessage().trim();
         Commande draft = Commande.builder()
                 .technicien(technicien)
-                .technicienNom(technicien.getUsername())
+                .technicienNom(displayUserName(technicien))
                 .message(message)
                 .dateDemande(LocalDateTime.now())
                 .status(OrderStatuses.PENDING)
                 .atelier(atelier)
+                .lignes(new ArrayList<>())
                 .build();
+        for (Device device : devices) {
+            draft.addLigne(CommandeLigne.builder()
+                    .device(device)
+                    .quantite(quantities.getOrDefault(device.getId(), 1))
+                    .build());
+        }
 
-        String subject = "Demande de commande (aperçu) — " + quantities.size() + " pièce(s)";
-        String body = buildAdminNotificationBody(draft, atelier, quantities, devices)
+        List<MailPreviewItem> previews = new ArrayList<>();
+        String adminSubject = "Demande de commande (aperçu) — " + quantities.size() + " pièce(s)";
+        String adminBody = buildAdminNotificationBody(draft, atelier, quantities, devices)
                 .replace("Demande n°null", "Demande n°(sera attribuée à l'envoi)");
-
-        return List.of(MailPreviewItem.builder()
+        previews.add(MailPreviewItem.builder()
                 .kind("ADMIN")
                 .to(mailService.getAdminEmail())
-                .subject(subject)
-                .body(body)
+                .subject(adminSubject)
+                .body(adminBody)
                 .sfmNom(null)
                 .build());
+        // Aperçu des futurs e-mails SFM (même modèle que la validation)
+        previews.addAll(buildSfmMailPreviews(draft));
+        return previews;
     }
 
     /**
@@ -244,8 +262,8 @@ public class OrderRequestService {
             Sfm sfm = entry.getValue().getFirst().getDevice().getSfm();
             Hibernate.initialize(sfm.getContacts());
             Set<String> recipients = resolveSfmRecipients(sfm);
-            String subject = "Commande validée #" + commande.getId() + " — " + sfm.getNom();
-            String body = buildSfmOrderMailBody(commande, sfm, entry.getValue());
+            String subject = buildSfmOrderMailSubject(commande);
+            String body = buildSfmOrderMailBody(commande, entry.getValue());
             if (recipients.isEmpty()) {
                 previews.add(MailPreviewItem.builder()
                         .kind("WARNING")
@@ -328,7 +346,14 @@ public class OrderRequestService {
         );
     }
 
-    private String buildSfmOrderMailBody(Commande commande, Sfm sfm, List<CommandeLigne> lignes) {
+    private String buildSfmOrderMailSubject(Commande commande) {
+        if (commande.getId() == null) {
+            return "Demande de devis #(n° à l'envoi)";
+        }
+        return "Demande de devis #" + commande.getId();
+    }
+
+    private String buildSfmOrderMailBody(Commande commande, List<CommandeLigne> lignes) {
         StringBuilder linesBody = new StringBuilder();
         for (CommandeLigne ligne : lignes) {
             Device device = ligne.getDevice();
@@ -338,34 +363,14 @@ public class OrderRequestService {
             }
             linesBody.append(" × ").append(ligne.getQuantite()).append('\n');
         }
-        String atelierNom = commande.getAtelier() != null ? commande.getAtelier().getNom() : "";
         return """
-                Bonjour %s,
+                Bonjour,
 
-                Une commande de pièces détachées a été validée par l'administrateur.
+                Pouvez-vous nous faire un devis pour les pièces détachées suivantes :
 
-                Commande n°%s
-                Atelier : %s
-                Demandée par : %s
-                Date de la demande : %s
-
-                Pièces à fournir :
                 %s
-                Message du technicien :
-                %s
-
-                Merci de traiter cette commande.
-
-                — DeviceManager
-                """.formatted(
-                sfm.getNom(),
-                commande.getId(),
-                atelierNom,
-                commande.getTechnicienNom(),
-                commande.getDateDemande(),
-                linesBody,
-                commande.getMessage()
-        );
+                Merci, bien à vous.
+                """.formatted(linesBody);
     }
 
     private Map<Long, List<CommandeLigne>> groupLinesBySfm(Commande commande) {
@@ -441,6 +446,13 @@ public class OrderRequestService {
                 .sfmId(sfm != null ? sfm.getId() : null)
                 .sfmNom(sfm != null ? sfm.getNom() : null)
                 .build();
+    }
+
+    private static String displayUserName(User user) {
+        String prenom = user.getPrenom() == null ? "" : user.getPrenom().trim();
+        String nom = user.getNom() == null ? "" : user.getNom().trim();
+        String full = (prenom + " " + nom).trim();
+        return full.isEmpty() ? user.getUsername() : full;
     }
 
     private static String nullToEmpty(String value) {

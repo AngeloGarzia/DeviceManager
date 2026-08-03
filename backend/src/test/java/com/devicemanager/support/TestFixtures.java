@@ -81,6 +81,8 @@ public final class TestFixtures {
         return User.builder()
                 .id(50L)
                 .username(username)
+                .nom("Demo")
+                .prenom("User")
                 .password("encoded")
                 .role(role)
                 .groupe(groupe())

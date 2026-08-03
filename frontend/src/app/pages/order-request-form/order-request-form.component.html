@@ -188,11 +188,21 @@
 
         @if (mailPreviews().length > 0) {
           <div class="mail-preview-block mt-4">
-            <h3 class="m-0 mb-2 text-sm font-semibold text-ink">Aperçu de l’e-mail qui sera envoyé</h3>
+            <h3 class="m-0 mb-2 text-sm font-semibold text-ink">Aperçu des e-mails</h3>
             @for (mail of mailPreviews(); track $index) {
               <article class="mail-preview-card" [class.warning]="mail.kind === 'WARNING'">
                 <div class="mail-meta">
-                  <span class="mail-kind">{{ mail.kind === 'ADMIN' ? 'Administrateur' : mail.kind }}</span>
+                  <span class="mail-kind">
+                    {{
+                      mail.kind === 'ADMIN'
+                        ? 'Administrateur (à l’envoi)'
+                        : mail.kind === 'SFM'
+                          ? 'SFM' + (mail.sfmNom ? ' · ' + mail.sfmNom : '') + ' (après validation)'
+                          : mail.kind === 'WARNING'
+                            ? 'Attention'
+                            : mail.kind
+                    }}
+                  </span>
                   <span><strong>À :</strong> {{ mail.to }}</span>
                   <span><strong>Objet :</strong> {{ mail.subject }}</span>
                 </div>

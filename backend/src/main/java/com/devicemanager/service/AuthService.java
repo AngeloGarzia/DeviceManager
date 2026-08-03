@@ -46,6 +46,8 @@ public class AuthService {
                 .tokenType("Bearer")
                 .expiresInMs(jwtService.getExpirationMs())
                 .username(user.getUsername())
+                .nom(user.getNom())
+                .prenom(user.getPrenom())
                 .role(user.getRole())
                 .groupeId(user.getGroupe() != null ? user.getGroupe().getId() : null)
                 .groupeNom(user.getGroupe() != null ? user.getGroupe().getNom() : null)

@@ -208,6 +208,8 @@ public class DataInitializer implements CommandLineRunner {
             }
         }, () -> userRepository.save(User.builder()
                 .username(username)
+                .nom(username.equals("admin") ? "Admin" : "Technicien")
+                .prenom(username.equals("admin") ? "Système" : "Demo")
                 .password(passwordEncoder.encode(rawPassword))
                 .role(role)
                 .groupe(groupe)

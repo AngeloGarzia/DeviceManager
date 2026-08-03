@@ -17,6 +17,8 @@ public class AuthResponse {
     private String tokenType;
     private Long expiresInMs;
     private String username;
+    private String nom;
+    private String prenom;
     private String role;
     private Long groupeId;
     private String groupeNom;

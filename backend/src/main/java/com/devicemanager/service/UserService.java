@@ -52,11 +52,14 @@ public class UserService {
         String role = normalizeRole(request.getRole());
         User saved = userRepository.save(User.builder()
                 .username(username)
+                .nom(requireName(request.getNom(), "Nom"))
+                .prenom(requireName(request.getPrenom(), "Prénom"))
                 .password(passwordEncoder.encode(request.getPassword()))
                 .role(role)
                 .groupe(atelierService.requireCurrentAtelier().getCasino().getGroupe())
                 .build());
-        log.info("Utilisateur créé: {} ({})", saved.getUsername(), saved.getRole());
+        log.info("Utilisateur créé: {} {} {} ({})",
+                saved.getPrenom(), saved.getNom(), saved.getUsername(), saved.getRole());
         return toResponse(saved);
     }
 
@@ -73,11 +76,15 @@ public class UserService {
         }
 
         user.setUsername(username);
+        user.setNom(requireName(request.getNom(), "Nom"));
+        user.setPrenom(requireName(request.getPrenom(), "Prénom"));
         user.setRole(newRole);
         if (request.getPassword() != null && !request.getPassword().isBlank()) {
             user.setPassword(passwordEncoder.encode(request.getPassword()));
         }
-        return toResponse(userRepository.save(user));
+        User saved = userRepository.saveAndFlush(user);
+        log.info("Utilisateur mis à jour: {} {} ({})", saved.getPrenom(), saved.getNom(), saved.getUsername());
+        return toResponse(saved);
     }
 
     public void delete(Long id, String currentUsername) {
@@ -95,6 +102,13 @@ public class UserService {
         return userRepository.findAll().stream()
                 .filter(u -> Roles.ADMIN.equals(u.getRole()))
                 .count();
+    }
+
+    private String requireName(String value, String label) {
+        if (value == null || value.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, label + " obligatoire");
+        }
+        return value.trim();
     }
 
     private String normalizeRole(String role) {
@@ -117,6 +131,8 @@ public class UserService {
         return UserResponse.builder()
                 .id(user.getId())
                 .username(user.getUsername())
+                .nom(user.getNom())
+                .prenom(user.getPrenom())
                 .role(user.getRole())
                 .createdAt(user.getCreatedAt())
                 .build();

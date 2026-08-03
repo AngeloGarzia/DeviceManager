@@ -10,6 +10,8 @@ import java.time.Instant;
 public class UserResponse {
     private Long id;
     private String username;
+    private String nom;
+    private String prenom;
     private String role;
     private Instant createdAt;
 }

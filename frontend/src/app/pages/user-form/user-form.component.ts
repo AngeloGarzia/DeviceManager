@@ -9,6 +9,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatCardModule } from '@angular/material/card';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { AppUserForm } from '../../models/models';
 import { UserService } from '../../services/user.service';
 
 @Component({
@@ -41,6 +42,8 @@ export class UserFormComponent implements OnInit {
   id: number | null = null;
 
   readonly form = this.fb.group({
+    prenom: ['', [Validators.required, Validators.maxLength(80)]],
+    nom: ['', [Validators.required, Validators.maxLength(80)]],
     username: ['', [Validators.required, Validators.maxLength(80)]],
     password: [''],
     role: ['TECHNICIEN', Validators.required]
@@ -67,7 +70,13 @@ export class UserFormComponent implements OnInit {
           this.loading.set(false);
           return;
         }
-        this.form.patchValue({ username: user.username, role: user.role, password: '' });
+        this.form.patchValue({
+          prenom: user.prenom || '',
+          nom: user.nom || '',
+          username: user.username,
+          role: user.role,
+          password: ''
+        });
         this.form.controls.password.setValidators([Validators.minLength(6)]);
         this.form.controls.password.updateValueAndValidity();
         this.loading.set(false);
@@ -85,7 +94,9 @@ export class UserFormComponent implements OnInit {
       return;
     }
     const raw = this.form.getRawValue();
-    const payload = {
+    const payload: AppUserForm = {
+      prenom: raw.prenom!.trim(),
+      nom: raw.nom!.trim(),
       username: raw.username!.trim(),
       role: raw.role!,
       ...(raw.password ? { password: raw.password } : {})

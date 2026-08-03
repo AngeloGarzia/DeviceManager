@@ -22,7 +22,9 @@ public class OrderRequestController {
 
     private final OrderRequestService orderRequestService;
 
+    /** Création d'une demande — admin et technicien. */
     @PostMapping
+    @PreAuthorize("hasAnyRole('ADMIN', 'TECHNICIEN')")
     public ResponseEntity<OrderRequestResponse> create(
             @Valid @RequestBody OrderRequestDto request,
             Authentication authentication) {
@@ -30,33 +32,50 @@ public class OrderRequestController {
                 .body(orderRequestService.create(request, authentication.getName()));
     }
 
+    /** Consultation — admin et technicien. */
     @GetMapping
+    @PreAuthorize("hasAnyRole('ADMIN', 'TECHNICIEN')")
     public ResponseEntity<List<OrderRequestResponse>> list() {
         return ResponseEntity.ok(orderRequestService.findAll());
     }
 
     @GetMapping("/pending-count")
+    @PreAuthorize("hasAnyRole('ADMIN', 'TECHNICIEN')")
     public ResponseEntity<Map<String, Long>> pendingCount() {
         return ResponseEntity.ok(Map.of("count", orderRequestService.countPending()));
     }
 
     @PostMapping("/mail-preview")
+    @PreAuthorize("hasAnyRole('ADMIN', 'TECHNICIEN')")
     public ResponseEntity<List<MailPreviewItem>> previewCreate(
             @RequestBody OrderRequestDto request,
             Authentication authentication) {
         return ResponseEntity.ok(orderRequestService.previewCreateMails(request, authentication.getName()));
     }
 
+    /** Aperçu des e-mails SFM (consultation) — admin et technicien. */
     @GetMapping("/{id}/mail-preview")
+    @PreAuthorize("hasAnyRole('ADMIN', 'TECHNICIEN')")
     public ResponseEntity<List<MailPreviewItem>> previewValidate(@PathVariable Long id) {
         return ResponseEntity.ok(orderRequestService.previewSfmMails(id));
     }
 
+    /** Validation / envoi SFM — admin uniquement. */
     @PostMapping("/{id}/validate")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<OrderRequestResponse> validate(
             @PathVariable Long id,
             Authentication authentication) {
         return ResponseEntity.ok(orderRequestService.validate(id, authentication.getName()));
+    }
+
+    /** Suppression — admin uniquement. */
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Void> delete(
+            @PathVariable Long id,
+            Authentication authentication) {
+        orderRequestService.delete(id, authentication.getName());
+        return ResponseEntity.noContent().build();
     }
 }

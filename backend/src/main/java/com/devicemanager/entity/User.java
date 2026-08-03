@@ -21,6 +21,14 @@ public class User {
     @Column(nullable = false, unique = true, length = 80)
     private String username;
 
+    @Column(nullable = false, length = 80)
+    @Builder.Default
+    private String nom = "";
+
+    @Column(nullable = false, length = 80)
+    @Builder.Default
+    private String prenom = "";
+
     @Column(nullable = false)
     private String password;
 

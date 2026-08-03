@@ -37,6 +37,12 @@ export class OrderRequestService {
     );
   }
 
+  delete(id: number): Observable<void> {
+    return this.http.delete<void>(`${this.base}/${id}`).pipe(
+      tap(() => this.refreshPendingCount())
+    );
+  }
+
   previewCreate(payload: OrderRequestForm): Observable<MailPreviewItem[]> {
     return this.http.post<MailPreviewItem[]>(`${this.base}/mail-preview`, payload);
   }

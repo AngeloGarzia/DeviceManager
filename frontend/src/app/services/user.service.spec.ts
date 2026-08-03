@@ -19,22 +19,32 @@ describe('UserService', () => {
 
   it('should list users', () => {
     service.list().subscribe((users) => expect(users.length).toBe(1));
-    http.expectOne('/api/users').flush([{ id: 1, username: 'admin', role: 'ADMIN' }]);
+    http.expectOne('/api/users').flush([
+      { id: 1, username: 'admin', nom: 'Admin', prenom: 'Sys', role: 'ADMIN' }
+    ]);
   });
 
   it('should create user', () => {
-    const payload = { username: 'tech', password: 'tech123', role: 'TECHNICIEN' };
+    const payload = {
+      username: 'tech',
+      password: 'tech123',
+      role: 'TECHNICIEN',
+      nom: 'Martin',
+      prenom: 'Alice'
+    };
     service.create(payload).subscribe((u) => expect(u.username).toBe('tech'));
     const req = http.expectOne('/api/users');
     expect(req.request.method).toBe('POST');
-    req.flush({ id: 2, username: 'tech', role: 'TECHNICIEN' });
+    req.flush({ id: 2, username: 'tech', nom: 'Martin', prenom: 'Alice', role: 'TECHNICIEN' });
   });
 
   it('should update and delete user', () => {
-    service.update(2, { username: 'tech', role: 'TECHNICIEN' }).subscribe((u) => expect(u.username).toBe('tech'));
+    service
+      .update(2, { username: 'tech', role: 'TECHNICIEN', nom: 'Martin', prenom: 'Alice' })
+      .subscribe((u) => expect(u.username).toBe('tech'));
     const put = http.expectOne('/api/users/2');
     expect(put.request.method).toBe('PUT');
-    put.flush({ id: 2, username: 'tech', role: 'TECHNICIEN' });
+    put.flush({ id: 2, username: 'tech', nom: 'Martin', prenom: 'Alice', role: 'TECHNICIEN' });
 
     service.delete(2).subscribe({ next: () => expect().nothing() });
     const del = http.expectOne('/api/users/2');

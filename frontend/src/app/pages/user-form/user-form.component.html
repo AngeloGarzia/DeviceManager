@@ -6,7 +6,7 @@
 
   <header>
     <h1 class="page-title">{{ isEdit ? 'Modifier le compte' : 'Nouveau compte' }}</h1>
-    <p class="page-subtitle">Identifiant, mot de passe et rôle applicatif</p>
+    <p class="page-subtitle">Nom, prénom, identifiant, mot de passe et rôle</p>
   </header>
 
   @if (loading()) {
@@ -15,6 +15,16 @@
     <mat-card class="!rounded-xl !border !border-line !shadow-soft">
       <mat-card-content class="!pt-5">
         <form class="grid gap-3 sm:grid-cols-2 sm:gap-x-4" [formGroup]="form" (ngSubmit)="submit()">
+          <mat-form-field appearance="outline">
+            <mat-label>Prénom</mat-label>
+            <input matInput formControlName="prenom" autocomplete="given-name" />
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>Nom</mat-label>
+            <input matInput formControlName="nom" autocomplete="family-name" />
+          </mat-form-field>
+
           <mat-form-field appearance="outline" class="sm:col-span-2">
             <mat-label>Identifiant</mat-label>
             <input matInput formControlName="username" autocomplete="username" />

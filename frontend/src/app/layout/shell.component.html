@@ -5,7 +5,7 @@
         <div class="min-w-0 shrink">
           <div class="text-base font-semibold tracking-tight text-brand">DeviceManager</div>
           <div class="truncate text-xs text-ink-soft">
-            {{ auth.username() }} · {{ auth.roleLabel() }}
+            {{ auth.displayName() }} · {{ auth.roleLabel() }}
             @if (auth.groupeNom()) {
               · {{ auth.groupeNom() }}
             }

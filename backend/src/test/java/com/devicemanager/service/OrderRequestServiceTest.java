@@ -136,7 +136,15 @@ class OrderRequestServiceTest {
         OrderRequestResponse response = orderRequestService.validate(70L, "admin");
 
         assertThat(response.getStatus()).isEqualTo(OrderStatuses.VALIDATED);
-        verify(mailService).send(eq("jean@example.com"), contains("Commande validée"), contains("Carte mère"));
+        ArgumentCaptor<String> subjectCaptor = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<String> bodyCaptor = ArgumentCaptor.forClass(String.class);
+        verify(mailService).send(eq("jean@example.com"), subjectCaptor.capture(), bodyCaptor.capture());
+        assertThat(subjectCaptor.getValue()).isEqualTo("Demande de devis #70");
+        assertThat(bodyCaptor.getValue())
+                .contains("Pouvez-vous nous faire un devis pour les pièces détachées suivantes")
+                .contains("Carte mère")
+                .contains("Merci, bien à vous.")
+                .doesNotContain("Merci de traiter cette commande");
     }
 
     @Test
@@ -158,5 +166,34 @@ class OrderRequestServiceTest {
                 .extracting(ex -> ((ResponseStatusException) ex).getReason())
                 .asString()
                 .contains("déjà validée");
+    }
+
+    @Test
+    void delete_removesPendingOrder() {
+        Commande commande = Commande.builder()
+                .id(72L)
+                .technicien(TestFixtures.user("tech", Roles.TECHNICIEN))
+                .technicienNom("tech")
+                .message("x")
+                .dateDemande(LocalDateTime.now())
+                .status(OrderStatuses.PENDING)
+                .atelier(TestFixtures.atelier())
+                .lignes(new ArrayList<>())
+                .build();
+        when(commandeRepository.findByIdWithRelations(72L, 100L)).thenReturn(Optional.of(commande));
+
+        orderRequestService.delete(72L, "admin");
+
+        verify(commandeRepository).delete(commande);
+    }
+
+    @Test
+    void delete_rejectsUnknownOrder() {
+        when(commandeRepository.findByIdWithRelations(999L, 100L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> orderRequestService.delete(999L, "admin"))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getReason())
+                .isEqualTo("Demande introuvable");
     }
 }

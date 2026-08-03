@@ -35,7 +35,7 @@ export class UserListComponent implements OnInit {
   readonly error = signal<string | null>(null);
   readonly confirmOpen = signal(false);
   pendingDelete: AppUser | null = null;
-  readonly displayedColumns = ['username', 'role', 'createdAt', 'actions'];
+  readonly displayedColumns = ['name', 'username', 'role', 'createdAt', 'actions'];
 
   ngOnInit(): void {
     this.load();
@@ -60,6 +60,11 @@ export class UserListComponent implements OnInit {
     if (role === 'ADMIN') return 'Administrateur';
     if (role === 'TECHNICIEN' || role === 'TECH') return 'Technicien';
     return role;
+  }
+
+  displayName(user: AppUser): string {
+    const full = `${user.prenom || ''} ${user.nom || ''}`.trim();
+    return full || user.username;
   }
 
   askDelete(user: AppUser): void {
