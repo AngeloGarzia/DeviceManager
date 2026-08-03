@@ -132,6 +132,12 @@ class OrderRequestServiceTest {
 
         when(commandeRepository.findByIdWithRelations(70L, 100L)).thenReturn(Optional.of(commande));
         when(commandeRepository.save(any(Commande.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(userRepository.findByUsername("admin")).thenReturn(Optional.of(
+                TestFixtures.user("admin", Roles.ADMIN).toBuilder()
+                        .prenom("Sophie")
+                        .nom("Martin")
+                        .email("sophie.martin@casino.local")
+                        .build()));
 
         OrderRequestResponse response = orderRequestService.validate(70L, "admin");
 
@@ -144,6 +150,9 @@ class OrderRequestServiceTest {
                 .contains("Pouvez-vous nous faire un devis pour les pièces détachées suivantes")
                 .contains("Carte mère")
                 .contains("Merci, bien à vous.")
+                .contains("Sophie Martin")
+                .contains("sophie.martin@casino.local")
+                .contains("tech@test.local")
                 .doesNotContain("Merci de traiter cette commande");
     }
 

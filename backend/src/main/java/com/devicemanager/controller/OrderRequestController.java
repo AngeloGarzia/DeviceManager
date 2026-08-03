@@ -56,8 +56,10 @@ public class OrderRequestController {
     /** Aperçu des e-mails SFM (consultation) — admin et technicien. */
     @GetMapping("/{id}/mail-preview")
     @PreAuthorize("hasAnyRole('ADMIN', 'TECHNICIEN')")
-    public ResponseEntity<List<MailPreviewItem>> previewValidate(@PathVariable Long id) {
-        return ResponseEntity.ok(orderRequestService.previewSfmMails(id));
+    public ResponseEntity<List<MailPreviewItem>> previewValidate(
+            @PathVariable Long id,
+            Authentication authentication) {
+        return ResponseEntity.ok(orderRequestService.previewSfmMails(id, authentication.getName()));
     }
 
     /** Validation / envoi SFM — admin uniquement. */

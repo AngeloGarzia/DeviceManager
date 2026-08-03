@@ -110,6 +110,9 @@ public class OrderRequestService {
                     "Cette demande est déjà validée (statut=" + commande.getStatus() + ")");
         }
 
+        User admin = userRepository.findByUsername(adminUsername)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Administrateur introuvable"));
+
         Map<Long, List<CommandeLigne>> bySfm = groupLinesBySfm(commande);
         int mailsSent = 0;
         List<String> warnings = new ArrayList<>();
@@ -127,7 +130,7 @@ public class OrderRequestService {
                 continue;
             }
             String subject = buildSfmOrderMailSubject(commande);
-            String body = buildSfmOrderMailBody(commande, entry.getValue());
+            String body = buildSfmOrderMailBody(commande, entry.getValue(), admin);
             for (String to : recipients) {
                 try {
                     mailService.send(to, subject, body);
@@ -228,23 +231,25 @@ public class OrderRequestService {
                 .body(adminBody)
                 .sfmNom(null)
                 .build());
-        // Aperçu des futurs e-mails SFM (même modèle que la validation)
-        previews.addAll(buildSfmMailPreviews(draft));
+        // Aperçu SFM : signature admin encore inconnue à la création
+        previews.addAll(buildSfmMailPreviews(draft, null));
         return previews;
     }
 
     /**
      * Aperçu des e-mails SFM qui seront envoyés à la validation.
+     * {@code viewerUsername} = admin connecté (signature affichée dans l'aperçu).
      */
     @Transactional(readOnly = true)
-    public List<MailPreviewItem> previewSfmMails(Long id) {
+    public List<MailPreviewItem> previewSfmMails(Long id, String viewerUsername) {
         Long atelierId = atelierService.requireCurrentAtelier().getId();
         Commande commande = commandeRepository.findByIdWithRelations(id, atelierId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Demande introuvable"));
-        return buildSfmMailPreviews(commande);
+        User viewer = userRepository.findByUsername(viewerUsername).orElse(null);
+        return buildSfmMailPreviews(commande, viewer);
     }
 
-    private List<MailPreviewItem> buildSfmMailPreviews(Commande commande) {
+    private List<MailPreviewItem> buildSfmMailPreviews(Commande commande, User validator) {
         List<MailPreviewItem> previews = new ArrayList<>();
         Map<Long, List<CommandeLigne>> bySfm = groupLinesBySfm(commande);
         for (Map.Entry<Long, List<CommandeLigne>> entry : bySfm.entrySet()) {
@@ -263,7 +268,7 @@ public class OrderRequestService {
             Hibernate.initialize(sfm.getContacts());
             Set<String> recipients = resolveSfmRecipients(sfm);
             String subject = buildSfmOrderMailSubject(commande);
-            String body = buildSfmOrderMailBody(commande, entry.getValue());
+            String body = buildSfmOrderMailBody(commande, entry.getValue(), validator);
             if (recipients.isEmpty()) {
                 previews.add(MailPreviewItem.builder()
                         .kind("WARNING")
@@ -353,7 +358,7 @@ public class OrderRequestService {
         return "Demande de devis #" + commande.getId();
     }
 
-    private String buildSfmOrderMailBody(Commande commande, List<CommandeLigne> lignes) {
+    private String buildSfmOrderMailBody(Commande commande, List<CommandeLigne> lignes, User validator) {
         StringBuilder linesBody = new StringBuilder();
         for (CommandeLigne ligne : lignes) {
             Device device = ligne.getDevice();
@@ -363,6 +368,13 @@ public class OrderRequestService {
             }
             linesBody.append(" × ").append(ligne.getQuantite()).append('\n');
         }
+
+        String adminName = validator != null
+                ? displayUserName(validator)
+                : "(Prénom Nom de l'administrateur)";
+        String adminEmail = resolveUserEmail(validator, "(e-mail de l'administrateur)");
+        String requesterEmail = resolveUserEmail(commande.getTechnicien(), "(e-mail du demandeur)");
+
         return """
                 Bonjour,
 
@@ -370,7 +382,17 @@ public class OrderRequestService {
 
                 %s
                 Merci, bien à vous.
-                """.formatted(linesBody);
+                %s
+                %s
+                %s
+                """.formatted(linesBody, adminName, adminEmail, requesterEmail);
+    }
+
+    private static String resolveUserEmail(User user, String fallback) {
+        if (user == null || user.getEmail() == null || user.getEmail().isBlank()) {
+            return fallback;
+        }
+        return user.getEmail().trim();
     }
 
     private Map<Long, List<CommandeLigne>> groupLinesBySfm(Commande commande) {
