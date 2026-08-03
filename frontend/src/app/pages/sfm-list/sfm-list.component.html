@@ -28,8 +28,8 @@
           <mat-card-content class="!pt-4">
             <h2 class="m-0 text-base font-semibold">{{ item.nom }}</h2>
             <p class="mt-2 text-sm text-brand">
-              {{ item.contacts?.length || 0 }} contact(s)
-              @if (item.contacts?.length) {
+              {{ item.contacts.length || 0 }} contact(s)
+              @if (item.contacts.length) {
                 · {{ item.contacts[0].nom }}
               } @else if (item.responsable) {
                 · {{ item.responsable }}
@@ -38,7 +38,7 @@
             @if (item.marques?.length) {
               <p class="mt-1 text-sm text-ink-soft">Marques : {{ marquesLabel(item) }}</p>
             }
-            @if (item.contacts?.length) {
+            @if (item.contacts.length) {
               <p class="mt-1 text-sm text-ink-soft">{{ item.contacts[0].telephone }} · {{ item.contacts[0].email }}</p>
             } @else {
               <p class="mt-1 text-sm"><a class="text-ink-soft no-underline" [href]="'tel:' + item.telephone">{{ item.telephone }}</a></p>
@@ -58,9 +58,9 @@
       <table mat-table [dataSource]="items()" class="w-full">
         <ng-container matColumnDef="nom"><th mat-header-cell *matHeaderCellDef>Nom</th><td mat-cell *matCellDef="let item">{{ item.nom }}</td></ng-container>
         <ng-container matColumnDef="marques"><th mat-header-cell *matHeaderCellDef>Marques</th><td mat-cell *matCellDef="let item">{{ marquesLabel(item) }}</td></ng-container>
-        <ng-container matColumnDef="responsable"><th mat-header-cell *matHeaderCellDef>Contacts</th><td mat-cell *matCellDef="let item">{{ item.contacts?.length || 0 }} · {{ item.contacts?.[0]?.nom || item.responsable || '—' }}</td></ng-container>
-        <ng-container matColumnDef="telephone"><th mat-header-cell *matHeaderCellDef>Téléphone</th><td mat-cell *matCellDef="let item"><a [href]="'tel:' + (item.contacts?.[0]?.telephone || item.telephone)">{{ item.contacts?.[0]?.telephone || item.telephone }}</a></td></ng-container>
-        <ng-container matColumnDef="email"><th mat-header-cell *matHeaderCellDef>Email</th><td mat-cell *matCellDef="let item"><a [href]="'mailto:' + (item.contacts?.[0]?.email || item.email)">{{ item.contacts?.[0]?.email || item.email }}</a></td></ng-container>
+        <ng-container matColumnDef="responsable"><th mat-header-cell *matHeaderCellDef>Contacts</th><td mat-cell *matCellDef="let item">{{ item.contacts.length || 0 }} · {{ item.contacts[0]?.nom || item.responsable || '—' }}</td></ng-container>
+        <ng-container matColumnDef="telephone"><th mat-header-cell *matHeaderCellDef>Téléphone</th><td mat-cell *matCellDef="let item"><a [href]="'tel:' + (item.contacts[0]?.telephone || item.telephone)">{{ item.contacts[0]?.telephone || item.telephone }}</a></td></ng-container>
+        <ng-container matColumnDef="email"><th mat-header-cell *matHeaderCellDef>Email</th><td mat-cell *matCellDef="let item"><a [href]="'mailto:' + (item.contacts[0]?.email || item.email)">{{ item.contacts[0]?.email || item.email }}</a></td></ng-container>
         <ng-container matColumnDef="actions">
           <th mat-header-cell *matHeaderCellDef></th>
           <td mat-cell *matCellDef="let item">

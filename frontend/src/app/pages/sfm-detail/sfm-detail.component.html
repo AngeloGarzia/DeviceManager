@@ -5,7 +5,7 @@
   @else {
     @if (item(); as sfm) {
       <header class="flex flex-wrap items-start justify-between gap-3">
-        <div><h1 class="page-title">{{ sfm.nom }}</h1><p class="page-subtitle">Fiche SFM · {{ sfm.contacts?.length || 0 }} contact(s)</p></div>
+        <div><h1 class="page-title">{{ sfm.nom }}</h1><p class="page-subtitle">Fiche SFM · {{ sfm.contacts.length || 0 }} contact(s)</p></div>
         <div class="flex gap-2">
           <a mat-stroked-button [routerLink]="['/sfm', sfm.id, 'edit']">Modifier</a>
           <button mat-flat-button color="warn" type="button" (click)="askDelete()">Supprimer</button>

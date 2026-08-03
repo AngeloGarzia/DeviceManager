@@ -16,7 +16,7 @@ interface DraftLine {
   deviceId: number;
   quantite: number;
   nom: string;
-  reference: string;
+  reference?: string | null;
   photoUrl: string;
 }
 
