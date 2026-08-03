@@ -91,12 +91,18 @@ export class MasFormComponent implements OnInit {
   loadMarques(selectId?: number): void {
     this.masService.listMarques().subscribe({
       next: (data) => {
-        this.marques.set(data);
+        this.marques.set(this.sortMarques(data));
         if (selectId != null) {
           this.form.patchValue({ marqueId: selectId });
         }
       }
     });
+  }
+
+  private sortMarques(data: MarqueMasOption[]): MarqueMasOption[] {
+    return [...data].sort((a, b) =>
+      (a.label || '').localeCompare(b.label || '', 'fr', { sensitivity: 'base' })
+    );
   }
 
   openNewMarque(): void {

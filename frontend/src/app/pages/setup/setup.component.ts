@@ -32,8 +32,10 @@ export class SetupComponent implements OnInit {
 
   readonly loading = signal(false);
   readonly saving = signal(false);
+  readonly testingMail = signal(false);
   readonly error = signal<string | null>(null);
   readonly success = signal(false);
+  readonly mailTestMessage = signal<string | null>(null);
   readonly settings = signal<AppSetting[]>([]);
   form: FormGroup = this.fb.group({});
 
@@ -92,6 +94,7 @@ export class SetupComponent implements OnInit {
     this.saving.set(true);
     this.error.set(null);
     this.success.set(false);
+    this.mailTestMessage.set(null);
     const values = this.form.getRawValue() as Record<string, string>;
     this.setupService.update(values).subscribe({
       next: (data) => {
@@ -105,6 +108,36 @@ export class SetupComponent implements OnInit {
       error: (err) => {
         this.saving.set(false);
         this.error.set(err?.error?.message || 'Enregistrement impossible.');
+      }
+    });
+  }
+
+  testMail(): void {
+    this.testingMail.set(true);
+    this.error.set(null);
+    this.mailTestMessage.set(null);
+    // Enregistre d'abord les valeurs du formulaire pour que le test utilise la config saisie
+    const values = this.form.getRawValue() as Record<string, string>;
+    this.setupService.update(values).subscribe({
+      next: (data) => {
+        this.settings.set(data);
+        for (const item of data) {
+          this.control(item.key)?.setValue(item.value ?? '', { emitEvent: false });
+        }
+        this.setupService.testMail().subscribe({
+          next: (res) => {
+            this.testingMail.set(false);
+            this.mailTestMessage.set(res.message || 'E-mail de test envoyé.');
+          },
+          error: (err) => {
+            this.testingMail.set(false);
+            this.error.set(err?.error?.message || 'Échec de l\'envoi de test.');
+          }
+        });
+      },
+      error: (err) => {
+        this.testingMail.set(false);
+        this.error.set(err?.error?.message || 'Enregistrement impossible avant le test.');
       }
     });
   }

@@ -14,7 +14,7 @@
               matInput
               [formControl]="searchCtrl"
               [matAutocomplete]="deviceAuto"
-              placeholder="Nom, référence, marque, MAS, SFM…"
+              placeholder="Nom, référence, usage, marque, MAS, SFM…"
               autocomplete="off"
             />
             @if (searching()) {
@@ -32,7 +32,7 @@
             } @else {
               <mat-icon matSuffix>search</mat-icon>
             }
-            <mat-hint>Tapez pour chercher dans l’inventaire de l’atelier</mat-hint>
+            <mat-hint>Recherche aussi dans le champ usage</mat-hint>
           </mat-form-field>
 
           <mat-autocomplete
@@ -56,6 +56,9 @@
                         · {{ deviceHint(d) }}
                       }
                     </div>
+                    @if (d.usage) {
+                      <div class="truncate text-xs text-ink-faint">{{ d.usage }}</div>
+                    }
                   </div>
                 </div>
               </mat-option>

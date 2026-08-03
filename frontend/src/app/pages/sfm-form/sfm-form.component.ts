@@ -39,7 +39,10 @@ export class SfmFormComponent implements OnInit {
 
   readonly loading = signal(false);
   readonly saving = signal(false);
+  readonly savingMarque = signal(false);
+  readonly showNewMarque = signal(false);
   readonly error = signal<string | null>(null);
+  readonly marqueError = signal<string | null>(null);
   readonly marques = signal<MarqueMasOption[]>([]);
   id: number | null = null;
   returnDevice: string | null = null;
@@ -49,6 +52,10 @@ export class SfmFormComponent implements OnInit {
     nom: ['', [Validators.required, Validators.maxLength(120)]],
     marqueIds: [[] as number[], Validators.required],
     contacts: this.fb.array([this.createContactGroup()])
+  });
+
+  readonly newMarqueForm = this.fb.nonNullable.group({
+    label: ['', [Validators.required, Validators.maxLength(80)]]
   });
 
   get isEdit(): boolean {
@@ -62,10 +69,7 @@ export class SfmFormComponent implements OnInit {
   ngOnInit(): void {
     this.returnDevice = this.route.snapshot.queryParamMap.get('returnDevice');
     this.returnForOrderRequest = this.route.snapshot.queryParamMap.get('forOrderRequest') === '1';
-    this.masService.listMarques().subscribe({
-      next: (data) => this.marques.set(data),
-      error: () => this.error.set('Impossible de charger les marques.')
-    });
+    this.loadMarques();
 
     const rawId = this.route.snapshot.paramMap.get('id');
     if (!rawId) {
@@ -91,6 +95,59 @@ export class SfmFormComponent implements OnInit {
       error: () => {
         this.error.set('SFM introuvable.');
         this.loading.set(false);
+      }
+    });
+  }
+
+  loadMarques(selectId?: number): void {
+    this.masService.listMarques().subscribe({
+      next: (data) => {
+        this.marques.set(this.sortMarques(data));
+        if (selectId != null) {
+          const current = this.form.controls.marqueIds.value ?? [];
+          if (!current.includes(selectId)) {
+            this.form.patchValue({ marqueIds: [...current, selectId] });
+          }
+        }
+      },
+      error: () => this.error.set('Impossible de charger les marques.')
+    });
+  }
+
+  private sortMarques(data: MarqueMasOption[]): MarqueMasOption[] {
+    return [...data].sort((a, b) =>
+      (a.label || '').localeCompare(b.label || '', 'fr', { sensitivity: 'base' })
+    );
+  }
+
+  openNewMarque(): void {
+    this.showNewMarque.set(true);
+    this.marqueError.set(null);
+    this.newMarqueForm.reset({ label: '' });
+  }
+
+  cancelNewMarque(): void {
+    this.showNewMarque.set(false);
+    this.marqueError.set(null);
+  }
+
+  createMarque(): void {
+    if (this.newMarqueForm.invalid) {
+      this.newMarqueForm.markAllAsTouched();
+      return;
+    }
+    this.savingMarque.set(true);
+    this.marqueError.set(null);
+    const label = this.newMarqueForm.controls.label.value.trim();
+    this.masService.createMarque(label).subscribe({
+      next: (created) => {
+        this.savingMarque.set(false);
+        this.showNewMarque.set(false);
+        this.loadMarques(created.id ?? created.value ?? undefined);
+      },
+      error: (err) => {
+        this.savingMarque.set(false);
+        this.marqueError.set(err?.error?.message || 'Création de la marque impossible.');
       }
     });
   }

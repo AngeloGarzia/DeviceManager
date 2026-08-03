@@ -101,6 +101,42 @@ Sur Render, désactive **Auto-Deploy** (ou mets-le sur *Commit*) pour API et fro
 
 ---
 
+## Messagerie (demandes de commande)
+
+Par défaut `APP_MAIL_ENABLED=false` → e-mail **simulé** dans les logs.
+
+### Config recommandée (Brevo gratuit)
+
+1. Compte : https://app.brevo.com  
+2. **SMTP & API** → créer une clé SMTP  
+3. Dans l’app → **Setup** (admin) :
+
+| Clé | Exemple |
+|-----|---------|
+| `MAIL_ENABLED` | `true` |
+| `MAIL_FROM` | e-mail vérifié Brevo |
+| `MAIL_ADMIN_EMAIL` | destinataire admin |
+| `MAIL_HOST` | `smtp-relay.brevo.com` |
+| `MAIL_PORT` | `587` |
+| `MAIL_USERNAME` | login SMTP Brevo |
+| `MAIL_PASSWORD` | clé SMTP |
+
+4. Bouton **Tester l'e-mail** puis envoyer une demande de commande.
+
+Sur Render, tu peux aussi mettre ces variables dans l’**Environment** de l’API (elles alimentent le Setup au 1er démarrage).
+
+---
+
+## Photos en production
+
+Sur le plan **free** Render, le disque du conteneur est **éphémère** (perdu à chaque deploy).  
+DeviceManager enregistre donc aussi les images dans MySQL (`upload_blob`) et les sert via `/uploads/...`.
+
+- **Nouvelles photos** : OK après ce correctif (survivent aux redéploiements).
+- **Anciennes photos** perdues du disque : à **re-uploader** une fois (éditer la pièce).
+
+---
+
 ## Limites du gratuit
 
 | Sujet | Comportement |

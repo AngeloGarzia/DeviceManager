@@ -10,6 +10,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -38,5 +39,14 @@ class JwtServiceTest {
         assertThat(jwtService.isTokenValid(token, "admin")).isTrue();
         assertThat(jwtService.isTokenValid(token, "other")).isFalse();
         assertThat(jwtService.getExpirationMs()).isEqualTo(3_600_000L);
+    }
+
+    @Test
+    void isTokenValid_rejectsTamperedToken() {
+        String token = jwtService.generateToken("admin", Roles.ADMIN);
+        String tampered = token.substring(0, token.length() - 4) + "xxxx";
+
+        assertThatThrownBy(() -> jwtService.isTokenValid(tampered, "admin"))
+                .isInstanceOf(RuntimeException.class);
     }
 }

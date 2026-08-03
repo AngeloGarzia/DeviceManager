@@ -4,6 +4,12 @@ import { Observable } from 'rxjs';
 import { environment } from '../../environments/environment';
 import { AppSetting } from '../models/models';
 
+export interface MailTestResponse {
+  success: boolean;
+  message: string;
+  to?: string;
+}
+
 @Injectable({ providedIn: 'root' })
 export class SetupService {
   private readonly base = `${environment.apiUrl}/api/setup`;
@@ -16,5 +22,9 @@ export class SetupService {
 
   update(values: Record<string, string>): Observable<AppSetting[]> {
     return this.http.put<AppSetting[]>(this.base, { values });
+  }
+
+  testMail(): Observable<MailTestResponse> {
+    return this.http.post<MailTestResponse>(`${this.base}/mail/test`, {});
   }
 }

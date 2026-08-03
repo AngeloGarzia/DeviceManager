@@ -101,7 +101,12 @@ public class OrderRequestService {
                 request.getMessage().trim()
         );
 
-        mailService.sendOrderRequestToAdmin(subject, body);
+        try {
+            mailService.sendOrderRequestToAdmin(subject, body);
+        } catch (Exception ex) {
+            // La demande est déjà enregistrée : ne pas annuler si SMTP échoue
+            log.error("Demande #{} enregistrée mais e-mail non envoyé: {}", saved.getId(), ex.getMessage());
+        }
         log.info("Demande de commande #{} créée par {} ({} pièce(s))",
                 saved.getId(), technicien.getUsername(), quantities.size());
         return toResponse(saved);

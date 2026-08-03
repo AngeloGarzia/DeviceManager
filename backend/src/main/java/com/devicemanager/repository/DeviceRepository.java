@@ -20,7 +20,7 @@ public interface DeviceRepository extends JpaRepository<Device, Long> {
               AND (
                    LOWER(d.nom) LIKE LOWER(CONCAT('%', :q, '%'))
                 OR (d.reference IS NOT NULL AND LOWER(d.reference) LIKE LOWER(CONCAT('%', :q, '%')))
-                OR LOWER(d.usage) LIKE LOWER(CONCAT('%', :q, '%'))
+                OR (d.usage IS NOT NULL AND LOWER(d.usage) LIKE LOWER(CONCAT('%', :q, '%')))
                 OR (d.sfm IS NOT NULL AND LOWER(d.sfm.nom) LIKE LOWER(CONCAT('%', :q, '%')))
                 OR (m IS NOT NULL AND LOWER(m.numero) LIKE LOWER(CONCAT('%', :q, '%')))
                 OR (d.marque IS NOT NULL AND LOWER(d.marque.label) LIKE LOWER(CONCAT('%', :q, '%')))

@@ -182,4 +182,69 @@ class DeviceServiceTest {
 
         assertThat(deviceService.findAll("")).hasSize(1);
     }
+
+    @Test
+    void findAll_searchesByQuery() {
+        when(deviceRepository.search(100L, "Carte")).thenReturn(List.of(TestFixtures.device()));
+
+        assertThat(deviceService.findAll("Carte")).hasSize(1);
+        verify(deviceRepository).search(100L, "Carte");
+        verify(deviceRepository, never()).findAllWithRelations(any());
+    }
+
+    @Test
+    void findAll_searchesByUsage() {
+        Device device = TestFixtures.device();
+        device.setUsage("Remplacement écran tactile");
+        when(deviceRepository.search(100L, "tactile")).thenReturn(List.of(device));
+
+        var results = deviceService.findAll("tactile");
+
+        assertThat(results).hasSize(1);
+        assertThat(results.getFirst().getUsage()).containsIgnoringCase("tactile");
+        verify(deviceRepository).search(100L, "tactile");
+    }
+
+    @Test
+    void findAll_filtersMultiTokenAcrossFields() {
+        Device match = TestFixtures.device(); // nom Carte + marque Novomatic
+        Device other = TestFixtures.device();
+        other.setId(41L);
+        other.setNom("Alimentation");
+        other.setMarque(TestFixtures.marque());
+
+        when(deviceRepository.search(100L, "Carte")).thenReturn(List.of(match, other));
+
+        var results = deviceService.findAll("Carte Novomatic");
+
+        assertThat(results).hasSize(1);
+        assertThat(results.getFirst().getNom()).isEqualTo("Carte mère");
+    }
+
+    @Test
+    void findAll_multiTokenExcludesPartialMatches() {
+        when(deviceRepository.search(100L, "Carte")).thenReturn(List.of(TestFixtures.device()));
+
+        assertThat(deviceService.findAll("Carte Inexistant")).isEmpty();
+    }
+
+    @Test
+    void findById_returnsDevice() {
+        when(deviceRepository.findByIdWithRelations(40L, 100L)).thenReturn(Optional.of(TestFixtures.device()));
+
+        DeviceResponse response = deviceService.findById(40L);
+
+        assertThat(response.getId()).isEqualTo(40L);
+        assertThat(response.getReference()).isEqualTo("REF-001");
+    }
+
+    @Test
+    void findById_notFound() {
+        when(deviceRepository.findByIdWithRelations(99L, 100L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> deviceService.findById(99L))
+                .isInstanceOf(ResponseStatusException.class)
+                .satisfies(ex -> assertThat(((ResponseStatusException) ex).getStatusCode())
+                        .isEqualTo(HttpStatus.NOT_FOUND));
+    }
 }

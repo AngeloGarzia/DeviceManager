@@ -28,6 +28,48 @@ public class SchemaMigrationRunner implements CommandLineRunner {
         repairOrphanAtelierAndMarqueIds();
         softenDeviceOptionalColumns();
         migrateUserPreferredAtelier();
+        migrateUploadBlobTable();
+        softenMarqueMasAtelierColumn();
+    }
+
+    /**
+     * Catalogue marque_mas partagé (pas par atelier) — atelier_id legacy rendu nullable.
+     */
+    private void softenMarqueMasAtelierColumn() {
+        try {
+            Integer hasCol = jdbcTemplate.queryForObject(
+                    """
+                    SELECT COUNT(*) FROM information_schema.COLUMNS
+                    WHERE TABLE_SCHEMA = DATABASE()
+                      AND TABLE_NAME = 'marque_mas'
+                      AND COLUMN_NAME = 'atelier_id'
+                    """,
+                    Integer.class);
+            if (hasCol == null || hasCol == 0) {
+                return;
+            }
+            jdbcTemplate.execute("ALTER TABLE marque_mas MODIFY COLUMN atelier_id BIGINT NULL");
+            log.info("Migration marque_mas: atelier_id rendu optionnel (catalogue global)");
+        } catch (Exception ex) {
+            log.warn("Migration marque_mas.atelier_id: {}", ex.getMessage());
+        }
+    }
+
+    /** Blobs d'images durables (Render free = disque éphémère). */
+    private void migrateUploadBlobTable() {
+        try {
+            jdbcTemplate.execute("""
+                    CREATE TABLE IF NOT EXISTS upload_blob (
+                      object_key VARCHAR(512) NOT NULL PRIMARY KEY,
+                      data LONGBLOB NOT NULL,
+                      content_type VARCHAR(100) NULL,
+                      file_size BIGINT NULL
+                    )
+                    """);
+            log.info("Migration upload_blob: table prête");
+        } catch (Exception ex) {
+            log.warn("Migration upload_blob: {}", ex.getMessage());
+        }
     }
 
     /** Colonne users.preferred_atelier_id (atelier mémorisé par compte). */

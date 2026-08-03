@@ -46,11 +46,23 @@
       @if (success()) {
         <p class="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800">Paramètres enregistrés.</p>
       }
+      @if (mailTestMessage()) {
+        <p class="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800">{{ mailTestMessage() }}</p>
+      }
       @if (error()) {
         <p class="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{{ error() }}</p>
       }
 
-      <div class="flex justify-end">
+      <div class="flex flex-wrap justify-end gap-3">
+        <button
+          mat-stroked-button
+          color="primary"
+          type="button"
+          [disabled]="testingMail() || saving() || settings().length === 0"
+          (click)="testMail()"
+        >
+          {{ testingMail() ? 'Envoi du test…' : 'Tester l\'e-mail' }}
+        </button>
         <button mat-flat-button color="primary" type="submit" [disabled]="saving() || settings().length === 0">
           {{ saving() ? 'Enregistrement…' : 'Enregistrer le setup' }}
         </button>

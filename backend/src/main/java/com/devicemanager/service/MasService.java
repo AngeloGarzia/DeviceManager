@@ -17,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.text.Normalizer;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 
@@ -47,6 +48,7 @@ public class MasService {
     @Transactional(readOnly = true)
     public List<MarqueMasResponse> listMarques() {
         return marqueMasRepository.findAllByOrderByLabelAsc().stream()
+                .sorted(Comparator.comparing(MarqueMas::getLabel, String.CASE_INSENSITIVE_ORDER))
                 .map(this::toMarqueResponse)
                 .toList();
     }

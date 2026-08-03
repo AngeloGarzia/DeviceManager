@@ -94,4 +94,40 @@ class AtelierServiceTest {
         assertThat(user.getPreferredAtelier()).isEqualTo(atelier);
         verify(userRepository).save(user);
     }
+
+    @Test
+    void setPreferredAtelier_rejectsForeignGroupe() {
+        var user = TestFixtures.user("admin", Roles.ADMIN);
+        var otherGroupe = com.devicemanager.entity.Groupe.builder().id(2L).nom("Autre").build();
+        var otherCasino = com.devicemanager.entity.Casino.builder().id(11L).nom("X").groupe(otherGroupe).build();
+        var foreign = Atelier.builder().id(999L).nom("Foreign").casino(otherCasino).build();
+
+        when(userRepository.findByUsername("admin")).thenReturn(Optional.of(user));
+        when(atelierRepository.findByIdWithCasino(999L)).thenReturn(Optional.of(foreign));
+
+        assertThatThrownBy(() -> atelierService.setPreferredAtelier("admin", 999L))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getReason())
+                .isEqualTo("Atelier non autorisé pour ce compte");
+    }
+
+    @Test
+    void setPreferredAtelier_notFound() {
+        when(userRepository.findByUsername("admin")).thenReturn(Optional.of(TestFixtures.user("admin", Roles.ADMIN)));
+        when(atelierRepository.findByIdWithCasino(404L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> atelierService.setPreferredAtelier("admin", 404L))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getReason())
+                .isEqualTo("Atelier introuvable");
+    }
+
+    @Test
+    void listForUser_emptyWhenNoGroupe() {
+        var user = TestFixtures.user("orphan", Roles.TECHNICIEN);
+        user.setGroupe(null);
+        when(userRepository.findByUsername("orphan")).thenReturn(Optional.of(user));
+
+        assertThat(atelierService.listForUser("orphan")).isEmpty();
+    }
 }
