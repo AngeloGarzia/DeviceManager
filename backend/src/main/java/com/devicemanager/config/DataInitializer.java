@@ -193,7 +193,10 @@ public class DataInitializer implements CommandLineRunner {
     }
 
     private void upsertUser(String username, String rawPassword, String role, Groupe groupe) {
-        String email = username.equals("admin") ? "admin@devicemanager.local" : "tech@devicemanager.local";
+        boolean isAdmin = "admin".equals(username);
+        String email = isAdmin ? "admin@devicemanager.local" : "tech@devicemanager.local";
+        String nom = isAdmin ? "Admin" : "Technicien";
+        String prenom = isAdmin ? "Système" : "Demo";
         userRepository.findByUsername(username).ifPresentOrElse(user -> {
             boolean changed = false;
             if (!role.equals(user.getRole())) {
@@ -208,13 +211,21 @@ public class DataInitializer implements CommandLineRunner {
                 user.setEmail(email);
                 changed = true;
             }
+            if (user.getNom() == null || user.getNom().isBlank()) {
+                user.setNom(nom);
+                changed = true;
+            }
+            if (user.getPrenom() == null || user.getPrenom().isBlank()) {
+                user.setPrenom(prenom);
+                changed = true;
+            }
             if (changed) {
                 userRepository.save(user);
             }
         }, () -> userRepository.save(User.builder()
                 .username(username)
-                .nom(username.equals("admin") ? "Admin" : "Technicien")
-                .prenom(username.equals("admin") ? "Système" : "Demo")
+                .nom(nom)
+                .prenom(prenom)
                 .email(email)
                 .password(passwordEncoder.encode(rawPassword))
                 .role(role)
