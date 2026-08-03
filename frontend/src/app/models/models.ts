@@ -159,6 +159,7 @@ export interface AppUser {
   username: string;
   nom: string;
   prenom: string;
+  email: string;
   role: string;
   createdAt: string;
 }
@@ -167,6 +168,7 @@ export interface AppUserForm {
   username: string;
   nom: string;
   prenom: string;
+  email: string;
   password?: string;
   role: string;
 }

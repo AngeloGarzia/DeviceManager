@@ -83,6 +83,7 @@ public final class TestFixtures {
                 .username(username)
                 .nom("Demo")
                 .prenom("User")
+                .email(username + "@test.local")
                 .password("encoded")
                 .role(role)
                 .groupe(groupe())

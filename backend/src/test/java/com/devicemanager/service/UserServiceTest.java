@@ -56,6 +56,7 @@ class UserServiceTest {
         request.setUsername(" tech2 ");
         request.setNom("Martin");
         request.setPrenom("Alice");
+        request.setEmail(" Alice.Martin@Casino.local ");
         request.setPassword("secret1");
         request.setRole("TECH");
 
@@ -64,6 +65,7 @@ class UserServiceTest {
         assertThat(response.getUsername()).isEqualTo("tech2");
         assertThat(response.getNom()).isEqualTo("Martin");
         assertThat(response.getPrenom()).isEqualTo("Alice");
+        assertThat(response.getEmail()).isEqualTo("alice.martin@casino.local");
         assertThat(response.getRole()).isEqualTo(Roles.TECHNICIEN);
     }
 
@@ -75,6 +77,7 @@ class UserServiceTest {
         request.setUsername("admin");
         request.setNom("Admin");
         request.setPrenom("Sys");
+        request.setEmail("admin@test.local");
         request.setPassword("secret1");
         request.setRole("ADMIN");
 
@@ -85,6 +88,25 @@ class UserServiceTest {
     }
 
     @Test
+    void create_rejectsDuplicateEmail() {
+        when(userRepository.existsByUsername("tech3")).thenReturn(false);
+        when(userRepository.existsByEmailIgnoreCase("alice@test.local")).thenReturn(true);
+
+        UserRequest request = new UserRequest();
+        request.setUsername("tech3");
+        request.setNom("Martin");
+        request.setPrenom("Alice");
+        request.setEmail("alice@test.local");
+        request.setPassword("secret1");
+        request.setRole("TECHNICIEN");
+
+        assertThatThrownBy(() -> userService.create(request))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getReason())
+                .isEqualTo("E-mail déjà utilisé");
+    }
+
+    @Test
     void create_requiresPassword() {
         when(userRepository.existsByUsername("x")).thenReturn(false);
 
@@ -92,6 +114,7 @@ class UserServiceTest {
         request.setUsername("x");
         request.setNom("X");
         request.setPrenom("Y");
+        request.setEmail("x@test.local");
         request.setRole("ADMIN");
 
         assertThatThrownBy(() -> userService.create(request))
@@ -133,6 +156,7 @@ class UserServiceTest {
         request.setUsername("x");
         request.setNom("X");
         request.setPrenom("Y");
+        request.setEmail("x@test.local");
         request.setPassword("secret1");
         request.setRole("GUEST");
 

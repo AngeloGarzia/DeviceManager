@@ -29,6 +29,7 @@ public class SchemaMigrationRunner implements CommandLineRunner {
         softenDeviceOptionalColumns();
         migrateUserPreferredAtelier();
         migrateUserNomPrenom();
+        migrateUserEmail();
         migrateUploadBlobTable();
         softenMarqueMasAtelierColumn();
         migrateSfmContactReceiveOrderMails();
@@ -51,6 +52,42 @@ public class SchemaMigrationRunner implements CommandLineRunner {
             log.info("Migration users: colonnes nom / prenom prêtes");
         } catch (Exception ex) {
             log.warn("Migration users.nom/prenom: {}", ex.getMessage());
+        }
+    }
+
+    /** Colonne users.email (obligatoire + unique). */
+    private void migrateUserEmail() {
+        try {
+            Integer usersTable = jdbcTemplate.queryForObject(
+                    """
+                    SELECT COUNT(*) FROM information_schema.TABLES
+                    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users'
+                    """,
+                    Integer.class);
+            if (usersTable == null || usersTable == 0) {
+                return;
+            }
+            addUsersVarcharColumnIfMissing("email", "VARCHAR(160) NOT NULL DEFAULT ''");
+            jdbcTemplate.update("""
+                    UPDATE users
+                    SET email = CONCAT(LOWER(username), '@users.local')
+                    WHERE email IS NULL OR TRIM(email) = ''
+                    """);
+            Integer hasIndex = jdbcTemplate.queryForObject(
+                    """
+                    SELECT COUNT(*) FROM information_schema.STATISTICS
+                    WHERE TABLE_SCHEMA = DATABASE()
+                      AND TABLE_NAME = 'users'
+                      AND INDEX_NAME = 'uk_users_email'
+                    """,
+                    Integer.class);
+            if (hasIndex == null || hasIndex == 0) {
+                jdbcTemplate.execute("CREATE UNIQUE INDEX uk_users_email ON users (email)");
+                log.info("Migration users: index unique uk_users_email");
+            }
+            log.info("Migration users: colonne email prête");
+        } catch (Exception ex) {
+            log.warn("Migration users.email: {}", ex.getMessage());
         }
     }
 

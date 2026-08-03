@@ -6,7 +6,7 @@
 
   <header>
     <h1 class="page-title">{{ isEdit ? 'Modifier le compte' : 'Nouveau compte' }}</h1>
-    <p class="page-subtitle">Nom, prénom, identifiant, mot de passe et rôle</p>
+    <p class="page-subtitle">Nom, prénom, e-mail, identifiant, mot de passe et rôle</p>
   </header>
 
   @if (loading()) {
@@ -23,6 +23,14 @@
           <mat-form-field appearance="outline">
             <mat-label>Nom</mat-label>
             <input matInput formControlName="nom" autocomplete="family-name" />
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" class="sm:col-span-2">
+            <mat-label>E-mail</mat-label>
+            <input matInput type="email" formControlName="email" autocomplete="email" />
+            @if (form.controls.email.invalid && form.controls.email.touched) {
+              <mat-error>E-mail valide obligatoire</mat-error>
+            }
           </mat-form-field>
 
           <mat-form-field appearance="outline" class="sm:col-span-2">

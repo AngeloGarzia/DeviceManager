@@ -35,7 +35,7 @@ export class UserListComponent implements OnInit {
   readonly error = signal<string | null>(null);
   readonly confirmOpen = signal(false);
   pendingDelete: AppUser | null = null;
-  readonly displayedColumns = ['name', 'username', 'role', 'createdAt', 'actions'];
+  readonly displayedColumns = ['name', 'email', 'username', 'role', 'createdAt', 'actions'];
 
   ngOnInit(): void {
     this.load();

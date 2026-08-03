@@ -27,6 +27,7 @@
         <mat-card class="!rounded-xl !border !border-line !shadow-soft">
           <mat-card-content class="!pt-4">
             <h2 class="m-0 text-base font-semibold">{{ displayName(item) }}</h2>
+            <p class="mt-1 text-sm text-ink-soft">{{ item.email || '—' }}</p>
             <p class="mt-1 text-sm text-ink-soft">{{ item.username }}</p>
             <p class="mt-1 text-sm text-brand">{{ roleLabel(item.role) }}</p>
             <p class="mt-1 text-xs text-ink-faint">Créé le {{ item.createdAt | date: 'dd/MM/yyyy HH:mm' }}</p>
@@ -52,6 +53,10 @@
         <ng-container matColumnDef="name">
           <th mat-header-cell *matHeaderCellDef>Nom</th>
           <td mat-cell *matCellDef="let item">{{ displayName(item) }}</td>
+        </ng-container>
+        <ng-container matColumnDef="email">
+          <th mat-header-cell *matHeaderCellDef>E-mail</th>
+          <td mat-cell *matCellDef="let item">{{ item.email || '—' }}</td>
         </ng-container>
         <ng-container matColumnDef="username">
           <th mat-header-cell *matHeaderCellDef>Identifiant</th>

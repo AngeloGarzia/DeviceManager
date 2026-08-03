@@ -44,6 +44,7 @@ export class UserFormComponent implements OnInit {
   readonly form = this.fb.group({
     prenom: ['', [Validators.required, Validators.maxLength(80)]],
     nom: ['', [Validators.required, Validators.maxLength(80)]],
+    email: ['', [Validators.required, Validators.email, Validators.maxLength(160)]],
     username: ['', [Validators.required, Validators.maxLength(80)]],
     password: [''],
     role: ['TECHNICIEN', Validators.required]
@@ -73,6 +74,7 @@ export class UserFormComponent implements OnInit {
         this.form.patchValue({
           prenom: user.prenom || '',
           nom: user.nom || '',
+          email: user.email || '',
           username: user.username,
           role: user.role,
           password: ''
@@ -97,6 +99,7 @@ export class UserFormComponent implements OnInit {
     const payload: AppUserForm = {
       prenom: raw.prenom!.trim(),
       nom: raw.nom!.trim(),
+      email: raw.email!.trim().toLowerCase(),
       username: raw.username!.trim(),
       role: raw.role!,
       ...(raw.password ? { password: raw.password } : {})

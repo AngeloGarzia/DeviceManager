@@ -29,6 +29,10 @@ public class User {
     @Builder.Default
     private String prenom = "";
 
+    @Column(nullable = false, unique = true, length = 160)
+    @Builder.Default
+    private String email = "";
+
     @Column(nullable = false)
     private String password;
 
