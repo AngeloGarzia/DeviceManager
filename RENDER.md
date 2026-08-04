@@ -127,6 +127,23 @@ Sur Render, tu peux aussi mettre ces variables dans l’**Environment** de l’A
 
 ---
 
+## Spring AI (optionnel)
+
+Assistant chat intégré (`/ai` dans le front, `POST /api/ai/chat`).
+
+Variables API Render / `.env` :
+
+```text
+APP_AI_ENABLED=true
+SPRING_AI_MODEL_CHAT=openai
+OPENAI_API_KEY=sk-...
+OPENAI_CHAT_MODEL=gpt-4o-mini
+```
+
+Sans ces variables, l’API démarre normalement et l’assistant affiche « désactivé ».
+
+---
+
 ## Photos en production
 
 Sur le plan **free** Render, le disque du conteneur est **éphémère** (perdu à chaque deploy).  

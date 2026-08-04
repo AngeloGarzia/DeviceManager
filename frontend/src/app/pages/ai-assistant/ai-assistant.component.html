@@ -1,0 +1,60 @@
+<section class="grid gap-4">
+  <header>
+    <h1 class="page-title">Assistant IA</h1>
+    <p class="page-subtitle">Spring AI · aide rédaction demandes, pièces, MAS / SFM</p>
+  </header>
+
+  @if (loadingStatus()) {
+    <div class="flex justify-center py-10"><mat-spinner diameter="36"></mat-spinner></div>
+  } @else {
+    <mat-card class="!rounded-xl !border !border-line !shadow-soft">
+      <mat-card-content class="!pt-5">
+        @if (error()) {
+          <p class="mb-3 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{{ error() }}</p>
+        }
+
+        <div class="chat-log mb-4 grid gap-3">
+          @if (turns().length === 0) {
+            <p class="m-0 text-sm text-ink-soft">
+              Exemples : « Comment rédiger une demande de devis SFM ? »,
+              « Quelle est la différence entre PENDING et VALIDATED ? »
+            </p>
+          }
+          @for (turn of turns(); track $index) {
+            <div class="chat-bubble" [class.user]="turn.role === 'user'" [class.assistant]="turn.role === 'assistant'">
+              <div class="chat-role">{{ turn.role === 'user' ? 'Vous' : 'Assistant' }}</div>
+              <pre class="chat-text">{{ turn.text }}</pre>
+            </div>
+          }
+          @if (sending()) {
+            <div class="flex items-center gap-2 text-sm text-ink-soft">
+              <mat-spinner diameter="18"></mat-spinner>
+              Réflexion…
+            </div>
+          }
+        </div>
+
+        <form class="grid gap-3" [formGroup]="form" (ngSubmit)="send()">
+          <mat-form-field appearance="outline" class="w-full">
+            <mat-label>Votre question</mat-label>
+            <textarea
+              matInput
+              rows="3"
+              formControlName="message"
+              [disabled]="!enabled() || sending()"
+            ></textarea>
+          </mat-form-field>
+          <button
+            mat-flat-button
+            color="primary"
+            type="submit"
+            [disabled]="!enabled() || sending() || form.invalid"
+          >
+            <mat-icon>send</mat-icon>
+            Envoyer
+          </button>
+        </form>
+      </mat-card-content>
+    </mat-card>
+  }
+</section>

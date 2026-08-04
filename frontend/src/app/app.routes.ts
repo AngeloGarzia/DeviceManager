@@ -104,6 +104,11 @@ export const routes: Routes = [
         path: 'setup',
         canActivate: [adminGuard],
         loadComponent: () => import('./pages/setup/setup.component').then((m) => m.SetupComponent)
+      },
+      {
+        path: 'ai',
+        loadComponent: () =>
+          import('./pages/ai-assistant/ai-assistant.component').then((m) => m.AiAssistantComponent)
       }
     ]
   },

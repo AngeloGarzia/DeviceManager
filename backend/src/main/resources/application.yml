@@ -63,6 +63,16 @@ spring:
           auth: true
           starttls:
             enable: true
+  ai:
+    # none = désactivé (défaut) ; openai = activer le chat OpenAI
+    model:
+      chat: ${SPRING_AI_MODEL_CHAT:none}
+    openai:
+      api-key: ${OPENAI_API_KEY:}
+      chat:
+        options:
+          model: ${OPENAI_CHAT_MODEL:gpt-4o-mini}
+          temperature: ${OPENAI_CHAT_TEMPERATURE:0.3}
 
 app:
   jwt:
@@ -82,6 +92,8 @@ app:
     secret-key: ${AWS_SECRET_ACCESS_KEY:}
     endpoint: ${AWS_S3_ENDPOINT:}
     local-fallback-dir: ${APP_S3_LOCAL_FALLBACK_DIR:uploads}
+  ai:
+    enabled: ${APP_AI_ENABLED:false}
 
 logging:
   level:

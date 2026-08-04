@@ -28,6 +28,9 @@
       </div>
 
       <div class="flex shrink-0 flex-wrap items-center gap-1 sm:gap-2">
+        <a mat-icon-button routerLink="/ai" routerLinkActive="admin-active" matTooltip="Assistant IA">
+          <mat-icon>smart_toy</mat-icon>
+        </a>
         @if (auth.isAdmin()) {
           <a mat-icon-button routerLink="/users" routerLinkActive="admin-active" matTooltip="Comptes">
             <mat-icon>manage_accounts</mat-icon>
