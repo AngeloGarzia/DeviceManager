@@ -249,8 +249,9 @@ export class SetupComponent implements OnInit {
           this.selectedAiProvider.set(next);
           const models = this.aiProviders.find((p) => p.id === next)?.models ?? [];
           const currentModel = this.form.get('AI_MODEL')?.value;
-          if (models.length > 0 && !models.some((m) => m.value === currentModel)) {
-            this.form.get('AI_MODEL')?.setValue(models[0].value);
+          const firstModel = models[0];
+          if (firstModel && !models.some((m) => m.value === currentModel)) {
+            this.form.get('AI_MODEL')?.setValue(firstModel.value);
           }
         });
         this.loading.set(false);
