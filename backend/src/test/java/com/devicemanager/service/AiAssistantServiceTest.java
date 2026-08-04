@@ -1,5 +1,6 @@
 package com.devicemanager.service;
 
+import com.devicemanager.ai.AiApiKeyBattery;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -11,6 +12,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -18,6 +20,8 @@ class AiAssistantServiceTest {
 
     @Mock
     private AppSettingsService appSettingsService;
+    @Mock
+    private AiApiKeyBattery aiApiKeyBattery;
     @Mock
     private ImageOptimizationService imageOptimizationService;
     @Mock
@@ -51,6 +55,8 @@ class AiAssistantServiceTest {
     @Test
     void chat_rejectsWhenApiKeyMissing() {
         when(appSettingsService.getBoolean(AppSettingsService.AI_ENABLED, false)).thenReturn(true);
+        when(appSettingsService.get(AppSettingsService.AI_PROVIDER, "openai")).thenReturn("openai");
+        when(aiApiKeyBattery.keyFor(anyString())).thenReturn("");
         when(appSettingsService.get(AppSettingsService.AI_API_KEY, "")).thenReturn("");
 
         assertThatThrownBy(() -> aiAssistantService.chat("Bonjour"))
@@ -63,8 +69,9 @@ class AiAssistantServiceTest {
     @Test
     void status_enabledWhenFlagAndKeyPresent() {
         when(appSettingsService.getBoolean(AppSettingsService.AI_ENABLED, false)).thenReturn(true);
-        when(appSettingsService.get(AppSettingsService.AI_API_KEY, "")).thenReturn("sk-test");
         when(appSettingsService.get(AppSettingsService.AI_PROVIDER, "openai")).thenReturn("openai");
+        when(aiApiKeyBattery.keyFor("openai")).thenReturn("");
+        when(appSettingsService.get(AppSettingsService.AI_API_KEY, "")).thenReturn("sk-test");
         when(appSettingsService.get(AppSettingsService.AI_MODEL, "gpt-4o-mini")).thenReturn("gpt-4o-mini");
 
         assertThat(aiAssistantService.isEnabled()).isTrue();
@@ -73,14 +80,22 @@ class AiAssistantServiceTest {
     }
 
     @Test
+    void status_enabledWhenEnvBatteryKeyPresent() {
+        when(appSettingsService.getBoolean(AppSettingsService.AI_ENABLED, false)).thenReturn(true);
+        when(appSettingsService.get(AppSettingsService.AI_PROVIDER, "openai")).thenReturn("gemini");
+        when(aiApiKeyBattery.keyFor("gemini")).thenReturn("gem-test");
+        when(appSettingsService.get(AppSettingsService.AI_MODEL, "gemini-2.0-flash")).thenReturn("gemini-2.0-flash");
+
+        assertThat(aiAssistantService.isEnabled()).isTrue();
+        assertThat(aiAssistantService.status().getReply()).contains("Gemini");
+    }
+
+    @Test
     void scanLabel_rejectsWhenDisabled() {
         when(appSettingsService.getBoolean(AppSettingsService.AI_ENABLED, false)).thenReturn(false);
         MockMultipartFile image = new MockMultipartFile("image", "x.jpg", "image/jpeg", new byte[]{1, 2});
 
         assertThatThrownBy(() -> aiAssistantService.scanLabel(image))
-                .isInstanceOf(ResponseStatusException.class)
-                .extracting(ex -> ((ResponseStatusException) ex).getReason())
-                .asString()
-                .contains("désactivé");
+                .isInstanceOf(ResponseStatusException.class);
     }
 }

@@ -31,10 +31,9 @@ interface ChatTurn {
   styleUrl: './ai-assistant.component.scss'
 })
 export class AiAssistantComponent implements OnInit {
-  private readonly ai = inject(AiService);
+  readonly ai = inject(AiService);
   private readonly fb = inject(FormBuilder);
 
-  readonly enabled = signal(false);
   readonly loadingStatus = signal(true);
   readonly sending = signal(false);
   readonly error = signal<string | null>(null);
@@ -47,7 +46,6 @@ export class AiAssistantComponent implements OnInit {
   ngOnInit(): void {
     this.ai.status().subscribe({
       next: (res) => {
-        this.enabled.set(!!res.enabled);
         this.loadingStatus.set(false);
         if (!res.enabled) {
           this.error.set(res.reply);
@@ -55,14 +53,13 @@ export class AiAssistantComponent implements OnInit {
       },
       error: () => {
         this.loadingStatus.set(false);
-        this.enabled.set(false);
         this.error.set('Impossible de contacter l’assistant IA.');
       }
     });
   }
 
   send(): void {
-    if (this.form.invalid || this.sending() || !this.enabled()) {
+    if (this.form.invalid || this.sending() || !this.ai.enabled()) {
       this.form.markAllAsTouched();
       return;
     }

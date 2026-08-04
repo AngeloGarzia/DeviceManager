@@ -1,5 +1,6 @@
 package com.devicemanager.service;
 
+import com.devicemanager.ai.AiApiKeyBattery;
 import com.devicemanager.ai.AiProviders;
 import com.devicemanager.dto.AiChatResponse;
 import com.devicemanager.dto.AiLabelScanResponse;
@@ -55,6 +56,7 @@ public class AiAssistantService {
             """;
 
     private final AppSettingsService appSettingsService;
+    private final AiApiKeyBattery aiApiKeyBattery;
     private final ImageOptimizationService imageOptimizationService;
     private final WebEnrichmentService webEnrichmentService;
     private final ObjectMapper objectMapper;
@@ -63,8 +65,8 @@ public class AiAssistantService {
         if (!appSettingsService.getBoolean(AppSettingsService.AI_ENABLED, false)) {
             return false;
         }
-        String apiKey = appSettingsService.get(AppSettingsService.AI_API_KEY, "");
-        return apiKey != null && !apiKey.isBlank();
+        String provider = resolveProviderId();
+        return !resolveApiKey(provider).isBlank();
     }
 
     public AiChatResponse status() {
@@ -76,14 +78,15 @@ public class AiAssistantService {
                 .enabled(enabled)
                 .reply(enabled
                         ? "Assistant IA prêt (" + providerLabel + " / " + model + ")."
-                        : "Assistant IA désactivé. Activez-le dans Setup (paramètres) et renseignez la clé API.")
+                        : "Assistant IA désactivé. Activez-le dans Setup et renseignez la clé "
+                                + "du fournisseur (batterie .env ou Setup).")
                 .build();
     }
 
     public AiChatResponse chat(String message) {
         requireEnabled();
-        String apiKey = requireApiKey();
         String provider = resolveProviderId();
+        String apiKey = requireApiKey(provider);
         String model = resolveChatModel(provider);
 
         try {
@@ -114,8 +117,8 @@ public class AiAssistantService {
         if (image == null || image.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Image obligatoire");
         }
-        String apiKey = requireApiKey();
         String provider = resolveProviderId();
+        String apiKey = requireApiKey(provider);
         String visionModel = resolveVisionModel(provider);
 
         MultipartFile optimized = imageOptimizationService.optimize(image);
@@ -225,13 +228,24 @@ public class AiAssistantService {
         }
     }
 
-    private String requireApiKey() {
-        String apiKey = appSettingsService.get(AppSettingsService.AI_API_KEY, "");
-        if (apiKey == null || apiKey.isBlank()) {
+    private String requireApiKey(String provider) {
+        String apiKey = resolveApiKey(provider);
+        if (apiKey.isBlank()) {
             throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
-                    "Clé API IA manquante dans Setup");
+                    "Clé API IA manquante pour le fournisseur « " + provider
+                            + " » (.env batterie ou Setup AI_API_KEY)");
         }
-        return apiKey.trim();
+        return apiKey;
+    }
+
+    /** Batterie .env du fournisseur, sinon clé Setup AI_API_KEY. */
+    private String resolveApiKey(String provider) {
+        String fromEnv = aiApiKeyBattery.keyFor(provider);
+        if (fromEnv != null && !fromEnv.isBlank()) {
+            return fromEnv.trim();
+        }
+        String fromSetup = appSettingsService.get(AppSettingsService.AI_API_KEY, "");
+        return fromSetup == null ? "" : fromSetup.trim();
     }
 
     private String resolveProviderId() {

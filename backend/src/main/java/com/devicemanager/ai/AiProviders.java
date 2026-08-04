@@ -22,6 +22,14 @@ public final class AiProviders {
     }
 
     private static final List<Provider> ALL = List.of(
+            new Provider("gemini", "Google Gemini", "https://generativelanguage.googleapis.com/v1beta/openai", List.of(
+                    new Model("gemini-2.0-flash", "Gemini 2.0 Flash (vision)", true),
+                    new Model("gemini-2.0-flash-lite", "Gemini 2.0 Flash Lite (vision)", true),
+                    new Model("gemini-2.5-flash", "Gemini 2.5 Flash (vision)", true),
+                    new Model("gemini-2.5-pro", "Gemini 2.5 Pro (vision)", true),
+                    new Model("gemini-1.5-flash", "Gemini 1.5 Flash (vision)", true),
+                    new Model("gemini-1.5-pro", "Gemini 1.5 Pro (vision)", true)
+            )),
             new Provider("openai", "OpenAI", "https://api.openai.com", List.of(
                     new Model("gpt-4o-mini", "gpt-4o-mini — économique (vision)", true),
                     new Model("gpt-4o", "gpt-4o — polyvalent (vision)", true),
@@ -159,8 +167,9 @@ public final class AiProviders {
             return "openai";
         }
         String id = raw.trim().toLowerCase(Locale.ROOT);
-        if (Arrays.asList("openai", "groq", "mistral", "openrouter", "deepseek", "together", "fireworks")
-                .contains(id)) {
+        if (Arrays.asList(
+                "gemini", "openai", "groq", "mistral", "openrouter", "deepseek", "together", "fireworks"
+        ).contains(id)) {
             return id;
         }
         return "openai";

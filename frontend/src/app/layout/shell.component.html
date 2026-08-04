@@ -28,9 +28,17 @@
       </div>
 
       <div class="flex shrink-0 flex-wrap items-center gap-1 sm:gap-2">
-        <a mat-icon-button routerLink="/ai" routerLinkActive="admin-active" matTooltip="Assistant IA">
+        <button
+          mat-icon-button
+          type="button"
+          [class.admin-active]="ai.enabled() && router.url.startsWith('/ai')"
+          [disabled]="!ai.enabled()"
+          [matTooltip]="ai.enabled() ? 'Assistant IA' : (ai.disabledReason() || 'IA désactivée')"
+          (click)="openAiAssistant()"
+          aria-label="Assistant IA"
+        >
           <mat-icon>smart_toy</mat-icon>
-        </a>
+        </button>
         @if (auth.isAdmin()) {
           <a mat-icon-button routerLink="/users" routerLinkActive="admin-active" matTooltip="Comptes">
             <mat-icon>manage_accounts</mat-icon>
@@ -44,7 +52,7 @@
           type="button"
           color="primary"
           class="!min-w-0"
-          (click)="auth.logout()"
+          (click)="logout()"
           aria-label="Déconnexion"
         >
           <mat-icon>logout</mat-icon>

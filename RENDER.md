@@ -133,21 +133,39 @@ Assistant chat intégré (`/ai` dans le front, `POST /api/ai/chat`).
 
 **Configuration recommandée** : page **Setup** (admin) → catégorie *Intelligence artificielle* :
 - Activer l’assistant IA
-- Fournisseur (`openai`, `groq`, `mistral`, `openrouter`, `deepseek`, `together`, `fireworks`)
+- Fournisseur (`gemini`, `openai`, `groq`, `mistral`, `openrouter`, `deepseek`, `together`, `fireworks`)
 - Modèle (liste filtrée selon le fournisseur)
-- Clé API du fournisseur
+- Clé API Setup (optionnelle si la batterie `.env` du fournisseur est renseignée)
 
 Les valeurs sont stockées en base (`app_setting`) et prises en compte immédiatement (sans redémarrage).
+La clé utilisée à l’exécution = **batterie `.env` du fournisseur courant**, sinon `AI_API_KEY` (Setup).
 
-Variables `.env` éventuelles (valeurs initiales au premier démarrage uniquement) :
+Variables Environment Render / `.env` :
 
 ```text
 APP_AI_ENABLED=false
+
+# -- Batterie IA --
+GEMINI_API_KEY=
 OPENAI_API_KEY=
-OPENAI_CHAT_MODEL=gpt-4o-mini
+GROQ_API_KEY=
+MISTRAL_API_KEY=
+OPENROUTER_API_KEY=
+DEEPSEEK_API_KEY=
+TOGETHER_API_KEY=
+FIREWORKS_API_KEY=
+AI_DEFAULT_PROVIDER=openai
+AI_DEFAULT_MODEL=gpt-4o-mini
 ```
 
-`OPENAI_API_KEY` sert de **seed** pour `AI_API_KEY` (clé du fournisseur choisi dans Setup — OpenAI, Groq, Mistral, OpenRouter, etc.).
+Exemple Gemini :
+
+```text
+APP_AI_ENABLED=true
+GEMINI_API_KEY=...
+AI_DEFAULT_PROVIDER=gemini
+AI_DEFAULT_MODEL=gemini-2.0-flash
+```
 
 ---
 

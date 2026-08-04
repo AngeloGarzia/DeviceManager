@@ -23,6 +23,7 @@ class AppSettingsServiceTest {
     private static final Logger log = LoggerFactory.getLogger(AppSettingsServiceTest.class);
 
     @Mock private AppSettingRepository appSettingRepository;
+    @Mock private com.devicemanager.ai.AiApiKeyBattery aiApiKeyBattery;
     @InjectMocks private AppSettingsService appSettingsService;
 
     @BeforeEach
@@ -40,6 +41,10 @@ class AppSettingsServiceTest {
         ReflectionTestUtils.setField(appSettingsService, "defaultS3Bucket", "");
         ReflectionTestUtils.setField(appSettingsService, "defaultS3Region", "");
         ReflectionTestUtils.setField(appSettingsService, "defaultLocalUploadDir", "uploads");
+        ReflectionTestUtils.setField(appSettingsService, "defaultAiEnabled", "false");
+        ReflectionTestUtils.setField(appSettingsService, "defaultAiProvider", "openai");
+        ReflectionTestUtils.setField(appSettingsService, "defaultAiModel", "");
+        ReflectionTestUtils.setField(appSettingsService, "legacyOpenAiChatModel", "gpt-4o-mini");
     }
 
     @Test

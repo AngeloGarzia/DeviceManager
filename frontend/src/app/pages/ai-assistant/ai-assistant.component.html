@@ -41,14 +41,14 @@
               matInput
               rows="3"
               formControlName="message"
-              [disabled]="!enabled() || sending()"
+              [disabled]="!ai.enabled() || sending()"
             ></textarea>
           </mat-form-field>
           <button
             mat-flat-button
             color="primary"
             type="submit"
-            [disabled]="!enabled() || sending() || form.invalid"
+            [disabled]="!ai.enabled() || sending() || form.invalid"
           >
             <mat-icon>send</mat-icon>
             Envoyer

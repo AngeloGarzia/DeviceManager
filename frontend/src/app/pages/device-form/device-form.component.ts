@@ -20,6 +20,7 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatCardModule } from '@angular/material/card';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { DeviceService } from '../../services/device.service';
 import { DeviceFormDraftService } from '../../services/device-form-draft.service';
 import { SfmService } from '../../services/sfm.service';
@@ -47,6 +48,7 @@ interface NewPhotoItem {
     MatCheckboxModule,
     MatCardModule,
     MatProgressSpinnerModule,
+    MatTooltipModule,
     ConfirmDialogComponent
   ],
   templateUrl: './device-form.component.html',
@@ -66,7 +68,7 @@ export class DeviceFormComponent implements OnInit, AfterViewInit, OnDestroy {
   private readonly draftService = inject(DeviceFormDraftService);
   private readonly sfmService = inject(SfmService);
   private readonly masService = inject(MasService);
-  private readonly aiService = inject(AiService);
+  readonly aiService = inject(AiService);
 
   readonly loading = signal(false);
   readonly saving = signal(false);
@@ -145,6 +147,7 @@ export class DeviceFormComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   ngOnInit(): void {
+    this.aiService.refreshStatus();
     this.forOrderRequest = this.route.snapshot.queryParamMap.get('forOrderRequest') === '1';
     this.form.controls.masId.valueChanges.subscribe((masId) => this.selectedMasId.set(masId));
     this.form.controls.sfmId.valueChanges.subscribe((sfmId) => {
@@ -389,6 +392,9 @@ export class DeviceFormComponent implements OnInit, AfterViewInit, OnDestroy {
 
   /** Capture (ou dernière photo) puis analyse IA de l'étiquette → préremplit le formulaire. */
   async scanLabelWithAi(): Promise<void> {
+    if (!this.aiService.enabled() || this.scanningLabel()) {
+      return;
+    }
     this.error.set(null);
     this.aiHint.set(null);
 

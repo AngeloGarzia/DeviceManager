@@ -84,7 +84,12 @@
                 color="accent"
                 type="button"
                 (click)="scanLabelWithAi()"
-                [disabled]="scanningLabel()"
+                [disabled]="scanningLabel() || !aiService.enabled()"
+                [matTooltip]="
+                  aiService.enabled()
+                    ? 'Analyser l’étiquette avec l’IA'
+                    : aiService.disabledReason() || 'IA désactivée'
+                "
               >
                 @if (scanningLabel()) {
                   <mat-spinner diameter="20" class="!inline-block"></mat-spinner>

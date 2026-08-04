@@ -100,6 +100,8 @@ app:
     local-fallback-dir: ${APP_S3_LOCAL_FALLBACK_DIR:uploads}
   ai:
     enabled: ${APP_AI_ENABLED:false}
+    default-provider: ${AI_DEFAULT_PROVIDER:openai}
+    default-model: ${AI_DEFAULT_MODEL:}
 
 logging:
   level:

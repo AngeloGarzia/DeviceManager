@@ -1,5 +1,7 @@
 package com.devicemanager.service;
 
+import com.devicemanager.ai.AiApiKeyBattery;
+import com.devicemanager.ai.AiProviders;
 import com.devicemanager.dto.AppSettingResponse;
 import com.devicemanager.dto.AppSettingsUpdateRequest;
 import com.devicemanager.entity.AppSetting;
@@ -39,6 +41,7 @@ public class AppSettingsService {
     public static final String AI_MODEL = "AI_MODEL";
 
     private final AppSettingRepository appSettingRepository;
+    private final AiApiKeyBattery aiApiKeyBattery;
     private final Map<String, String> cache = new ConcurrentHashMap<>();
 
     @Value("${app.mail.enabled:false}")
@@ -83,11 +86,14 @@ public class AppSettingsService {
     @Value("${app.ai.enabled:false}")
     private String defaultAiEnabled;
 
-    @Value("${OPENAI_API_KEY:}")
-    private String defaultAiApiKey;
+    @Value("${AI_DEFAULT_PROVIDER:openai}")
+    private String defaultAiProvider;
+
+    @Value("${AI_DEFAULT_MODEL:}")
+    private String defaultAiModel;
 
     @Value("${OPENAI_CHAT_MODEL:gpt-4o-mini}")
-    private String defaultAiModel;
+    private String legacyOpenAiChatModel;
 
     @PostConstruct
     public void initDefaults() {
@@ -104,12 +110,29 @@ public class AppSettingsService {
         ensure(S3_BUCKET, defaultS3Bucket, "Bucket S3", "Stockage", false);
         ensure(S3_REGION, defaultS3Region, "Région S3", "Stockage", false);
         ensure(LOCAL_UPLOAD_DIR, defaultLocalUploadDir, "Dossier local des uploads", "Stockage", false);
+
+        String provider = AiProviders.normalizeProvider(defaultAiProvider);
+        String model = firstNonBlank(defaultAiModel, legacyOpenAiChatModel, AiProviders.defaultModel(provider));
+        String seedApiKey = aiApiKeyBattery.seedKey(provider);
+
         ensure(AI_ENABLED, defaultAiEnabled, "Activer l'assistant IA", "Intelligence artificielle", false);
-        ensure(AI_PROVIDER, "openai", "Fournisseur IA", "Intelligence artificielle", false);
-        ensure(AI_MODEL, defaultAiModel == null || defaultAiModel.isBlank() ? "gpt-4o-mini" : defaultAiModel,
-                "Modèle IA", "Intelligence artificielle", false);
-        ensure(AI_API_KEY, defaultAiApiKey, "Clé API du fournisseur", "Intelligence artificielle", true);
+        ensure(AI_PROVIDER, provider, "Fournisseur IA", "Intelligence artificielle", false);
+        ensure(AI_MODEL, model, "Modèle IA", "Intelligence artificielle", false);
+        ensure(AI_API_KEY, seedApiKey,
+                "Clé API (optionnel si batterie .env du fournisseur)", "Intelligence artificielle", true);
         reloadCache();
+    }
+
+    private static String firstNonBlank(String... values) {
+        if (values == null) {
+            return "";
+        }
+        for (String v : values) {
+            if (v != null && !v.isBlank()) {
+                return v.trim();
+            }
+        }
+        return "";
     }
 
     @Transactional(readOnly = true)

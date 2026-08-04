@@ -29,6 +29,7 @@ import {
 import { SetupService } from '../../services/setup.service';
 import { AtelierService } from '../../services/atelier.service';
 import { AuthService } from '../../services/auth.service';
+import { AiService } from '../../services/ai.service';
 import { ConfirmDialogComponent } from '../../shared/confirm-dialog.component';
 
 @Component({
@@ -54,6 +55,7 @@ import { ConfirmDialogComponent } from '../../shared/confirm-dialog.component';
 export class SetupComponent implements OnInit {
   private readonly setupService = inject(SetupService);
   private readonly atelierService = inject(AtelierService);
+  private readonly aiService = inject(AiService);
   readonly auth = inject(AuthService);
   private readonly fb = inject(FormBuilder);
 
@@ -103,6 +105,18 @@ export class SetupComponent implements OnInit {
   });
 
   readonly aiProviders = [
+    {
+      id: 'gemini',
+      label: 'Google Gemini',
+      models: [
+        { value: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash (vision)' },
+        { value: 'gemini-2.0-flash-lite', label: 'Gemini 2.0 Flash Lite (vision)' },
+        { value: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash (vision)' },
+        { value: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro (vision)' },
+        { value: 'gemini-1.5-flash', label: 'Gemini 1.5 Flash (vision)' },
+        { value: 'gemini-1.5-pro', label: 'Gemini 1.5 Pro (vision)' }
+      ]
+    },
     {
       id: 'openai',
       label: 'OpenAI',
@@ -504,6 +518,7 @@ export class SetupComponent implements OnInit {
         }
         this.saving.set(false);
         this.success.set(true);
+        this.aiService.refreshStatus();
       },
       error: (err) => {
         this.saving.set(false);
@@ -523,6 +538,7 @@ export class SetupComponent implements OnInit {
         for (const item of data) {
           this.control(item.key)?.setValue(item.value ?? '', { emitEvent: false });
         }
+        this.aiService.refreshStatus();
         this.setupService.testMail().subscribe({
           next: (res) => {
             this.testingMail.set(false);

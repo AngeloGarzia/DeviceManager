@@ -1,6 +1,6 @@
-import { Injectable } from '@angular/core';
+import { Injectable, computed, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable } from 'rxjs';
+import { Observable, tap } from 'rxjs';
 import { environment } from '../../environments/environment';
 
 export interface AiChatResponse {
@@ -22,10 +22,40 @@ export interface AiLabelScanResponse {
 export class AiService {
   private readonly base = `${environment.apiUrl}/api/ai`;
 
+  /** IA activée + clé API renseignée (état serveur). */
+  readonly enabled = signal(false);
+  readonly statusMessage = signal<string | null>(null);
+  readonly statusLoaded = signal(false);
+
+  readonly disabledReason = computed(() =>
+    this.enabled()
+      ? null
+      : this.statusMessage() || 'IA désactivée — activez-la dans Setup (clé API).'
+  );
+
   constructor(private http: HttpClient) {}
 
   status(): Observable<AiChatResponse> {
-    return this.http.get<AiChatResponse>(`${this.base}/status`);
+    return this.http.get<AiChatResponse>(`${this.base}/status`).pipe(
+      tap((res) => this.applyStatus(res))
+    );
+  }
+
+  /** Rafraîchit le statut partagé (toolbar, formulaire pièce, etc.). */
+  refreshStatus(): void {
+    this.status().subscribe({
+      error: () => {
+        this.enabled.set(false);
+        this.statusMessage.set('Impossible de contacter l’assistant IA.');
+        this.statusLoaded.set(true);
+      }
+    });
+  }
+
+  reset(): void {
+    this.enabled.set(false);
+    this.statusMessage.set(null);
+    this.statusLoaded.set(false);
   }
 
   chat(message: string): Observable<AiChatResponse> {
@@ -40,5 +70,11 @@ export class AiService {
         : new File([image], `label-${Date.now()}.jpg`, { type: image.type || 'image/jpeg' });
     form.append('image', file);
     return this.http.post<AiLabelScanResponse>(`${this.base}/label-scan`, form);
+  }
+
+  private applyStatus(res: AiChatResponse): void {
+    this.enabled.set(!!res.enabled);
+    this.statusMessage.set(res.reply || null);
+    this.statusLoaded.set(true);
   }
 }
