@@ -8,6 +8,16 @@ export interface AiChatResponse {
   enabled: boolean;
 }
 
+export interface AiLabelScanResponse {
+  enabled: boolean;
+  nom?: string | null;
+  reference?: string | null;
+  marque?: string | null;
+  usage?: string | null;
+  rawText?: string | null;
+  notes?: string | null;
+}
+
 @Injectable({ providedIn: 'root' })
 export class AiService {
   private readonly base = `${environment.apiUrl}/api/ai`;
@@ -20,5 +30,15 @@ export class AiService {
 
   chat(message: string): Observable<AiChatResponse> {
     return this.http.post<AiChatResponse>(`${this.base}/chat`, { message });
+  }
+
+  scanLabel(image: File | Blob): Observable<AiLabelScanResponse> {
+    const form = new FormData();
+    const file =
+      image instanceof File
+        ? image
+        : new File([image], `label-${Date.now()}.jpg`, { type: image.type || 'image/jpeg' });
+    form.append('image', file);
+    return this.http.post<AiLabelScanResponse>(`${this.base}/label-scan`, form);
   }
 }

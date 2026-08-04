@@ -58,4 +58,6 @@ public interface DeviceRepository extends JpaRepository<Device, Long> {
     boolean existsByReferenceIgnoreCaseAndAtelierId(String reference, Long atelierId);
 
     boolean existsByReferenceIgnoreCaseAndAtelierIdAndIdNot(String reference, Long atelierId, Long id);
+
+    long countByAtelierId(Long atelierId);
 }

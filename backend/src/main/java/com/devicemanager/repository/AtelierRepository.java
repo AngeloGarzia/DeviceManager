@@ -11,9 +11,10 @@ import java.util.Optional;
 public interface AtelierRepository extends JpaRepository<Atelier, Long> {
 
     @Query("""
-            SELECT a FROM Atelier a
+            SELECT DISTINCT a FROM Atelier a
             JOIN FETCH a.casino c
             JOIN FETCH c.groupe
+            LEFT JOIN FETCH a.coordonnees
             WHERE c.groupe.id = :groupeId
             ORDER BY c.nom, a.nom
             """)
@@ -23,6 +24,7 @@ public interface AtelierRepository extends JpaRepository<Atelier, Long> {
             SELECT a FROM Atelier a
             JOIN FETCH a.casino c
             JOIN FETCH c.groupe
+            LEFT JOIN FETCH a.coordonnees
             WHERE a.id = :id
             """)
     Optional<Atelier> findByIdWithCasino(@Param("id") Long id);

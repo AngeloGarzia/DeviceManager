@@ -33,6 +33,10 @@ public class AppSettingsService {
     public static final String S3_BUCKET = "S3_BUCKET";
     public static final String S3_REGION = "S3_REGION";
     public static final String LOCAL_UPLOAD_DIR = "LOCAL_UPLOAD_DIR";
+    public static final String AI_ENABLED = "AI_ENABLED";
+    public static final String AI_PROVIDER = "AI_PROVIDER";
+    public static final String AI_API_KEY = "AI_API_KEY";
+    public static final String AI_MODEL = "AI_MODEL";
 
     private final AppSettingRepository appSettingRepository;
     private final Map<String, String> cache = new ConcurrentHashMap<>();
@@ -76,6 +80,15 @@ public class AppSettingsService {
     @Value("${app.s3.local-fallback-dir:uploads}")
     private String defaultLocalUploadDir;
 
+    @Value("${app.ai.enabled:false}")
+    private String defaultAiEnabled;
+
+    @Value("${OPENAI_API_KEY:}")
+    private String defaultAiApiKey;
+
+    @Value("${OPENAI_CHAT_MODEL:gpt-4o-mini}")
+    private String defaultAiModel;
+
     @PostConstruct
     public void initDefaults() {
         ensure(MAIL_ENABLED, defaultMailEnabled, "Activer l'envoi d'emails", "Messagerie", false);
@@ -91,6 +104,11 @@ public class AppSettingsService {
         ensure(S3_BUCKET, defaultS3Bucket, "Bucket S3", "Stockage", false);
         ensure(S3_REGION, defaultS3Region, "Région S3", "Stockage", false);
         ensure(LOCAL_UPLOAD_DIR, defaultLocalUploadDir, "Dossier local des uploads", "Stockage", false);
+        ensure(AI_ENABLED, defaultAiEnabled, "Activer l'assistant IA", "Intelligence artificielle", false);
+        ensure(AI_PROVIDER, "openai", "Fournisseur IA", "Intelligence artificielle", false);
+        ensure(AI_MODEL, defaultAiModel == null || defaultAiModel.isBlank() ? "gpt-4o-mini" : defaultAiModel,
+                "Modèle IA", "Intelligence artificielle", false);
+        ensure(AI_API_KEY, defaultAiApiKey, "Clé API du fournisseur", "Intelligence artificielle", true);
         reloadCache();
     }
 

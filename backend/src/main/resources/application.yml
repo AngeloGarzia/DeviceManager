@@ -64,9 +64,15 @@ spring:
           starttls:
             enable: true
   ai:
-    # none = désactivé (défaut) ; openai = activer le chat OpenAI
+    # Autoconfig Spring AI désactivée : le chat est créé à la demande depuis Setup (clé + modèle).
     model:
-      chat: ${SPRING_AI_MODEL_CHAT:none}
+      chat: none
+      embedding: none
+      image: none
+      moderation: none
+      audio:
+        speech: none
+        transcription: none
     openai:
       api-key: ${OPENAI_API_KEY:}
       chat:

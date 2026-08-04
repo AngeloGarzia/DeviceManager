@@ -73,17 +73,32 @@
                 color="primary"
                 type="button"
                 (click)="capturePhoto()"
-                [disabled]="!cameraReady() || !canAddPhoto()"
+                [disabled]="!cameraReady() || !canAddPhoto() || scanningLabel()"
               >
                 <mat-icon>photo_camera</mat-icon>
                 Acquisition image
               </button>
 
               <button
+                mat-flat-button
+                color="accent"
+                type="button"
+                (click)="scanLabelWithAi()"
+                [disabled]="scanningLabel()"
+              >
+                @if (scanningLabel()) {
+                  <mat-spinner diameter="20" class="!inline-block"></mat-spinner>
+                } @else {
+                  <mat-icon>document_scanner</mat-icon>
+                }
+                Scanner étiquette (IA)
+              </button>
+
+              <button
                 mat-stroked-button
                 type="button"
                 (click)="openGallery()"
-                [disabled]="!canAddPhoto()"
+                [disabled]="!canAddPhoto() || scanningLabel()"
               >
                 <mat-icon>image</mat-icon>
                 Galerie / appareil
@@ -97,6 +112,10 @@
                 (change)="onGallerySelected($event)"
               />
             </div>
+
+            @if (aiHint()) {
+              <p class="mt-3 rounded-lg bg-sky-50 px-3 py-2 text-sm text-sky-900">{{ aiHint() }}</p>
+            }
 
             @if (existingPhotos().length > 0 || newPhotos().length > 0) {
               <div class="mt-3">
@@ -240,4 +259,15 @@
       </mat-card-content>
     </mat-card>
   }
+
+  <app-confirm-dialog
+    [open]="offerAnotherOpen()"
+    title="Pièce enregistrée"
+    message="La pièce détachée a bien été ajoutée. Voulez-vous en ajouter une autre ?"
+    confirmLabel="Oui, ajouter"
+    cancelLabel="Non, voir la fiche"
+    confirmColor="primary"
+    (confirm)="addAnotherDevice()"
+    (cancel)="skipAnotherDevice()"
+  />
 </section>

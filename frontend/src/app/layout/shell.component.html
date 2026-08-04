@@ -13,14 +13,14 @@
         </div>
 
         @if (auth.ateliers().length > 0) {
-          <mat-form-field appearance="outline" class="atelier-select !mb-[-1.25em] min-w-0 flex-1 sm:flex-none">
+          <mat-form-field appearance="outline" class="atelier-select" subscriptSizing="dynamic">
             <mat-label>Atelier</mat-label>
             <mat-select
               [value]="auth.atelierId()"
               (selectionChange)="auth.switchAtelier($event.value)"
             >
               @for (a of auth.ateliers(); track a.id) {
-                <mat-option [value]="a.id">{{ a.label }}</mat-option>
+                <mat-option [value]="a.id">{{ a.nom || a.label }}</mat-option>
               }
             </mat-select>
           </mat-form-field>

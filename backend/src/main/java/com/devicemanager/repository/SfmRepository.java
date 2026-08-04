@@ -50,4 +50,6 @@ public interface SfmRepository extends JpaRepository<Sfm, Long> {
     boolean existsByNomIgnoreCaseAndAtelierId(String nom, Long atelierId);
 
     boolean existsByNomIgnoreCaseAndAtelierIdAndIdNot(String nom, Long atelierId, Long id);
+
+    long countByAtelierId(Long atelierId);
 }

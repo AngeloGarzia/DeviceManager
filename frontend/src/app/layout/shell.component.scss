@@ -75,21 +75,35 @@ a.admin-active mat-icon {
 }
 
 .atelier-select {
-  width: min(100%, 12rem);
+  width: 13.5rem;
+  max-width: min(13.5rem, 100%);
+  flex: 0 0 auto;
+  font-size: 0.875rem;
+}
+
+.atelier-select .mat-mdc-form-field-subscript-wrapper {
+  display: none;
+}
+
+.atelier-select .mat-mdc-text-field-wrapper {
+  background: #fff;
+}
+
+.atelier-select .mat-mdc-form-field-infix {
+  min-height: 2.75rem;
+  padding-top: 0.65rem;
+  padding-bottom: 0.65rem;
 }
 
 @media (min-width: 640px) {
   .atelier-select {
-    width: min(100%, 18rem);
+    width: 16rem;
+    max-width: 16rem;
   }
 
   .nav-link {
     @apply min-h-14 px-1 text-[0.7rem];
   }
-}
-
-.atelier-select .mat-mdc-form-field-subscript-wrapper {
-  display: none;
 }
 
 .logout-label {

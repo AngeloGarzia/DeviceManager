@@ -21,9 +21,9 @@
     </div>
   </div>
 
-  <div class="panel !py-2">
-    <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
-      <mat-form-field appearance="outline" class="flex-1 !mb-[-1.25em]">
+  <div class="panel filter-bar">
+    <div class="filter-bar__row">
+      <mat-form-field appearance="outline" class="filter-bar__field" subscriptSizing="dynamic">
         <mat-label>Rechercher</mat-label>
         <input
           matInput
@@ -33,7 +33,9 @@
         />
         <mat-icon matSuffix>search</mat-icon>
       </mat-form-field>
-      <button mat-stroked-button type="button" color="primary" class="!h-14" (click)="load()">Filtrer</button>
+      <button mat-stroked-button type="button" color="primary" class="filter-bar__action" (click)="load()">
+        Filtrer
+      </button>
     </div>
   </div>
 

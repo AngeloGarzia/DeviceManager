@@ -131,16 +131,23 @@ Sur Render, tu peux aussi mettre ces variables dans l’**Environment** de l’A
 
 Assistant chat intégré (`/ai` dans le front, `POST /api/ai/chat`).
 
-Variables API Render / `.env` :
+**Configuration recommandée** : page **Setup** (admin) → catégorie *Intelligence artificielle* :
+- Activer l’assistant IA
+- Fournisseur (`openai`, `groq`, `mistral`, `openrouter`, `deepseek`, `together`, `fireworks`)
+- Modèle (liste filtrée selon le fournisseur)
+- Clé API du fournisseur
+
+Les valeurs sont stockées en base (`app_setting`) et prises en compte immédiatement (sans redémarrage).
+
+Variables `.env` éventuelles (valeurs initiales au premier démarrage uniquement) :
 
 ```text
-APP_AI_ENABLED=true
-SPRING_AI_MODEL_CHAT=openai
-OPENAI_API_KEY=sk-...
+APP_AI_ENABLED=false
+OPENAI_API_KEY=
 OPENAI_CHAT_MODEL=gpt-4o-mini
 ```
 
-Sans ces variables, l’API démarre normalement et l’assistant affiche « désactivé ».
+`OPENAI_API_KEY` sert de **seed** pour `AI_API_KEY` (clé du fournisseur choisi dans Setup — OpenAI, Groq, Mistral, OpenRouter, etc.).
 
 ---
 

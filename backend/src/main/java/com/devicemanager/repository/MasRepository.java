@@ -41,4 +41,6 @@ public interface MasRepository extends JpaRepository<Mas, Long> {
     boolean existsByNumeroIgnoreCaseAndAtelierId(String numero, Long atelierId);
 
     boolean existsByNumeroIgnoreCaseAndAtelierIdAndIdNot(String numero, Long atelierId, Long id);
+
+    long countByAtelierId(Long atelierId);
 }

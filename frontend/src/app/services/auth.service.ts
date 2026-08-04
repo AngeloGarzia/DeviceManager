@@ -190,4 +190,21 @@ export class AuthService {
       return [];
     }
   }
+
+  /** Rafraîchit la liste des ateliers du header après une gestion admin. */
+  refreshAteliers(): void {
+    this.http.get<AtelierSummary[]>(`${environment.apiUrl}/api/ateliers`).subscribe({
+      next: (list) => {
+        const ateliers = (list ?? []).map((a) => ({ ...a, id: Number(a.id) }));
+        this.ateliers.set(ateliers);
+        localStorage.setItem(ATELIERS_KEY, JSON.stringify(ateliers));
+        const current = this.atelierId();
+        if (current != null && !ateliers.some((a) => a.id === current)) {
+          const fallback = ateliers[0]?.id ?? null;
+          this.setAtelierId(fallback);
+          this.atelierRevision.update((v) => v + 1);
+        }
+      }
+    });
+  }
 }

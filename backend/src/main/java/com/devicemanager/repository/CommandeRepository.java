@@ -42,4 +42,6 @@ public interface CommandeRepository extends JpaRepository<Commande, Long> {
             where c.id = :id and c.atelier.id = :atelierId
             """)
     Optional<Commande> findByIdWithRelations(@Param("id") Long id, @Param("atelierId") Long atelierId);
+
+    long countByAtelierId(Long atelierId);
 }

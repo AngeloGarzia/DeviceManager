@@ -25,6 +25,77 @@ export interface AtelierSummary {
   groupeId: number;
   groupeNom: string;
   label: string;
+  coordonnees?: Coordonnees;
+  responsables?: AtelierResponsable[];
+}
+
+export interface CasinoSummary {
+  id: number;
+  nom: string;
+  groupeId: number;
+  groupeNom: string;
+}
+
+export interface AtelierResponsable {
+  id: number;
+  username: string;
+  nom: string;
+  prenom: string;
+  email: string;
+}
+
+export interface AdressePostale {
+  ligne1?: string;
+  ligne2?: string;
+  codePostal?: string;
+  ville?: string;
+  pays?: string;
+}
+
+export interface EmailCoord {
+  id?: number;
+  valeur: string;
+  principal?: boolean;
+}
+
+export interface TelephoneCoord {
+  id?: number;
+  valeur: string;
+  label?: string;
+  principal?: boolean;
+}
+
+export type TypeReseauSocial =
+  | 'LINKEDIN'
+  | 'FACEBOOK'
+  | 'INSTAGRAM'
+  | 'X'
+  | 'YOUTUBE'
+  | 'SITE_WEB'
+  | 'AUTRE';
+
+export interface ReseauSocial {
+  id?: number;
+  type: TypeReseauSocial;
+  url: string;
+}
+
+export interface Coordonnees {
+  id?: number;
+  adresse?: AdressePostale;
+  emails?: EmailCoord[];
+  telephones?: TelephoneCoord[];
+  reseauxSociaux?: ReseauSocial[];
+}
+
+export interface AtelierRequest {
+  nom: string;
+  casinoId: number;
+  adresse?: AdressePostale;
+  emails?: EmailCoord[];
+  telephones?: TelephoneCoord[];
+  reseauxSociaux?: ReseauSocial[];
+  responsableIds?: number[];
 }
 
 export interface SfmContact {

@@ -24,7 +24,9 @@ import { DeviceService } from '../../services/device.service';
 import { DeviceFormDraftService } from '../../services/device-form-draft.service';
 import { SfmService } from '../../services/sfm.service';
 import { MasService } from '../../services/mas.service';
+import { AiService } from '../../services/ai.service';
 import { DeviceForm, DevicePhoto, Mas, Sfm } from '../../models/models';
+import { ConfirmDialogComponent } from '../../shared/confirm-dialog.component';
 
 interface NewPhotoItem {
   file: File;
@@ -44,7 +46,8 @@ interface NewPhotoItem {
     MatSelectModule,
     MatCheckboxModule,
     MatCardModule,
-    MatProgressSpinnerModule
+    MatProgressSpinnerModule,
+    ConfirmDialogComponent
   ],
   templateUrl: './device-form.component.html',
   styleUrl: './device-form.component.scss'
@@ -63,10 +66,13 @@ export class DeviceFormComponent implements OnInit, AfterViewInit, OnDestroy {
   private readonly draftService = inject(DeviceFormDraftService);
   private readonly sfmService = inject(SfmService);
   private readonly masService = inject(MasService);
+  private readonly aiService = inject(AiService);
 
   readonly loading = signal(false);
   readonly saving = signal(false);
+  readonly scanningLabel = signal(false);
   readonly error = signal<string | null>(null);
+  readonly aiHint = signal<string | null>(null);
   readonly cameraError = signal<string | null>(null);
   readonly cameraReady = signal(false);
   readonly cameras = signal<MediaDeviceInfo[]>([]);
@@ -77,6 +83,8 @@ export class DeviceFormComponent implements OnInit, AfterViewInit, OnDestroy {
   readonly selectedSfmId = signal<number | null>(null);
   readonly existingPhotos = signal<DevicePhoto[]>([]);
   readonly newPhotos = signal<NewPhotoItem[]>([]);
+  readonly offerAnotherOpen = signal(false);
+  private savedDeviceId: number | null = null;
 
   private mediaStream: MediaStream | null = null;
   private keepDraftOnDestroy = false;
@@ -379,6 +387,106 @@ export class DeviceFormComponent implements OnInit, AfterViewInit, OnDestroy {
     this.addNewPhoto(new File([blob], `piece-${Date.now()}.jpg`, { type: 'image/jpeg' }));
   }
 
+  /** Capture (ou dernière photo) puis analyse IA de l'étiquette → préremplit le formulaire. */
+  async scanLabelWithAi(): Promise<void> {
+    this.error.set(null);
+    this.aiHint.set(null);
+
+    let file: File | null = null;
+    try {
+      file = await this.captureBlobAsFile();
+    } catch {
+      // fallback: dernière image ajoutée
+    }
+    if (!file) {
+      const latest = this.newPhotos().at(-1)?.file ?? null;
+      file = latest;
+    }
+    if (!file) {
+      this.error.set('Prenez une photo d’étiquette ou ajoutez une image avant le scan IA.');
+      return;
+    }
+
+    // Conserve aussi l'image dans la galerie si elle vient de la caméra et qu'on peut encore ajouter
+    const alreadyStored = this.newPhotos().some((p) => p.file === file);
+    if (!alreadyStored && this.canAddPhoto()) {
+      this.addNewPhoto(file);
+    }
+
+    this.scanningLabel.set(true);
+    this.aiService.scanLabel(file).subscribe({
+      next: (res) => {
+        this.scanningLabel.set(false);
+        this.applyLabelScan(res);
+      },
+      error: (err) => {
+        this.scanningLabel.set(false);
+        this.error.set(
+          err?.error?.message ||
+            'Scan IA impossible. Vérifiez que l’IA est activée dans Setup (clé API).'
+        );
+      }
+    });
+  }
+
+  private applyLabelScan(res: {
+    nom?: string | null;
+    reference?: string | null;
+    marque?: string | null;
+    usage?: string | null;
+    notes?: string | null;
+  }): void {
+    const patch: Record<string, string> = {};
+    if (res.nom?.trim()) {
+      patch['nom'] = res.nom.trim().slice(0, 120);
+    }
+    if (res.reference?.trim()) {
+      patch['reference'] = res.reference.trim().slice(0, 80);
+    }
+    if (res.usage?.trim()) {
+      patch['usage'] = res.usage.trim().slice(0, 500);
+    }
+    if (Object.keys(patch).length > 0) {
+      this.form.patchValue(patch);
+    }
+    const hints: string[] = [];
+    if (res.marque?.trim()) {
+      hints.push(`Marque détectée : ${res.marque.trim()} (à rattacher via MAS si besoin)`);
+    }
+    if (res.notes?.trim()) {
+      hints.push(res.notes.trim());
+    }
+    if (hints.length === 0 && Object.keys(patch).length === 0) {
+      this.aiHint.set('Aucune information lisible sur l’étiquette. Réessayez avec une photo plus nette.');
+    } else if (hints.length > 0) {
+      this.aiHint.set(hints.join(' · '));
+    } else {
+      this.aiHint.set('Champs préremplis à partir de l’étiquette.');
+    }
+  }
+
+  private async captureBlobAsFile(): Promise<File | null> {
+    const video = this.videoEl?.nativeElement;
+    const canvas = this.canvasEl?.nativeElement;
+    if (!video || !canvas || !this.cameraReady()) {
+      return null;
+    }
+    canvas.width = video.videoWidth || 1280;
+    canvas.height = video.videoHeight || 720;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      return null;
+    }
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const blob = await new Promise<Blob | null>((resolve) =>
+      canvas.toBlob((b) => resolve(b), 'image/jpeg', 0.9)
+    );
+    if (!blob) {
+      return null;
+    }
+    return new File([blob], `etiquette-${Date.now()}.jpg`, { type: 'image/jpeg' });
+  }
+
   openGallery(): void {
     if (!this.canAddPhoto()) {
       this.error.set(`Maximum ${this.maxPhotos} images par pièce.`);
@@ -448,17 +556,65 @@ export class DeviceFormComponent implements OnInit, AfterViewInit, OnDestroy {
       : this.deviceService.create(payload, files);
     req$.subscribe({
       next: (saved) => {
+        this.saving.set(false);
         if (this.forOrderRequest) {
           this.router.navigate(['/order-request'], { queryParams: { deviceId: saved.id } });
           return;
         }
-        this.router.navigate(['/devices', saved.id]);
+        if (this.isEdit) {
+          this.router.navigate(['/devices', saved.id]);
+          return;
+        }
+        this.savedDeviceId = saved.id;
+        this.offerAnotherOpen.set(true);
       },
       error: (err) => {
         this.saving.set(false);
         this.error.set(err?.error?.message || 'Enregistrement impossible.');
       }
     });
+  }
+
+  addAnotherDevice(): void {
+    this.offerAnotherOpen.set(false);
+    this.resetFormForAnother();
+  }
+
+  skipAnotherDevice(): void {
+    this.offerAnotherOpen.set(false);
+    const id = this.savedDeviceId;
+    this.savedDeviceId = null;
+    if (id != null) {
+      this.router.navigate(['/devices', id]);
+    } else {
+      this.router.navigate(['/devices']);
+    }
+  }
+
+  private resetFormForAnother(): void {
+    this.savedDeviceId = null;
+    this.error.set(null);
+    this.stopCamera();
+    for (const item of this.newPhotos()) {
+      URL.revokeObjectURL(item.previewUrl);
+    }
+    this.newPhotos.set([]);
+    this.existingPhotos.set([]);
+    const keepSfmId = this.form.controls.sfmId.value;
+    const keepMasId = this.form.controls.masId.value;
+    this.form.reset({
+      nom: '',
+      reference: '',
+      usage: '',
+      dateAcquisition: this.todayIso(),
+      obsolete: false,
+      sfmId: keepSfmId,
+      masId: keepMasId
+    });
+    this.selectedSfmId.set(keepSfmId);
+    this.selectedMasId.set(keepMasId);
+    this.draftService.clear();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
   cancel(): void {

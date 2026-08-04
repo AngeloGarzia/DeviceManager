@@ -18,8 +18,10 @@ import { MatDialogModule } from '@angular/material/dialog';
           <h2 class="m-0 text-lg font-semibold text-ink">{{ title }}</h2>
           <p class="mt-2 text-sm leading-relaxed text-ink-soft">{{ message }}</p>
           <div class="mt-5 grid grid-cols-2 gap-3">
-            <button mat-stroked-button type="button" (click)="cancel.emit()">Annuler</button>
-            <button mat-flat-button color="warn" type="button" (click)="confirm.emit()">{{ confirmLabel }}</button>
+            <button mat-stroked-button type="button" (click)="cancel.emit()">{{ cancelLabel }}</button>
+            <button mat-flat-button [color]="confirmColor" type="button" (click)="confirm.emit()">
+              {{ confirmLabel }}
+            </button>
           </div>
         </div>
       </div>
@@ -31,6 +33,8 @@ export class ConfirmDialogComponent {
   @Input() title = 'Confirmer';
   @Input() message = 'Cette action est irréversible.';
   @Input() confirmLabel = 'Supprimer';
+  @Input() cancelLabel = 'Annuler';
+  @Input() confirmColor: 'primary' | 'accent' | 'warn' = 'warn';
   @Output() confirm = new EventEmitter<void>();
   @Output() cancel = new EventEmitter<void>();
 }
