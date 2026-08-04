@@ -150,6 +150,30 @@ class AtelierServiceTest {
     }
 
     @Test
+    void listForUser_technicienOnlyPreferred() {
+        var tech = TestFixtures.user("tech", Roles.TECHNICIEN);
+        tech.setPreferredAtelier(TestFixtures.atelier());
+        when(userRepository.findByUsername("tech")).thenReturn(Optional.of(tech));
+        when(atelierRepository.findByIdWithCasino(100L)).thenReturn(Optional.of(TestFixtures.atelier()));
+
+        List<AtelierSummary> list = atelierService.listForUser("tech");
+
+        assertThat(list).hasSize(1);
+        assertThat(list.getFirst().getId()).isEqualTo(100L);
+    }
+
+    @Test
+    void setPreferredAtelier_rejectsTechnicien() {
+        when(userRepository.findByUsername("tech"))
+                .thenReturn(Optional.of(TestFixtures.user("tech", Roles.TECHNICIEN)));
+
+        assertThatThrownBy(() -> atelierService.setPreferredAtelier("tech", 100L))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getReason())
+                .isEqualTo("Seuls les administrateurs peuvent changer d'atelier");
+    }
+
+    @Test
     void create_persistsCoordonneesAndResponsables() {
         var user = TestFixtures.user("admin", Roles.ADMIN);
         user.setId(1L);

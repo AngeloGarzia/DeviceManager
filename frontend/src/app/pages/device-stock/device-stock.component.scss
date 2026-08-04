@@ -1,0 +1,177 @@
+.stock-toolbar {
+  align-items: stretch;
+}
+
+@media (min-width: 640px) {
+  .stock-toolbar {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+}
+
+.stock-group-field {
+  width: 100%;
+  max-width: 18rem;
+}
+
+.stock-toolbar__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  align-items: center;
+}
+
+.stock-group__header,
+.stock-subgroup__header {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 0.5rem;
+  border: 0;
+  background: #f8fafc;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+}
+
+.stock-group__header {
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.stock-group__header:hover,
+.stock-subgroup__header:hover {
+  background: #f1f5f9;
+}
+
+.stock-group__title {
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.stock-group__count {
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: #e8f1fb;
+  color: #0b6bcb;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.15rem 0.55rem;
+}
+
+.stock-group__nested {
+  display: grid;
+  gap: 0;
+}
+
+.stock-subgroup__header {
+  padding: 0.65rem 1rem 0.65rem 1.75rem;
+  border-top: 1px solid #eef2f6;
+  background: #fff;
+}
+
+.stock-subgroup__title {
+  flex: 1;
+  min-width: 0;
+  font-weight: 550;
+  font-size: 0.875rem;
+  color: #334155;
+}
+
+.stock-table-wrap {
+  display: none;
+  overflow: auto;
+}
+
+@media (min-width: 768px) {
+  .stock-table-wrap {
+    display: block;
+  }
+
+  .stock-cards {
+    display: none;
+  }
+}
+
+.stock-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.stock-table th,
+.stock-table td {
+  padding: 0.65rem 0.85rem;
+  border-top: 1px solid #eef2f6;
+  text-align: left;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.stock-table th {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: #64748b;
+  background: #fff;
+}
+
+.stock-table tbody tr:hover {
+  background: #f8fafc;
+}
+
+.stock-col-photo {
+  width: 3.25rem;
+}
+
+.stock-col-actions {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.stock-thumb {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 0.5rem;
+  object-fit: cover;
+  display: block;
+  background: #eef2f6;
+}
+
+.stock-thumb--empty {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #94a3b8;
+}
+
+.stock-thumb--empty mat-icon {
+  font-size: 1.1rem;
+  width: 1.1rem;
+  height: 1.1rem;
+}
+
+.stock-cards {
+  display: grid;
+  gap: 0.75rem;
+  padding: 0.85rem;
+}
+
+.stock-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 0.75rem;
+  padding: 0.85rem;
+  background: #fff;
+}
+
+.line-clamp-1 {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 14rem;
+}

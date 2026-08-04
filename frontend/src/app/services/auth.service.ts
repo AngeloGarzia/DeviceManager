@@ -96,6 +96,9 @@ export class AuthService {
   }
 
   switchAtelier(id: number | string): void {
+    if (!this.isAdmin()) {
+      return;
+    }
     const nextId = this.toAtelierId(id);
     if (nextId == null) {
       return;
@@ -106,7 +109,7 @@ export class AuthService {
     this.setAtelierId(nextId);
     // Force le rechargement des écrans (listes / formulaires) pour le nouvel atelier
     this.atelierRevision.update((v) => v + 1);
-    // Mémorise l'atelier préféré sur le compte (prochaine connexion)
+    // Mémorise l'atelier préféré admin (prochaine connexion)
     this.http.put(`${environment.apiUrl}/api/ateliers/preferred`, { atelierId: nextId }).subscribe({
       error: () => {
         // Le changement local reste actif même si la persistance échoue

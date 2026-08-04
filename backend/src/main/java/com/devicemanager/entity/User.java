@@ -5,6 +5,10 @@ import lombok.*;
 
 import java.time.Instant;
 
+/**
+ * Compte utilisateur de l'application (technicien ou administrateur).
+ * Rattaché à un groupe ; les techniciens sélectionnent un atelier de travail.
+ */
 @Entity
 @Table(name = "users")
 @Getter
@@ -36,14 +40,16 @@ public class User {
     @Column(nullable = false)
     private String password;
 
+    /** Rôle applicatif (ex. {@code ADMIN}, {@code TECHNICIEN}). */
     @Column(nullable = false, length = 30)
     private String role;
 
+    /** Groupe d'appartenance — détermine les casinos et ateliers accessibles. */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "groupe_id", foreignKey = @ForeignKey(name = "fk_user_groupe"))
     private Groupe groupe;
 
-    /** Dernier atelier sélectionné ; utilisé à la prochaine connexion. */
+    /** Dernier atelier sélectionné ; réutilisé à la prochaine connexion. */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "preferred_atelier_id", foreignKey = @ForeignKey(name = "fk_user_preferred_atelier"))
     private Atelier preferredAtelier;

@@ -25,6 +25,17 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import java.util.List;
 
+/**
+ * Configuration Spring Security : API stateless JWT, CORS et règles d'accès par rôle.
+ * <p>
+ * Chaîne de filtres : {@link JwtAuthenticationFilter} (Bearer token) puis
+ * {@link AtelierContextFilter} (en-tête {@code X-Atelier-Id}). CSRF désactivé (API REST).
+ * Sessions désactivées ({@link SessionCreationPolicy#STATELESS}).
+ * <p>
+ * Accès public : authentification ({@code /api/auth/**}), santé Actuator, fichiers uploadés
+ * et requêtes OPTIONS. Gestion des utilisateurs et setup réservés aux admins ; le reste de
+ * l'API métier exige le rôle admin ou technicien.
+ */
 @Configuration
 @EnableMethodSecurity
 @RequiredArgsConstructor
@@ -36,6 +47,13 @@ public class SecurityConfig {
     @Value("${app.cors.allowed-origins}")
     private String allowedOrigins;
 
+    /**
+     * Déclare la chaîne de filtres HTTP, les autorisations par chemin et l'ordre JWT → atelier.
+     *
+     * @param http builder de configuration HTTP Security
+     * @return chaîne de filtres construite
+     * @throws Exception en cas d'erreur de configuration Spring Security
+     */
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
@@ -65,6 +83,12 @@ public class SecurityConfig {
         return http.build();
     }
 
+    /**
+     * Configuration CORS : origines depuis {@code app.cors.allowed-origins}, plus Render,
+     * localhost et 127.0.0.1 par motif. Credentials et en-tête {@code Authorization} exposés.
+     *
+     * @return source CORS enregistrée sur {@code /**}
+     */
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
@@ -93,11 +117,23 @@ public class SecurityConfig {
         return source;
     }
 
+    /**
+     * Encodeur de mots de passe BCrypt pour la création et la vérification des comptes.
+     *
+     * @return instance {@link BCryptPasswordEncoder}
+     */
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
     }
 
+    /**
+     * Fournit le gestionnaire d'authentification Spring Security.
+     *
+     * @param configuration configuration d'authentification Spring
+     * @return gestionnaire d'authentification
+     * @throws Exception en cas d'erreur d'initialisation
+     */
     @Bean
     public AuthenticationManager authenticationManager(AuthenticationConfiguration configuration) throws Exception {
         return configuration.getAuthenticationManager();

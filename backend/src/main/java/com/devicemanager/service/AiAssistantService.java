@@ -4,6 +4,7 @@ import com.devicemanager.ai.AiApiKeyBattery;
 import com.devicemanager.ai.AiProviders;
 import com.devicemanager.dto.AiChatResponse;
 import com.devicemanager.dto.AiLabelScanResponse;
+import com.devicemanager.dto.AiProviderAvailability;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -20,6 +21,15 @@ import org.springframework.util.MimeTypeUtils;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.List;
+
+/**
+ * Service de l'assistant IA intégré à DeviceManager.
+ * <p>
+ * Chat métier, statut des fournisseurs et scan d'étiquettes de pièces détachées
+ * casino. La configuration provient des paramètres Setup et des clés API .env ;
+ * indépendant du filtre atelier sauf pour le contexte métier des réponses.
+ */
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -61,6 +71,11 @@ public class AiAssistantService {
     private final WebEnrichmentService webEnrichmentService;
     private final ObjectMapper objectMapper;
 
+    /**
+     * Indique si l'assistant IA est activé et qu'une clé API est disponible pour le fournisseur courant.
+     *
+     * @return {@code true} si l'IA peut être invoquée
+     */
     public boolean isEnabled() {
         if (!appSettingsService.getBoolean(AppSettingsService.AI_ENABLED, false)) {
             return false;
@@ -69,20 +84,59 @@ public class AiAssistantService {
         return !resolveApiKey(provider).isBlank();
     }
 
+    /**
+     * Retourne le statut détaillé de l'assistant et la disponibilité de chaque fournisseur IA.
+     *
+     * @return message explicatif, drapeau {@code enabled} et liste des fournisseurs
+     */
     public AiChatResponse status() {
-        boolean enabled = isEnabled();
         String provider = resolveProviderId();
         String model = appSettingsService.get(AppSettingsService.AI_MODEL, AiProviders.defaultModel(provider));
         String providerLabel = AiProviders.require(provider).label();
+        boolean flagOn = appSettingsService.getBoolean(AppSettingsService.AI_ENABLED, false);
+        String apiKey = resolveApiKey(provider);
+        boolean enabled = flagOn && !apiKey.isBlank();
+
+        String reply;
+        if (enabled) {
+            reply = "Assistant IA prêt (" + providerLabel + " / " + model + ").";
+        } else if (!flagOn) {
+            reply = "Assistant IA désactivé dans les paramètres — activez « Activer l'assistant IA ».";
+        } else {
+            String envVar = AiApiKeyBattery.envVarName(provider);
+            reply = "Fournisseur « " + providerLabel + " » sélectionné mais " + envVar
+                    + " est vide. Choisissez un fournisseur avec clé (ex. Groq) "
+                    + "ou renseignez " + envVar + " dans le .env / Render.";
+        }
+
         return AiChatResponse.builder()
                 .enabled(enabled)
-                .reply(enabled
-                        ? "Assistant IA prêt (" + providerLabel + " / " + model + ")."
-                        : "Assistant IA désactivé. Activez-le dans Setup et renseignez la clé "
-                                + "du fournisseur (batterie .env ou Setup).")
+                .reply(reply)
+                .providers(listProviderAvailability())
                 .build();
     }
 
+    private List<AiProviderAvailability> listProviderAvailability() {
+        return AiProviders.all().stream()
+                .map(p -> {
+                    String key = aiApiKeyBattery.keyFor(p.id());
+                    return AiProviderAvailability.builder()
+                            .id(p.id())
+                            .label(p.label())
+                            .hasApiKey(key != null && !key.isBlank())
+                            .build();
+                })
+                .toList();
+    }
+
+    /**
+     * Envoie un message utilisateur au modèle de chat configuré.
+     *
+     * @param message question ou consigne en langage naturel
+     * @return réponse textuelle du modèle
+     * @throws org.springframework.web.server.ResponseStatusException {@code 503} si IA désactivée ou clé absente ;
+     *         {@code 502} en cas d'échec d'appel externe
+     */
     public AiChatResponse chat(String message) {
         requireEnabled();
         String provider = resolveProviderId();
@@ -111,15 +165,21 @@ public class AiAssistantService {
 
     /**
      * Analyse une photo d'étiquette : OCR vision + enrichissement web + texte d'usage.
+     *
+     * @param image fichier image de l'étiquette
+     * @return champs extraits (nom, référence, marque, usage, notes)
+     * @throws org.springframework.web.server.ResponseStatusException {@code 400} si image absente ou vide ;
+     *         {@code 502} en cas d'échec d'analyse IA
      */
     public AiLabelScanResponse scanLabel(MultipartFile image) {
         requireEnabled();
         if (image == null || image.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Image obligatoire");
         }
-        String provider = resolveProviderId();
-        String apiKey = requireApiKey(provider);
-        String visionModel = resolveVisionModel(provider);
+        VisionEndpoint vision = resolveVisionEndpoint();
+        String provider = vision.providerId();
+        String apiKey = vision.apiKey();
+        String visionModel = vision.model();
 
         MultipartFile optimized = imageOptimizationService.optimize(image);
         byte[] bytes;
@@ -148,7 +208,7 @@ public class AiAssistantService {
             String notes = textOrNull(extracted, "notes");
 
             String webContext = webEnrichmentService.gatherContext(marque, nom, reference);
-            String usage = generateUsage(apiKey, provider, resolveChatModel(provider),
+            String usage = generateUsage(apiKey, provider, resolveChatModelForProvider(provider),
                     nom, reference, marque, rawText, notes, webContext);
 
             return AiLabelScanResponse.builder()
@@ -233,19 +293,15 @@ public class AiAssistantService {
         if (apiKey.isBlank()) {
             throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
                     "Clé API IA manquante pour le fournisseur « " + provider
-                            + " » (.env batterie ou Setup AI_API_KEY)");
+                            + " » (variable .env de la batterie IA)");
         }
         return apiKey;
     }
 
-    /** Batterie .env du fournisseur, sinon clé Setup AI_API_KEY. */
+    /** Clé du fournisseur courant depuis la batterie .env uniquement. */
     private String resolveApiKey(String provider) {
         String fromEnv = aiApiKeyBattery.keyFor(provider);
-        if (fromEnv != null && !fromEnv.isBlank()) {
-            return fromEnv.trim();
-        }
-        String fromSetup = appSettingsService.get(AppSettingsService.AI_API_KEY, "");
-        return fromSetup == null ? "" : fromSetup.trim();
+        return fromEnv == null ? "" : fromEnv.trim();
     }
 
     private String resolveProviderId() {
@@ -253,27 +309,65 @@ public class AiAssistantService {
     }
 
     private String resolveChatModel(String provider) {
-        String model = appSettingsService.get(AppSettingsService.AI_MODEL, AiProviders.defaultModel(provider));
-        if (model == null || model.isBlank()) {
-            return AiProviders.defaultModel(provider);
-        }
-        return model.trim();
+        return resolveChatModelForProvider(provider);
     }
 
-    /** Vision : modèle multimodal du fournisseur, sinon erreur claire. */
-    private String resolveVisionModel(String provider) {
-        String model = resolveChatModel(provider);
-        if (AiProviders.supportsVision(provider, model)) {
-            return model;
+    private String resolveChatModelForProvider(String provider) {
+        // Pour le fournisseur courant, respecter le modèle Setup ; sinon modèle par défaut du fournisseur.
+        if (provider.equals(resolveProviderId())) {
+            String model = appSettingsService.get(AppSettingsService.AI_MODEL, AiProviders.defaultModel(provider));
+            if (model != null && !model.isBlank()) {
+                return model.trim();
+            }
         }
-        String fallback = AiProviders.visionFallbackModel(provider);
-        if (fallback != null) {
-            log.info("Modèle {} sans vision → fallback vision {}", model, fallback);
-            return fallback;
+        return AiProviders.defaultModel(provider);
+    }
+
+    private record VisionEndpoint(String providerId, String model, String apiKey) {
+    }
+
+    /**
+     * Endpoint vision : fournisseur courant s'il a un modèle vision + clé,
+     * sinon premier autre fournisseur avec clé et modèle vision (ex. Gemini).
+     */
+    private VisionEndpoint resolveVisionEndpoint() {
+        String preferred = resolveProviderId();
+        VisionEndpoint local = tryVisionEndpoint(preferred);
+        if (local != null) {
+            return local;
+        }
+        for (String id : AiProviders.providerIds()) {
+            if (id.equals(preferred)) {
+                continue;
+            }
+            VisionEndpoint alt = tryVisionEndpoint(id);
+            if (alt != null) {
+                log.info("Scan étiquette : {} sans vision accessible → fallback {}", preferred, id);
+                return alt;
+            }
         }
         throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                "Le fournisseur/modèle sélectionné ne gère pas la vision. "
-                        + "Choisissez un modèle vision (ex. gpt-4o-mini, pixtral, ou OpenRouter/Claude/Gemini).");
+                "Aucun fournisseur vision disponible. "
+                        + "Groq n’offre souvent pas de modèle vision : choisissez Gemini ou OpenRouter "
+                        + "dans Paramètres, ou renseignez GEMINI_API_KEY / OPENROUTER_API_KEY.");
+    }
+
+    private VisionEndpoint tryVisionEndpoint(String providerId) {
+        String key = resolveApiKey(providerId);
+        if (key.isBlank()) {
+            return null;
+        }
+        String configured = resolveChatModelForProvider(providerId);
+        String visionModel;
+        if (AiProviders.supportsVision(providerId, configured)) {
+            visionModel = configured;
+        } else {
+            visionModel = AiProviders.visionFallbackModel(providerId);
+        }
+        if (visionModel == null || visionModel.isBlank()) {
+            return null;
+        }
+        return new VisionEndpoint(providerId, visionModel, key);
     }
 
     private ChatClient buildChatClient(String apiKey, String providerId, String model, double temperature) {

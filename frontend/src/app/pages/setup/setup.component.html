@@ -1,7 +1,7 @@
 <section class="grid gap-4">
   <header>
-    <h1 class="page-title">Setup application</h1>
-    <p class="page-subtitle">Paramètres réservés à l'administrateur</p>
+    <h1 class="page-title">Paramètres</h1>
+    <p class="page-subtitle">Réservés à l’administrateur</p>
   </header>
 
   <mat-card class="!rounded-xl !border !border-line !shadow-soft">
@@ -217,10 +217,25 @@
                     <mat-label>{{ item.label }}</mat-label>
                     <mat-select [formControl]="control(item.key)">
                       @for (provider of aiProviders; track provider.id) {
-                        <mat-option [value]="provider.id">{{ provider.label }}</mat-option>
+                        <mat-option
+                          [value]="provider.id"
+                          [disabled]="!hasAiProviderKey(provider.id)"
+                          [class.ai-provider-missing]="!hasAiProviderKey(provider.id)"
+                        >
+                          {{ aiProviderOptionLabel(provider) }}
+                        </mat-option>
                       }
                     </mat-select>
-                    <mat-hint>OpenAI, Groq, Mistral, OpenRouter, DeepSeek, Together, Fireworks — chaque fournisseur a sa propre clé API</mat-hint>
+                    <mat-hint>
+                      @if (!aiService.statusLoaded()) {
+                        Chargement de la disponibilité des clés…
+                      } @else if (!providersKeyStatusReady()) {
+                        L’API ne renvoie pas encore les clés fournisseurs — redémarrez le backend.
+                      } @else {
+                        Les fournisseurs sans clé .env sont grisés. Ajoutez la variable
+                        (ex. GROQ_API_KEY) puis redémarrez l’API.
+                      }
+                    </mat-hint>
                   </mat-form-field>
                 } @else if (isAiModelSetting(item.key)) {
                   <mat-form-field appearance="outline" class="sm:col-span-2">
@@ -233,7 +248,7 @@
                         <mat-option [value]="control(item.key).value">{{ control(item.key).value }} (actuel)</mat-option>
                       }
                     </mat-select>
-                    <mat-hint>Modèles du fournisseur sélectionné — privilégiez un modèle « vision » pour le scan d’étiquette</mat-hint>
+                    <mat-hint>Privilégiez un modèle « vision » pour le scan d’étiquette</mat-hint>
                   </mat-form-field>
                 } @else {
                   <mat-form-field appearance="outline" class="sm:col-span-2">
@@ -276,7 +291,7 @@
           {{ testingMail() ? 'Envoi du test…' : 'Tester l\'e-mail' }}
         </button>
         <button mat-flat-button color="primary" type="submit" [disabled]="saving() || settings().length === 0">
-          {{ saving() ? 'Enregistrement…' : 'Enregistrer le setup' }}
+          {{ saving() ? 'Enregistrement…' : 'Enregistrer les paramètres' }}
         </button>
       </div>
     </form>

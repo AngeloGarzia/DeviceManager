@@ -9,9 +9,14 @@ import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatCardModule } from '@angular/material/card';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { AppUserForm } from '../../models/models';
+import { AppUserForm, AtelierSummary } from '../../models/models';
 import { UserService } from '../../services/user.service';
+import { AtelierService } from '../../services/atelier.service';
 
+/**
+ * Formulaire de création ou modification d'un compte utilisateur.
+ * Gère rôle, atelier préféré pour les techniciens et mot de passe.
+ */
 @Component({
   selector: 'app-user-form',
   standalone: true,
@@ -35,10 +40,12 @@ export class UserFormComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly userService = inject(UserService);
+  private readonly atelierService = inject(AtelierService);
 
   readonly loading = signal(false);
   readonly saving = signal(false);
   readonly error = signal<string | null>(null);
+  readonly ateliers = signal<AtelierSummary[]>([]);
   id: number | null = null;
 
   readonly form = this.fb.group({
@@ -47,14 +54,30 @@ export class UserFormComponent implements OnInit {
     email: ['', [Validators.required, Validators.email, Validators.maxLength(160)]],
     username: ['', [Validators.required, Validators.maxLength(80)]],
     password: [''],
-    role: ['TECHNICIEN', Validators.required]
+    role: ['TECHNICIEN', Validators.required],
+    preferredAtelierId: [null as number | null]
   });
 
+  /** Indique si le formulaire est en mode édition. */
   get isEdit(): boolean {
     return this.id !== null;
   }
 
+  /** Indique si le rôle sélectionné est technicien (atelier requis). */
+  get isTechnicien(): boolean {
+    const role = this.form.controls.role.value;
+    return role === 'TECHNICIEN' || role === 'TECH';
+  }
+
   ngOnInit(): void {
+    this.form.controls.role.valueChanges.subscribe(() => this.syncPreferredValidators());
+    this.syncPreferredValidators();
+
+    this.atelierService.list().subscribe({
+      next: (list) => this.ateliers.set(list ?? []),
+      error: () => this.ateliers.set([])
+    });
+
     const rawId = this.route.snapshot.paramMap.get('id');
     if (!rawId) {
       this.form.controls.password.setValidators([Validators.required, Validators.minLength(6)]);
@@ -77,8 +100,10 @@ export class UserFormComponent implements OnInit {
           email: user.email || '',
           username: user.username,
           role: user.role,
+          preferredAtelierId: user.preferredAtelierId ?? null,
           password: ''
         });
+        this.syncPreferredValidators();
         this.form.controls.password.setValidators([Validators.minLength(6)]);
         this.form.controls.password.updateValueAndValidity();
         this.loading.set(false);
@@ -90,6 +115,7 @@ export class UserFormComponent implements OnInit {
     });
   }
 
+  /** Valide et enregistre le compte (création ou mise à jour). */
   submit(): void {
     if (this.form.invalid) {
       this.form.markAllAsTouched();
@@ -102,6 +128,7 @@ export class UserFormComponent implements OnInit {
       email: raw.email!.trim().toLowerCase(),
       username: raw.username!.trim(),
       role: raw.role!,
+      preferredAtelierId: this.isTechnicien ? raw.preferredAtelierId : (raw.preferredAtelierId ?? null),
       ...(raw.password ? { password: raw.password } : {})
     };
     this.saving.set(true);
@@ -116,5 +143,15 @@ export class UserFormComponent implements OnInit {
         this.error.set(err?.error?.message || 'Enregistrement impossible.');
       }
     });
+  }
+
+  private syncPreferredValidators(): void {
+    const control = this.form.controls.preferredAtelierId;
+    if (this.isTechnicien) {
+      control.setValidators([Validators.required]);
+    } else {
+      control.clearValidators();
+    }
+    control.updateValueAndValidity({ emitEvent: false });
   }
 }

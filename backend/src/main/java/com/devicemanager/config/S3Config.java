@@ -12,9 +12,24 @@ import software.amazon.awssdk.services.s3.S3Configuration;
 
 import java.net.URI;
 
+/**
+ * Configuration du client Amazon S3 (ou compatible S3) pour le stockage d'objets.
+ * <p>
+ * Activé uniquement si {@code app.s3.enabled=true}. Un endpoint personnalisé active
+ * l'accès path-style (MinIO, Scaleway, etc.).
+ */
 @Configuration
 public class S3Config {
 
+    /**
+     * Construit un {@link S3Client} à partir des propriétés {@code app.s3.*}.
+     *
+     * @param region    région AWS (ex. {@code eu-west-3})
+     * @param accessKey identifiant d'accès
+     * @param secretKey clé secrète
+     * @param endpoint  URL de endpoint optionnelle (vide = AWS standard)
+     * @return client S3 configuré
+     */
     @Bean
     @ConditionalOnProperty(name = "app.s3.enabled", havingValue = "true")
     public S3Client s3Client(

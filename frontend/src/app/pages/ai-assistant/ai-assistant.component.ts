@@ -14,6 +14,10 @@ interface ChatTurn {
   text: string;
 }
 
+/**
+ * Assistant conversationnel IA intégré à DeviceManager.
+ * Permet d'interroger le modèle configuré sur le parc de pièces et les processus métier.
+ */
 @Component({
   selector: 'app-ai-assistant',
   standalone: true,
@@ -58,6 +62,7 @@ export class AiAssistantComponent implements OnInit {
     });
   }
 
+  /** Envoie le message saisi et affiche la réponse de l'assistant. */
   send(): void {
     if (this.form.invalid || this.sending() || !this.ai.enabled()) {
       this.form.markAllAsTouched();

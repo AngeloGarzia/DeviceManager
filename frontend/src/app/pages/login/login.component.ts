@@ -9,6 +9,10 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { AuthService } from '../../services/auth.service';
 
+/**
+ * Page de connexion à DeviceManager.
+ * Authentifie l'utilisateur et redirige vers la liste des pièces détachées.
+ */
 @Component({
   selector: 'app-login',
   standalone: true,
@@ -43,6 +47,7 @@ export class LoginComponent {
     }
   }
 
+  /** Soumet les identifiants et gère les erreurs de connexion. */
   submit(): void {
     if (this.form.invalid) {
       this.form.markAllAsTouched();

@@ -11,6 +11,8 @@
 Blueprint : [`render.yaml`](./render.yaml)
 
 > L’API free **s’endort** après ~15 min d’inactivité (1er appel un peu lent).  
+> Un **keep-alive** interne pingue `/actuator/health` toutes les **14 min** via l’URL publique
+> (`RENDER_EXTERNAL_URL`) pour retarder la veille tant que le service tourne déjà.  
 > Les photos sont stockées sur disque éphémère (peuvent disparaître au redéploiement).
 
 ---
@@ -131,14 +133,12 @@ Sur Render, tu peux aussi mettre ces variables dans l’**Environment** de l’A
 
 Assistant chat intégré (`/ai` dans le front, `POST /api/ai/chat`).
 
-**Configuration recommandée** : page **Setup** (admin) → catégorie *Intelligence artificielle* :
-- Activer l’assistant IA
-- Fournisseur (`gemini`, `openai`, `groq`, `mistral`, `openrouter`, `deepseek`, `together`, `fireworks`)
-- Modèle (liste filtrée selon le fournisseur)
-- Clé API Setup (optionnelle si la batterie `.env` du fournisseur est renseignée)
+**Configuration** :
+- Page **Setup** : activer l’IA, choisir fournisseur + modèle
+- Clés API : **uniquement** dans `.env` / Environment Render (batterie IA) — pas dans Setup
 
-Les valeurs sont stockées en base (`app_setting`) et prises en compte immédiatement (sans redémarrage).
-La clé utilisée à l’exécution = **batterie `.env` du fournisseur courant**, sinon `AI_API_KEY` (Setup).
+Les paramètres Setup (activation, fournisseur, modèle) sont stockés en base et pris en compte immédiatement.
+La clé utilisée = variable `.env` du fournisseur courant (`GEMINI_API_KEY`, `OPENAI_API_KEY`, `GROQ_API_KEY`, …).
 
 Variables Environment Render / `.env` :
 

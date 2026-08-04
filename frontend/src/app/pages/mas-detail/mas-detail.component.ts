@@ -10,6 +10,10 @@ import { MasService } from '../../services/mas.service';
 import { AuthService } from '../../services/auth.service';
 import { ConfirmDialogComponent } from '../../shared/confirm-dialog.component';
 
+/**
+ * Fiche détaillée d'une MAS.
+ * Affiche numéro, marque, statut d'utilisation et actions de modification ou suppression.
+ */
 @Component({
   selector: 'app-mas-detail',
   standalone: true,
@@ -34,7 +38,9 @@ export class MasDetailComponent implements OnInit {
     });
   }
 
+  /** Ouvre la boîte de dialogue de confirmation de suppression. */
   askDelete(): void { this.confirmOpen.set(true); }
+  /** Supprime la MAS et retourne à la liste. */
   confirmDelete(): void {
     const current = this.item();
     if (!current) return;

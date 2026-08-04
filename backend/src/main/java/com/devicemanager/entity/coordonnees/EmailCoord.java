@@ -16,6 +16,9 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+/**
+ * Adresse e-mail rattachée à un bloc {@link Coordonnees}.
+ */
 @Entity
 @Table(name = "email_coord")
 @Getter
@@ -37,6 +40,7 @@ public class EmailCoord {
     @Column(nullable = false, length = 160)
     private String valeur;
 
+    /** Indique l'e-mail principal parmi la liste. */
     @Column(nullable = false)
     @Builder.Default
     private boolean principal = false;

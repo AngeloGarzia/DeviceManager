@@ -3,9 +3,16 @@ import { HttpClient } from '@angular/common/http';
 import { Observable, tap } from 'rxjs';
 import { environment } from '../../environments/environment';
 
+export interface AiProviderAvailability {
+  id: string;
+  label: string;
+  hasApiKey: boolean;
+}
+
 export interface AiChatResponse {
   reply: string;
   enabled: boolean;
+  providers?: AiProviderAvailability[];
 }
 
 export interface AiLabelScanResponse {
@@ -26,19 +33,20 @@ export class AiService {
   readonly enabled = signal(false);
   readonly statusMessage = signal<string | null>(null);
   readonly statusLoaded = signal(false);
+  /** id fournisseur → clé .env présente */
+  readonly providerKeyStatus = signal<Record<string, boolean>>({});
 
   readonly disabledReason = computed(() =>
     this.enabled()
       ? null
-      : this.statusMessage() || 'IA désactivée — activez-la dans Setup (clé API).'
+      : this.statusMessage() ||
+        'IA désactivée — activez-la dans les paramètres et choisissez un fournisseur avec clé.'
   );
 
   constructor(private http: HttpClient) {}
 
   status(): Observable<AiChatResponse> {
-    return this.http.get<AiChatResponse>(`${this.base}/status`).pipe(
-      tap((res) => this.applyStatus(res))
-    );
+    return this.http.get<AiChatResponse>(`${this.base}/status`).pipe(tap((res) => this.applyStatus(res)));
   }
 
   /** Rafraîchit le statut partagé (toolbar, formulaire pièce, etc.). */
@@ -47,14 +55,22 @@ export class AiService {
       error: () => {
         this.enabled.set(false);
         this.statusMessage.set('Impossible de contacter l’assistant IA.');
+        this.providerKeyStatus.set({});
         this.statusLoaded.set(true);
       }
     });
   }
 
+  hasProviderKey(providerId: string): boolean {
+    const status = this.providerKeyStatus();
+    // Pas dans la map = pas de clé (ou fournisseur inconnu côté API)
+    return status[providerId] === true;
+  }
+
   reset(): void {
     this.enabled.set(false);
     this.statusMessage.set(null);
+    this.providerKeyStatus.set({});
     this.statusLoaded.set(false);
   }
 
@@ -75,6 +91,14 @@ export class AiService {
   private applyStatus(res: AiChatResponse): void {
     this.enabled.set(!!res.enabled);
     this.statusMessage.set(res.reply || null);
+    const map: Record<string, boolean> = {};
+    const list = res.providers ?? [];
+    for (const p of list) {
+      map[p.id] = !!p.hasApiKey;
+    }
+    // Si l'API ne renvoie pas encore la liste, marquer explicitement l'absence
+    // pour éviter d'afficher tous les fournisseurs comme disponibles.
+    this.providerKeyStatus.set(map);
     this.statusLoaded.set(true);
   }
 }

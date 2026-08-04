@@ -9,6 +9,9 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Requête de création ou mise à jour d'une pièce ({@link com.devicemanager.entity.Device}).
+ */
 @Data
 public class DeviceRequest {
 
@@ -29,12 +32,12 @@ public class DeviceRequest {
     @NotNull
     private Boolean obsolete;
 
-    /** Optionnel. */
+    /** Identifiant SFM associé (optionnel). */
     private Long sfmId;
 
-    /** Optionnel — la marque est héritée de la MAS si renseignée. */
+    /** Identifiant MAS associé (optionnel) — la marque est héritée de la MAS si renseignée. */
     private Long masId;
 
-    /** Photos existantes à conserver lors d'une mise à jour (ids). */
+    /** Identifiants des photos existantes à conserver lors d'une mise à jour. */
     private List<Long> keepPhotoIds = new ArrayList<>();
 }

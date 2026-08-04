@@ -13,6 +13,10 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MasService } from '../../services/mas.service';
 import { MarqueMasOption, MasForm } from '../../models/models';
 
+/**
+ * Formulaire de création ou modification d'une MAS.
+ * Permet aussi la création inline d'une marque et le retour vers le formulaire pièce.
+ */
 @Component({
   selector: 'app-mas-form',
   standalone: true,
@@ -58,6 +62,7 @@ export class MasFormComponent implements OnInit {
     label: ['', [Validators.required, Validators.maxLength(120)]]
   });
 
+  /** Indique si le formulaire est en mode édition. */
   get isEdit(): boolean {
     return this.id !== null;
   }
@@ -88,6 +93,7 @@ export class MasFormComponent implements OnInit {
     }
   }
 
+  /** Charge la liste des marques disponibles pour la MAS. */
   loadMarques(selectId?: number): void {
     this.masService.listMarques().subscribe({
       next: (data) => {
@@ -105,17 +111,20 @@ export class MasFormComponent implements OnInit {
     );
   }
 
+  /** Affiche le sous-formulaire de création d'une nouvelle marque. */
   openNewMarque(): void {
     this.showNewMarque.set(true);
     this.marqueError.set(null);
     this.newMarqueForm.reset({ label: '' });
   }
 
+  /** Ferme le sous-formulaire de création de marque. */
   cancelNewMarque(): void {
     this.showNewMarque.set(false);
     this.marqueError.set(null);
   }
 
+  /** Crée une nouvelle marque et la sélectionne dans le formulaire. */
   createMarque(): void {
     if (this.newMarqueForm.invalid) {
       this.newMarqueForm.markAllAsTouched();
@@ -137,6 +146,7 @@ export class MasFormComponent implements OnInit {
     });
   }
 
+  /** Valide et enregistre la MAS (création ou mise à jour). */
   submit(): void {
     if (this.form.invalid) {
       this.form.markAllAsTouched();
@@ -160,6 +170,7 @@ export class MasFormComponent implements OnInit {
     });
   }
 
+  /** Annule la saisie et retourne à la fiche ou à la liste. */
   cancel(): void {
     if (this.returnToDeviceForm()) {
       return;
@@ -168,7 +179,7 @@ export class MasFormComponent implements OnInit {
   }
 
   private navigateAfterSave(masId: number): void {
-    if (this.returnToDeviceForm({ masId })) {
+    if (this.returnToDeviceForm({ masId: String(masId) })) {
       return;
     }
     this.router.navigate(['/mas', masId]);
@@ -178,7 +189,10 @@ export class MasFormComponent implements OnInit {
     if (!this.returnDevice) {
       return false;
     }
-    const queryParams: Record<string, string | number> = { ...extra };
+    const queryParams: Record<string, string> = {};
+    for (const [key, value] of Object.entries(extra)) {
+      queryParams[key] = String(value);
+    }
     if (this.returnForOrderRequest) {
       queryParams['forOrderRequest'] = '1';
     }

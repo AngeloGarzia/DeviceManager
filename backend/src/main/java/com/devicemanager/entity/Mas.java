@@ -3,6 +3,10 @@ package com.devicemanager.entity;
 import jakarta.persistence.*;
 import lombok.*;
 
+/**
+ * Référence MAS (Matériel After-Sales) d'un atelier.
+ * Numéro unique par atelier, associé à une marque du catalogue.
+ */
 @Entity
 @Table(
         name = "mas",
@@ -30,9 +34,11 @@ public class Mas {
             foreignKey = @ForeignKey(name = "fk_mas_marque"))
     private MarqueMas marque;
 
+    /** Indique si cette référence est encore utilisée en exploitation. */
     @Column(nullable = false)
     private boolean utilise;
 
+    /** Atelier propriétaire — périmètre multi-tenant. */
     @ManyToOne(optional = false, fetch = FetchType.LAZY)
     @JoinColumn(name = "atelier_id", foreignKey = @ForeignKey(name = "fk_mas_atelier"))
     private Atelier atelier;

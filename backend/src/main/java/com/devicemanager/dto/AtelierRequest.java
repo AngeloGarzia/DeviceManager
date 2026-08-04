@@ -13,6 +13,9 @@ import lombok.Data;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Requête de création ou mise à jour d'un atelier.
+ */
 @Data
 public class AtelierRequest {
 
@@ -20,6 +23,7 @@ public class AtelierRequest {
     @Size(max = 160)
     private String nom;
 
+    /** Identifiant du casino parent. */
     @NotNull
     private Long casinoId;
 
@@ -35,5 +39,6 @@ public class AtelierRequest {
     @Valid
     private List<ReseauSocialDto> reseauxSociaux = new ArrayList<>();
 
+    /** Identifiants des utilisateurs responsables de l'atelier. */
     private List<Long> responsableIds = new ArrayList<>();
 }

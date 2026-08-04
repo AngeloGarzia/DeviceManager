@@ -55,6 +55,44 @@ class AtelierContextFilterTest {
     }
 
     @Test
+    void allowsTechnicienOnPreferredAtelier() throws Exception {
+        authenticate("tech");
+        var tech = TestFixtures.user("tech", Roles.TECHNICIEN);
+        tech.setPreferredAtelier(TestFixtures.atelier());
+        when(userRepository.findByUsername("tech")).thenReturn(Optional.of(tech));
+        when(atelierRepository.findByIdWithCasino(100L)).thenReturn(Optional.of(TestFixtures.atelier()));
+
+        MockHttpServletRequest request = request("/api/devices", "100");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        filter.doFilter(request, response, filterChain);
+
+        assertThat(response.getStatus()).isEqualTo(200);
+        verify(filterChain).doFilter(request, response);
+    }
+
+    @Test
+    void rejectsTechnicienOnOtherAtelier() throws Exception {
+        authenticate("tech");
+        var tech = TestFixtures.user("tech", Roles.TECHNICIEN);
+        tech.setPreferredAtelier(TestFixtures.atelier());
+        when(userRepository.findByUsername("tech")).thenReturn(Optional.of(tech));
+        Groupe same = TestFixtures.groupe();
+        Casino casino = Casino.builder().id(11L).nom("X").groupe(same).build();
+        Atelier other = Atelier.builder().id(200L).nom("Autre").casino(casino).build();
+        when(atelierRepository.findByIdWithCasino(200L)).thenReturn(Optional.of(other));
+
+        MockHttpServletRequest request = request("/api/devices", "200");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        filter.doFilter(request, response, filterChain);
+
+        assertThat(response.getStatus()).isEqualTo(403);
+        assertThat(response.getContentAsString()).contains("atelier préféré");
+        verify(filterChain, never()).doFilter(any(), any());
+    }
+
+    @Test
     void rejectsAtelierOfOtherGroupe() throws Exception {
         authenticate("admin");
         when(userRepository.findByUsername("admin")).thenReturn(Optional.of(TestFixtures.user("admin", Roles.ADMIN)));

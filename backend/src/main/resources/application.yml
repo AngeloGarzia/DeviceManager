@@ -102,6 +102,13 @@ app:
     enabled: ${APP_AI_ENABLED:false}
     default-provider: ${AI_DEFAULT_PROVIDER:openai}
     default-model: ${AI_DEFAULT_MODEL:}
+  # Ping HTTP toutes les 14 min pour retarder la veille Render free (trafic entrant).
+  # Activé automatiquement si RENDER=true (plateforme Render).
+  keepalive:
+    enabled: ${APP_KEEPALIVE_ENABLED:${RENDER:false}}
+    url: ${APP_KEEPALIVE_URL:}
+    interval-ms: ${APP_KEEPALIVE_INTERVAL_MS:840000}
+    initial-delay-ms: ${APP_KEEPALIVE_INITIAL_DELAY_MS:60000}
 
 logging:
   level:

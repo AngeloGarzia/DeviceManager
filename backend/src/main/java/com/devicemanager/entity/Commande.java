@@ -7,6 +7,10 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Demande de commande de pièces déposée par un technicien pour un atelier.
+ * Contient un message libre et une ou plusieurs lignes (pièce + quantité).
+ */
 @Entity
 @Table(name = "commande")
 @Getter
@@ -20,11 +24,13 @@ public class Commande {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    /** Technicien ayant soumis la demande. */
     @ManyToOne(optional = false, fetch = FetchType.LAZY)
     @JoinColumn(name = "technicien_id", nullable = false,
             foreignKey = @ForeignKey(name = "fk_commande_technicien"))
     private User technicien;
 
+    /** Nom du technicien dénormalisé pour l'historique et les e-mails. */
     @Column(name = "technicien_nom", nullable = false, length = 120)
     private String technicienNom;
 
@@ -34,6 +40,7 @@ public class Commande {
     @Column(name = "date_demande", nullable = false)
     private LocalDateTime dateDemande;
 
+    /** Statut du cycle de vie (ex. {@code PENDING}, {@code VALIDATED}). */
     @Column(nullable = false, length = 30)
     private String status;
 
@@ -41,6 +48,7 @@ public class Commande {
     @Builder.Default
     private List<CommandeLigne> lignes = new ArrayList<>();
 
+    /** Atelier concerné — périmètre multi-tenant de la commande. */
     @ManyToOne(optional = false, fetch = FetchType.LAZY)
     @JoinColumn(name = "atelier_id", foreignKey = @ForeignKey(name = "fk_commande_atelier"))
     private Atelier atelier;

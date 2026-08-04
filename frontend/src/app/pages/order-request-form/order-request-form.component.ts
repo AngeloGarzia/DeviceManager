@@ -31,6 +31,11 @@ interface DraftLine {
   sfmNom?: string | null;
 }
 
+/**
+ * Formulaire de création d'une demande de commande de pièces détachées.
+ * Permet la recherche de pièces, la composition des lignes, l'aperçu des e-mails
+ * et l'envoi de la demande aux SFM concernés.
+ */
 @Component({
   selector: 'app-order-request-form',
   standalone: true,
@@ -127,6 +132,7 @@ export class OrderRequestFormComponent implements OnInit {
     });
   }
 
+  /** Formate une pièce pour l'affichage dans l'autocomplétion. */
   displayDevice = (value: Device | string | null): string => {
     if (!value) {
       return '';
@@ -138,11 +144,13 @@ export class OrderRequestFormComponent implements OnInit {
     return ref ? `${value.nom} (${ref})` : value.nom;
   };
 
+  /** Applique la pièce choisie dans la liste de suggestions. */
   onDeviceSelected(event: MatAutocompleteSelectedEvent): void {
     const device = event.option.value as Device;
     this.applyDevice(device);
   }
 
+  /** Réinitialise la recherche et la sélection de pièce. */
   clearSearch(): void {
     this.searchCtrl.setValue('');
     this.selectedDevice.set(null);
@@ -150,11 +158,13 @@ export class OrderRequestFormComponent implements OnInit {
     this.suggestions.set([]);
   }
 
+  /** Texte saisi dans le champ de recherche (hors objet Device). */
   searchQueryText(): string {
     const value = this.searchCtrl.value;
     return typeof value === 'string' ? value.trim() : '';
   }
 
+  /** URL absolue de la photo d'une pièce ou d'une ligne brouillon. */
   photoUrl(device: Device | null | DraftLine): string {
     if (!device) return '';
     const url = 'photoUrl' in device ? device.photoUrl : '';
@@ -162,6 +172,7 @@ export class OrderRequestFormComponent implements OnInit {
     return this.deviceService.resolvePhotoUrl(url);
   }
 
+  /** Sous-titre contextuel (marque, MAS, SFM) pour une pièce suggérée. */
   deviceHint(device: Device): string {
     const parts = [
       device.marqueLabel || device.masMarque,
@@ -171,6 +182,7 @@ export class OrderRequestFormComponent implements OnInit {
     return parts.join(' · ');
   }
 
+  /** Ajoute la pièce sélectionnée à la liste des lignes de commande. */
   addLine(): void {
     if (this.picker.invalid) {
       this.picker.markAllAsTouched();
@@ -211,6 +223,7 @@ export class OrderRequestFormComponent implements OnInit {
     this.mailPreviews.set([]);
   }
 
+  /** Met à jour la quantité d'une ligne existante. */
   updateQty(deviceId: number, value: string | number): void {
     const qty = Math.max(1, Number(value) || 1);
     this.lines.update((list) =>
@@ -219,11 +232,13 @@ export class OrderRequestFormComponent implements OnInit {
     this.mailPreviews.set([]);
   }
 
+  /** Retire une ligne de la demande en cours. */
   removeLine(deviceId: number): void {
     this.lines.update((list) => list.filter((l) => l.deviceId !== deviceId));
     this.mailPreviews.set([]);
   }
 
+  /** Charge l'aperçu des e-mails qui seraient envoyés aux SFM. */
   loadMailPreview(): void {
     if (this.lines().length === 0) {
       this.error.set('Ajoutez au moins une pièce pour prévisualiser l’e-mail.');
@@ -252,6 +267,7 @@ export class OrderRequestFormComponent implements OnInit {
       });
   }
 
+  /** Envoie la demande de commande avec message et lignes saisies. */
   submit(): void {
     if (this.form.invalid) {
       this.form.markAllAsTouched();

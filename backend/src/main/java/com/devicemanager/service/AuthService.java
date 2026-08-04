@@ -16,6 +16,13 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 
+/**
+ * Service d'authentification JWT pour DeviceManager.
+ * <p>
+ * Valide les identifiants, émet un jeton et renvoie le profil utilisateur avec
+ * la liste des ateliers casino accessibles et l'atelier actif initial pour
+ * le contexte multi-tenant ({@code X-Atelier-Id}).
+ */
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -26,6 +33,13 @@ public class AuthService {
     private final JwtService jwtService;
     private final AtelierService atelierService;
 
+    /**
+     * Authentifie un utilisateur et construit la réponse de connexion.
+     *
+     * @param request identifiants (nom d'utilisateur et mot de passe)
+     * @return jeton JWT, profil, groupe et ateliers disponibles
+     * @throws org.springframework.web.server.ResponseStatusException {@code 401} si identifiants invalides
+     */
     @Transactional(readOnly = true)
     public AuthResponse login(LoginRequest request) {
         User user = userRepository.findByUsername(request.getUsername())

@@ -14,14 +14,32 @@ import org.springframework.web.server.ResponseStatusException;
 import java.time.Instant;
 import java.util.stream.Collectors;
 
+/**
+ * Gestionnaire global des exceptions REST.
+ * Transforme les erreurs applicatives en réponses {@link ApiError} structurées.
+ */
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+    /**
+     * Convertit une {@link ResponseStatusException} en réponse HTTP avec le statut et le message fournis.
+     *
+     * @param ex      exception avec code HTTP et raison
+     * @param request requête en cours (pour le chemin)
+     * @return réponse d'erreur structurée
+     */
     @ExceptionHandler(ResponseStatusException.class)
     public ResponseEntity<ApiError> handleStatus(ResponseStatusException ex, HttpServletRequest request) {
         return build(ex.getStatusCode().value(), ex.getReason(), request.getRequestURI());
     }
 
+    /**
+     * Agrège les messages de validation Bean Validation en une seule réponse 400.
+     *
+     * @param ex      exception de validation des arguments du contrôleur
+     * @param request requête en cours (pour le chemin)
+     * @return réponse d'erreur avec les messages de champ concaténés
+     */
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiError> handleValidation(MethodArgumentNotValidException ex, HttpServletRequest request) {
         String message = ex.getBindingResult().getFieldErrors().stream()
@@ -30,6 +48,13 @@ public class GlobalExceptionHandler {
         return build(HttpStatus.BAD_REQUEST.value(), message, request.getRequestURI());
     }
 
+    /**
+     * Traduit les violations d'intégrité SQL en messages métier lisibles (unicité, clés étrangères).
+     *
+     * @param ex      exception de contrainte base de données
+     * @param request requête en cours (pour le chemin)
+     * @return réponse 409 avec message contextualisé
+     */
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ApiError> handleIntegrity(DataIntegrityViolationException ex, HttpServletRequest request) {
         String raw = ex.getMostSpecificCause() != null ? ex.getMostSpecificCause().getMessage() : ex.getMessage();
@@ -53,6 +78,13 @@ public class GlobalExceptionHandler {
         return build(HttpStatus.CONFLICT.value(), message, request.getRequestURI());
     }
 
+    /**
+     * Attrape toute exception non gérée et renvoie une erreur 500 générique.
+     *
+     * @param ex      exception non prévue
+     * @param request requête en cours (pour le chemin)
+     * @return réponse d'erreur interne
+     */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiError> handleGeneric(Exception ex, HttpServletRequest request) {
         return build(HttpStatus.INTERNAL_SERVER_ERROR.value(), ex.getMessage(), request.getRequestURI());

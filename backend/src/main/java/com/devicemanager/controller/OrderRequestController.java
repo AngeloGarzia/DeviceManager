@@ -15,6 +15,12 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Contrôleur REST des demandes de commande de pièces détachées.
+ * <p>
+ * Flux technicien → validation admin → envoi e-mails aux SFM, scopé à l'atelier
+ * courant ({@code X-Atelier-Id}). Statuts {@code PENDING} puis {@code VALIDATED}.
+ */
 @RestController
 @RequestMapping("/api/order-requests")
 @RequiredArgsConstructor
@@ -22,7 +28,14 @@ public class OrderRequestController {
 
     private final OrderRequestService orderRequestService;
 
-    /** Création d'une demande — admin et technicien. */
+    /**
+     * Crée une demande de commande — admin et technicien.
+     *
+     * @param request lignes de pièces et message du demandeur
+     * @param authentication utilisateur authentifié
+     * @return demande enregistrée (statut {@code PENDING})
+     * @throws org.springframework.web.server.ResponseStatusException {@code 400} si aucune ligne ou pièce introuvable
+     */
     @PostMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'TECHNICIEN')")
     public ResponseEntity<OrderRequestResponse> create(
@@ -32,19 +45,36 @@ public class OrderRequestController {
                 .body(orderRequestService.create(request, authentication.getName()));
     }
 
-    /** Consultation — admin et technicien. */
+    /**
+     * Liste les demandes de commande de l'atelier courant — admin et technicien.
+     *
+     * @return demandes triées par date décroissante
+     */
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'TECHNICIEN')")
     public ResponseEntity<List<OrderRequestResponse>> list() {
         return ResponseEntity.ok(orderRequestService.findAll());
     }
 
+    /**
+     * Compte les demandes en attente de validation dans l'atelier courant.
+     *
+     * @return mappe {@code count} vers le nombre de demandes {@code PENDING} ou {@code SENT}
+     */
     @GetMapping("/pending-count")
     @PreAuthorize("hasAnyRole('ADMIN', 'TECHNICIEN')")
     public ResponseEntity<Map<String, Long>> pendingCount() {
         return ResponseEntity.ok(Map.of("count", orderRequestService.countPending()));
     }
 
+    /**
+     * Aperçu des e-mails (admin + SFM) qui seraient envoyés à la création, sans persister.
+     *
+     * @param request brouillon de demande
+     * @param authentication utilisateur authentifié
+     * @return aperçus des messages
+     * @throws org.springframework.web.server.ResponseStatusException {@code 400} si lignes invalides
+     */
     @PostMapping("/mail-preview")
     @PreAuthorize("hasAnyRole('ADMIN', 'TECHNICIEN')")
     public ResponseEntity<List<MailPreviewItem>> previewCreate(
@@ -53,7 +83,14 @@ public class OrderRequestController {
         return ResponseEntity.ok(orderRequestService.previewCreateMails(request, authentication.getName()));
     }
 
-    /** Aperçu des e-mails SFM (consultation) — admin et technicien. */
+    /**
+     * Aperçu des e-mails SFM (consultation) — admin et technicien.
+     *
+     * @param id identifiant de la demande
+     * @param authentication utilisateur connecté (signature dans l'aperçu si admin)
+     * @return aperçus des e-mails fournisseurs
+     * @throws org.springframework.web.server.ResponseStatusException {@code 404} si demande introuvable
+     */
     @GetMapping("/{id}/mail-preview")
     @PreAuthorize("hasAnyRole('ADMIN', 'TECHNICIEN')")
     public ResponseEntity<List<MailPreviewItem>> previewValidate(
@@ -62,7 +99,15 @@ public class OrderRequestController {
         return ResponseEntity.ok(orderRequestService.previewSfmMails(id, authentication.getName()));
     }
 
-    /** Validation / envoi SFM — admin uniquement. */
+    /**
+     * Validation / envoi SFM — admin uniquement.
+     *
+     * @param id identifiant de la demande
+     * @param authentication administrateur validant la demande
+     * @return demande passée en statut {@code VALIDATED}
+     * @throws org.springframework.web.server.ResponseStatusException {@code 404} si introuvable ;
+     *         {@code 409} si déjà validée
+     */
     @PostMapping("/{id}/validate")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<OrderRequestResponse> validate(
@@ -71,7 +116,14 @@ public class OrderRequestController {
         return ResponseEntity.ok(orderRequestService.validate(id, authentication.getName()));
     }
 
-    /** Suppression — admin uniquement. */
+    /**
+     * Suppression — admin uniquement.
+     *
+     * @param id identifiant de la demande
+     * @param authentication administrateur effectuant la suppression
+     * @return réponse vide ({@code 204})
+     * @throws org.springframework.web.server.ResponseStatusException {@code 404} si introuvable
+     */
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> delete(

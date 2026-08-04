@@ -3,6 +3,9 @@ package com.devicemanager.dto;
 import lombok.Builder;
 import lombok.Data;
 
+/**
+ * Vue synthétique d'un casino avec son groupe parent.
+ */
 @Data
 @Builder
 public class CasinoSummary {

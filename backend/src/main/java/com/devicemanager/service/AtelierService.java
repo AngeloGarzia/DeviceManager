@@ -25,6 +25,7 @@ import com.devicemanager.repository.DeviceRepository;
 import com.devicemanager.repository.MasRepository;
 import com.devicemanager.repository.SfmRepository;
 import com.devicemanager.repository.UserRepository;
+import com.devicemanager.security.Roles;
 import com.devicemanager.tenancy.AtelierContext;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -39,6 +40,13 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+/**
+ * Service de gestion des ateliers techniques et du contexte multi-tenant.
+ * <p>
+ * Résout les ateliers par groupe casino, gère l'atelier courant via
+ * {@link com.devicemanager.tenancy.AtelierContext} ({@code X-Atelier-Id})
+ * et administre les coordonnées et responsables d'atelier.
+ */
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -52,16 +60,50 @@ public class AtelierService {
     private final SfmRepository sfmRepository;
     private final CommandeRepository commandeRepository;
 
+    /**
+     * Liste les ateliers accessibles à un utilisateur selon son rôle et son groupe.
+     *
+     * @param username nom d'utilisateur connecté
+     * @return tous les ateliers du groupe (admin) ou l'atelier préféré seul (technicien)
+     * @throws org.springframework.web.server.ResponseStatusException {@code 401} si utilisateur introuvable
+     */
     public List<AtelierSummary> listForUser(String username) {
         User user = requireUser(username);
         if (user.getGroupe() == null) {
             return List.of();
+        }
+        // Technicien : uniquement son atelier préféré (pas de bascule libre).
+        if (isTechnicien(user.getRole())) {
+            Atelier preferred = user.getPreferredAtelier();
+            if (preferred == null) {
+                return List.of();
+            }
+            return List.of(toSummary(requireAtelierInUserGroupe(user, preferred.getId())));
         }
         return atelierRepository.findAllByGroupeId(user.getGroupe().getId()).stream()
                 .map(this::toSummary)
                 .toList();
     }
 
+    /**
+     * Résout un atelier du groupe de l'utilisateur (création / affectation compte).
+     *
+     * @param user utilisateur authentifié
+     * @param atelierId identifiant de l'atelier
+     * @return entité atelier vérifiée
+     * @throws org.springframework.web.server.ResponseStatusException {@code 403} si hors groupe ;
+     *         {@code 400} si introuvable
+     */
+    public Atelier requireAtelierForUserGroupe(User user, Long atelierId) {
+        return requireAtelierInUserGroupe(user, atelierId);
+    }
+
+    /**
+     * Liste les casinos du groupe de l'utilisateur.
+     *
+     * @param username nom d'utilisateur connecté
+     * @return casinos triés par nom
+     */
     public List<CasinoSummary> listCasinosForUser(String username) {
         User user = requireUser(username);
         if (user.getGroupe() == null) {
@@ -77,6 +119,12 @@ public class AtelierService {
                 .toList();
     }
 
+    /**
+     * Liste les utilisateurs du même groupe (candidats responsables d'atelier).
+     *
+     * @param username administrateur connecté
+     * @return utilisateurs du groupe
+     */
     public List<AtelierResponsableDto> listUsersForGroupe(String username) {
         User user = requireUser(username);
         if (user.getGroupe() == null) {
@@ -87,6 +135,12 @@ public class AtelierService {
                 .toList();
     }
 
+    /**
+     * Charge l'atelier courant depuis le contexte thread-local ({@code X-Atelier-Id}).
+     *
+     * @return entité atelier avec casino
+     * @throws org.springframework.web.server.ResponseStatusException {@code 400} si en-tête absent ou atelier introuvable
+     */
     public Atelier requireCurrentAtelier() {
         Long id = AtelierContext.get();
         if (id == null) {
@@ -96,15 +150,35 @@ public class AtelierService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Atelier introuvable"));
     }
 
+    /**
+     * Enregistre l'atelier préféré d'un administrateur pour les prochaines sessions.
+     *
+     * @param username administrateur connecté
+     * @param atelierId identifiant de l'atelier à mémoriser
+     * @return résumé de l'atelier choisi
+     * @throws org.springframework.web.server.ResponseStatusException {@code 403} si non admin ou hors groupe
+     */
     @Transactional
     public AtelierSummary setPreferredAtelier(String username, Long atelierId) {
         User user = requireUser(username);
+        if (!Roles.ADMIN.equals(user.getRole())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "Seuls les administrateurs peuvent changer d'atelier");
+        }
         Atelier atelier = requireAtelierInUserGroupe(user, atelierId);
         user.setPreferredAtelier(atelier);
         userRepository.saveAndFlush(user);
         return toSummary(atelier);
     }
 
+    /**
+     * Crée un atelier rattaché à un casino du groupe de l'administrateur.
+     *
+     * @param username administrateur connecté
+     * @param request nom, casino, coordonnées et responsables
+     * @return atelier créé
+     * @throws org.springframework.web.server.ResponseStatusException {@code 409} si nom déjà utilisé pour ce casino
+     */
     @Transactional
     public AtelierSummary create(String username, AtelierRequest request) {
         User user = requireUser(username);
@@ -121,6 +195,16 @@ public class AtelierService {
         return toSummary(atelierRepository.saveAndFlush(atelier));
     }
 
+    /**
+     * Met à jour un atelier existant du groupe.
+     *
+     * @param username administrateur connecté
+     * @param id identifiant de l'atelier
+     * @param request données mises à jour
+     * @return atelier modifié
+     * @throws org.springframework.web.server.ResponseStatusException {@code 403} si hors groupe ;
+     *         {@code 409} en cas de conflit de nom
+     */
     @Transactional
     public AtelierSummary update(String username, Long id, AtelierRequest request) {
         User user = requireUser(username);
@@ -135,6 +219,13 @@ public class AtelierService {
         return toSummary(atelierRepository.saveAndFlush(atelier));
     }
 
+    /**
+     * Supprime un atelier sans données métier rattachées.
+     *
+     * @param username administrateur connecté
+     * @param id identifiant de l'atelier
+     * @throws org.springframework.web.server.ResponseStatusException {@code 409} si pièces, MAS, SFM ou commandes liées
+     */
     @Transactional
     public void delete(String username, Long id) {
         User user = requireUser(username);
@@ -155,6 +246,12 @@ public class AtelierService {
         atelierRepository.flush();
     }
 
+    /**
+     * Convertit une entité atelier en DTO résumé pour l'API.
+     *
+     * @param atelier entité persistée
+     * @return résumé avec casino, groupe, coordonnées et responsables
+     */
     public AtelierSummary toSummary(Atelier atelier) {
         String casinoNom = atelier.getCasino() != null ? atelier.getCasino().getNom() : "";
         String groupeNom = atelier.getCasino() != null && atelier.getCasino().getGroupe() != null
@@ -397,5 +494,9 @@ public class AtelierService {
     private User requireUser(String username) {
         return userRepository.findByUsername(username)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Utilisateur introuvable"));
+    }
+
+    private static boolean isTechnicien(String role) {
+        return Roles.TECHNICIEN.equals(role) || "TECH".equals(role);
     }
 }

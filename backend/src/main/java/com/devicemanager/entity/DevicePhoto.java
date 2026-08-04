@@ -3,6 +3,10 @@ package com.devicemanager.entity;
 import jakarta.persistence.*;
 import lombok.*;
 
+/**
+ * Photo attachée à une pièce ({@link Device}).
+ * L'ordre d'affichage est défini par {@link #position} ; la première photo alimente les champs dénormalisés du device.
+ */
 @Entity
 @Table(name = "device_photo")
 @Getter
@@ -21,6 +25,7 @@ public class DevicePhoto {
             foreignKey = @ForeignKey(name = "fk_device_photo_device"))
     private Device device;
 
+    /** Clé objet de stockage (S3 ou blob local). */
     @Column(name = "photo_key", nullable = false, length = 512)
     private String photoKey;
 
@@ -33,6 +38,7 @@ public class DevicePhoto {
     @Column(name = "file_size")
     private Long fileSize;
 
+    /** Position dans la galerie (0 = photo principale). */
     @Column(nullable = false)
     private int position;
 }

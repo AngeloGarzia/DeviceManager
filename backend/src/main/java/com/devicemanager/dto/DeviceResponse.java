@@ -6,6 +6,9 @@ import lombok.Data;
 import java.time.LocalDate;
 import java.util.List;
 
+/**
+ * Représentation complète d'une pièce renvoyée par l'API.
+ */
 @Data
 @Builder
 public class DeviceResponse {
@@ -15,7 +18,7 @@ public class DeviceResponse {
     private String usage;
     private LocalDate dateAcquisition;
     private boolean obsolete;
-    /** Photo principale (compat listes / commandes). */
+    /** URL de la photo principale (compatibilité listes et commandes). */
     private String photoUrl;
     private String contentType;
     private Long fileSize;
@@ -24,8 +27,11 @@ public class DeviceResponse {
     private String sfmNom;
     private Long masId;
     private String masNumero;
+    /** Code court de la marque MAS. */
     private String masMarque;
     private Long marqueId;
+    /** Code court de la marque de la pièce. */
     private String marque;
+    /** Libellé complet de la marque de la pièce. */
     private String marqueLabel;
 }

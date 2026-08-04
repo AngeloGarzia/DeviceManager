@@ -20,6 +20,11 @@ export const routes: Routes = [
           import('./pages/device-list/device-list.component').then((m) => m.DeviceListComponent)
       },
       {
+        path: 'devices/stock',
+        loadComponent: () =>
+          import('./pages/device-stock/device-stock.component').then((m) => m.DeviceStockComponent)
+      },
+      {
         path: 'devices/new',
         loadComponent: () =>
           import('./pages/device-form/device-form.component').then((m) => m.DeviceFormComponent)

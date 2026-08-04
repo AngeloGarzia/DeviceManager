@@ -33,6 +33,12 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+/**
+ * Service métier des demandes de commande de pièces détachées.
+ * <p>
+ * Création par technicien/admin, notification admin, validation et envoi
+ * d'e-mails aux SFM, le tout scopé à l'atelier courant ({@code X-Atelier-Id}).
+ */
 @Service
 @RequiredArgsConstructor
 @Transactional
@@ -45,6 +51,14 @@ public class OrderRequestService {
     private final MailService mailService;
     private final AtelierService atelierService;
 
+    /**
+     * Crée une demande {@code PENDING} et notifie l'administrateur par e-mail.
+     *
+     * @param request lignes de pièces et message
+     * @param username demandeur authentifié
+     * @return demande enregistrée
+     * @throws org.springframework.web.server.ResponseStatusException {@code 400} si lignes vides ou pièce introuvable
+     */
     public OrderRequestResponse create(OrderRequestDto request, String username) {
         User technicien = userRepository.findByUsername(username)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Utilisateur introuvable"));
@@ -99,7 +113,13 @@ public class OrderRequestService {
     }
 
     /**
-     * Validation admin : passe la demande en VALIDATED et envoie un e-mail par SFM concerné.
+     * Validation admin : passe la demande en {@code VALIDATED} et envoie un e-mail par SFM concerné.
+     *
+     * @param id identifiant de la demande
+     * @param adminUsername administrateur validant
+     * @return demande validée
+     * @throws org.springframework.web.server.ResponseStatusException {@code 404} si introuvable ;
+     *         {@code 409} si déjà validée
      */
     public OrderRequestResponse validate(Long id, String adminUsername) {
         Long atelierId = atelierService.requireCurrentAtelier().getId();
@@ -152,6 +172,13 @@ public class OrderRequestService {
         return toResponse(saved);
     }
 
+    /**
+     * Supprime une demande de commande de l'atelier courant.
+     *
+     * @param id identifiant de la demande
+     * @param adminUsername administrateur effectuant la suppression
+     * @throws org.springframework.web.server.ResponseStatusException {@code 404} si introuvable
+     */
     public void delete(Long id, String adminUsername) {
         Long atelierId = atelierService.requireCurrentAtelier().getId();
         Commande commande = commandeRepository.findByIdWithRelations(id, atelierId)
@@ -160,6 +187,11 @@ public class OrderRequestService {
         log.info("Demande #{} supprimée par {}", id, adminUsername);
     }
 
+    /**
+     * Liste les demandes de l'atelier courant, triées par date décroissante.
+     *
+     * @return demandes avec lignes et statuts
+     */
     @Transactional(readOnly = true)
     public List<OrderRequestResponse> findAll() {
         Long atelierId = atelierService.requireCurrentAtelier().getId();
@@ -168,6 +200,11 @@ public class OrderRequestService {
                 .toList();
     }
 
+    /**
+     * Compte les demandes en attente ({@code PENDING} ou {@code SENT}) dans l'atelier courant.
+     *
+     * @return nombre de demandes non validées
+     */
     @Transactional(readOnly = true)
     public long countPending() {
         Long atelierId = atelierService.requireCurrentAtelier().getId();
@@ -177,6 +214,11 @@ public class OrderRequestService {
 
     /**
      * Aperçu de l'e-mail admin qui sera envoyé à la création (sans enregistrer).
+     *
+     * @param request brouillon de demande
+     * @param username utilisateur authentifié
+     * @return aperçus admin et SFM simulés
+     * @throws org.springframework.web.server.ResponseStatusException {@code 400} si lignes invalides
      */
     @Transactional(readOnly = true)
     public List<MailPreviewItem> previewCreateMails(OrderRequestDto request, String username) {
@@ -240,7 +282,11 @@ public class OrderRequestService {
 
     /**
      * Aperçu des e-mails SFM qui seront envoyés à la validation.
-     * {@code viewerUsername} = admin connecté (signature affichée dans l'aperçu).
+     *
+     * @param id identifiant de la demande
+     * @param viewerUsername utilisateur connecté (signature admin dans l'aperçu si rôle admin)
+     * @return aperçus par destinataire SFM ou alertes
+     * @throws org.springframework.web.server.ResponseStatusException {@code 404} si demande introuvable
      */
     @Transactional(readOnly = true)
     public List<MailPreviewItem> previewSfmMails(Long id, String viewerUsername) {

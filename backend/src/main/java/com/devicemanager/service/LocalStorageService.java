@@ -17,8 +17,10 @@ import java.util.Optional;
 import java.util.UUID;
 
 /**
- * Stockage local + copie durable en MySQL (Aiven) pour survivre au disque éphémère Render.
- * Lecture/écriture blob via JDBC (plus fiable que @Lob LAZY Hibernate sur LONGBLOB).
+ * Stockage local des photos de pièces détachées avec copie durable en MySQL.
+ * <p>
+ * Active lorsque S3 est désactivé ; survit au disque éphémère Render via
+ * la table {@code upload_blob}. Lecture/écriture blob via JDBC.
  */
 @Service
 @ConditionalOnProperty(name = "app.s3.enabled", havingValue = "false", matchIfMissing = true)
@@ -28,6 +30,13 @@ public class LocalStorageService implements StorageService {
     private final Path root;
     private final JdbcTemplate jdbcTemplate;
 
+    /**
+     * Constructeur : résout un dossier d'uploads accessible en écriture.
+     *
+     * @param dir chemin préféré (configuration {@code app.s3.local-fallback-dir})
+     * @param jdbcTemplate accès JDBC pour la persistance blob
+     * @throws IllegalStateException si aucun dossier n'est accessible en écriture
+     */
     public LocalStorageService(
             @Value("${app.s3.local-fallback-dir:uploads}") String dir,
             JdbcTemplate jdbcTemplate) {
@@ -36,6 +45,11 @@ public class LocalStorageService implements StorageService {
         log.info("Uploads locaux: dossier={}", root.toAbsolutePath());
     }
 
+    /**
+     * Retourne le répertoire racine des uploads locaux.
+     *
+     * @return chemin absolu du dossier de stockage
+     */
     public Path getRoot() {
         return root;
     }
@@ -65,6 +79,12 @@ public class LocalStorageService implements StorageService {
                 last);
     }
 
+    /**
+     * Enregistre un fichier sur disque et en base MySQL.
+     *
+     * @param file fichier à stocker
+     * @return clé, URL relative et métadonnées
+     */
     @Override
     @Transactional
     public StoredObject store(MultipartFile file) {
@@ -81,6 +101,11 @@ public class LocalStorageService implements StorageService {
         }
     }
 
+    /**
+     * Supprime un fichier du disque et de la table {@code upload_blob}.
+     *
+     * @param key clé du fichier (ignorée si invalide)
+     */
     @Override
     @Transactional
     public void delete(String key) {
@@ -95,6 +120,12 @@ public class LocalStorageService implements StorageService {
         jdbcTemplate.update("DELETE FROM upload_blob WHERE object_key = ?", key);
     }
 
+    /**
+     * Charge un fichier depuis le disque, avec repli et réhydratation depuis MySQL.
+     *
+     * @param key clé du fichier
+     * @return octets et type MIME, ou vide si introuvable ou clé non sûre
+     */
     @Transactional(readOnly = true)
     public Optional<StoredObjectBytes> load(String key) {
         if (!isSafeKey(key)) {
@@ -175,6 +206,13 @@ public class LocalStorageService implements StorageService {
         return name.replaceAll("[^a-zA-Z0-9._-]", "_");
     }
 
+    /**
+     * Contenu binaire d'un fichier chargé depuis le stockage local.
+     *
+     * @param data octets du fichier
+     * @param contentType type MIME
+     * @param fileSize taille en octets
+     */
     public record StoredObjectBytes(byte[] data, String contentType, Long fileSize) {
     }
 }

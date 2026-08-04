@@ -10,7 +10,13 @@
         }
       </p>
     </div>
-    <button mat-stroked-button type="button" (click)="load()">Actualiser</button>
+    <div class="flex flex-wrap gap-2">
+      <a mat-flat-button color="primary" routerLink="/order-request">
+        <mat-icon>mail</mat-icon>
+        Nouvelle demande
+      </a>
+      <button mat-stroked-button type="button" (click)="load()">Actualiser</button>
+    </div>
   </header>
 
   @if (success()) {

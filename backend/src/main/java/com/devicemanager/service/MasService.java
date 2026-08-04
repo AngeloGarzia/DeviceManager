@@ -21,6 +21,12 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 
+/**
+ * Service métier des MAS (Machines À Sous) et marques associées.
+ * <p>
+ * Les MAS sont rattachées à l'atelier courant ({@code X-Atelier-Id}) ;
+ * les marques constituent un référentiel global partagé entre ateliers.
+ */
 @Service
 @RequiredArgsConstructor
 @Transactional
@@ -31,6 +37,12 @@ public class MasService {
     private final MarqueMasRepository marqueMasRepository;
     private final AtelierService atelierService;
 
+    /**
+     * Liste les MAS de l'atelier courant, avec recherche optionnelle.
+     *
+     * @param q filtre textuel
+     * @return MAS de l'atelier actif
+     */
     @Transactional(readOnly = true)
     public List<MasResponse> findAll(String q) {
         Long atelierId = atelierService.requireCurrentAtelier().getId();
@@ -40,11 +52,23 @@ public class MasService {
         return list.stream().map(this::toResponse).toList();
     }
 
+    /**
+     * Retourne une MAS par identifiant dans l'atelier courant.
+     *
+     * @param id identifiant de la MAS
+     * @return fiche MAS
+     * @throws org.springframework.web.server.ResponseStatusException {@code 404} si introuvable
+     */
     @Transactional(readOnly = true)
     public MasResponse findById(Long id) {
         return toResponse(getEntity(id));
     }
 
+    /**
+     * Liste toutes les marques MAS (référentiel global).
+     *
+     * @return marques triées par libellé
+     */
     @Transactional(readOnly = true)
     public List<MarqueMasResponse> listMarques() {
         return marqueMasRepository.findAllByOrderByLabelAsc().stream()
@@ -53,6 +77,13 @@ public class MasService {
                 .toList();
     }
 
+    /**
+     * Crée une marque MAS avec code dérivé du libellé.
+     *
+     * @param request libellé de la marque
+     * @return marque créée
+     * @throws org.springframework.web.server.ResponseStatusException {@code 409} si libellé en doublon
+     */
     public MarqueMasResponse createMarque(MarqueMasRequest request) {
         String label = request.getLabel().trim();
         if (marqueMasRepository.existsByLabelIgnoreCase(label)) {
@@ -72,6 +103,13 @@ public class MasService {
         return toMarqueResponse(saved);
     }
 
+    /**
+     * Crée une MAS dans l'atelier courant.
+     *
+     * @param request numéro, marque et statut
+     * @return MAS créée
+     * @throws org.springframework.web.server.ResponseStatusException {@code 409} si numéro en doublon
+     */
     public MasResponse create(MasRequest request) {
         Atelier atelier = atelierService.requireCurrentAtelier();
         String numero = request.getNumero().trim();
@@ -87,6 +125,15 @@ public class MasService {
         return toResponse(saved);
     }
 
+    /**
+     * Met à jour une MAS de l'atelier courant.
+     *
+     * @param id identifiant de la MAS
+     * @param request données mises à jour
+     * @return MAS modifiée
+     * @throws org.springframework.web.server.ResponseStatusException {@code 404} si introuvable ;
+     *         {@code 409} en cas de conflit de numéro
+     */
     public MasResponse update(Long id, MasRequest request) {
         Mas entity = getEntity(id);
         String numero = request.getNumero().trim();
@@ -97,11 +144,24 @@ public class MasService {
         return toResponse(masRepository.save(entity));
     }
 
+    /**
+     * Supprime une MAS de l'atelier courant.
+     *
+     * @param id identifiant de la MAS
+     * @throws org.springframework.web.server.ResponseStatusException {@code 404} si introuvable
+     */
     public void delete(Long id) {
         Mas entity = getEntity(id);
         masRepository.delete(entity);
     }
 
+    /**
+     * Charge l'entité MAS pour usage interne (ex. liaison pièce détachée).
+     *
+     * @param id identifiant de la MAS
+     * @return entité persistée
+     * @throws org.springframework.web.server.ResponseStatusException {@code 404} si introuvable dans l'atelier
+     */
     public Mas getEntity(Long id) {
         Long atelierId = atelierService.requireCurrentAtelier().getId();
         return masRepository.findByIdAndAtelierId(id, atelierId)

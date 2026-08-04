@@ -3,6 +3,9 @@ package com.devicemanager.dto;
 import lombok.Builder;
 import lombok.Data;
 
+/**
+ * Ligne détaillée d'une commande renvoyée par l'API.
+ */
 @Data
 @Builder
 public class OrderRequestLineResponse {

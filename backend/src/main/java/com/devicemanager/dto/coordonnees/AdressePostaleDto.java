@@ -3,6 +3,9 @@ package com.devicemanager.dto.coordonnees;
 import lombok.Builder;
 import lombok.Data;
 
+/**
+ * Adresse postale transférée entre l'API et l'entité {@link com.devicemanager.entity.coordonnees.AdressePostale}.
+ */
 @Data
 @Builder
 public class AdressePostaleDto {

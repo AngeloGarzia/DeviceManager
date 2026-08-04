@@ -5,11 +5,15 @@ import lombok.Data;
 
 import java.util.List;
 
+/**
+ * Représentation complète d'un SFM renvoyée par l'API.
+ */
 @Data
 @Builder
 public class SfmResponse {
     private Long id;
     private String nom;
+    /** Champs dénormalisés du premier contact (compatibilité / recherche). */
     private String responsable;
     private String telephone;
     private String email;

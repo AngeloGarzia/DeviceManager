@@ -22,7 +22,10 @@ import java.io.InputStream;
 import java.util.Iterator;
 
 /**
- * Redimensionne et compresse les photos avant stockage (max 1200×1200, JPEG optimisé).
+ * Optimisation des photos de pièces détachées avant stockage.
+ * <p>
+ * Redimensionne (max {@link #MAX_DIMENSION} px) et compresse en JPEG
+ * pour limiter l'espace disque/S3 et accélérer le scan IA d'étiquettes.
  */
 @Service
 @Slf4j
@@ -31,6 +34,13 @@ public class ImageOptimizationService {
     public static final int MAX_DIMENSION = 1200;
     private static final float JPEG_QUALITY = 0.82f;
 
+    /**
+     * Redimensionne et compresse une image en JPEG optimisé.
+     *
+     * @param file image source
+     * @return fichier multipart en mémoire (JPEG)
+     * @throws org.springframework.web.server.ResponseStatusException {@code 400} si image absente ou illisible
+     */
     public MultipartFile optimize(MultipartFile file) {
         if (file == null || file.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La photo est obligatoire");

@@ -10,6 +10,9 @@ import lombok.Data;
 
 import java.util.List;
 
+/**
+ * Requête de soumission d'une commande de pièces par un technicien.
+ */
 @Data
 public class OrderRequestDto {
 
@@ -21,8 +24,12 @@ public class OrderRequestDto {
     @Size(max = 1000)
     private String message;
 
+    /**
+     * Ligne de commande : pièce et quantité demandée.
+     */
     @Data
     public static class OrderRequestLineDto {
+        /** Identifiant de la pièce commandée. */
         @NotNull
         private Long deviceId;
 

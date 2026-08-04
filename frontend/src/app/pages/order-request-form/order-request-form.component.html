@@ -1,7 +1,13 @@
 <section class="grid gap-4">
-  <header>
-    <h1 class="page-title">Demande de commande</h1>
-    <p class="page-subtitle">Ajoutez plusieurs pièces, modifiez la liste, puis envoyez</p>
+  <header class="flex flex-wrap items-start justify-between gap-3">
+    <div>
+      <h1 class="page-title">Demande de commande</h1>
+      <p class="page-subtitle">Ajoutez plusieurs pièces, modifiez la liste, puis envoyez</p>
+    </div>
+    <a mat-stroked-button routerLink="/order-requests">
+      <mat-icon>inbox</mat-icon>
+      Demandes en cours
+    </a>
   </header>
 
   <mat-card class="!rounded-xl !border !border-line !shadow-soft">

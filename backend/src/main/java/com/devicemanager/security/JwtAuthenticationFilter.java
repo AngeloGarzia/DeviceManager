@@ -17,6 +17,18 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 import java.util.List;
 
+/**
+ * Filtre d'authentification JWT exécuté avant la chaîne Spring Security.
+ * <p>
+ * Lit l'en-tête {@code Authorization: Bearer &lt;token&gt;}, valide le JWT via {@link JwtService},
+ * charge l'utilisateur en base et peuple le {@link SecurityContextHolder} avec son rôle
+ * ({@code ROLE_ADMIN} ou {@code ROLE_TECHNICIEN}).
+ * <p>
+ * Un token absent, invalide ou expiré laisse la requête non authentifiée : les endpoints protégés
+ * seront refusés par {@link com.devicemanager.config.SecurityConfig}. Ce filtre s'exécute
+ * <em>avant</em> {@link com.devicemanager.tenancy.AtelierContextFilter}, qui dépend d'un
+ * utilisateur déjà authentifié pour résoudre le contexte d'atelier.
+ */
 @Component
 @RequiredArgsConstructor
 public class JwtAuthenticationFilter extends OncePerRequestFilter {

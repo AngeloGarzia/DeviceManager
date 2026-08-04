@@ -3,6 +3,10 @@ package com.devicemanager.entity;
 import jakarta.persistence.*;
 import lombok.*;
 
+/**
+ * Contact rattaché à un SFM (fournisseur).
+ * Peut être configuré pour recevoir les e-mails de commande validée.
+ */
 @Entity
 @Table(name = "sfm_contact")
 @Getter

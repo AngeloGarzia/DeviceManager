@@ -230,7 +230,9 @@
                   <mat-option [value]="mas.id">{{ mas.numero }} — {{ mas.marqueLabel || mas.marque }}</mat-option>
                 }
               </mat-select>
-              @if (selectedSfmId() && filteredMasses().length === 0) {
+              @if (associatedMasHint()) {
+                <mat-hint class="!text-emerald-700">{{ associatedMasHint() }}</mat-hint>
+              } @else if (selectedSfmId() && filteredMasses().length === 0) {
                 <mat-hint>Aucune MAS pour les marques de ce SFM</mat-hint>
               } @else {
                 <mat-hint>Facultatif — la marque en découle</mat-hint>

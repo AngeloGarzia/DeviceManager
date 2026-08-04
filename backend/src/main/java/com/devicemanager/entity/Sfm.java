@@ -9,6 +9,11 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+/**
+ * SFM (Service Fournisseur Maintenance) — fournisseur de pièces pour un atelier.
+ * Peut couvrir plusieurs marques et disposer de plusieurs contacts.
+ * Le nom est unique par atelier.
+ */
 @Entity
 @Table(
         name = "sfm",
@@ -58,6 +63,7 @@ public class Sfm {
     @Builder.Default
     private Set<MarqueMas> marques = new HashSet<>();
 
+    /** Atelier propriétaire — périmètre multi-tenant. */
     @ManyToOne(optional = false, fetch = FetchType.LAZY)
     @JoinColumn(name = "atelier_id", foreignKey = @ForeignKey(name = "fk_sfm_atelier"))
     private Atelier atelier;

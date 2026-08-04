@@ -7,6 +7,9 @@ import lombok.Data;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Vue synthétique d'un atelier avec contexte casino/groupe et coordonnées.
+ */
 @Data
 @Builder
 public class AtelierSummary {
@@ -16,6 +19,7 @@ public class AtelierSummary {
     private String casinoNom;
     private Long groupeId;
     private String groupeNom;
+    /** Libellé composite pour l'affichage (casino — atelier). */
     private String label;
     private CoordonneesDto coordonnees;
     @Builder.Default

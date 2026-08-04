@@ -232,6 +232,8 @@ export interface AppUser {
   prenom: string;
   email: string;
   role: string;
+  preferredAtelierId?: number | null;
+  preferredAtelierNom?: string | null;
   createdAt: string;
 }
 
@@ -242,6 +244,7 @@ export interface AppUserForm {
   email: string;
   password?: string;
   role: string;
+  preferredAtelierId?: number | null;
 }
 
 export interface AppSetting {

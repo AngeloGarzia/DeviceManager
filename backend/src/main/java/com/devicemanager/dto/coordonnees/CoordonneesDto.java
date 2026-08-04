@@ -7,9 +7,13 @@ import lombok.Data;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Ensemble de coordonnées d'un atelier exposé par l'API.
+ */
 @Data
 @Builder
 public class CoordonneesDto {
+    /** Identifiant du bloc coordonnées (absent à la création). */
     private Long id;
 
     @Valid

@@ -13,6 +13,12 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Properties;
 
+/**
+ * Service d'envoi d'e-mails pour DeviceManager.
+ * <p>
+ * Notifications admin (demandes de commande), e-mails SFM et test SMTP.
+ * Configuration lue depuis Setup ; simulation en log si {@code MAIL_ENABLED=false}.
+ */
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -30,10 +36,23 @@ public class MailService {
     @Value("${app.mail.admin-email:admin@casino.local}")
     private String adminEmailDefault;
 
+    /**
+     * Envoie une notification de nouvelle demande de commande à l'administrateur.
+     *
+     * @param subject sujet du message
+     * @param body corps texte
+     */
     public void sendOrderRequestToAdmin(String subject, String body) {
         send(getAdminEmail(), subject, body);
     }
 
+    /**
+     * Envoie un e-mail de test SMTP vers l'adresse administrateur configurée.
+     *
+     * @return résultat avec destinataire et message de succès
+     * @throws org.springframework.web.server.ResponseStatusException {@code 400} si destinataire non configuré ;
+     *         {@code 502} en cas d'échec SMTP
+     */
     public MailTestResponse sendTestEmail() {
         String to = getAdminEmail();
         if (to == null || to.isBlank()) {
@@ -63,6 +82,14 @@ public class MailService {
         }
     }
 
+    /**
+     * Envoie un e-mail texte simple (ou le simule si la messagerie est désactivée).
+     *
+     * @param to adresse destinataire
+     * @param subject sujet
+     * @param body corps texte
+     * @throws org.springframework.web.server.ResponseStatusException {@code 400} si configuration SMTP invalide
+     */
     public void send(String to, String subject, String body) {
         boolean mailEnabled = appSettingsService.getBoolean(AppSettingsService.MAIL_ENABLED, mailEnabledDefault);
         String from = appSettingsService.get(AppSettingsService.MAIL_FROM, fromDefault);
@@ -92,6 +119,11 @@ public class MailService {
         log.info("Email envoyé à {} (sujet={})", to, subject);
     }
 
+    /**
+     * Retourne l'adresse e-mail administrateur effective (Setup ou défaut application).
+     *
+     * @return e-mail admin configuré
+     */
     public String getAdminEmail() {
         return appSettingsService.get(AppSettingsService.MAIL_ADMIN_EMAIL, adminEmailDefault);
     }

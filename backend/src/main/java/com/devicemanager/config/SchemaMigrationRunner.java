@@ -8,7 +8,11 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
 /**
- * Migrations schéma légères (commande multi-lignes, marques MAS en table).
+ * Migrations de schéma SQL légères exécutées au démarrage (ordre 1, avant {@link DataInitializer}).
+ * <p>
+ * Adapte progressivement une base existante : commandes multi-lignes, catalogue {@code marque_mas},
+ * photos multiples, blobs d'upload, colonnes utilisateur, etc. Chaque migration est tolérante
+ * aux erreurs (journalisation sans arrêt de l'application).
  */
 @Component
 @Order(1)
@@ -18,6 +22,11 @@ public class SchemaMigrationRunner implements CommandLineRunner {
 
     private final JdbcTemplate jdbcTemplate;
 
+    /**
+     * Lance l'ensemble des migrations idempotentes dans un ordre fixe.
+     *
+     * @param args arguments de ligne de commande (non utilisés)
+     */
     @Override
     public void run(String... args) {
         softenCommandeLegacyColumns();

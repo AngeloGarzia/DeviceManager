@@ -14,6 +14,10 @@ import { SfmService } from '../../services/sfm.service';
 import { AuthService } from '../../services/auth.service';
 import { ConfirmDialogComponent } from '../../shared/confirm-dialog.component';
 
+/**
+ * Liste des SFM (fournisseurs de pièces) de l'atelier.
+ * Permet la recherche, la consultation et la suppression des SFM.
+ */
 @Component({
   selector: 'app-sfm-list',
   standalone: true,
@@ -37,12 +41,15 @@ export class SfmListComponent implements OnInit {
 
   constructor(private sfmService: SfmService) {}
   ngOnInit(): void { this.load(); }
+  /** Nombre total de SFM affichés. */
   get total(): number { return this.items().length; }
 
+  /** Libellé des marques associées à un SFM, séparées par des virgules. */
   marquesLabel(item: Sfm): string {
     return item.marques?.map((m) => m.label).join(', ') || '—';
   }
 
+  /** Charge les SFM selon le filtre de recherche courant. */
   load(): void {
     this.loading.set(true); this.error.set(null);
     this.sfmService.list(this.query).subscribe({
@@ -50,8 +57,11 @@ export class SfmListComponent implements OnInit {
       error: () => { this.error.set('Impossible de charger les SFM.'); this.loading.set(false); }
     });
   }
+  /** Demande confirmation avant suppression d'un SFM. */
   askDelete(item: Sfm): void { this.pendingDelete = item; this.confirmOpen.set(true); }
+  /** Annule la suppression en cours. */
   cancelDelete(): void { this.pendingDelete = null; this.confirmOpen.set(false); }
+  /** Supprime le SFM sélectionné après confirmation. */
   confirmDelete(): void {
     if (!this.pendingDelete) return;
     const id = this.pendingDelete.id;

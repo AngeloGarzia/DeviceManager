@@ -5,6 +5,9 @@ import lombok.Data;
 
 import java.time.Instant;
 
+/**
+ * Représentation d'un utilisateur renvoyée par l'API.
+ */
 @Data
 @Builder
 public class UserResponse {
@@ -14,5 +17,7 @@ public class UserResponse {
     private String prenom;
     private String email;
     private String role;
+    private Long preferredAtelierId;
+    private String preferredAtelierNom;
     private Instant createdAt;
 }

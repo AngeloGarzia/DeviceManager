@@ -13,6 +13,13 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
+/**
+ * Initialisation des données de démonstration au démarrage (ordre 2, après {@link SchemaMigrationRunner}).
+ * <p>
+ * Crée le groupe Circus, des casinos et ateliers, le catalogue de marques MAS, rattache les
+ * données orphelines à l'atelier par défaut, provisionne les comptes {@code admin} et {@code tech},
+ * et seed les SFM/MAS si les tables sont vides.
+ */
 @Component
 @Order(2)
 @RequiredArgsConstructor
@@ -28,6 +35,11 @@ public class DataInitializer implements CommandLineRunner {
     private final PasswordEncoder passwordEncoder;
     private final JdbcTemplate jdbcTemplate;
 
+    /**
+     * Exécute le seed idempotent : entités de référence, utilisateurs demo et données SFM/MAS.
+     *
+     * @param args arguments de ligne de commande (non utilisés)
+     */
     @Override
     @Transactional
     public void run(String... args) {
@@ -64,8 +76,8 @@ public class DataInitializer implements CommandLineRunner {
 
         assignExistingDataToAtelier(defaultAtelier);
 
-        upsertUser("admin", "admin123", Roles.ADMIN, circus);
-        upsertUser("tech", "tech123", Roles.TECHNICIEN, circus);
+        upsertUser("admin", "admin123", Roles.ADMIN, circus, null);
+        upsertUser("tech", "tech123", Roles.TECHNICIEN, circus, defaultAtelier);
 
         userRepository.findByUsername("tech").ifPresent(user -> {
             if ("TECH".equals(user.getRole())) {
@@ -192,7 +204,7 @@ public class DataInitializer implements CommandLineRunner {
                 .orElseThrow(() -> new IllegalStateException("Marque absente: " + code));
     }
 
-    private void upsertUser(String username, String rawPassword, String role, Groupe groupe) {
+    private void upsertUser(String username, String rawPassword, String role, Groupe groupe, Atelier preferredAtelier) {
         boolean isAdmin = "admin".equals(username);
         String email = isAdmin ? "admin@devicemanager.local" : "tech@devicemanager.local";
         String nom = isAdmin ? "Admin" : "Technicien";
@@ -219,6 +231,10 @@ public class DataInitializer implements CommandLineRunner {
                 user.setPrenom(prenom);
                 changed = true;
             }
+            if (user.getPreferredAtelier() == null && preferredAtelier != null) {
+                user.setPreferredAtelier(preferredAtelier);
+                changed = true;
+            }
             if (changed) {
                 userRepository.save(user);
             }
@@ -230,6 +246,7 @@ public class DataInitializer implements CommandLineRunner {
                 .password(passwordEncoder.encode(rawPassword))
                 .role(role)
                 .groupe(groupe)
+                .preferredAtelier(preferredAtelier)
                 .build()));
     }
 }

@@ -34,6 +34,11 @@ interface NewPhotoItem {
   previewUrl: string;
 }
 
+/**
+ * Formulaire de création ou modification d'une pièce détachée.
+ * Gère la capture photo (caméra ou galerie), le rattachement SFM/MAS,
+ * le scan IA d'étiquette et la sauvegarde avec brouillon de retour.
+ */
 @Component({
   selector: 'app-device-form',
   standalone: true,
@@ -75,6 +80,7 @@ export class DeviceFormComponent implements OnInit, AfterViewInit, OnDestroy {
   readonly scanningLabel = signal(false);
   readonly error = signal<string | null>(null);
   readonly aiHint = signal<string | null>(null);
+  readonly associatedMasHint = signal<string | null>(null);
   readonly cameraError = signal<string | null>(null);
   readonly cameraReady = signal(false);
   readonly cameras = signal<MediaDeviceInfo[]>([]);
@@ -122,26 +128,38 @@ export class DeviceFormComponent implements OnInit, AfterViewInit, OnDestroy {
   });
 
   readonly filteredMasses = computed(() => {
+    const all = this.masses();
+    const selectedId = this.selectedMasId();
     const sfmId = this.selectedSfmId();
+    let list: Mas[];
     if (sfmId == null) {
-      return this.masses();
+      list = [...all];
+    } else {
+      const sfm = this.sfms().find((s) => s.id === sfmId);
+      const marqueIds = new Set(sfm?.marqueIds ?? sfm?.marques?.map((m) => m.id) ?? []);
+      list = marqueIds.size === 0 ? [] : all.filter((m) => marqueIds.has(m.marqueId));
     }
-    const sfm = this.sfms().find((s) => s.id === sfmId);
-    const marqueIds = new Set(sfm?.marqueIds ?? sfm?.marques?.map((m) => m.id) ?? []);
-    if (marqueIds.size === 0) {
-      return [] as Mas[];
+    // Toujours conserver la MAS sélectionnée (ex. créée puis associée au retour)
+    if (selectedId != null && !list.some((m) => m.id === selectedId)) {
+      const selected = all.find((m) => m.id === selectedId);
+      if (selected) {
+        list = [selected, ...list];
+      }
     }
-    return this.masses().filter((m) => marqueIds.has(m.marqueId));
+    return list;
   });
 
+  /** Indique si le formulaire est en mode édition. */
   get isEdit(): boolean {
     return this.id !== null;
   }
 
+  /** Longueur actuelle du champ usage (compteur d'affichage). */
   get usageLength(): number {
     return this.form.controls.usage.value?.length ?? 0;
   }
 
+  /** Nombre maximal de photos autorisées par pièce. */
   get maxPhotos(): number {
     return DeviceFormComponent.MAX_PHOTOS;
   }
@@ -258,18 +276,21 @@ export class DeviceFormComponent implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 
+  /** Sauvegarde le brouillon et navigue vers la création d'un SFM. */
   goCreateSfm(): void {
     this.persistDraft();
     this.keepDraftOnDestroy = true;
     this.router.navigate(['/sfm/new'], { queryParams: this.returnDeviceQuery() });
   }
 
+  /** Sauvegarde le brouillon et navigue vers la création d'une MAS. */
   goCreateMas(): void {
     this.persistDraft();
     this.keepDraftOnDestroy = true;
     this.router.navigate(['/mas/new'], { queryParams: this.returnDeviceQuery() });
   }
 
+  /** Libellé affiché pour une source caméra dans la liste déroulante. */
   cameraLabel(device: MediaDeviceInfo, index: number): string {
     if (device.label?.trim()) {
       return device.label;
@@ -277,10 +298,12 @@ export class DeviceFormComponent implements OnInit, AfterViewInit, OnDestroy {
     return `Caméra ${index + 1}`;
   }
 
+  /** URL absolue d'une photo déjà enregistrée. */
   resolveExistingUrl(photo: DevicePhoto): string {
     return this.deviceService.resolvePhotoUrl(photo.photoUrl);
   }
 
+  /** Change la caméra active et redémarre le flux vidéo. */
   async onCameraSourceChange(deviceId: string): Promise<void> {
     if (!deviceId || deviceId === this.selectedCameraId()) {
       return;
@@ -289,6 +312,7 @@ export class DeviceFormComponent implements OnInit, AfterViewInit, OnDestroy {
     await this.startCamera(deviceId);
   }
 
+  /** Démarre ou redémarre le flux caméra pour la capture photo. */
   async startCamera(deviceId?: string | null): Promise<void> {
     if (!this.videoEl) {
       setTimeout(() => void this.startCamera(deviceId), 50);
@@ -359,6 +383,7 @@ export class DeviceFormComponent implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 
+  /** Capture une photo depuis le flux caméra et l'ajoute à la galerie. */
   async capturePhoto(): Promise<void> {
     if (!this.canAddPhoto()) {
       this.error.set(`Maximum ${this.maxPhotos} images par pièce.`);
@@ -429,7 +454,7 @@ export class DeviceFormComponent implements OnInit, AfterViewInit, OnDestroy {
         this.scanningLabel.set(false);
         this.error.set(
           err?.error?.message ||
-            'Scan IA impossible. Vérifiez que l’IA est activée dans Setup (clé API).'
+            'Scan IA impossible. Vérifiez que l’IA est activée dans les paramètres et qu’une clé .env existe pour le fournisseur choisi.'
         );
       }
     });
@@ -493,6 +518,7 @@ export class DeviceFormComponent implements OnInit, AfterViewInit, OnDestroy {
     return new File([blob], `etiquette-${Date.now()}.jpg`, { type: 'image/jpeg' });
   }
 
+  /** Ouvre le sélecteur de fichiers pour ajouter des images depuis la galerie. */
   openGallery(): void {
     if (!this.canAddPhoto()) {
       this.error.set(`Maximum ${this.maxPhotos} images par pièce.`);
@@ -501,6 +527,7 @@ export class DeviceFormComponent implements OnInit, AfterViewInit, OnDestroy {
     this.fileInput?.nativeElement.click();
   }
 
+  /** Traite les fichiers image sélectionnés depuis la galerie. */
   onGallerySelected(event: Event): void {
     const input = event.target as HTMLInputElement;
     const files = Array.from(input.files ?? []);
@@ -518,10 +545,12 @@ export class DeviceFormComponent implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 
+  /** Retire une photo déjà enregistrée de la liste à conserver. */
   removeExistingPhoto(photoId: number): void {
     this.existingPhotos.update((list) => list.filter((p) => p.id !== photoId));
   }
 
+  /** Retire une nouvelle photo non encore enregistrée. */
   removeNewPhoto(index: number): void {
     const list = [...this.newPhotos()];
     const [removed] = list.splice(index, 1);
@@ -531,6 +560,7 @@ export class DeviceFormComponent implements OnInit, AfterViewInit, OnDestroy {
     this.newPhotos.set(list);
   }
 
+  /** Valide et enregistre la pièce (création ou mise à jour). */
   submit(): void {
     if (this.form.invalid) {
       this.form.markAllAsTouched();
@@ -581,11 +611,13 @@ export class DeviceFormComponent implements OnInit, AfterViewInit, OnDestroy {
     });
   }
 
+  /** Réinitialise le formulaire pour saisir une autre pièce après création. */
   addAnotherDevice(): void {
     this.offerAnotherOpen.set(false);
     this.resetFormForAnother();
   }
 
+  /** Termine la création et navigue vers la fiche de la pièce enregistrée. */
   skipAnotherDevice(): void {
     this.offerAnotherOpen.set(false);
     const id = this.savedDeviceId;
@@ -623,6 +655,7 @@ export class DeviceFormComponent implements OnInit, AfterViewInit, OnDestroy {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
+  /** Annule la saisie et retourne à la liste ou à la fiche. */
   cancel(): void {
     this.draftService.clear();
     if (this.forOrderRequest) {
@@ -674,9 +707,11 @@ export class DeviceFormComponent implements OnInit, AfterViewInit, OnDestroy {
     if (masId != null) {
       patch.masId = masId;
       this.selectedMasId.set(masId);
+      this.associatedMasHint.set('MAS associée automatiquement après création.');
     }
     if (Object.keys(patch).length > 0) {
-      this.form.patchValue(patch);
+      // emitEvent:false évite que le changement de SFM efface la MAS nouvellement associée
+      this.form.patchValue(patch, { emitEvent: false });
     }
   }
 

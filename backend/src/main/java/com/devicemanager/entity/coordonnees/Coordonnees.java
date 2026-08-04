@@ -18,6 +18,10 @@ import lombok.Setter;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Ensemble de coordonnées d'un atelier : adresse, e-mails, téléphones et réseaux sociaux.
+ * Entité autonome liée en {@code OneToOne} à {@link com.devicemanager.entity.Atelier}.
+ */
 @Entity
 @Table(name = "coordonnees")
 @Getter

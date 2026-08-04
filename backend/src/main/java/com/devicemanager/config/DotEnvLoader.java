@@ -10,13 +10,25 @@ import java.util.Locale;
 import java.util.Map;
 
 /**
- * Charge backend/.env.development ou backend/.env.production
- * avant le démarrage Spring (secrets hors frontend).
+ * Charge les variables depuis {@code backend/.env.development} ou {@code backend/.env.production}
+ * avant le démarrage Spring Boot, afin de centraliser les secrets hors du frontend.
+ * <p>
+ * Le profil actif est déduit de {@code APP_ENV} ou {@code SPRING_PROFILES_ACTIVE}
+ * ({@code production} si la valeur commence par « prod », sinon {@code development}).
+ * Les clés déjà définies dans l'environnement système ou en propriétés JVM ne sont pas écrasées.
+ * Sur Render ou Docker, l'absence de fichier dotenv est normale : les variables viennent de la plateforme.
  */
 public final class DotEnvLoader {
 
     private DotEnvLoader() {}
 
+    /**
+     * Lit le fichier dotenv adapté au profil, publie les valeurs en propriétés système
+     * (si non déjà présentes) et retourne la map chargée.
+     *
+     * @return map clé/valeur lue depuis le fichier, ou map vide si aucun fichier trouvé
+     * @throws IllegalStateException si le fichier existe mais est illisible
+     */
     public static Map<String, String> load() {
         String profile = resolveProfile();
         String filename = "production".equals(profile) ? ".env.production" : ".env.development";

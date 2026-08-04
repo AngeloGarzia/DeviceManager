@@ -14,6 +14,10 @@ import { SfmService } from '../../services/sfm.service';
 import { MasService } from '../../services/mas.service';
 import { MarqueMasOption, SfmContact, SfmForm } from '../../models/models';
 
+/**
+ * Formulaire de création ou modification d'un SFM (fournisseur de pièces).
+ * Gère les contacts, les marques associées et le retour vers le formulaire pièce.
+ */
 @Component({
   selector: 'app-sfm-form',
   standalone: true,
@@ -60,6 +64,7 @@ export class SfmFormComponent implements OnInit {
     label: ['', [Validators.required, Validators.maxLength(80)]]
   });
 
+  /** Indique si le formulaire est en mode édition. */
   get isEdit(): boolean {
     return this.id !== null;
   }
@@ -101,6 +106,7 @@ export class SfmFormComponent implements OnInit {
     });
   }
 
+  /** Charge la liste des marques disponibles pour le SFM. */
   loadMarques(selectId?: number): void {
     this.masService.listMarques().subscribe({
       next: (data) => {
@@ -122,17 +128,20 @@ export class SfmFormComponent implements OnInit {
     );
   }
 
+  /** Affiche le sous-formulaire de création d'une nouvelle marque. */
   openNewMarque(): void {
     this.showNewMarque.set(true);
     this.marqueError.set(null);
     this.newMarqueForm.reset({ label: '' });
   }
 
+  /** Ferme le sous-formulaire de création de marque. */
   cancelNewMarque(): void {
     this.showNewMarque.set(false);
     this.marqueError.set(null);
   }
 
+  /** Crée une nouvelle marque et l'ajoute à la sélection du SFM. */
   createMarque(): void {
     if (this.newMarqueForm.invalid) {
       this.newMarqueForm.markAllAsTouched();
@@ -154,6 +163,7 @@ export class SfmFormComponent implements OnInit {
     });
   }
 
+  /** Crée un groupe de formulaire pour un contact SFM. */
   createContactGroup(contact?: Partial<SfmContact>) {
     return this.fb.group({
       nom: [contact?.nom || '', [Validators.required, Validators.maxLength(120)]],
@@ -163,10 +173,12 @@ export class SfmFormComponent implements OnInit {
     });
   }
 
+  /** Ajoute une ligne contact au formulaire SFM. */
   addContact(): void {
     this.contacts.push(this.createContactGroup());
   }
 
+  /** Supprime une ligne contact (minimum un contact requis). */
   removeContact(index: number): void {
     if (this.contacts.length <= 1) {
       this.error.set('Un SFM doit avoir au moins un contact.');
@@ -176,6 +188,7 @@ export class SfmFormComponent implements OnInit {
     this.error.set(null);
   }
 
+  /** Valide et enregistre le SFM (création ou mise à jour). */
   submit(): void {
     if (this.form.invalid) {
       this.form.markAllAsTouched();
@@ -209,6 +222,7 @@ export class SfmFormComponent implements OnInit {
     });
   }
 
+  /** Annule la saisie et retourne à la fiche ou à la liste. */
   cancel(): void {
     if (this.returnToDeviceForm()) {
       return;
@@ -217,7 +231,7 @@ export class SfmFormComponent implements OnInit {
   }
 
   private navigateAfterSave(sfmId: number): void {
-    if (this.returnToDeviceForm({ sfmId })) {
+    if (this.returnToDeviceForm({ sfmId: String(sfmId) })) {
       return;
     }
     this.router.navigate(['/sfm', sfmId]);
@@ -227,7 +241,10 @@ export class SfmFormComponent implements OnInit {
     if (!this.returnDevice) {
       return false;
     }
-    const queryParams: Record<string, string | number> = { ...extra };
+    const queryParams: Record<string, string> = {};
+    for (const [key, value] of Object.entries(extra)) {
+      queryParams[key] = String(value);
+    }
     if (this.returnForOrderRequest) {
       queryParams['forOrderRequest'] = '1';
     }

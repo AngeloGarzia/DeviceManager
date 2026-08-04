@@ -16,6 +16,9 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+/**
+ * Numéro de téléphone rattaché à un bloc {@link Coordonnees}.
+ */
 @Entity
 @Table(name = "telephone_coord")
 @Getter
@@ -40,6 +43,7 @@ public class TelephoneCoord {
     @Column(length = 40)
     private String label;
 
+    /** Indique le numéro principal parmi la liste. */
     @Column(nullable = false)
     @Builder.Default
     private boolean principal = false;

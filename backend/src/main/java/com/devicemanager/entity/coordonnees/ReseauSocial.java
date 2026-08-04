@@ -18,6 +18,9 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+/**
+ * Lien vers un réseau social rattaché à un bloc {@link Coordonnees}.
+ */
 @Entity
 @Table(name = "reseau_social")
 @Getter

@@ -35,10 +35,12 @@ class AiAssistantServiceTest {
     @Test
     void status_reportsDisabledWhenFlagOff() {
         when(appSettingsService.getBoolean(AppSettingsService.AI_ENABLED, false)).thenReturn(false);
+        when(appSettingsService.get(AppSettingsService.AI_PROVIDER, "openai")).thenReturn("openai");
+        when(appSettingsService.get(AppSettingsService.AI_MODEL, "gpt-4o-mini")).thenReturn("gpt-4o-mini");
 
         assertThat(aiAssistantService.isEnabled()).isFalse();
         assertThat(aiAssistantService.status().isEnabled()).isFalse();
-        assertThat(aiAssistantService.status().getReply()).contains("désactivé");
+        assertThat(aiAssistantService.status().getReply()).contains("paramètres");
     }
 
     @Test
@@ -57,7 +59,6 @@ class AiAssistantServiceTest {
         when(appSettingsService.getBoolean(AppSettingsService.AI_ENABLED, false)).thenReturn(true);
         when(appSettingsService.get(AppSettingsService.AI_PROVIDER, "openai")).thenReturn("openai");
         when(aiApiKeyBattery.keyFor(anyString())).thenReturn("");
-        when(appSettingsService.get(AppSettingsService.AI_API_KEY, "")).thenReturn("");
 
         assertThatThrownBy(() -> aiAssistantService.chat("Bonjour"))
                 .isInstanceOf(ResponseStatusException.class)
@@ -70,8 +71,7 @@ class AiAssistantServiceTest {
     void status_enabledWhenFlagAndKeyPresent() {
         when(appSettingsService.getBoolean(AppSettingsService.AI_ENABLED, false)).thenReturn(true);
         when(appSettingsService.get(AppSettingsService.AI_PROVIDER, "openai")).thenReturn("openai");
-        when(aiApiKeyBattery.keyFor("openai")).thenReturn("");
-        when(appSettingsService.get(AppSettingsService.AI_API_KEY, "")).thenReturn("sk-test");
+        when(aiApiKeyBattery.keyFor("openai")).thenReturn("sk-test");
         when(appSettingsService.get(AppSettingsService.AI_MODEL, "gpt-4o-mini")).thenReturn("gpt-4o-mini");
 
         assertThat(aiAssistantService.isEnabled()).isTrue();

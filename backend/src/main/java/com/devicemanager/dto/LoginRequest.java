@@ -4,6 +4,9 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
+/**
+ * Requête de connexion utilisateur.
+ */
 @Data
 public class LoginRequest {
 

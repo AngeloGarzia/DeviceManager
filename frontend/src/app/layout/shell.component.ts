@@ -5,11 +5,18 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
+import { MatMenuModule } from '@angular/material/menu';
 import { AuthService } from '../services/auth.service';
 import { OrderRequestService } from '../services/order-request.service';
 import { AiService } from '../services/ai.service';
 
+/**
+ * Coque principale de l'application après connexion.
+ * Affiche la barre de navigation, le sélecteur d'atelier, les badges de commandes
+ * en attente et le conteneur des pages routées.
+ */
 @Component({
   selector: 'app-shell',
   standalone: true,
@@ -22,7 +29,9 @@ import { AiService } from '../services/ai.service';
     MatIconModule,
     MatTooltipModule,
     MatFormFieldModule,
-    MatSelectModule
+    MatInputModule,
+    MatSelectModule,
+    MatMenuModule
   ],
   templateUrl: './shell.component.html',
   styleUrl: './shell.component.scss'
@@ -44,6 +53,7 @@ export class ShellComponent implements OnInit {
     });
   }
 
+  /** Charge le compteur de commandes en attente et le statut IA au démarrage. */
   ngOnInit(): void {
     if (this.auth.getToken()) {
       this.orders.refreshPendingCount();
@@ -51,6 +61,17 @@ export class ShellComponent implements OnInit {
     }
   }
 
+  /** Indique si la section « Pièces détachées » est active dans la barre de navigation. */
+  isDevicesSectionActive(): boolean {
+    return this.router.url.startsWith('/devices');
+  }
+
+  /** Indique si la section « Demandes de commande » est active dans la barre de navigation. */
+  isOrdersSectionActive(): boolean {
+    return this.router.url.startsWith('/order-request');
+  }
+
+  /** Ouvre l'assistant IA si le module est activé. */
   openAiAssistant(): void {
     if (!this.ai.enabled()) {
       return;
@@ -58,6 +79,7 @@ export class ShellComponent implements OnInit {
     void this.router.navigate(['/ai']);
   }
 
+  /** Réinitialise l'état IA et déconnecte l'utilisateur. */
   logout(): void {
     this.ai.reset();
     this.auth.logout();

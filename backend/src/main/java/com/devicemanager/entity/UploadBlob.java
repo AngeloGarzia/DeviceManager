@@ -4,7 +4,8 @@ import jakarta.persistence.*;
 import lombok.*;
 
 /**
- * Contenu binaire des uploads locaux — survit aux redéploiements Render (disque éphémère).
+ * Contenu binaire des uploads locaux.
+ * Permet de conserver les fichiers malgré le disque éphémère de Render.
  */
 @Entity
 @Table(name = "upload_blob")
@@ -15,11 +16,12 @@ import lombok.*;
 @Builder
 public class UploadBlob {
 
+    /** Clé objet correspondant au chemin de stockage (identifiant primaire). */
     @Id
     @Column(name = "object_key", length = 512)
     private String objectKey;
 
-    /** Eager : les LAZY @Lob byte[] sont peu fiables sans enhancement (prod Render). */
+    /** Chargement eager : les {@code @Lob} lazy sur {@code byte[]} sont peu fiables sans enhancement (prod Render). */
     @Lob
     @Column(name = "data", nullable = false, columnDefinition = "LONGBLOB")
     private byte[] data;

@@ -10,6 +10,9 @@ import lombok.Data;
 
 import java.util.List;
 
+/**
+ * Requête de création ou mise à jour d'un SFM (fournisseur).
+ */
 @Data
 public class SfmRequest {
 
@@ -21,11 +24,16 @@ public class SfmRequest {
     @Valid
     private List<SfmContactRequest> contacts;
 
+    /** Identifiants des marques couvertes par ce SFM. */
     @NotEmpty(message = "Sélectionnez au moins une marque")
     private List<@NotNull Long> marqueIds;
 
+    /**
+     * Contact rattaché à un SFM dans une requête de création ou mise à jour.
+     */
     @Data
     public static class SfmContactRequest {
+        /** Identifiant du contact existant (mise à jour) ; absent à la création. */
         private Long id;
 
         @NotBlank
@@ -41,7 +49,7 @@ public class SfmRequest {
         @Size(max = 160)
         private String email;
 
-        /** Défaut true si absent (compat clients anciens). */
+        /** Défaut {@code true} si absent (compatibilité clients anciens). */
         private Boolean receiveOrderMails;
     }
 }

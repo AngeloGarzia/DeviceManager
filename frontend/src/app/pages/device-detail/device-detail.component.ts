@@ -10,6 +10,10 @@ import { DeviceService } from '../../services/device.service';
 import { AuthService } from '../../services/auth.service';
 import { ConfirmDialogComponent } from '../../shared/confirm-dialog.component';
 
+/**
+ * Fiche détaillée d'une pièce détachée.
+ * Affiche les informations, la galerie photos et les actions de modification ou suppression.
+ */
 @Component({
   selector: 'app-device-detail',
   standalone: true,
@@ -50,14 +54,17 @@ export class DeviceDetailComponent implements OnInit {
     });
   }
 
+  /** Ouvre la boîte de dialogue de confirmation de suppression. */
   askDelete(): void {
     this.confirmOpen.set(true);
   }
 
+  /** URL absolue de la photo principale d'une pièce. */
   photoUrl(device: Device): string {
     return this.deviceService.resolvePhotoUrl(device.photoUrl);
   }
 
+  /** Liste des URLs de la galerie photos, triées par position. */
   galleryUrls(device: Device): string[] {
     if (device.photos && device.photos.length > 0) {
       return [...device.photos]
@@ -69,6 +76,7 @@ export class DeviceDetailComponent implements OnInit {
     return primary ? [primary] : [];
   }
 
+  /** Supprime la pièce et retourne à la liste. */
   confirmDelete(): void {
     const current = this.item();
     if (!current) {

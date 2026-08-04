@@ -10,6 +10,10 @@ import { SfmService } from '../../services/sfm.service';
 import { AuthService } from '../../services/auth.service';
 import { ConfirmDialogComponent } from '../../shared/confirm-dialog.component';
 
+/**
+ * Fiche détaillée d'un SFM (fournisseur de pièces).
+ * Affiche contacts, marques associées et actions de modification ou suppression.
+ */
 @Component({
   selector: 'app-sfm-detail',
   standalone: true,
@@ -33,11 +37,14 @@ export class SfmDetailComponent implements OnInit {
       error: () => { this.error.set('SFM introuvable.'); this.loading.set(false); }
     });
   }
+  /** Libellé des marques associées au SFM, séparées par des virgules. */
   marquesLabel(sfm: Sfm): string {
     return sfm.marques?.map((m) => m.label).join(', ') || '—';
   }
 
+  /** Ouvre la boîte de dialogue de confirmation de suppression. */
   askDelete(): void { this.confirmOpen.set(true); }
+  /** Supprime le SFM et retourne à la liste. */
   confirmDelete(): void {
     const current = this.item();
     if (!current) return;

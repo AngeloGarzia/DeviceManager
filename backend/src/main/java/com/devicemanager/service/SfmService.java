@@ -26,6 +26,12 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+/**
+ * Service métier des SFM (fournisseurs de pièces détachées casino).
+ * <p>
+ * CRUD des fournisseurs avec contacts et marques couvertes, filtré par
+ * l'atelier courant ({@code X-Atelier-Id}).
+ */
 @Service
 @RequiredArgsConstructor
 @Transactional
@@ -36,6 +42,12 @@ public class SfmService {
     private final MarqueMasRepository marqueMasRepository;
     private final AtelierService atelierService;
 
+    /**
+     * Liste les SFM de l'atelier courant, avec recherche optionnelle.
+     *
+     * @param q filtre textuel
+     * @return fournisseurs avec contacts et marques
+     */
     @Transactional(readOnly = true)
     public List<SfmResponse> findAll(String q) {
         Long atelierId = atelierService.requireCurrentAtelier().getId();
@@ -46,11 +58,26 @@ public class SfmService {
         return list.stream().map(this::toResponse).toList();
     }
 
+    /**
+     * Retourne un SFM par identifiant dans l'atelier courant.
+     *
+     * @param id identifiant du SFM
+     * @return fiche fournisseur
+     * @throws org.springframework.web.server.ResponseStatusException {@code 404} si introuvable
+     */
     @Transactional(readOnly = true)
     public SfmResponse findById(Long id) {
         return toResponse(getEntity(id));
     }
 
+    /**
+     * Crée un SFM dans l'atelier courant.
+     *
+     * @param request nom, contacts et marques
+     * @return SFM créé
+     * @throws org.springframework.web.server.ResponseStatusException {@code 400} si contacts ou marques manquants ;
+     *         {@code 409} en cas de conflit de nom
+     */
     public SfmResponse create(SfmRequest request) {
         Atelier atelier = atelierService.requireCurrentAtelier();
         String nom = request.getNom().trim();
@@ -73,6 +100,15 @@ public class SfmService {
         return toResponse(saved);
     }
 
+    /**
+     * Met à jour un SFM de l'atelier courant.
+     *
+     * @param id identifiant du SFM
+     * @param request données mises à jour
+     * @return SFM modifié
+     * @throws org.springframework.web.server.ResponseStatusException {@code 404} si introuvable ;
+     *         {@code 409} en cas de conflit de nom
+     */
     public SfmResponse update(Long id, SfmRequest request) {
         Sfm entity = getEntity(id);
         String nom = request.getNom().trim();
@@ -85,11 +121,24 @@ public class SfmService {
         return toResponse(sfmRepository.save(entity));
     }
 
+    /**
+     * Supprime un SFM de l'atelier courant.
+     *
+     * @param id identifiant du SFM
+     * @throws org.springframework.web.server.ResponseStatusException {@code 404} si introuvable
+     */
     public void delete(Long id) {
         Sfm entity = getEntity(id);
         sfmRepository.delete(entity);
     }
 
+    /**
+     * Charge l'entité SFM pour usage interne (ex. liaison pièce détachée).
+     *
+     * @param id identifiant du SFM
+     * @return entité persistée avec contacts et marques
+     * @throws org.springframework.web.server.ResponseStatusException {@code 404} si introuvable dans l'atelier
+     */
     public Sfm getEntity(Long id) {
         Long atelierId = atelierService.requireCurrentAtelier().getId();
         Sfm entity = sfmRepository.findByIdWithContacts(id, atelierId)

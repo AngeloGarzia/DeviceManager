@@ -6,7 +6,7 @@
 
   <header>
     <h1 class="page-title">{{ isEdit ? 'Modifier le compte' : 'Nouveau compte' }}</h1>
-    <p class="page-subtitle">Nom, prénom, e-mail, identifiant, mot de passe et rôle</p>
+    <p class="page-subtitle">Nom, prénom, e-mail, identifiant, mot de passe, rôle et atelier du technicien</p>
   </header>
 
   @if (loading()) {
@@ -50,6 +50,21 @@
               <mat-option value="TECHNICIEN">Technicien</mat-option>
             </mat-select>
           </mat-form-field>
+
+          @if (isTechnicien) {
+            <mat-form-field appearance="outline" class="sm:col-span-2">
+              <mat-label>Atelier préféré</mat-label>
+              <mat-select formControlName="preferredAtelierId">
+                @for (a of ateliers(); track a.id) {
+                  <mat-option [value]="a.id">{{ a.nom || a.label }}</mat-option>
+                }
+              </mat-select>
+              <mat-hint>Le technicien ne pourra travailler que dans cet atelier</mat-hint>
+              @if (form.controls.preferredAtelierId.invalid && form.controls.preferredAtelierId.touched) {
+                <mat-error>Atelier obligatoire pour un technicien</mat-error>
+              }
+            </mat-form-field>
+          }
 
           @if (error()) {
             <p class="sm:col-span-2 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{{ error() }}</p>

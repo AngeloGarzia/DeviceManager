@@ -1,6 +1,5 @@
 package com.devicemanager.service;
 
-import com.devicemanager.ai.AiApiKeyBattery;
 import com.devicemanager.ai.AiProviders;
 import com.devicemanager.dto.AppSettingResponse;
 import com.devicemanager.dto.AppSettingsUpdateRequest;
@@ -17,6 +16,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
+/**
+ * Service de paramètres applicatifs persistés (Setup DeviceManager).
+ * <p>
+ * Initialise et met en cache messagerie, JWT, CORS, stockage et IA.
+ * Global à l'application — indépendant du contexte atelier ({@code X-Atelier-Id}).
+ */
 @Service
 @RequiredArgsConstructor
 @Transactional
@@ -41,7 +46,6 @@ public class AppSettingsService {
     public static final String AI_MODEL = "AI_MODEL";
 
     private final AppSettingRepository appSettingRepository;
-    private final AiApiKeyBattery aiApiKeyBattery;
     private final Map<String, String> cache = new ConcurrentHashMap<>();
 
     @Value("${app.mail.enabled:false}")
@@ -95,6 +99,9 @@ public class AppSettingsService {
     @Value("${OPENAI_CHAT_MODEL:gpt-4o-mini}")
     private String legacyOpenAiChatModel;
 
+    /**
+     * Initialise les paramètres manquants en base et recharge le cache au démarrage.
+     */
     @PostConstruct
     public void initDefaults() {
         ensure(MAIL_ENABLED, defaultMailEnabled, "Activer l'envoi d'emails", "Messagerie", false);
@@ -113,13 +120,11 @@ public class AppSettingsService {
 
         String provider = AiProviders.normalizeProvider(defaultAiProvider);
         String model = firstNonBlank(defaultAiModel, legacyOpenAiChatModel, AiProviders.defaultModel(provider));
-        String seedApiKey = aiApiKeyBattery.seedKey(provider);
 
         ensure(AI_ENABLED, defaultAiEnabled, "Activer l'assistant IA", "Intelligence artificielle", false);
         ensure(AI_PROVIDER, provider, "Fournisseur IA", "Intelligence artificielle", false);
         ensure(AI_MODEL, model, "Modèle IA", "Intelligence artificielle", false);
-        ensure(AI_API_KEY, seedApiKey,
-                "Clé API (optionnel si batterie .env du fournisseur)", "Intelligence artificielle", true);
+        // Clés API : uniquement batterie .env (GEMINI_API_KEY, OPENAI_API_KEY, …) — pas exposées dans Setup
         reloadCache();
     }
 
@@ -135,13 +140,25 @@ public class AppSettingsService {
         return "";
     }
 
+    /**
+     * Liste tous les paramètres (clé API IA exclue, secrets masqués).
+     *
+     * @return réglages triés par catégorie et libellé
+     */
     @Transactional(readOnly = true)
     public List<AppSettingResponse> list() {
         return appSettingRepository.findAllByOrderByCategoryAscLabelAsc().stream()
+                .filter(s -> !AI_API_KEY.equals(s.getSettingKey()))
                 .map(this::toResponse)
                 .toList();
     }
 
+    /**
+     * Met à jour les valeurs fournies et retourne la liste actualisée.
+     *
+     * @param request mappe clé → nouvelle valeur
+     * @return paramètres après mise à jour
+     */
     public List<AppSettingResponse> update(AppSettingsUpdateRequest request) {
         Map<String, String> values = request.getValues() == null ? Map.of() : request.getValues();
         for (Map.Entry<String, String> entry : values.entrySet()) {
@@ -160,6 +177,13 @@ public class AppSettingsService {
         return list();
     }
 
+    /**
+     * Lit une valeur textuelle depuis le cache (avec repli).
+     *
+     * @param key clé du paramètre
+     * @param fallback valeur par défaut si absente ou vide
+     * @return valeur effective
+     */
     public String get(String key, String fallback) {
         String value = cache.get(key);
         if (value == null || value.isBlank()) {
@@ -168,6 +192,13 @@ public class AppSettingsService {
         return value;
     }
 
+    /**
+     * Lit un booléen depuis le cache ({@code true}, {@code 1}, {@code yes} acceptés).
+     *
+     * @param key clé du paramètre
+     * @param fallback valeur par défaut si absente
+     * @return valeur booléenne interprétée
+     */
     public boolean getBoolean(String key, boolean fallback) {
         String value = get(key, null);
         if (value == null || value.isBlank()) {
@@ -176,6 +207,13 @@ public class AppSettingsService {
         return Boolean.parseBoolean(value) || "1".equals(value) || "yes".equalsIgnoreCase(value);
     }
 
+    /**
+     * Lit un entier long depuis le cache.
+     *
+     * @param key clé du paramètre
+     * @param fallback valeur par défaut si absente ou non numérique
+     * @return valeur numérique
+     */
     public long getLong(String key, long fallback) {
         try {
             return Long.parseLong(get(key, String.valueOf(fallback)));

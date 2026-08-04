@@ -4,6 +4,7 @@ import com.devicemanager.entity.Atelier;
 import com.devicemanager.entity.User;
 import com.devicemanager.repository.AtelierRepository;
 import com.devicemanager.repository.UserRepository;
+import com.devicemanager.security.Roles;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -18,10 +19,27 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.io.IOException;
 
+/**
+ * Filtre de multi-location (tenancy) par atelier, exécuté après l'authentification JWT.
+ * <p>
+ * Le frontend envoie l'atelier actif via l'en-tête HTTP {@value #HEADER}. Lorsque cet en-tête
+ * est présent et que l'utilisateur est authentifié :
+ * <ul>
+ *   <li>l'atelier est chargé et vérifié (existence, appartenance au même groupe que l'utilisateur) ;</li>
+ *   <li>les techniciens ne peuvent sélectionner que leur atelier préféré ({@code preferredAtelier}) ;</li>
+ *   <li>l'identifiant est exposé aux services via {@link AtelierContext} pour la durée de la requête.</li>
+ * </ul>
+ * Sans en-tête, la requête continue sans contexte d'atelier (certains endpoints peuvent exiger
+ * {@link AtelierContext#require()} en aval).
+ * <p>
+ * Ignoré pour {@code /api/auth/**} et {@code /uploads/**}. En fin de requête, le contexte
+ * thread-local est toujours nettoyé dans un bloc {@code finally}.
+ */
 @Component
 @RequiredArgsConstructor
 public class AtelierContextFilter extends OncePerRequestFilter {
 
+    /** Nom de l'en-tête HTTP portant l'identifiant numérique de l'atelier sélectionné. */
     public static final String HEADER = "X-Atelier-Id";
 
     private final AtelierRepository atelierRepository;
@@ -54,6 +72,13 @@ public class AtelierContextFilter extends OncePerRequestFilter {
                             || !user.getGroupe().getId().equals(atelier.getCasino().getGroupe().getId())) {
                         throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Atelier non autorisé pour ce compte");
                     }
+                    if (isTechnicien(user.getRole())) {
+                        Atelier preferred = user.getPreferredAtelier();
+                        if (preferred == null || !preferred.getId().equals(atelierId)) {
+                            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                                    "Les techniciens sont limités à leur atelier préféré");
+                        }
+                    }
                     AtelierContext.set(atelierId);
                 }
             }
@@ -69,5 +94,9 @@ public class AtelierContextFilter extends OncePerRequestFilter {
         } finally {
             AtelierContext.clear();
         }
+    }
+
+    private static boolean isTechnicien(String role) {
+        return Roles.TECHNICIEN.equals(role) || "TECH".equals(role);
     }
 }

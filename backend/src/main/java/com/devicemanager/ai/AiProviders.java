@@ -6,10 +6,21 @@ import java.util.Locale;
 import java.util.Optional;
 
 /**
- * Fournisseurs compatibles OpenAI (baseUrl + modèles courants).
+ * Catalogue des fournisseurs IA compatibles API OpenAI (URL de base et modèles supportés).
+ * <p>
+ * Utilisé pour la configuration du chat, le scan d'étiquettes et l'exposition des options
+ * disponibles au frontend.
  */
 public final class AiProviders {
 
+    /**
+     * Métadonnées d'un fournisseur IA (identifiant, libellé, URL de base, modèles).
+     *
+     * @param id      identifiant normalisé (ex. {@code openai}, {@code gemini})
+     * @param label   libellé affiché à l'utilisateur
+     * @param baseUrl URL de base compatible OpenAI
+     * @param models  modèles proposés pour ce fournisseur
+     */
     public record Provider(
             String id,
             String label,
@@ -18,6 +29,13 @@ public final class AiProviders {
     ) {
     }
 
+    /**
+     * Modèle IA proposé par un fournisseur.
+     *
+     * @param id     identifiant technique du modèle
+     * @param label  libellé affiché
+     * @param vision {@code true} si le modèle accepte des entrées image
+     */
     public record Model(String id, String label, boolean vision) {
     }
 
@@ -45,12 +63,11 @@ public final class AiProviders {
             new Provider("groq", "Groq", "https://api.groq.com/openai", List.of(
                     new Model("llama-3.3-70b-versatile", "Llama 3.3 70B Versatile", false),
                     new Model("llama-3.1-8b-instant", "Llama 3.1 8B Instant", false),
-                    new Model("llama-3.1-70b-versatile", "Llama 3.1 70B Versatile", false),
-                    new Model("gemma2-9b-it", "Gemma2 9B IT", false),
-                    new Model("mixtral-8x7b-32768", "Mixtral 8x7B", false),
-                    new Model("qwen/qwen3-32b", "Qwen3 32B", false),
-                    new Model("meta-llama/llama-4-scout-17b-16e-instruct", "Llama 4 Scout (vision)", true),
-                    new Model("meta-llama/llama-4-maverick-17b-128e-instruct", "Llama 4 Maverick (vision)", true)
+                    new Model("openai/gpt-oss-120b", "GPT-OSS 120B", false),
+                    new Model("openai/gpt-oss-20b", "GPT-OSS 20B", false),
+                    new Model("qwen/qwen3.6-27b", "Qwen3.6 27B", false),
+                    new Model("groq/compound", "Groq Compound", false)
+                    // Pas de modèle vision sur la plupart des comptes Groq (Llama 4 Scout souvent indisponible)
             )),
             new Provider("mistral", "Mistral AI", "https://api.mistral.ai", List.of(
                     new Model("mistral-small-latest", "Mistral Small", false),
@@ -95,10 +112,17 @@ public final class AiProviders {
     private AiProviders() {
     }
 
+    /** @return liste immuable de tous les fournisseurs configurés */
     public static List<Provider> all() {
         return ALL;
     }
 
+    /**
+     * Recherche un fournisseur par identifiant ; retourne le premier si l'identifiant est vide.
+     *
+     * @param id identifiant du fournisseur (insensible à la casse)
+     * @return fournisseur correspondant, ou le premier de la liste par défaut
+     */
     public static Optional<Provider> find(String id) {
         if (id == null || id.isBlank()) {
             return Optional.of(ALL.getFirst());
@@ -107,15 +131,34 @@ public final class AiProviders {
         return ALL.stream().filter(p -> p.id().equals(key)).findFirst();
     }
 
+    /**
+     * Retourne le fournisseur demandé, ou le premier disponible en secours.
+     *
+     * @param id identifiant du fournisseur
+     * @return fournisseur résolu (jamais vide grâce au fallback)
+     */
     public static Provider require(String id) {
         return find(id).orElse(ALL.getFirst());
     }
 
+    /**
+     * Modèle par défaut pour un fournisseur (premier de la liste, ou {@code gpt-4o-mini}).
+     *
+     * @param providerId identifiant du fournisseur
+     * @return identifiant de modèle par défaut
+     */
     public static String defaultModel(String providerId) {
         Provider p = require(providerId);
         return p.models().isEmpty() ? "gpt-4o-mini" : p.models().getFirst().id();
     }
 
+    /**
+     * Indique si le modèle accepte des entrées visuelles (catalogue ou heuristique sur le nom).
+     *
+     * @param providerId identifiant du fournisseur
+     * @param modelId    identifiant du modèle
+     * @return {@code true} si la vision est supportée
+     */
     public static boolean supportsVision(String providerId, String modelId) {
         return find(providerId)
                 .flatMap(p -> p.models().stream().filter(m -> m.id().equals(modelId)).findFirst())
@@ -127,6 +170,12 @@ public final class AiProviders {
                 });
     }
 
+    /**
+     * Premier modèle vision disponible pour le fournisseur, ou {@code null} si aucun.
+     *
+     * @param providerId identifiant du fournisseur
+     * @return identifiant d'un modèle vision, ou {@code null}
+     */
     public static String visionFallbackModel(String providerId) {
         Provider p = require(providerId);
         return p.models().stream()
@@ -136,14 +185,25 @@ public final class AiProviders {
                 .orElse(null);
     }
 
+    /**
+     * @param id identifiant du fournisseur
+     * @return {@code true} si le fournisseur figure dans le catalogue
+     */
     public static boolean isKnownProvider(String id) {
         return find(id).isPresent();
     }
 
+    /** @return identifiants de tous les fournisseurs du catalogue */
     public static List<String> providerIds() {
         return ALL.stream().map(Provider::id).toList();
     }
 
+    /**
+     * Vérifie si un modèle existe dans au moins un fournisseur du catalogue.
+     *
+     * @param modelId identifiant du modèle
+     * @return {@code true} si le modèle est connu
+     */
     public static boolean isKnownModelAcrossProviders(String modelId) {
         if (modelId == null || modelId.isBlank()) {
             return false;
@@ -151,6 +211,12 @@ public final class AiProviders {
         return ALL.stream().anyMatch(p -> p.models().stream().anyMatch(m -> m.id().equals(modelId.trim())));
     }
 
+    /**
+     * Déduit le fournisseur à partir de l'identifiant d'un modèle connu.
+     *
+     * @param modelId identifiant du modèle
+     * @return identifiant du fournisseur, ou vide si le modèle est inconnu
+     */
     public static Optional<String> inferProviderFromModel(String modelId) {
         if (modelId == null || modelId.isBlank()) {
             return Optional.empty();
@@ -162,6 +228,12 @@ public final class AiProviders {
                 .findFirst();
     }
 
+    /**
+     * Normalise un identifiant de fournisseur ; retourne {@code openai} si inconnu ou vide.
+     *
+     * @param raw identifiant brut saisi ou lu en configuration
+     * @return identifiant normalisé en minuscules
+     */
     public static String normalizeProvider(String raw) {
         if (raw == null || raw.isBlank()) {
             return "openai";

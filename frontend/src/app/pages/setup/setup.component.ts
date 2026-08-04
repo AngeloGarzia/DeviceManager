@@ -32,6 +32,11 @@ import { AuthService } from '../../services/auth.service';
 import { AiService } from '../../services/ai.service';
 import { ConfirmDialogComponent } from '../../shared/confirm-dialog.component';
 
+/**
+ * Page d'administration initiale et des paramètres applicatifs.
+ * Permet la configuration mail, S3, IA, la gestion des ateliers
+ * et l'accès réservé aux administrateurs.
+ */
 @Component({
   selector: 'app-setup',
   standalone: true,
@@ -55,7 +60,7 @@ import { ConfirmDialogComponent } from '../../shared/confirm-dialog.component';
 export class SetupComponent implements OnInit {
   private readonly setupService = inject(SetupService);
   private readonly atelierService = inject(AtelierService);
-  private readonly aiService = inject(AiService);
+  readonly aiService = inject(AiService);
   readonly auth = inject(AuthService);
   private readonly fb = inject(FormBuilder);
 
@@ -139,12 +144,10 @@ export class SetupComponent implements OnInit {
       models: [
         { value: 'llama-3.3-70b-versatile', label: 'Llama 3.3 70B Versatile' },
         { value: 'llama-3.1-8b-instant', label: 'Llama 3.1 8B Instant' },
-        { value: 'llama-3.1-70b-versatile', label: 'Llama 3.1 70B Versatile' },
-        { value: 'gemma2-9b-it', label: 'Gemma2 9B IT' },
-        { value: 'mixtral-8x7b-32768', label: 'Mixtral 8x7B' },
-        { value: 'qwen/qwen3-32b', label: 'Qwen3 32B' },
-        { value: 'meta-llama/llama-4-scout-17b-16e-instruct', label: 'Llama 4 Scout (vision)' },
-        { value: 'meta-llama/llama-4-maverick-17b-128e-instruct', label: 'Llama 4 Maverick (vision)' }
+        { value: 'openai/gpt-oss-120b', label: 'GPT-OSS 120B' },
+        { value: 'openai/gpt-oss-20b', label: 'GPT-OSS 20B' },
+        { value: 'qwen/qwen3.6-27b', label: 'Qwen3.6 27B' },
+        { value: 'groq/compound', label: 'Groq Compound' }
       ]
     },
     {
@@ -221,12 +224,17 @@ export class SetupComponent implements OnInit {
   readonly categories = computed(() => {
     const map = new Map<string, AppSetting[]>();
     for (const item of this.settings()) {
+      if (item.key === 'AI_API_KEY') {
+        continue;
+      }
       const list = map.get(item.category) ?? [];
       list.push(item);
       map.set(item.category, list);
     }
     return [...map.entries()];
   });
+
+  providersKeyStatusReady = computed(() => Object.keys(this.aiService.providerKeyStatus()).length > 0);
 
   readonly atelierFormTitle = computed(() =>
     this.editingAtelierId() == null ? 'Nouvel atelier' : 'Modifier l’atelier'
@@ -244,11 +252,14 @@ export class SetupComponent implements OnInit {
     return this.atelierForm.get('reseauxSociaux') as FormArray;
   }
 
+  /** Charge les paramètres applicatifs et initialise les ateliers. */
   ngOnInit(): void {
+    this.aiService.refreshStatus();
     this.load();
     this.loadAteliers();
   }
 
+  /** Charge la liste des paramètres depuis l'API. */
   load(): void {
     this.loading.set(true);
     this.error.set(null);
@@ -283,6 +294,7 @@ export class SetupComponent implements OnInit {
     });
   }
 
+  /** Charge ateliers, casinos et utilisateurs responsables. */
   loadAteliers(): void {
     this.ateliersLoading.set(true);
     this.atelierError.set(null);
@@ -310,40 +322,67 @@ export class SetupComponent implements OnInit {
     });
   }
 
+  /** Retourne le contrôle de formulaire associé à une clé de paramètre. */
   control(key: string): FormControl<string> {
     return this.form.get(key) as FormControl<string>;
   }
 
+  /** Indique si le paramètre est un booléen (toggle). */
   isBooleanSetting(key: string): boolean {
     return key === 'MAIL_ENABLED' || key === 'S3_ENABLED' || key === 'AI_ENABLED';
   }
 
+  /** Indique si le paramètre correspond au choix du fournisseur IA. */
   isAiProviderSetting(key: string): boolean {
     return key === 'AI_PROVIDER';
   }
 
+  /** Indique si le paramètre correspond au choix du modèle IA. */
   isAiModelSetting(key: string): boolean {
     return key === 'AI_MODEL';
   }
 
+  /** Vérifie si une clé API est configurée pour le fournisseur IA donné. */
+  hasAiProviderKey(providerId: string): boolean {
+    if (!this.aiService.statusLoaded()) {
+      return true;
+    }
+    return this.aiService.hasProviderKey(providerId);
+  }
+
+  /** Libellé d'option fournisseur IA, avec mention si la clé est absente. */
+  aiProviderOptionLabel(provider: { id: string; label: string }): string {
+    if (!this.aiService.statusLoaded()) {
+      return provider.label;
+    }
+    return this.hasAiProviderKey(provider.id)
+      ? provider.label
+      : `${provider.label} (clé absente)`;
+  }
+
+  /** Indique si le modèle IA sélectionné n'est pas dans la liste prédéfinie. */
   isCustomAiModel(key: string): boolean {
     const value = this.control(key)?.value;
     return !!value && !this.aiModelsForProvider().some((m) => m.value === value);
   }
 
+  /** Interprète la valeur textuelle d'un paramètre booléen. */
   booleanValue(key: string): boolean {
     const value = this.control(key)?.value ?? '';
     return value === 'true' || value === '1' || value.toLowerCase() === 'yes';
   }
 
+  /** Met à jour un paramètre booléen sous forme de chaîne « true » / « false ». */
   toggleBoolean(key: string, checked: boolean): void {
     this.control(key)?.setValue(checked ? 'true' : 'false');
   }
 
+  /** Ajoute une ligne e-mail au formulaire atelier. */
   addEmail(): void {
     this.emails.push(this.newEmailGroup());
   }
 
+  /** Supprime ou réinitialise une ligne e-mail du formulaire atelier. */
   removeEmail(index: number): void {
     if (this.emails.length <= 1) {
       this.emails.at(index).reset({ valeur: '', principal: true });
@@ -352,10 +391,12 @@ export class SetupComponent implements OnInit {
     this.emails.removeAt(index);
   }
 
+  /** Ajoute une ligne téléphone au formulaire atelier. */
   addTelephone(): void {
     this.telephones.push(this.newTelephoneGroup());
   }
 
+  /** Supprime ou réinitialise une ligne téléphone du formulaire atelier. */
   removeTelephone(index: number): void {
     if (this.telephones.length <= 1) {
       this.telephones.at(index).reset({ valeur: '', label: '', principal: true });
@@ -364,19 +405,23 @@ export class SetupComponent implements OnInit {
     this.telephones.removeAt(index);
   }
 
+  /** Ajoute un réseau social au formulaire atelier. */
   addReseau(): void {
     this.reseauxSociaux.push(this.newReseauGroup());
   }
 
+  /** Supprime un réseau social du formulaire atelier. */
   removeReseau(index: number): void {
     this.reseauxSociaux.removeAt(index);
   }
 
+  /** Libellé affiché pour un responsable d'atelier dans la liste de sélection. */
   responsableLabel(user: AtelierResponsable): string {
     const name = `${user.prenom || ''} ${user.nom || ''}`.trim();
     return name ? `${name} (${user.username})` : user.username;
   }
 
+  /** Passe en mode création d'un nouvel atelier. */
   startCreateAtelier(): void {
     this.editingAtelierId.set(null);
     this.atelierSuccess.set(null);
@@ -384,6 +429,7 @@ export class SetupComponent implements OnInit {
     this.resetAtelierForm();
   }
 
+  /** Charge un atelier existant dans le formulaire pour édition. */
   startEditAtelier(item: AtelierSummary): void {
     this.editingAtelierId.set(item.id);
     this.atelierSuccess.set(null);
@@ -416,10 +462,12 @@ export class SetupComponent implements OnInit {
     });
   }
 
+  /** Annule l'édition et réinitialise le formulaire atelier. */
   cancelAtelierEdit(): void {
     this.startCreateAtelier();
   }
 
+  /** Enregistre un atelier (création ou mise à jour). */
   saveAtelier(): void {
     if (this.atelierForm.invalid) {
       this.atelierForm.markAllAsTouched();
@@ -474,12 +522,14 @@ export class SetupComponent implements OnInit {
     });
   }
 
+  /** Ouvre la boîte de dialogue de confirmation de suppression d'atelier. */
   askDeleteAtelier(item: AtelierSummary): void {
     this.pendingDelete = item;
     this.pendingDeleteNom.set(item.nom);
     this.confirmDeleteOpen.set(true);
   }
 
+  /** Supprime l'atelier en attente après confirmation. */
   confirmDeleteAtelier(): void {
     const item = this.pendingDelete;
     this.confirmDeleteOpen.set(false);
@@ -507,12 +557,14 @@ export class SetupComponent implements OnInit {
     });
   }
 
+  /** Annule la suppression d'atelier en cours. */
   cancelDeleteAtelier(): void {
     this.confirmDeleteOpen.set(false);
     this.pendingDelete = null;
     this.pendingDeleteNom.set('');
   }
 
+  /** Enregistre l'ensemble des paramètres applicatifs. */
   submit(): void {
     this.saving.set(true);
     this.error.set(null);
@@ -536,6 +588,7 @@ export class SetupComponent implements OnInit {
     });
   }
 
+  /** Sauvegarde les paramètres puis envoie un e-mail de test. */
   testMail(): void {
     this.testingMail.set(true);
     this.error.set(null);

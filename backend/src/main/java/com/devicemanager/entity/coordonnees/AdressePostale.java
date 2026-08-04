@@ -8,6 +8,10 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+/**
+ * Adresse postale embarquée (composant {@code @Embeddable}).
+ * Utilisée dans {@link Coordonnees} pour structurer l'adresse d'un atelier.
+ */
 @Embeddable
 @Getter
 @Setter

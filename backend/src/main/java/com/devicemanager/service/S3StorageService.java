@@ -12,6 +12,12 @@ import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import java.io.IOException;
 import java.util.UUID;
 
+/**
+ * Stockage S3 des photos de pièces détachées DeviceManager.
+ * <p>
+ * Active lorsque {@code app.s3.enabled=true} ; remplace le stockage local
+ * pour les déploiements cloud multi-instances.
+ */
 @Service
 @ConditionalOnProperty(name = "app.s3.enabled", havingValue = "true")
 public class S3StorageService implements StorageService {
@@ -20,6 +26,11 @@ public class S3StorageService implements StorageService {
     private final String bucket;
     private final String region;
 
+    /**
+     * @param s3Client client AWS SDK configuré
+     * @param bucket nom du bucket S3
+     * @param region région AWS du bucket
+     */
     public S3StorageService(
             S3Client s3Client,
             @Value("${app.s3.bucket}") String bucket,
@@ -29,6 +40,13 @@ public class S3StorageService implements StorageService {
         this.region = region;
     }
 
+    /**
+     * Upload un fichier vers S3 sous le préfixe {@code spare-parts/}.
+     *
+     * @param file fichier multipart
+     * @return clé S3, URL HTTPS publique et métadonnées
+     * @throws IllegalStateException en cas d'échec d'upload
+     */
     @Override
     public StoredObject store(MultipartFile file) {
         String key = "spare-parts/" + UUID.randomUUID() + "-" + sanitize(file.getOriginalFilename());
@@ -46,6 +64,11 @@ public class S3StorageService implements StorageService {
         }
     }
 
+    /**
+     * Supprime un objet du bucket S3.
+     *
+     * @param key clé S3 de l'objet
+     */
     @Override
     public void delete(String key) {
         s3Client.deleteObject(DeleteObjectRequest.builder().bucket(bucket).key(key).build());

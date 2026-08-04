@@ -1,5 +1,6 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatIconModule } from '@angular/material/icon';
@@ -9,11 +10,16 @@ import { MailPreviewItem, OrderRequestService } from '../../services/order-reque
 import { AuthService } from '../../services/auth.service';
 import { ConfirmDialogComponent } from '../../shared/confirm-dialog.component';
 
+/**
+ * Liste des demandes de commande de pièces détachées.
+ * Permet la validation (admin), l'aperçu des e-mails et la suppression en deux étapes.
+ */
 @Component({
   selector: 'app-order-request-list',
   standalone: true,
   imports: [
     CommonModule,
+    RouterLink,
     MatButtonModule,
     MatCardModule,
     MatIconModule,
@@ -44,6 +50,7 @@ export class OrderRequestListComponent implements OnInit {
     this.load();
   }
 
+  /** Charge les demandes de commande de l'atelier courant. */
   load(): void {
     this.loading.set(true);
     this.error.set(null);
@@ -60,10 +67,12 @@ export class OrderRequestListComponent implements OnInit {
     });
   }
 
+  /** Indique si la demande est en attente de validation. */
   isPending(status: string): boolean {
     return status === 'PENDING' || status === 'SENT';
   }
 
+  /** Libellé français du statut de demande. */
   statusLabel(status: string): string {
     if (status === 'VALIDATED') {
       return 'Validée';
@@ -74,6 +83,7 @@ export class OrderRequestListComponent implements OnInit {
     return status;
   }
 
+  /** Affiche ou masque l'aperçu des e-mails de validation pour une demande. */
   toggleMailPreview(item: OrderRequest): void {
     if (!this.auth.isAdmin()) {
       return;
@@ -99,6 +109,7 @@ export class OrderRequestListComponent implements OnInit {
     });
   }
 
+  /** Valide une demande en attente et envoie les e-mails aux SFM. */
   validate(item: OrderRequest): void {
     if (!this.auth.isAdmin() || !this.isPending(item.status)) {
       return;
@@ -126,6 +137,7 @@ export class OrderRequestListComponent implements OnInit {
     });
   }
 
+  /** Ouvre la première étape de confirmation de suppression. */
   askDelete(item: OrderRequest): void {
     if (!this.auth.isAdmin()) {
       return;
@@ -135,12 +147,14 @@ export class OrderRequestListComponent implements OnInit {
     this.confirmOpen.set(true);
   }
 
+  /** Annule la suppression en cours et réinitialise l'étape. */
   cancelDelete(): void {
     this.pendingDelete = null;
     this.confirmStep.set(1);
     this.confirmOpen.set(false);
   }
 
+  /** Passe à la confirmation définitive ou supprime la demande. */
   confirmDelete(): void {
     if (!this.pendingDelete) {
       this.cancelDelete();
@@ -177,12 +191,14 @@ export class OrderRequestListComponent implements OnInit {
     });
   }
 
+  /** Titre de la boîte de dialogue selon l'étape de confirmation. */
   confirmTitle(): string {
     return this.confirmStep() === 1
       ? 'Supprimer la demande'
       : 'Confirmation définitive';
   }
 
+  /** Message de la boîte de dialogue selon l'étape de confirmation. */
   confirmMessage(): string {
     const id = this.pendingDelete?.id;
     if (this.confirmStep() === 1) {
@@ -195,6 +211,7 @@ export class OrderRequestListComponent implements OnInit {
       : 'Dernière confirmation : cette demande sera définitivement supprimée. Cette action est irréversible.';
   }
 
+  /** Libellé du bouton de confirmation selon l'étape. */
   confirmLabel(): string {
     return this.confirmStep() === 1 ? 'Continuer' : 'Supprimer définitivement';
   }

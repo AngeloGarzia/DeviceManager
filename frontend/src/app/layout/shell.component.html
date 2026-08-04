@@ -3,7 +3,9 @@
     <div class="flex w-full flex-wrap items-center justify-between gap-2 sm:gap-3">
       <div class="flex min-w-0 flex-1 flex-wrap items-center gap-2 sm:gap-3">
         <div class="min-w-0 shrink">
-          <div class="text-base font-semibold tracking-tight text-brand">DeviceManager</div>
+          <a routerLink="/devices" class="block text-base font-semibold tracking-tight text-brand no-underline hover:opacity-80">
+            DeviceManager
+          </a>
           <div class="truncate text-xs text-ink-soft">
             {{ auth.displayName() }} · {{ auth.roleLabel() }}
             @if (auth.groupeNom()) {
@@ -15,14 +17,22 @@
         @if (auth.ateliers().length > 0) {
           <mat-form-field appearance="outline" class="atelier-select" subscriptSizing="dynamic">
             <mat-label>Atelier</mat-label>
-            <mat-select
-              [value]="auth.atelierId()"
-              (selectionChange)="auth.switchAtelier($event.value)"
-            >
-              @for (a of auth.ateliers(); track a.id) {
-                <mat-option [value]="a.id">{{ a.nom || a.label }}</mat-option>
-              }
-            </mat-select>
+            @if (auth.isAdmin()) {
+              <mat-select
+                [value]="auth.atelierId()"
+                (selectionChange)="auth.switchAtelier($event.value)"
+              >
+                @for (a of auth.ateliers(); track a.id) {
+                  <mat-option [value]="a.id">{{ a.nom || a.label }}</mat-option>
+                }
+              </mat-select>
+            } @else {
+              <input
+                matInput
+                readonly
+                [value]="auth.currentAtelier()?.nom || auth.currentAtelier()?.label || ''"
+              />
+            }
           </mat-form-field>
         }
       </div>
@@ -43,7 +53,7 @@
           <a mat-icon-button routerLink="/users" routerLinkActive="admin-active" matTooltip="Comptes">
             <mat-icon>manage_accounts</mat-icon>
           </a>
-          <a mat-icon-button routerLink="/setup" routerLinkActive="admin-active" matTooltip="Setup">
+          <a mat-icon-button routerLink="/setup" routerLinkActive="admin-active" matTooltip="Paramètres">
             <mat-icon>settings</mat-icon>
           </a>
         }
@@ -74,37 +84,59 @@
     aria-label="Navigation principale"
   >
     <div class="nav-grid">
-      <a
-        routerLink="/devices"
-        routerLinkActive="active-nav"
-        [routerLinkActiveOptions]="{ exact: false }"
+      <button
+        type="button"
         class="nav-link"
+        [class.active-nav]="isDevicesSectionActive()"
+        [matMenuTriggerFor]="devicesMenu"
+        aria-label="Pièces"
+        aria-haspopup="menu"
       >
         <mat-icon>build</mat-icon>
         <span>Pièces</span>
-      </a>
+      </button>
+      <mat-menu #devicesMenu="matMenu" class="devices-nav-menu">
+        <a mat-menu-item routerLink="/devices/new" routerLinkActive="devices-menu-active">
+          <mat-icon>add_circle</mat-icon>
+          <span>Créer une nouvelle pièce</span>
+        </a>
+        <a mat-menu-item routerLink="/devices/stock" routerLinkActive="devices-menu-active">
+          <mat-icon>inventory_2</mat-icon>
+          <span>Éditer le stock des pièces détachées</span>
+        </a>
+      </mat-menu>
 
-      <a routerLink="/order-request" routerLinkActive="active-nav" class="nav-link" aria-label="Demande de commande">
-        <mat-icon>mail</mat-icon>
-        <span>Demande de commande</span>
-      </a>
-
-      <a
-        routerLink="/order-requests"
-        routerLinkActive="active-nav"
+      <button
+        type="button"
         class="nav-link nav-link--badge"
-        aria-label="Demande en cours"
+        [class.active-nav]="isOrdersSectionActive()"
+        [matMenuTriggerFor]="ordersMenu"
+        aria-label="Commandes"
+        aria-haspopup="menu"
       >
         <span class="nav-icon-wrap">
-          <mat-icon>inbox</mat-icon>
+          <mat-icon>shopping_cart</mat-icon>
           @if (orders.pendingCount() > 0) {
             <span class="pending-badge" [attr.aria-label]="orders.pendingCount() + ' demande(s) en attente'">
               {{ orders.pendingCount() > 99 ? '99+' : orders.pendingCount() }}
             </span>
           }
         </span>
-        <span [class.pending-label-blink]="orders.pendingCount() > 0">Demande en cours</span>
-      </a>
+        <span [class.pending-label-blink]="orders.pendingCount() > 0">Commandes</span>
+      </button>
+      <mat-menu #ordersMenu="matMenu" class="orders-nav-menu">
+        <a mat-menu-item routerLink="/order-request" routerLinkActive="orders-menu-active">
+          <mat-icon>mail</mat-icon>
+          <span>Nouvelle demande</span>
+        </a>
+        <a mat-menu-item routerLink="/order-requests" routerLinkActive="orders-menu-active">
+          <mat-icon>inbox</mat-icon>
+          <span>Demandes en cours</span>
+          @if (orders.pendingCount() > 0) {
+            <span class="orders-menu-count">{{ orders.pendingCount() > 99 ? '99+' : orders.pendingCount() }}</span>
+          }
+        </a>
+      </mat-menu>
 
       <a routerLink="/mas" routerLinkActive="active-nav" [routerLinkActiveOptions]="{ exact: false }" class="nav-link">
         <mat-icon>casino</mat-icon>

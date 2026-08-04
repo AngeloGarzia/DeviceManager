@@ -6,6 +6,7 @@ import com.devicemanager.entity.User;
 import com.devicemanager.repository.UserRepository;
 import com.devicemanager.security.Roles;
 import com.devicemanager.support.TestFixtures;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -15,6 +16,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -38,8 +41,19 @@ class UserServiceTest {
 
     @BeforeEach
     void setUp() {
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken("admin", null, List.of()));
+        lenient().when(userRepository.findByUsername("admin"))
+                .thenReturn(Optional.of(TestFixtures.user("admin", Roles.ADMIN)));
         lenient().when(atelierService.requireCurrentAtelier()).thenReturn(TestFixtures.atelier());
+        lenient().when(atelierService.requireAtelierForUserGroupe(any(User.class), eq(100L)))
+                .thenReturn(TestFixtures.atelier());
         lenient().when(passwordEncoder.encode(anyString())).thenReturn("hashed");
+    }
+
+    @AfterEach
+    void tearDown() {
+        SecurityContextHolder.clearContext();
     }
 
     @Test
@@ -59,6 +73,7 @@ class UserServiceTest {
         request.setEmail(" Alice.Martin@Casino.local ");
         request.setPassword("secret1");
         request.setRole("TECH");
+        request.setPreferredAtelierId(100L);
 
         UserResponse response = userService.create(request);
 
@@ -67,6 +82,26 @@ class UserServiceTest {
         assertThat(response.getPrenom()).isEqualTo("Alice");
         assertThat(response.getEmail()).isEqualTo("alice.martin@casino.local");
         assertThat(response.getRole()).isEqualTo(Roles.TECHNICIEN);
+        assertThat(response.getPreferredAtelierId()).isEqualTo(100L);
+        verify(atelierService).requireAtelierForUserGroupe(any(User.class), eq(100L));
+    }
+
+    @Test
+    void create_techRequiresPreferredAtelier() {
+        when(userRepository.existsByUsername("tech2")).thenReturn(false);
+
+        UserRequest request = new UserRequest();
+        request.setUsername("tech2");
+        request.setNom("Martin");
+        request.setPrenom("Alice");
+        request.setEmail("alice@test.local");
+        request.setPassword("secret1");
+        request.setRole("TECHNICIEN");
+
+        assertThatThrownBy(() -> userService.create(request))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getReason())
+                .isEqualTo("Atelier préféré obligatoire pour un technicien");
     }
 
     @Test
@@ -99,6 +134,7 @@ class UserServiceTest {
         request.setEmail("alice@test.local");
         request.setPassword("secret1");
         request.setRole("TECHNICIEN");
+        request.setPreferredAtelierId(100L);
 
         assertThatThrownBy(() -> userService.create(request))
                 .isInstanceOf(ResponseStatusException.class)

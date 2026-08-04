@@ -11,6 +11,10 @@ import { UserService } from '../../services/user.service';
 import { AuthService } from '../../services/auth.service';
 import { ConfirmDialogComponent } from '../../shared/confirm-dialog.component';
 
+/**
+ * Liste des comptes utilisateurs du groupe (réservée aux administrateurs).
+ * Permet la consultation et la suppression des comptes.
+ */
 @Component({
   selector: 'app-user-list',
   standalone: true,
@@ -35,12 +39,13 @@ export class UserListComponent implements OnInit {
   readonly error = signal<string | null>(null);
   readonly confirmOpen = signal(false);
   pendingDelete: AppUser | null = null;
-  readonly displayedColumns = ['name', 'email', 'username', 'role', 'createdAt', 'actions'];
+  readonly displayedColumns = ['name', 'email', 'username', 'role', 'atelier', 'createdAt', 'actions'];
 
   ngOnInit(): void {
     this.load();
   }
 
+  /** Charge la liste des utilisateurs depuis l'API. */
   load(): void {
     this.loading.set(true);
     this.error.set(null);
@@ -56,22 +61,26 @@ export class UserListComponent implements OnInit {
     });
   }
 
+  /** Libellé français du rôle utilisateur. */
   roleLabel(role: string): string {
     if (role === 'ADMIN') return 'Administrateur';
     if (role === 'TECHNICIEN' || role === 'TECH') return 'Technicien';
     return role;
   }
 
+  /** Nom complet affiché ou identifiant de connexion en repli. */
   displayName(user: AppUser): string {
     const full = `${user.prenom || ''} ${user.nom || ''}`.trim();
     return full || user.username;
   }
 
+  /** Demande confirmation avant suppression d'un compte. */
   askDelete(user: AppUser): void {
     this.pendingDelete = user;
     this.confirmOpen.set(true);
   }
 
+  /** Supprime le compte sélectionné si l'utilisateur confirme. */
   confirmDelete(ok: boolean): void {
     this.confirmOpen.set(false);
     if (!ok || !this.pendingDelete) {

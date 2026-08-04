@@ -26,6 +26,12 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+/**
+ * Service métier du catalogue de pièces détachées (devices).
+ * <p>
+ * CRUD, recherche multi-termes, photos et liens MAS/SFM, scopé strictement
+ * à l'atelier courant ({@code X-Atelier-Id}).
+ */
 @Service
 @RequiredArgsConstructor
 @Transactional
@@ -41,6 +47,13 @@ public class DeviceService {
     private final ImageOptimizationService imageOptimizationService;
     private final AtelierService atelierService;
 
+    /**
+     * Liste ou recherche les pièces de l'atelier courant.
+     *
+     * @param q termes de recherche optionnels (tous les mots doivent correspondre)
+     * @return fiches pièces avec photos
+     * @throws org.springframework.web.server.ResponseStatusException {@code 400} si atelier non sélectionné
+     */
     @Transactional(readOnly = true)
     public List<DeviceResponse> findAll(String q) {
         Long atelierId = atelierService.requireCurrentAtelier().getId();
@@ -90,11 +103,27 @@ public class DeviceService {
         return value == null ? "" : value;
     }
 
+    /**
+     * Retourne une pièce par identifiant dans l'atelier courant.
+     *
+     * @param id identifiant de la pièce
+     * @return fiche complète
+     * @throws org.springframework.web.server.ResponseStatusException {@code 404} si introuvable
+     */
     @Transactional(readOnly = true)
     public DeviceResponse findById(Long id) {
         return toResponse(getEntity(id));
     }
 
+    /**
+     * Crée une pièce avec photos dans l'atelier courant.
+     *
+     * @param request métadonnées (nom, usage, MAS/SFM, etc.)
+     * @param photos images (1 à {@link #MAX_PHOTOS})
+     * @return pièce persistée
+     * @throws org.springframework.web.server.ResponseStatusException {@code 400} si validation échoue ;
+     *         {@code 409} en cas de doublon nom/référence
+     */
     public DeviceResponse create(DeviceRequest request, List<MultipartFile> photos) {
         List<MultipartFile> files = normalizeFiles(photos);
         ensurePhotoCount(files.size(), true);
@@ -134,6 +163,16 @@ public class DeviceService {
         return toResponse(saved);
     }
 
+    /**
+     * Met à jour une pièce et remplace éventuellement ses photos.
+     *
+     * @param id identifiant de la pièce
+     * @param request métadonnées mises à jour (incluant {@code keepPhotoIds})
+     * @param photos nouvelles images à ajouter
+     * @return pièce modifiée
+     * @throws org.springframework.web.server.ResponseStatusException {@code 404} si introuvable ;
+     *         {@code 409} en cas de conflit nom/référence
+     */
     public DeviceResponse update(Long id, DeviceRequest request, List<MultipartFile> photos) {
         Device entity = getEntity(id);
         String nom = request.getNom().trim();
@@ -199,6 +238,12 @@ public class DeviceService {
         return toResponse(deviceRepository.save(entity));
     }
 
+    /**
+     * Supprime une pièce et les fichiers stockés associés.
+     *
+     * @param id identifiant de la pièce
+     * @throws org.springframework.web.server.ResponseStatusException {@code 404} si introuvable
+     */
     public void delete(Long id) {
         Device entity = getEntity(id);
         for (DevicePhoto photo : entity.getPhotos()) {

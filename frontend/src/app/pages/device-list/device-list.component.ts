@@ -15,6 +15,10 @@ import { DeviceService } from '../../services/device.service';
 import { AuthService } from '../../services/auth.service';
 import { ConfirmDialogComponent } from '../../shared/confirm-dialog.component';
 
+/**
+ * Liste des pièces détachées de l'atelier courant.
+ * Permet la recherche, la consultation et la suppression des pièces.
+ */
 @Component({
   selector: 'app-device-list',
   standalone: true,
@@ -47,6 +51,7 @@ export class DeviceListComponent implements OnInit {
 
   constructor(private deviceService: DeviceService) {}
 
+  /** URL absolue de la photo principale d'une pièce. */
   photoUrl(item: Device): string {
     return this.deviceService.resolvePhotoUrl(item.photoUrl);
   }
@@ -55,14 +60,17 @@ export class DeviceListComponent implements OnInit {
     this.load();
   }
 
+  /** Nombre total de pièces affichées. */
   get total(): number {
     return this.items().length;
   }
 
+  /** Nombre de pièces marquées comme obsolètes. */
   get obsoleteCount(): number {
     return this.items().filter((d) => d.obsolete).length;
   }
 
+  /** Charge les pièces selon le filtre de recherche courant. */
   load(): void {
     this.loading.set(true);
     this.error.set(null);
@@ -78,16 +86,19 @@ export class DeviceListComponent implements OnInit {
     });
   }
 
+  /** Demande confirmation avant suppression d'une pièce. */
   askDelete(item: Device): void {
     this.pendingDelete = item;
     this.confirmOpen.set(true);
   }
 
+  /** Annule la suppression en cours. */
   cancelDelete(): void {
     this.pendingDelete = null;
     this.confirmOpen.set(false);
   }
 
+  /** Supprime la pièce sélectionnée après confirmation. */
   confirmDelete(): void {
     if (!this.pendingDelete) {
       return;

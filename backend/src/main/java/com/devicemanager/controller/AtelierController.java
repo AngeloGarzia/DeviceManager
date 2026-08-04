@@ -24,6 +24,13 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
+/**
+ * Contrôleur REST de gestion des ateliers techniques casino.
+ * <p>
+ * Permet de lister, créer et modifier les ateliers d'un groupe multi-tenant.
+ * Le technicien ne voit que son atelier préféré ; l'admin bascule via
+ * {@code X-Atelier-Id} ou l'endpoint {@code /preferred}.
+ */
 @RestController
 @RequestMapping("/api/ateliers")
 @RequiredArgsConstructor
@@ -31,30 +38,65 @@ public class AtelierController {
 
     private final AtelierService atelierService;
 
+    /**
+     * Liste les ateliers accessibles à l'utilisateur connecté.
+     *
+     * @param authentication utilisateur authentifié
+     * @return ateliers du groupe (un seul pour un technicien)
+     */
     @GetMapping
     public ResponseEntity<List<AtelierSummary>> list(Authentication authentication) {
         return ResponseEntity.ok(atelierService.listForUser(authentication.getName()));
     }
 
+    /**
+     * Liste les casinos du groupe de l'administrateur connecté.
+     *
+     * @param authentication administrateur authentifié
+     * @return casinos rattachés au même groupe
+     */
     @GetMapping("/casinos")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<List<CasinoSummary>> listCasinos(Authentication authentication) {
         return ResponseEntity.ok(atelierService.listCasinosForUser(authentication.getName()));
     }
 
+    /**
+     * Liste les utilisateurs du groupe pouvant être responsables d'atelier.
+     *
+     * @param authentication administrateur authentifié
+     * @return utilisateurs du même groupe
+     */
     @GetMapping("/users")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<List<AtelierResponsableDto>> listUsers(Authentication authentication) {
         return ResponseEntity.ok(atelierService.listUsersForGroupe(authentication.getName()));
     }
 
+    /**
+     * Mémorise l'atelier préféré de l'administrateur (contexte {@code X-Atelier-Id}).
+     *
+     * @param authentication administrateur authentifié
+     * @param request identifiant de l'atelier à sélectionner
+     * @return résumé de l'atelier choisi
+     * @throws org.springframework.web.server.ResponseStatusException {@code 403} si l'atelier n'appartient pas au groupe
+     */
     @PutMapping("/preferred")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<AtelierSummary> setPreferred(
             Authentication authentication,
             @Valid @RequestBody PreferredAtelierRequest request) {
         return ResponseEntity.ok(atelierService.setPreferredAtelier(authentication.getName(), request.getAtelierId()));
     }
 
+    /**
+     * Crée un nouvel atelier rattaché à un casino du groupe.
+     *
+     * @param authentication administrateur authentifié
+     * @param request nom, casino, coordonnées et responsables
+     * @return atelier créé
+     * @throws org.springframework.web.server.ResponseStatusException {@code 409} si le nom existe déjà pour ce casino
+     */
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<AtelierSummary> create(
@@ -64,6 +106,16 @@ public class AtelierController {
                 .body(atelierService.create(authentication.getName(), request));
     }
 
+    /**
+     * Met à jour un atelier existant du groupe.
+     *
+     * @param authentication administrateur authentifié
+     * @param id identifiant de l'atelier
+     * @param request données mises à jour
+     * @return atelier modifié
+     * @throws org.springframework.web.server.ResponseStatusException {@code 403} si hors groupe ;
+     *         {@code 409} en cas de conflit de nom
+     */
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<AtelierSummary> update(
@@ -73,6 +125,13 @@ public class AtelierController {
         return ResponseEntity.ok(atelierService.update(authentication.getName(), id, request));
     }
 
+    /**
+     * Supprime un atelier sans pièces, MAS, SFM ni demandes liées.
+     *
+     * @param authentication administrateur authentifié
+     * @param id identifiant de l'atelier
+     * @throws org.springframework.web.server.ResponseStatusException {@code 409} si des données métier y sont rattachées
+     */
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     @ResponseStatus(HttpStatus.NO_CONTENT)

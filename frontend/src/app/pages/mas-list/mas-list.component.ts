@@ -14,6 +14,10 @@ import { MasService } from '../../services/mas.service';
 import { AuthService } from '../../services/auth.service';
 import { ConfirmDialogComponent } from '../../shared/confirm-dialog.component';
 
+/**
+ * Liste des MAS (modèles d'appareils de substitution) de l'atelier.
+ * Permet la recherche, la consultation et la suppression des MAS.
+ */
 @Component({
   selector: 'app-mas-list',
   standalone: true,
@@ -38,9 +42,12 @@ export class MasListComponent implements OnInit {
   constructor(private masService: MasService) {}
 
   ngOnInit(): void { this.load(); }
+  /** Nombre total de MAS affichées. */
   get total(): number { return this.items().length; }
+  /** Nombre de MAS marquées comme utilisées. */
   get usedCount(): number { return this.items().filter((m) => m.utilise).length; }
 
+  /** Charge les MAS selon le filtre de recherche courant. */
   load(): void {
     this.loading.set(true);
     this.error.set(null);
@@ -50,8 +57,11 @@ export class MasListComponent implements OnInit {
     });
   }
 
+  /** Demande confirmation avant suppression d'une MAS. */
   askDelete(item: Mas): void { this.pendingDelete = item; this.confirmOpen.set(true); }
+  /** Annule la suppression en cours. */
   cancelDelete(): void { this.pendingDelete = null; this.confirmOpen.set(false); }
+  /** Supprime la MAS sélectionnée après confirmation. */
   confirmDelete(): void {
     if (!this.pendingDelete) return;
     const id = this.pendingDelete.id;

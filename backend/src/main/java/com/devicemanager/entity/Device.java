@@ -8,6 +8,11 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Pièce détachée ou consommable géré dans un atelier.
+ * Peut être liée à un SFM (fournisseur) et/ou une MAS (référence catalogue).
+ * Le nom et la référence sont uniques par atelier.
+ */
 @Entity
 @Table(
         name = "device",
@@ -39,10 +44,11 @@ public class Device {
     @Column(name = "date_acquisition", nullable = false)
     private LocalDate dateAcquisition;
 
+    /** Indique si la pièce n'est plus utilisée en exploitation. */
     @Column(nullable = false)
     private boolean obsolete;
 
-    /** Photo principale (1re) — synchronisée pour listes / commandes. */
+    /** Photo principale (1re) — synchronisée pour listes et commandes. */
     @Column(name = "photo_key", length = 512)
     private String photoKey;
 
@@ -61,10 +67,12 @@ public class Device {
     @Builder.Default
     private List<DevicePhoto> photos = new ArrayList<>();
 
+    /** Fournisseur SFM associé (optionnel). */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "sfm_id")
     private Sfm sfm;
 
+    /** Référence MAS du catalogue (optionnelle). */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "mas_id")
     private Mas mas;
@@ -78,6 +86,7 @@ public class Device {
             foreignKey = @ForeignKey(name = "fk_device_marque"))
     private MarqueMas marque;
 
+    /** Atelier propriétaire — périmètre multi-tenant. */
     @ManyToOne(optional = false, fetch = FetchType.LAZY)
     @JoinColumn(name = "atelier_id", foreignKey = @ForeignKey(name = "fk_device_atelier"))
     private Atelier atelier;

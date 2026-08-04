@@ -23,7 +23,6 @@ class AppSettingsServiceTest {
     private static final Logger log = LoggerFactory.getLogger(AppSettingsServiceTest.class);
 
     @Mock private AppSettingRepository appSettingRepository;
-    @Mock private com.devicemanager.ai.AiApiKeyBattery aiApiKeyBattery;
     @InjectMocks private AppSettingsService appSettingsService;
 
     @BeforeEach

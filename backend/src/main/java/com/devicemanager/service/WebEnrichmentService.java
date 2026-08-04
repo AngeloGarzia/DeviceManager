@@ -20,6 +20,9 @@ import java.util.Set;
 
 /**
  * Enrichissement léger via APIs publiques (Wikipedia / DuckDuckGo) — sans clé API.
+ * <p>
+ * Complète le scan IA d'étiquettes de pièces détachées avec du contexte web
+ * pour rédiger le champ « usage » de la fiche pièce.
  */
 @Service
 @RequiredArgsConstructor
@@ -32,6 +35,12 @@ public class WebEnrichmentService {
             .followRedirects(HttpClient.Redirect.NORMAL)
             .build();
 
+    /**
+     * Agrège des extraits web à partir de termes (marque, nom, référence).
+     *
+     * @param terms termes de recherche (valeurs nulles ou vides ignorées)
+     * @return texte concaténé de snippets, ou chaîne vide si aucun résultat
+     */
     public String gatherContext(String... terms) {
         String query = buildQuery(terms);
         if (query.isBlank()) {
