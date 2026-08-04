@@ -210,8 +210,12 @@ export class SetupComponent implements OnInit {
   readonly selectedAiProvider = signal<string>('openai');
 
   readonly aiModelsForProvider = computed(() => {
-    const provider = this.aiProviders.find((p) => p.id === this.selectedAiProvider()) ?? this.aiProviders[0];
-    return provider.models;
+    const selected = this.selectedAiProvider();
+    const provider =
+      this.aiProviders.find((p) => p.id === selected) ??
+      this.aiProviders.find((p) => p.id === 'openai') ??
+      this.aiProviders.find(() => true);
+    return provider ? [...provider.models] : [];
   });
 
   readonly categories = computed(() => {
@@ -261,9 +265,11 @@ export class SetupComponent implements OnInit {
         this.form.get('AI_PROVIDER')?.valueChanges.subscribe((value) => {
           const next = (value || 'openai').toString();
           this.selectedAiProvider.set(next);
-          const models = this.aiProviders.find((p) => p.id === next)?.models ?? [];
+          const models = [
+            ...(this.aiProviders.find((p) => p.id === next)?.models ?? [])
+          ];
           const currentModel = this.form.get('AI_MODEL')?.value;
-          const firstModel = models[0];
+          const firstModel = models.at(0);
           if (firstModel && !models.some((m) => m.value === currentModel)) {
             this.form.get('AI_MODEL')?.setValue(firstModel.value);
           }
@@ -291,7 +297,10 @@ export class SetupComponent implements OnInit {
         this.groupeUsers.set(users);
         this.ateliersLoading.set(false);
         if (casinos.length > 0 && this.atelierForm.controls.casinoId.value == null) {
-          this.atelierForm.patchValue({ casinoId: casinos[0].id });
+          const firstCasino = casinos.at(0);
+          if (firstCasino) {
+            this.atelierForm.patchValue({ casinoId: firstCasino.id });
+          }
         }
       },
       error: (err) => {

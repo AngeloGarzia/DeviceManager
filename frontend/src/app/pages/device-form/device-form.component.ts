@@ -355,7 +355,7 @@ export class DeviceFormComponent implements OnInit, AfterViewInit, OnDestroy {
       const rear = videoInputs.find((d) =>
         /back|rear|environment|arri[eè]re|world/i.test(d.label)
       );
-      this.selectedCameraId.set(rear?.deviceId ?? videoInputs[0].deviceId);
+      this.selectedCameraId.set(rear?.deviceId ?? videoInputs.at(0)?.deviceId ?? null);
     }
   }
 
