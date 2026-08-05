@@ -17,8 +17,27 @@
 
         <mat-form-field appearance="outline">
           <mat-label>Mot de passe</mat-label>
-          <input matInput type="password" formControlName="password" autocomplete="current-password" />
+          <input
+            matInput
+            [type]="showPassword() ? 'text' : 'password'"
+            formControlName="password"
+            autocomplete="current-password"
+          />
+          <button
+            mat-icon-button
+            matSuffix
+            type="button"
+            (click)="togglePasswordVisibility()"
+            [attr.aria-label]="showPassword() ? 'Masquer le mot de passe' : 'Afficher le mot de passe'"
+            [attr.aria-pressed]="showPassword()"
+          >
+            <mat-icon>{{ showPassword() ? 'visibility_off' : 'visibility' }}</mat-icon>
+          </button>
         </mat-form-field>
+
+        <mat-checkbox formControlName="rememberPassword" color="primary">
+          Enregistrer le mot de passe
+        </mat-checkbox>
 
         @if (error()) {
           <p class="mb-3 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{{ error() }}</p>

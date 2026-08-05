@@ -14,6 +14,8 @@ const ROLE_KEY = 'dm_role';
 const ATELIER_KEY = 'dm_atelier_id';
 const ATELIERS_KEY = 'dm_ateliers';
 const GROUPE_KEY = 'dm_groupe_nom';
+const REMEMBER_USER_KEY = 'dm_remember_user';
+const REMEMBER_PASS_KEY = 'dm_remember_pass';
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
@@ -40,11 +42,19 @@ export class AuthService {
     return this.ateliers().find((a) => a.id === id) ?? null;
   });
 
-  constructor(private http: HttpClient, private router: Router) {}
+  private sessionExpiredHandled = false;
+
+  constructor(private http: HttpClient, private router: Router) {
+    // Nettoie une session déjà expirée au démarrage (token encore en localStorage).
+    if (this.getToken() && this.isTokenExpired()) {
+      this.clearSession();
+    }
+  }
 
   login(payload: LoginRequest): Observable<AuthResponse> {
     return this.http.post<AuthResponse>(`${environment.apiUrl}/api/auth/login`, payload).pipe(
       tap((res) => {
+        this.sessionExpiredHandled = false;
         localStorage.setItem(TOKEN_KEY, res.token);
         localStorage.setItem(USER_KEY, res.username);
         localStorage.setItem(ROLE_KEY, res.role);
@@ -123,6 +133,89 @@ export class AuthService {
   }
 
   logout(): void {
+    this.clearSession();
+    this.router.navigate(['/login']);
+  }
+
+  /**
+   * Appelé quand le serveur répond 401 (token invalide / expiré).
+   * Nettoie la session et renvoie vers la page de connexion.
+   */
+  handleSessionExpired(): void {
+    if (this.sessionExpiredHandled) {
+      return;
+    }
+    this.sessionExpiredHandled = true;
+    this.clearSession();
+    if (!this.router.url.startsWith('/login')) {
+      void this.router.navigate(['/login'], { queryParams: { reason: 'expired' } });
+    }
+  }
+
+  /** Mémorise identifiant + mot de passe pour la prochaine visite. */
+  rememberCredentials(username: string, password: string): void {
+    localStorage.setItem(REMEMBER_USER_KEY, username);
+    localStorage.setItem(REMEMBER_PASS_KEY, password);
+  }
+
+  clearRememberedCredentials(): void {
+    localStorage.removeItem(REMEMBER_USER_KEY);
+    localStorage.removeItem(REMEMBER_PASS_KEY);
+  }
+
+  getRememberedCredentials(): { username: string; password: string } | null {
+    const username = localStorage.getItem(REMEMBER_USER_KEY);
+    const password = localStorage.getItem(REMEMBER_PASS_KEY);
+    if (!username || password == null || password === '') {
+      return null;
+    }
+    return { username, password };
+  }
+
+  getToken(): string | null {
+    return localStorage.getItem(TOKEN_KEY);
+  }
+
+  getAtelierId(): number | null {
+    return this.atelierId();
+  }
+
+  isLoggedIn(): boolean {
+    const token = this.getToken();
+    if (!token) {
+      return false;
+    }
+    if (this.isTokenExpired(token)) {
+      this.clearSession();
+      return false;
+    }
+    return true;
+  }
+
+  /** Indique si le JWT est expiré (lecture du claim {@code exp} côté client). */
+  isTokenExpired(token: string | null = this.getToken()): boolean {
+    if (!token) {
+      return true;
+    }
+    const exp = this.readJwtExp(token);
+    if (exp == null) {
+      return false;
+    }
+    // Petite marge pour éviter les courses avec l'horloge serveur.
+    return Date.now() >= exp * 1000 - 5_000;
+  }
+
+  roleLabel(): string {
+    if (this.isAdmin()) {
+      return 'Administrateur';
+    }
+    if (this.isTechnicien()) {
+      return 'Technicien';
+    }
+    return this.role() || '';
+  }
+
+  private clearSession(): void {
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
     localStorage.removeItem(NOM_KEY);
@@ -139,29 +232,21 @@ export class AuthService {
     this.ateliers.set([]);
     this.groupeNom.set(null);
     this.atelierRevision.set(0);
-    this.router.navigate(['/login']);
   }
 
-  getToken(): string | null {
-    return localStorage.getItem(TOKEN_KEY);
-  }
-
-  getAtelierId(): number | null {
-    return this.atelierId();
-  }
-
-  isLoggedIn(): boolean {
-    return !!this.getToken();
-  }
-
-  roleLabel(): string {
-    if (this.isAdmin()) {
-      return 'Administrateur';
+  private readJwtExp(token: string): number | null {
+    try {
+      const parts = token.split('.');
+      if (parts.length < 2) {
+        return null;
+      }
+      const payload = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+      const padded = payload + '='.repeat((4 - (payload.length % 4)) % 4);
+      const json = JSON.parse(atob(padded)) as { exp?: number };
+      return typeof json.exp === 'number' ? json.exp : null;
+    } catch {
+      return null;
     }
-    if (this.isTechnicien()) {
-      return 'Technicien';
-    }
-    return this.role() || '';
   }
 
   private toAtelierId(value: unknown): number | null {

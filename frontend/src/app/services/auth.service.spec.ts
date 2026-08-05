@@ -60,4 +60,20 @@ describe('AuthService', () => {
     expect(service.username()).toBeNull();
     expect(router.navigate).toHaveBeenCalledWith(['/login']);
   });
+
+  it('should remember and restore credentials', () => {
+    service.rememberCredentials('admin', 'secret');
+    expect(service.getRememberedCredentials()).toEqual({ username: 'admin', password: 'secret' });
+    service.clearRememberedCredentials();
+    expect(service.getRememberedCredentials()).toBeNull();
+  });
+
+  it('should detect expired jwt and clear session', () => {
+    const exp = Math.floor(Date.now() / 1000) - 60;
+    const payload = btoa(JSON.stringify({ exp, sub: 'admin' }));
+    localStorage.setItem('dm_token', `hdr.${payload}.sig`);
+    expect(service.isTokenExpired()).toBeTrue();
+    expect(service.isLoggedIn()).toBeFalse();
+    expect(service.getToken()).toBeNull();
+  });
 });

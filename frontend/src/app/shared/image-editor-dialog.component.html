@@ -1,0 +1,84 @@
+<h2 mat-dialog-title>{{ title }}</h2>
+
+<mat-dialog-content class="editor-content">
+  <div class="toolbar">
+    <div class="toolbar-group" role="group" aria-label="Zoom">
+      <button mat-stroked-button type="button" (click)="zoomOut()" matTooltip="Zoom arrière">
+        <mat-icon>zoom_out</mat-icon>
+      </button>
+      <span class="zoom-label">{{ (transform.scale || 1) | number: '1.1-1' }}×</span>
+      <button mat-stroked-button type="button" (click)="zoomIn()" matTooltip="Zoom avant">
+        <mat-icon>zoom_in</mat-icon>
+      </button>
+    </div>
+
+    <div class="toolbar-group" role="group" aria-label="Rotation">
+      <button mat-stroked-button type="button" (click)="rotateLeft()" matTooltip="Rotation gauche">
+        <mat-icon>rotate_left</mat-icon>
+      </button>
+      <button mat-stroked-button type="button" (click)="rotateRight()" matTooltip="Rotation droite">
+        <mat-icon>rotate_right</mat-icon>
+      </button>
+    </div>
+
+    <div class="toolbar-group" role="group" aria-label="Miroir">
+      <button mat-stroked-button type="button" (click)="flipHorizontal()" matTooltip="Miroir horizontal">
+        <mat-icon>flip</mat-icon>
+      </button>
+      <button mat-stroked-button type="button" (click)="flipVertical()" matTooltip="Miroir vertical">
+        <mat-icon class="flip-v">flip</mat-icon>
+      </button>
+    </div>
+
+    <mat-button-toggle-group
+      class="aspect-group"
+      [value]="aspectRatio"
+      (change)="setAspect($event.value)"
+      aria-label="Ratio de recadrage"
+    >
+      <mat-button-toggle [value]="0">Libre</mat-button-toggle>
+      <mat-button-toggle [value]="1">1:1</mat-button-toggle>
+      <mat-button-toggle [value]="4 / 3">4:3</mat-button-toggle>
+      <mat-button-toggle [value]="16 / 9">16:9</mat-button-toggle>
+    </mat-button-toggle-group>
+
+    <button mat-button type="button" (click)="resetTransforms()" matTooltip="Réinitialiser">
+      <mat-icon>restart_alt</mat-icon>
+      Réinitialiser
+    </button>
+  </div>
+
+  <p class="hint">
+    Déplacez et redimensionnez le cadre pour recadrer. Molette ou boutons pour zoomer.
+  </p>
+
+  <div class="cropper-wrap">
+    <image-cropper
+      [imageFile]="imageFile"
+      [maintainAspectRatio]="maintainAspectRatio"
+      [aspectRatio]="aspectRatio || 1"
+      [roundCropper]="roundCropper"
+      [transform]="transform"
+      [resizeToWidth]="1600"
+      [format]="'jpeg'"
+      [imageQuality]="92"
+      [autoCrop]="true"
+      [onlyScaleDown]="false"
+      [alignImage]="'center'"
+      (imageCropped)="onImageCropped($event)"
+      (loadImageFailed)="onLoadFailed()"
+    ></image-cropper>
+  </div>
+
+  @if (error()) {
+    <p class="error">{{ error() }}</p>
+  }
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button mat-stroked-button type="button" (click)="cancel()" [disabled]="saving()">Annuler</button>
+  <button mat-flat-button color="primary" type="button" (click)="apply()" [disabled]="saving()">
+    <mat-icon>crop</mat-icon>
+    Valider le recadrage
+  </button>
+</mat-dialog-actions>

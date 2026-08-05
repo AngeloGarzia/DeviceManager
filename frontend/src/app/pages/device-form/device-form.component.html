@@ -147,6 +147,17 @@
                       <button
                         mat-mini-fab
                         type="button"
+                        color="primary"
+                        class="photo-edit"
+                        (click)="editNewPhoto(i)"
+                        aria-label="Éditer l'image"
+                        matTooltip="Zoom / recadrage"
+                      >
+                        <mat-icon>crop</mat-icon>
+                      </button>
+                      <button
+                        mat-mini-fab
+                        type="button"
                         color="warn"
                         class="photo-remove"
                         (click)="removeNewPhoto(i)"
@@ -232,10 +243,8 @@
               </mat-select>
               @if (associatedMasHint()) {
                 <mat-hint class="!text-emerald-700">{{ associatedMasHint() }}</mat-hint>
-              } @else if (selectedSfmId() && filteredMasses().length === 0) {
-                <mat-hint>Aucune MAS pour les marques de ce SFM</mat-hint>
               } @else {
-                <mat-hint>Facultatif — la marque en découle</mat-hint>
+                <mat-hint>Facultatif — les MAS compatibles avec le SFM apparaissent en premier</mat-hint>
               }
             </mat-form-field>
             <div class="flex items-start sm:pt-1">
@@ -266,6 +275,17 @@
       </mat-card-content>
     </mat-card>
   }
+
+  <app-confirm-dialog
+    [open]="marqueMismatchOpen()"
+    title="Marques SFM / MAS différentes"
+    [message]="marqueMismatchMessage()"
+    confirmLabel="Enregistrer quand même"
+    cancelLabel="Modifier le choix"
+    confirmColor="primary"
+    (confirm)="confirmMarqueMismatch()"
+    (cancel)="cancelMarqueMismatch()"
+  />
 
   <app-confirm-dialog
     [open]="offerAnotherOpen()"

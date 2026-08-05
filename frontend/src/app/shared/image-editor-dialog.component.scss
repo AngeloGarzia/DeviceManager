@@ -1,0 +1,69 @@
+.editor-content {
+  display: grid;
+  gap: 0.75rem;
+  min-width: min(92vw, 52rem);
+  max-width: 56rem;
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+}
+
+.toolbar-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.zoom-label {
+  min-width: 2.5rem;
+  text-align: center;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #334155;
+}
+
+.aspect-group {
+  flex-wrap: wrap;
+}
+
+.flip-v {
+  transform: rotate(90deg);
+}
+
+.hint {
+  margin: 0;
+  font-size: 0.8rem;
+  color: #64748b;
+}
+
+.cropper-wrap {
+  border: 1px solid #e2e8f0;
+  border-radius: 0.75rem;
+  overflow: hidden;
+  background: #0f172a;
+  min-height: 280px;
+  max-height: min(58vh, 520px);
+}
+
+:host ::ng-deep image-cropper {
+  max-height: min(58vh, 520px);
+}
+
+.error {
+  margin: 0;
+  border-radius: 0.5rem;
+  background: #fff1f2;
+  color: #be123c;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+}
+
+@media (max-width: 640px) {
+  .editor-content {
+    min-width: 0;
+  }
+}

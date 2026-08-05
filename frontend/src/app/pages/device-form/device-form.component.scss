@@ -30,6 +30,15 @@ video {
   }
 }
 
+.photo-edit {
+  position: absolute !important;
+  top: 0.35rem;
+  left: 0.35rem;
+  width: 1.75rem !important;
+  height: 1.75rem !important;
+  transform: scale(0.85);
+}
+
 .photo-remove {
   position: absolute !important;
   top: 0.35rem;

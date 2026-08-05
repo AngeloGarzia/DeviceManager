@@ -21,6 +21,8 @@ import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatCardModule } from '@angular/material/card';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { MatDialog, MatDialogModule } from '@angular/material/dialog';
+import { firstValueFrom } from 'rxjs';
 import { DeviceService } from '../../services/device.service';
 import { DeviceFormDraftService } from '../../services/device-form-draft.service';
 import { SfmService } from '../../services/sfm.service';
@@ -28,6 +30,7 @@ import { MasService } from '../../services/mas.service';
 import { AiService } from '../../services/ai.service';
 import { DeviceForm, DevicePhoto, Mas, Sfm } from '../../models/models';
 import { ConfirmDialogComponent } from '../../shared/confirm-dialog.component';
+import { ImageEditorDialogComponent } from '../../shared/image-editor-dialog.component';
 
 interface NewPhotoItem {
   file: File;
@@ -54,6 +57,7 @@ interface NewPhotoItem {
     MatCardModule,
     MatProgressSpinnerModule,
     MatTooltipModule,
+    MatDialogModule,
     ConfirmDialogComponent
   ],
   templateUrl: './device-form.component.html',
@@ -73,6 +77,7 @@ export class DeviceFormComponent implements OnInit, AfterViewInit, OnDestroy {
   private readonly draftService = inject(DeviceFormDraftService);
   private readonly sfmService = inject(SfmService);
   private readonly masService = inject(MasService);
+  private readonly dialog = inject(MatDialog);
   readonly aiService = inject(AiService);
 
   readonly loading = signal(false);
@@ -92,6 +97,7 @@ export class DeviceFormComponent implements OnInit, AfterViewInit, OnDestroy {
   readonly existingPhotos = signal<DevicePhoto[]>([]);
   readonly newPhotos = signal<NewPhotoItem[]>([]);
   readonly offerAnotherOpen = signal(false);
+  readonly marqueMismatchOpen = signal(false);
   private savedDeviceId: number | null = null;
 
   private mediaStream: MediaStream | null = null;
@@ -128,25 +134,22 @@ export class DeviceFormComponent implements OnInit, AfterViewInit, OnDestroy {
   });
 
   readonly filteredMasses = computed(() => {
-    const all = this.masses();
-    const selectedId = this.selectedMasId();
+    const all = [...this.masses()];
     const sfmId = this.selectedSfmId();
-    let list: Mas[];
     if (sfmId == null) {
-      list = [...all];
-    } else {
-      const sfm = this.sfms().find((s) => s.id === sfmId);
-      const marqueIds = new Set(sfm?.marqueIds ?? sfm?.marques?.map((m) => m.id) ?? []);
-      list = marqueIds.size === 0 ? [] : all.filter((m) => marqueIds.has(m.marqueId));
+      return all.sort((a, b) => a.numero.localeCompare(b.numero, 'fr'));
     }
-    // Toujours conserver la MAS sélectionnée (ex. créée puis associée au retour)
-    if (selectedId != null && !list.some((m) => m.id === selectedId)) {
-      const selected = all.find((m) => m.id === selectedId);
-      if (selected) {
-        list = [selected, ...list];
+    const sfm = this.sfms().find((s) => s.id === sfmId);
+    const marqueIds = new Set(sfm?.marqueIds ?? sfm?.marques?.map((m) => m.id) ?? []);
+    // Toutes les MAS restent sélectionnables ; les marques compatibles avec le SFM en premier.
+    return all.sort((a, b) => {
+      const aOk = marqueIds.size === 0 || marqueIds.has(a.marqueId) ? 0 : 1;
+      const bOk = marqueIds.size === 0 || marqueIds.has(b.marqueId) ? 0 : 1;
+      if (aOk !== bOk) {
+        return aOk - bOk;
       }
-    }
-    return list;
+      return a.numero.localeCompare(b.numero, 'fr');
+    });
   });
 
   /** Indique si le formulaire est en mode édition. */
@@ -170,18 +173,6 @@ export class DeviceFormComponent implements OnInit, AfterViewInit, OnDestroy {
     this.form.controls.masId.valueChanges.subscribe((masId) => this.selectedMasId.set(masId));
     this.form.controls.sfmId.valueChanges.subscribe((sfmId) => {
       this.selectedSfmId.set(sfmId);
-      if (sfmId == null) {
-        return;
-      }
-      const currentMasId = this.form.controls.masId.value;
-      if (currentMasId == null || this.sfms().length === 0 || this.masses().length === 0) {
-        return;
-      }
-      const allowed = this.filteredMasses().some((m) => m.id === currentMasId);
-      if (!allowed) {
-        this.form.patchValue({ masId: null }, { emitEvent: false });
-        this.selectedMasId.set(null);
-      }
     });
 
     const draft = this.draftService.take();
@@ -383,36 +374,21 @@ export class DeviceFormComponent implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 
-  /** Capture une photo depuis le flux caméra et l'ajoute à la galerie. */
+  /** Capture une photo depuis le flux caméra, l'édite, puis l'ajoute à la galerie. */
   async capturePhoto(): Promise<void> {
     if (!this.canAddPhoto()) {
       this.error.set(`Maximum ${this.maxPhotos} images par pièce.`);
       return;
     }
-    const video = this.videoEl?.nativeElement;
-    const canvas = this.canvasEl?.nativeElement;
-    if (!video || !canvas || !this.cameraReady()) {
-      this.error.set("La caméra n'est pas prête.");
+    const file = await this.captureBlobAsFile();
+    if (!file) {
+      this.error.set(this.cameraReady() ? "Impossible d'acquérir l'image." : "La caméra n'est pas prête.");
       return;
     }
-
-    canvas.width = video.videoWidth || 1280;
-    canvas.height = video.videoHeight || 720;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) {
-      return;
+    const edited = await this.openImageEditor(file, 'Recadrer la capture');
+    if (edited) {
+      this.addNewPhoto(edited);
     }
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-    const blob = await new Promise<Blob | null>((resolve) =>
-      canvas.toBlob((b) => resolve(b), 'image/jpeg', 0.9)
-    );
-    if (!blob) {
-      this.error.set("Impossible d'acquérir l'image.");
-      return;
-    }
-
-    this.addNewPhoto(new File([blob], `piece-${Date.now()}.jpg`, { type: 'image/jpeg' }));
   }
 
   /** Capture (ou dernière photo) puis analyse IA de l'étiquette → préremplit le formulaire. */
@@ -438,9 +414,15 @@ export class DeviceFormComponent implements OnInit, AfterViewInit, OnDestroy {
       return;
     }
 
-    // Conserve aussi l'image dans la galerie si elle vient de la caméra et qu'on peut encore ajouter
-    const alreadyStored = this.newPhotos().some((p) => p.file === file);
-    if (!alreadyStored && this.canAddPhoto()) {
+    // Propose un recadrage avant le scan (étiquette plus nette pour l'IA)
+    const edited = await this.openImageEditor(file, 'Recadrer l’étiquette pour le scan IA');
+    if (!edited) {
+      return;
+    }
+    file = edited;
+
+    // Conserve aussi l'image dans la galerie si on peut encore ajouter
+    if (this.canAddPhoto()) {
       this.addNewPhoto(file);
     }
 
@@ -527,8 +509,8 @@ export class DeviceFormComponent implements OnInit, AfterViewInit, OnDestroy {
     this.fileInput?.nativeElement.click();
   }
 
-  /** Traite les fichiers image sélectionnés depuis la galerie. */
-  onGallerySelected(event: Event): void {
+  /** Traite les fichiers image sélectionnés depuis la galerie (édition avant ajout). */
+  async onGallerySelected(event: Event): Promise<void> {
     const input = event.target as HTMLInputElement;
     const files = Array.from(input.files ?? []);
     input.value = '';
@@ -541,8 +523,29 @@ export class DeviceFormComponent implements OnInit, AfterViewInit, OnDestroy {
         this.error.set('Seules les images sont acceptées.');
         continue;
       }
-      this.addNewPhoto(file);
+      const edited = await this.openImageEditor(file, 'Recadrer l’image');
+      if (edited) {
+        this.addNewPhoto(edited);
+      }
     }
+  }
+
+  /** Ouvre l'éditeur (zoom / recadrage) sur une nouvelle photo déjà ajoutée. */
+  async editNewPhoto(index: number): Promise<void> {
+    const current = this.newPhotos()[index];
+    if (!current) {
+      return;
+    }
+    const edited = await this.openImageEditor(current.file, 'Modifier l’image');
+    if (!edited) {
+      return;
+    }
+    URL.revokeObjectURL(current.previewUrl);
+    this.newPhotos.update((list) => {
+      const next = [...list];
+      next[index] = { file: edited, previewUrl: URL.createObjectURL(edited) };
+      return next;
+    });
   }
 
   /** Retire une photo déjà enregistrée de la liste à conserver. */
@@ -575,6 +578,61 @@ export class DeviceFormComponent implements OnInit, AfterViewInit, OnDestroy {
       return;
     }
 
+    if (this.hasMarqueMismatch()) {
+      this.marqueMismatchOpen.set(true);
+      return;
+    }
+
+    this.saveDevice();
+  }
+
+  /** L'utilisateur confirme l'enregistrement malgré le décalage de marques. */
+  confirmMarqueMismatch(): void {
+    this.marqueMismatchOpen.set(false);
+    this.saveDevice();
+  }
+
+  /** Ferme l'avertissement sans enregistrer. */
+  cancelMarqueMismatch(): void {
+    this.marqueMismatchOpen.set(false);
+  }
+
+  /** Message détaillé pour la popup d'incompatibilité SFM / MAS. */
+  marqueMismatchMessage(): string {
+    const sfmId = this.form.controls.sfmId.value;
+    const masId = this.form.controls.masId.value;
+    const sfm = this.sfms().find((s) => s.id === sfmId);
+    const mas = this.masses().find((m) => m.id === masId);
+    const sfmMarques =
+      sfm?.marques?.map((m) => m.label).filter(Boolean).join(', ') ||
+      'aucune marque définie';
+    const masMarque = mas?.marqueLabel || mas?.marque || '—';
+    return (
+      `La marque de la MAS « ${mas?.numero || '—'} » (${masMarque}) ` +
+      `ne fait pas partie des marques du SFM « ${sfm?.nom || '—'} » (${sfmMarques}). ` +
+      `Vous pouvez tout de même enregistrer la pièce détachée.`
+    );
+  }
+
+  private hasMarqueMismatch(): boolean {
+    const sfmId = this.form.controls.sfmId.value;
+    const masId = this.form.controls.masId.value;
+    if (sfmId == null || masId == null) {
+      return false;
+    }
+    const sfm = this.sfms().find((s) => s.id === sfmId);
+    const mas = this.masses().find((m) => m.id === masId);
+    if (!sfm || !mas) {
+      return false;
+    }
+    const marqueIds = new Set(sfm.marqueIds ?? sfm.marques?.map((m) => m.id) ?? []);
+    if (marqueIds.size === 0) {
+      return false;
+    }
+    return !marqueIds.has(mas.marqueId);
+  }
+
+  private saveDevice(): void {
     const keepPhotoIds = this.existingPhotos()
       .map((p) => p.id)
       .filter((id) => id > 0);
@@ -729,6 +787,19 @@ export class DeviceFormComponent implements OnInit, AfterViewInit, OnDestroy {
     const m = String(d.getMonth() + 1).padStart(2, '0');
     const day = String(d.getDate()).padStart(2, '0');
     return `${y}-${m}-${day}`;
+  }
+
+  /** Ouvre l'éditeur d'image (zoom, recadrage, rotation, miroir). */
+  private async openImageEditor(file: File, title: string): Promise<File | null> {
+    const ref = this.dialog.open(ImageEditorDialogComponent, {
+      data: { file, title },
+      width: 'min(960px, 96vw)',
+      maxHeight: '94vh',
+      autoFocus: false,
+      disableClose: true
+    });
+    const result = await firstValueFrom(ref.afterClosed());
+    return result ?? null;
   }
 
   private addNewPhoto(file: File): void {
