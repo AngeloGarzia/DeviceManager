@@ -1,196 +1,201 @@
 <section class="grid gap-4">
   <header>
     <h1 class="page-title">Paramètres</h1>
-    <p class="page-subtitle">Réservés à l’administrateur</p>
+    <p class="page-subtitle">Réservés à l’administrateur — tuiles repliées par défaut</p>
   </header>
 
-  <mat-card class="!rounded-xl !border !border-line !shadow-soft">
-    <mat-card-content class="!pt-5">
-      <div class="mb-4 flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h2 class="m-0 text-base font-semibold text-ink">Ateliers</h2>
-          <p class="mt-1 text-sm text-ink-soft">Gérez les ateliers du groupe ({{ auth.groupeNom() || '—' }}).</p>
-        </div>
-        <button mat-stroked-button type="button" color="primary" (click)="startCreateAtelier()">
-          <mat-icon>add</mat-icon>
-          Nouvel atelier
-        </button>
+  <mat-card class="setup-tile !rounded-xl !border !border-line !shadow-soft">
+    <button type="button" class="setup-tile-toggle" (click)="toggleTile('ateliers')" [attr.aria-expanded]="isTileOpen('ateliers')">
+      <div class="min-w-0 text-left">
+        <h2 class="m-0 text-base font-semibold text-ink">Ateliers</h2>
+        <p class="mt-0.5 text-sm text-ink-soft">Gérez les ateliers du groupe ({{ auth.groupeNom() || '—' }}).</p>
       </div>
-
-      @if (atelierError()) {
-        <p class="mb-3 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{{ atelierError() }}</p>
-      }
-      @if (atelierSuccess()) {
-        <p class="mb-3 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800">{{ atelierSuccess() }}</p>
-      }
-
-      @if (ateliersLoading()) {
-        <div class="flex justify-center py-8"><mat-spinner diameter="32"></mat-spinner></div>
-      } @else {
-        <div class="mb-5 grid gap-2">
-          @if (ateliers().length === 0) {
-            <p class="m-0 text-sm text-ink-soft">Aucun atelier pour ce groupe.</p>
-          } @else {
-            @for (item of ateliers(); track item.id) {
-              <div class="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-line px-3 py-2.5">
-                <div class="min-w-0">
-                  <div class="font-medium text-ink">{{ item.nom }}</div>
-                  <div class="text-xs text-ink-soft">{{ item.casinoNom }}</div>
-                  @if (item.coordonnees?.emails?.length || item.coordonnees?.telephones?.length || item.responsables?.length) {
-                    <div class="mt-1 text-xs text-ink-faint">
-                      @if (item.coordonnees?.emails?.[0]?.valeur) {
-                        {{ item.coordonnees?.emails?.[0]?.valeur }}
-                      }
-                      @if (item.coordonnees?.telephones?.[0]?.valeur) {
-                        · {{ item.coordonnees?.telephones?.[0]?.valeur }}
-                      }
-                      @if (item.responsables?.length) {
-                        · {{ item.responsables?.length }} resp.
-                      }
-                    </div>
-                  }
-                </div>
-                <div class="flex shrink-0 gap-1">
-                  <button mat-button type="button" (click)="startEditAtelier(item)">Éditer</button>
-                  <button mat-button type="button" color="warn" (click)="askDeleteAtelier(item)">Suppr.</button>
-                </div>
-              </div>
-            }
-          }
+      <mat-icon>{{ isTileOpen('ateliers') ? 'expand_less' : 'expand_more' }}</mat-icon>
+    </button>
+    @if (isTileOpen('ateliers')) {
+      <mat-card-content class="!pt-0">
+        <div class="mb-4 flex flex-wrap justify-end gap-2">
+          <button mat-stroked-button type="button" color="primary" (click)="startCreateAtelier()">
+            <mat-icon>add</mat-icon>
+            Nouvel atelier
+          </button>
         </div>
 
-        <form class="grid gap-3 sm:grid-cols-2" [formGroup]="atelierForm" (ngSubmit)="saveAtelier()">
-          <h3 class="sm:col-span-2 m-0 text-sm font-semibold text-ink">{{ atelierFormTitle() }}</h3>
-          <mat-form-field appearance="outline">
-            <mat-label>Nom de l’atelier</mat-label>
-            <input matInput formControlName="nom" maxlength="160" />
-          </mat-form-field>
-          <mat-form-field appearance="outline">
-            <mat-label>Casino</mat-label>
-            <mat-select formControlName="casinoId">
-              @for (c of casinos(); track c.id) {
-                <mat-option [value]="c.id">{{ c.nom }}</mat-option>
-              }
-            </mat-select>
-          </mat-form-field>
+        @if (atelierError()) {
+          <p class="mb-3 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{{ atelierError() }}</p>
+        }
+        @if (atelierSuccess()) {
+          <p class="mb-3 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800">{{ atelierSuccess() }}</p>
+        }
 
-          <h4 class="sm:col-span-2 m-0 mt-2 text-sm font-semibold text-ink">Adresse</h4>
-          <mat-form-field appearance="outline" class="sm:col-span-2">
-            <mat-label>Ligne 1</mat-label>
-            <input matInput formControlName="ligne1" />
-          </mat-form-field>
-          <mat-form-field appearance="outline" class="sm:col-span-2">
-            <mat-label>Ligne 2</mat-label>
-            <input matInput formControlName="ligne2" />
-          </mat-form-field>
-          <mat-form-field appearance="outline">
-            <mat-label>Code postal</mat-label>
-            <input matInput formControlName="codePostal" />
-          </mat-form-field>
-          <mat-form-field appearance="outline">
-            <mat-label>Ville</mat-label>
-            <input matInput formControlName="ville" />
-          </mat-form-field>
-          <mat-form-field appearance="outline" class="sm:col-span-2">
-            <mat-label>Pays</mat-label>
-            <input matInput formControlName="pays" />
-          </mat-form-field>
-
-          <div class="sm:col-span-2 mt-2 flex items-center justify-between">
-            <h4 class="m-0 text-sm font-semibold text-ink">E-mails</h4>
-            <button mat-stroked-button type="button" (click)="addEmail()">
-              <mat-icon>add</mat-icon>
-              Ajouter
-            </button>
-          </div>
-          <div class="sm:col-span-2 grid gap-2" formArrayName="emails">
-            @for (ctrl of emails.controls; track $index; let i = $index) {
-              <div class="grid gap-2 rounded-lg border border-line p-3 sm:grid-cols-[1fr_auto_auto]" [formGroupName]="i">
-                <mat-form-field appearance="outline">
-                  <mat-label>E-mail</mat-label>
-                  <input matInput type="email" formControlName="valeur" />
-                </mat-form-field>
-                <mat-checkbox formControlName="principal" class="self-center">Principal</mat-checkbox>
-                <button mat-button type="button" color="warn" class="self-center" (click)="removeEmail(i)">Retirer</button>
-              </div>
-            }
-          </div>
-
-          <div class="sm:col-span-2 mt-2 flex items-center justify-between">
-            <h4 class="m-0 text-sm font-semibold text-ink">Téléphones</h4>
-            <button mat-stroked-button type="button" (click)="addTelephone()">
-              <mat-icon>add</mat-icon>
-              Ajouter
-            </button>
-          </div>
-          <div class="sm:col-span-2 grid gap-2" formArrayName="telephones">
-            @for (ctrl of telephones.controls; track $index; let i = $index) {
-              <div class="grid gap-2 rounded-lg border border-line p-3 sm:grid-cols-[1fr_1fr_auto_auto]" [formGroupName]="i">
-                <mat-form-field appearance="outline">
-                  <mat-label>Numéro</mat-label>
-                  <input matInput formControlName="valeur" />
-                </mat-form-field>
-                <mat-form-field appearance="outline">
-                  <mat-label>Libellé</mat-label>
-                  <input matInput formControlName="label" placeholder="Mobile, fixe…" />
-                </mat-form-field>
-                <mat-checkbox formControlName="principal" class="self-center">Principal</mat-checkbox>
-                <button mat-button type="button" color="warn" class="self-center" (click)="removeTelephone(i)">Retirer</button>
-              </div>
-            }
-          </div>
-
-          <div class="sm:col-span-2 mt-2 flex items-center justify-between">
-            <h4 class="m-0 text-sm font-semibold text-ink">Réseaux sociaux</h4>
-            <button mat-stroked-button type="button" (click)="addReseau()">
-              <mat-icon>add</mat-icon>
-              Ajouter
-            </button>
-          </div>
-          <div class="sm:col-span-2 grid gap-2" formArrayName="reseauxSociaux">
-            @if (reseauxSociaux.length === 0) {
-              <p class="m-0 text-sm text-ink-soft">Aucun réseau social.</p>
-            }
-            @for (ctrl of reseauxSociaux.controls; track $index; let i = $index) {
-              <div class="grid gap-2 rounded-lg border border-line p-3 sm:grid-cols-[10rem_1fr_auto]" [formGroupName]="i">
-                <mat-form-field appearance="outline">
-                  <mat-label>Type</mat-label>
-                  <mat-select formControlName="type">
-                    @for (t of reseauTypes; track t.value) {
-                      <mat-option [value]="t.value">{{ t.label }}</mat-option>
+        @if (ateliersLoading()) {
+          <div class="flex justify-center py-8"><mat-spinner diameter="32"></mat-spinner></div>
+        } @else {
+          <div class="mb-5 grid gap-2">
+            @if (ateliers().length === 0) {
+              <p class="m-0 text-sm text-ink-soft">Aucun atelier pour ce groupe.</p>
+            } @else {
+              @for (item of ateliers(); track item.id) {
+                <div class="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-line px-3 py-2.5">
+                  <div class="min-w-0">
+                    <div class="font-medium text-ink">{{ item.nom }}</div>
+                    <div class="text-xs text-ink-soft">{{ item.casinoNom }}</div>
+                    @if (item.coordonnees?.emails?.length || item.coordonnees?.telephones?.length || item.responsables?.length) {
+                      <div class="mt-1 text-xs text-ink-faint">
+                        @if (item.coordonnees?.emails?.[0]?.valeur) {
+                          {{ item.coordonnees?.emails?.[0]?.valeur }}
+                        }
+                        @if (item.coordonnees?.telephones?.[0]?.valeur) {
+                          · {{ item.coordonnees?.telephones?.[0]?.valeur }}
+                        }
+                        @if (item.responsables?.length) {
+                          · {{ item.responsables?.length }} resp.
+                        }
+                      </div>
                     }
-                  </mat-select>
-                </mat-form-field>
-                <mat-form-field appearance="outline">
-                  <mat-label>URL</mat-label>
-                  <input matInput formControlName="url" />
-                </mat-form-field>
-                <button mat-button type="button" color="warn" class="self-center" (click)="removeReseau(i)">Retirer</button>
-              </div>
-            }
-          </div>
-
-          <mat-form-field appearance="outline" class="sm:col-span-2">
-            <mat-label>Responsables</mat-label>
-            <mat-select formControlName="responsableIds" multiple>
-              @for (u of groupeUsers(); track u.id) {
-                <mat-option [value]="u.id">{{ responsableLabel(u) }}</mat-option>
+                  </div>
+                  <div class="flex shrink-0 gap-1">
+                    <button mat-button type="button" (click)="startEditAtelier(item)">Éditer</button>
+                    <button mat-button type="button" color="warn" (click)="askDeleteAtelier(item)">Suppr.</button>
+                  </div>
+                </div>
               }
-            </mat-select>
-            <mat-hint>Comptes utilisateurs du groupe liés à cet atelier</mat-hint>
-          </mat-form-field>
-
-          <div class="sm:col-span-2 flex flex-wrap justify-end gap-2">
-            @if (editingAtelierId() != null) {
-              <button mat-stroked-button type="button" (click)="cancelAtelierEdit()">Annuler</button>
             }
-            <button mat-flat-button color="primary" type="submit" [disabled]="atelierSaving() || casinos().length === 0">
-              {{ atelierSaving() ? 'Enregistrement…' : editingAtelierId() == null ? 'Créer l’atelier' : 'Enregistrer' }}
-            </button>
           </div>
-        </form>
-      }
-    </mat-card-content>
+
+          <form class="grid gap-3 sm:grid-cols-2" [formGroup]="atelierForm" (ngSubmit)="saveAtelier()">
+            <h3 class="sm:col-span-2 m-0 text-sm font-semibold text-ink">{{ atelierFormTitle() }}</h3>
+            <mat-form-field appearance="outline">
+              <mat-label>Nom de l’atelier</mat-label>
+              <input matInput formControlName="nom" maxlength="160" />
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Casino</mat-label>
+              <mat-select formControlName="casinoId">
+                @for (c of casinos(); track c.id) {
+                  <mat-option [value]="c.id">{{ c.nom }}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+
+            <h4 class="sm:col-span-2 m-0 mt-2 text-sm font-semibold text-ink">Adresse</h4>
+            <mat-form-field appearance="outline" class="sm:col-span-2">
+              <mat-label>Ligne 1</mat-label>
+              <input matInput formControlName="ligne1" />
+            </mat-form-field>
+            <mat-form-field appearance="outline" class="sm:col-span-2">
+              <mat-label>Ligne 2</mat-label>
+              <input matInput formControlName="ligne2" />
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Code postal</mat-label>
+              <input matInput formControlName="codePostal" />
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Ville</mat-label>
+              <input matInput formControlName="ville" />
+            </mat-form-field>
+            <mat-form-field appearance="outline" class="sm:col-span-2">
+              <mat-label>Pays</mat-label>
+              <input matInput formControlName="pays" />
+            </mat-form-field>
+
+            <div class="sm:col-span-2 mt-2 flex items-center justify-between">
+              <h4 class="m-0 text-sm font-semibold text-ink">E-mails</h4>
+              <button mat-stroked-button type="button" (click)="addEmail()">
+                <mat-icon>add</mat-icon>
+                Ajouter
+              </button>
+            </div>
+            <div class="sm:col-span-2 grid gap-2" formArrayName="emails">
+              @for (ctrl of emails.controls; track $index; let i = $index) {
+                <div class="grid gap-2 rounded-lg border border-line p-3 sm:grid-cols-[1fr_auto_auto]" [formGroupName]="i">
+                  <mat-form-field appearance="outline">
+                    <mat-label>E-mail</mat-label>
+                    <input matInput type="email" formControlName="valeur" />
+                  </mat-form-field>
+                  <mat-checkbox formControlName="principal" class="self-center">Principal</mat-checkbox>
+                  <button mat-button type="button" color="warn" class="self-center" (click)="removeEmail(i)">Retirer</button>
+                </div>
+              }
+            </div>
+
+            <div class="sm:col-span-2 mt-2 flex items-center justify-between">
+              <h4 class="m-0 text-sm font-semibold text-ink">Téléphones</h4>
+              <button mat-stroked-button type="button" (click)="addTelephone()">
+                <mat-icon>add</mat-icon>
+                Ajouter
+              </button>
+            </div>
+            <div class="sm:col-span-2 grid gap-2" formArrayName="telephones">
+              @for (ctrl of telephones.controls; track $index; let i = $index) {
+                <div class="grid gap-2 rounded-lg border border-line p-3 sm:grid-cols-[1fr_1fr_auto_auto]" [formGroupName]="i">
+                  <mat-form-field appearance="outline">
+                    <mat-label>Numéro</mat-label>
+                    <input matInput formControlName="valeur" />
+                  </mat-form-field>
+                  <mat-form-field appearance="outline">
+                    <mat-label>Libellé</mat-label>
+                    <input matInput formControlName="label" placeholder="Mobile, fixe…" />
+                  </mat-form-field>
+                  <mat-checkbox formControlName="principal" class="self-center">Principal</mat-checkbox>
+                  <button mat-button type="button" color="warn" class="self-center" (click)="removeTelephone(i)">Retirer</button>
+                </div>
+              }
+            </div>
+
+            <div class="sm:col-span-2 mt-2 flex items-center justify-between">
+              <h4 class="m-0 text-sm font-semibold text-ink">Réseaux sociaux</h4>
+              <button mat-stroked-button type="button" (click)="addReseau()">
+                <mat-icon>add</mat-icon>
+                Ajouter
+              </button>
+            </div>
+            <div class="sm:col-span-2 grid gap-2" formArrayName="reseauxSociaux">
+              @if (reseauxSociaux.length === 0) {
+                <p class="m-0 text-sm text-ink-soft">Aucun réseau social.</p>
+              }
+              @for (ctrl of reseauxSociaux.controls; track $index; let i = $index) {
+                <div class="grid gap-2 rounded-lg border border-line p-3 sm:grid-cols-[10rem_1fr_auto]" [formGroupName]="i">
+                  <mat-form-field appearance="outline">
+                    <mat-label>Type</mat-label>
+                    <mat-select formControlName="type">
+                      @for (t of reseauTypes; track t.value) {
+                        <mat-option [value]="t.value">{{ t.label }}</mat-option>
+                      }
+                    </mat-select>
+                  </mat-form-field>
+                  <mat-form-field appearance="outline">
+                    <mat-label>URL</mat-label>
+                    <input matInput formControlName="url" />
+                  </mat-form-field>
+                  <button mat-button type="button" color="warn" class="self-center" (click)="removeReseau(i)">Retirer</button>
+                </div>
+              }
+            </div>
+
+            <mat-form-field appearance="outline" class="sm:col-span-2">
+              <mat-label>Responsables</mat-label>
+              <mat-select formControlName="responsableIds" multiple>
+                @for (u of groupeUsers(); track u.id) {
+                  <mat-option [value]="u.id">{{ responsableLabel(u) }}</mat-option>
+                }
+              </mat-select>
+              <mat-hint>Comptes utilisateurs du groupe liés à cet atelier</mat-hint>
+            </mat-form-field>
+
+            <div class="sm:col-span-2 flex flex-wrap justify-end gap-2">
+              @if (editingAtelierId() != null) {
+                <button mat-stroked-button type="button" (click)="cancelAtelierEdit()">Annuler</button>
+              }
+              <button mat-flat-button color="primary" type="submit" [disabled]="atelierSaving() || casinos().length === 0">
+                {{ atelierSaving() ? 'Enregistrement…' : editingAtelierId() == null ? 'Créer l’atelier' : 'Enregistrer' }}
+              </button>
+            </div>
+          </form>
+        }
+      </mat-card-content>
+    }
   </mat-card>
 
   @if (loading()) {
@@ -198,75 +203,85 @@
   } @else {
     <form class="grid gap-4" [formGroup]="form" (ngSubmit)="submit()">
       @for (entry of categories(); track entry[0]) {
-        <mat-card class="!rounded-xl !border !border-line !shadow-soft">
-          <mat-card-content class="!pt-5">
-            <h2 class="m-0 mb-4 text-base font-semibold text-ink">{{ entry[0] }}</h2>
-            <div class="grid gap-3 sm:grid-cols-2 sm:gap-x-4">
-              @for (item of entry[1]; track item.key) {
-                @if (isBooleanSetting(item.key)) {
-                  <div class="sm:col-span-2 flex items-center justify-between rounded-lg border border-line px-3 py-3">
-                    <span class="text-sm text-ink">{{ item.label }}</span>
-                    <mat-slide-toggle
-                      color="primary"
-                      [checked]="booleanValue(item.key)"
-                      (change)="toggleBoolean(item.key, $event.checked)"
-                    />
-                  </div>
-                } @else if (isAiProviderSetting(item.key)) {
-                  <mat-form-field appearance="outline" class="sm:col-span-2">
-                    <mat-label>{{ item.label }}</mat-label>
-                    <mat-select [formControl]="control(item.key)">
-                      @for (provider of aiProviders; track provider.id) {
-                        <mat-option
-                          [value]="provider.id"
-                          [disabled]="!hasAiProviderKey(provider.id)"
-                          [class.ai-provider-missing]="!hasAiProviderKey(provider.id)"
-                        >
-                          {{ aiProviderOptionLabel(provider) }}
-                        </mat-option>
+        <mat-card class="setup-tile !rounded-xl !border !border-line !shadow-soft">
+          <button
+            type="button"
+            class="setup-tile-toggle"
+            (click)="toggleTile('cat:' + entry[0])"
+            [attr.aria-expanded]="isTileOpen('cat:' + entry[0])"
+          >
+            <h2 class="m-0 text-base font-semibold text-ink">{{ entry[0] }}</h2>
+            <mat-icon>{{ isTileOpen('cat:' + entry[0]) ? 'expand_less' : 'expand_more' }}</mat-icon>
+          </button>
+          @if (isTileOpen('cat:' + entry[0])) {
+            <mat-card-content class="!pt-0">
+              <div class="grid gap-3 sm:grid-cols-2 sm:gap-x-4">
+                @for (item of entry[1]; track item.key) {
+                  @if (isBooleanSetting(item.key)) {
+                    <div class="sm:col-span-2 flex items-center justify-between rounded-lg border border-line px-3 py-3">
+                      <span class="text-sm text-ink">{{ item.label }}</span>
+                      <mat-slide-toggle
+                        color="primary"
+                        [checked]="booleanValue(item.key)"
+                        (change)="toggleBoolean(item.key, $event.checked)"
+                      />
+                    </div>
+                  } @else if (isAiProviderSetting(item.key)) {
+                    <mat-form-field appearance="outline" class="sm:col-span-2">
+                      <mat-label>{{ item.label }}</mat-label>
+                      <mat-select [formControl]="control(item.key)">
+                        @for (provider of aiProviders; track provider.id) {
+                          <mat-option
+                            [value]="provider.id"
+                            [disabled]="!hasAiProviderKey(provider.id)"
+                            [class.ai-provider-missing]="!hasAiProviderKey(provider.id)"
+                          >
+                            {{ aiProviderOptionLabel(provider) }}
+                          </mat-option>
+                        }
+                      </mat-select>
+                      <mat-hint>
+                        @if (!aiService.statusLoaded()) {
+                          Chargement de la disponibilité des clés…
+                        } @else if (!providersKeyStatusReady()) {
+                          L’API ne renvoie pas encore les clés fournisseurs — redémarrez le backend.
+                        } @else {
+                          Les fournisseurs sans clé .env sont grisés. Ajoutez la variable
+                          (ex. GROQ_API_KEY) puis redémarrez l’API.
+                        }
+                      </mat-hint>
+                    </mat-form-field>
+                  } @else if (isAiModelSetting(item.key)) {
+                    <mat-form-field appearance="outline" class="sm:col-span-2">
+                      <mat-label>{{ item.label }}</mat-label>
+                      <mat-select [formControl]="control(item.key)">
+                        @for (model of aiModelsForProvider(); track model.value) {
+                          <mat-option [value]="model.value">{{ model.label }}</mat-option>
+                        }
+                        @if (isCustomAiModel(item.key)) {
+                          <mat-option [value]="control(item.key).value">{{ control(item.key).value }} (actuel)</mat-option>
+                        }
+                      </mat-select>
+                      <mat-hint>Privilégiez un modèle « vision » pour le scan d’étiquette</mat-hint>
+                    </mat-form-field>
+                  } @else {
+                    <mat-form-field appearance="outline" class="sm:col-span-2">
+                      <mat-label>{{ item.label }}</mat-label>
+                      <input
+                        matInput
+                        [type]="item.secret ? 'password' : 'text'"
+                        [formControl]="control(item.key)"
+                        [attr.autocomplete]="item.secret ? 'new-password' : null"
+                      />
+                      @if (item.secret) {
+                        <mat-hint>Laisser ******** pour conserver la valeur actuelle</mat-hint>
                       }
-                    </mat-select>
-                    <mat-hint>
-                      @if (!aiService.statusLoaded()) {
-                        Chargement de la disponibilité des clés…
-                      } @else if (!providersKeyStatusReady()) {
-                        L’API ne renvoie pas encore les clés fournisseurs — redémarrez le backend.
-                      } @else {
-                        Les fournisseurs sans clé .env sont grisés. Ajoutez la variable
-                        (ex. GROQ_API_KEY) puis redémarrez l’API.
-                      }
-                    </mat-hint>
-                  </mat-form-field>
-                } @else if (isAiModelSetting(item.key)) {
-                  <mat-form-field appearance="outline" class="sm:col-span-2">
-                    <mat-label>{{ item.label }}</mat-label>
-                    <mat-select [formControl]="control(item.key)">
-                      @for (model of aiModelsForProvider(); track model.value) {
-                        <mat-option [value]="model.value">{{ model.label }}</mat-option>
-                      }
-                      @if (isCustomAiModel(item.key)) {
-                        <mat-option [value]="control(item.key).value">{{ control(item.key).value }} (actuel)</mat-option>
-                      }
-                    </mat-select>
-                    <mat-hint>Privilégiez un modèle « vision » pour le scan d’étiquette</mat-hint>
-                  </mat-form-field>
-                } @else {
-                  <mat-form-field appearance="outline" class="sm:col-span-2">
-                    <mat-label>{{ item.label }}</mat-label>
-                    <input
-                      matInput
-                      [type]="item.secret ? 'password' : 'text'"
-                      [formControl]="control(item.key)"
-                      [attr.autocomplete]="item.secret ? 'new-password' : null"
-                    />
-                    @if (item.secret) {
-                      <mat-hint>Laisser ******** pour conserver la valeur actuelle</mat-hint>
-                    }
-                  </mat-form-field>
+                    </mat-form-field>
+                  }
                 }
-              }
-            </div>
-          </mat-card-content>
+              </div>
+            </mat-card-content>
+          }
         </mat-card>
       }
 
@@ -297,6 +312,79 @@
     </form>
   }
 
+  <mat-card class="setup-tile !rounded-xl !border !border-line !shadow-soft">
+    <button type="button" class="setup-tile-toggle" (click)="toggleTile('logs')" [attr.aria-expanded]="isTileOpen('logs')">
+      <div class="min-w-0 text-left">
+        <h2 class="m-0 text-base font-semibold text-ink">Logs applicatifs</h2>
+        <p class="mt-0.5 text-sm text-ink-soft">
+          Journal SLF4J en base ({{ logTotal() }} / {{ logRetention() }}) — admins uniquement
+        </p>
+      </div>
+      <mat-icon>{{ isTileOpen('logs') ? 'expand_less' : 'expand_more' }}</mat-icon>
+    </button>
+    @if (isTileOpen('logs')) {
+      <mat-card-content class="!pt-0">
+        <div class="mb-3 flex flex-wrap gap-2">
+          <button mat-stroked-button type="button" (click)="reloadLogs()" [disabled]="logsLoading()">
+            <mat-icon>refresh</mat-icon>
+            Actualiser
+          </button>
+          <button mat-stroked-button color="warn" type="button" (click)="askClearLogs()">
+            <mat-icon>delete_sweep</mat-icon>
+            Vider
+          </button>
+        </div>
+
+        <div class="mb-3 grid gap-3 md:grid-cols-4">
+          <mat-form-field appearance="outline" subscriptSizing="dynamic">
+            <mat-label>Niveau min.</mat-label>
+            <mat-select [(ngModel)]="logLevel" [ngModelOptions]="{standalone: true}" (selectionChange)="reloadLogs()">
+              <mat-option value="TRACE">TRACE</mat-option>
+              <mat-option value="DEBUG">DEBUG</mat-option>
+              <mat-option value="INFO">INFO</mat-option>
+              <mat-option value="WARN">WARN</mat-option>
+              <mat-option value="ERROR">ERROR</mat-option>
+            </mat-select>
+          </mat-form-field>
+          <mat-form-field appearance="outline" subscriptSizing="dynamic">
+            <mat-label>Logger</mat-label>
+            <input matInput [(ngModel)]="logLogger" [ngModelOptions]="{standalone: true}" (keyup.enter)="reloadLogs()" />
+          </mat-form-field>
+          <mat-form-field appearance="outline" subscriptSizing="dynamic" class="md:col-span-2">
+            <mat-label>Recherche</mat-label>
+            <input matInput [(ngModel)]="logQuery" [ngModelOptions]="{standalone: true}" (keyup.enter)="reloadLogs()" />
+          </mat-form-field>
+        </div>
+
+        @if (logsError()) {
+          <p class="mb-3 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{{ logsError() }}</p>
+        }
+
+        @if (logsLoading() && logItems().length === 0) {
+          <div class="flex justify-center py-8"><mat-spinner diameter="32"></mat-spinner></div>
+        } @else if (logItems().length === 0) {
+          <p class="m-0 text-sm text-ink-soft">Aucun log en base pour ces filtres.</p>
+        } @else {
+          <ul class="log-list m-0 list-none overflow-auto rounded-lg border border-line p-0">
+            @for (entry of logItems(); track entry.id) {
+              <li class="log-row border-b border-line px-3 py-2 last:border-b-0">
+                <div class="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-xs">
+                  <span class="font-mono text-ink-faint">{{ entry.timestamp | date: 'dd/MM HH:mm:ss.SSS' }}</span>
+                  <span class="level-badge" [ngClass]="logLevelClass(entry.level)">{{ entry.level }}</span>
+                  <span class="truncate font-mono text-ink-soft" [title]="entry.logger">{{ entry.logger }}</span>
+                </div>
+                <pre class="m-0 mt-1 whitespace-pre-wrap break-words font-mono text-sm">{{ entry.message }}</pre>
+                @if (entry.throwable) {
+                  <pre class="m-0 mt-1 whitespace-pre-wrap break-words font-mono text-xs text-rose-800">{{ entry.throwable }}</pre>
+                }
+              </li>
+            }
+          </ul>
+        }
+      </mat-card-content>
+    }
+  </mat-card>
+
   <app-confirm-dialog
     [open]="confirmDeleteOpen()"
     title="Supprimer l’atelier ?"
@@ -307,5 +395,14 @@
     "
     (confirm)="confirmDeleteAtelier()"
     (cancel)="cancelDeleteAtelier()"
+  />
+
+  <app-confirm-dialog
+    [open]="confirmClearLogs()"
+    title="Vider les logs ?"
+    message="Toutes les entrées de la table app_log seront supprimées."
+    confirmLabel="Vider"
+    (confirm)="doClearLogs()"
+    (cancel)="confirmClearLogs.set(false)"
   />
 </section>

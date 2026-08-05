@@ -26,11 +26,28 @@ jobs:
           java-version: "21"
           cache: maven
 
-      - name: Tests
+      - name: Tests + JaCoCo
         run: mvn -B test
+
+      - name: Checkstyle
+        run: mvn -B -DskipTests checkstyle:check
+
+      - name: SpotBugs
+        run: mvn -B -DskipTests spotbugs:check
+
+      - name: JaCoCo coverage gate
+        run: mvn -B -DskipTests jacoco:check
 
       - name: Package
         run: mvn -B -DskipTests package
+
+      - name: Upload JaCoCo report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jacoco-report
+          path: backend/target/site/jacoco/
+          if-no-files-found: ignore
 
   frontend:
     name: Frontend (Angular)

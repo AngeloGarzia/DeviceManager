@@ -19,6 +19,7 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Arrays;
 import java.util.Iterator;
 
 /**
@@ -67,8 +68,9 @@ public class ImageOptimizationService {
                     jpegBytes.length
             );
 
+            String partName = file.getName();
             return new OptimizedMultipartFile(
-                    file.getName() == null ? "photo" : file.getName(),
+                    partName.isBlank() ? "photo" : partName,
                     filename,
                     MediaType.IMAGE_JPEG_VALUE,
                     jpegBytes
@@ -170,7 +172,7 @@ public class ImageOptimizationService {
             this.name = name;
             this.originalFilename = originalFilename;
             this.contentType = contentType;
-            this.content = content;
+            this.content = Arrays.copyOf(content, content.length);
         }
 
         @Override
@@ -200,7 +202,7 @@ public class ImageOptimizationService {
 
         @Override
         public byte[] getBytes() {
-            return content;
+            return Arrays.copyOf(content, content.length);
         }
 
         @Override

@@ -13,6 +13,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Arrays;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -25,7 +26,7 @@ import java.util.UUID;
 @Service
 @ConditionalOnProperty(name = "app.s3.enabled", havingValue = "false", matchIfMissing = true)
 @Slf4j
-public class LocalStorageService implements StorageService {
+public final class LocalStorageService implements StorageService {
 
     private final Path root;
     private final JdbcTemplate jdbcTemplate;
@@ -214,5 +215,13 @@ public class LocalStorageService implements StorageService {
      * @param fileSize taille en octets
      */
     public record StoredObjectBytes(byte[] data, String contentType, Long fileSize) {
+        public StoredObjectBytes {
+            data = data == null ? null : Arrays.copyOf(data, data.length);
+        }
+
+        @Override
+        public byte[] data() {
+            return data == null ? null : Arrays.copyOf(data, data.length);
+        }
     }
 }

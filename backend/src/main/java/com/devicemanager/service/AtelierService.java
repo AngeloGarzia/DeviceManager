@@ -272,8 +272,10 @@ public class AtelierService {
                         : atelier.getResponsables().stream()
                                 .map(this::toResponsableDto)
                                 .sorted((a, b) -> {
-                                    String la = ((a.getNom() == null ? "" : a.getNom()) + " " + (a.getPrenom() == null ? "" : a.getPrenom())).trim();
-                                    String lb = ((b.getNom() == null ? "" : b.getNom()) + " " + (b.getPrenom() == null ? "" : b.getPrenom())).trim();
+                                    String la = ((a.getNom() == null ? "" : a.getNom())
+                                            + " " + (a.getPrenom() == null ? "" : a.getPrenom())).trim();
+                                    String lb = ((b.getNom() == null ? "" : b.getNom())
+                                            + " " + (b.getPrenom() == null ? "" : b.getPrenom())).trim();
                                     return la.compareToIgnoreCase(lb);
                                 })
                                 .toList())

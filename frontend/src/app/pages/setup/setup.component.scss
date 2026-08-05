@@ -4,3 +4,56 @@
   color: #9aa3af !important;
   font-style: italic;
 }
+
+.setup-tile-toggle {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 1rem 1rem 0.75rem;
+  margin: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+}
+
+.setup-tile-toggle:hover {
+  background: color-mix(in srgb, #0f172a 3%, transparent);
+}
+
+.log-list {
+  max-height: min(55vh, 560px);
+}
+
+.log-row:nth-child(even) {
+  background: color-mix(in srgb, #f8fafc 90%, transparent);
+}
+
+.level-badge {
+  display: inline-block;
+  border-radius: 0.25rem;
+  padding: 0.1rem 0.4rem;
+  font-weight: 600;
+}
+
+.lvl-error {
+  background: #ffe4e6;
+  color: #9f1239;
+}
+
+.lvl-warn {
+  background: #ffedd5;
+  color: #9a3412;
+}
+
+.lvl-info {
+  background: #e0f2fe;
+  color: #075985;
+}
+
+.lvl-debug {
+  background: #f1f5f9;
+  color: #475569;
+}

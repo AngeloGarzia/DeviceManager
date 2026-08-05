@@ -1,0 +1,12 @@
+<?xml version="1.0"?>
+<!DOCTYPE suppressions PUBLIC
+        "-//Checkstyle//DTD SuppressionFilter Configuration 1.2//EN"
+        "https://checkstyle.org/dtds/suppressions_1_2.dtd">
+<!-- Suppressions Checkstyle ciblées (Lombok / modules générés / cas documentés). -->
+<suppressions>
+    <!-- Javadoc verbose déjà présent ; AtclauseOrder trop bruyant sur DTOs Lombok. -->
+    <suppress checks="JavadocTagContinuationIndentation|NonEmptyAtclauseDescription|AtclauseOrder"
+              files=".*[\\/]dto[\\/].*\.java"/>
+    <suppress checks="JavadocTagContinuationIndentation|NonEmptyAtclauseDescription|AtclauseOrder"
+              files=".*[\\/]entity[\\/].*\.java"/>
+</suppressions>

@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Exclusions SpotBugs : faux positifs Spring / modèles immuables / gabarits texte.
+  Les alertes corrigibles dans le code ne doivent PAS figurer ici.
+-->
+<FindBugsFilter>
+    <!-- Record Provider : List.copyOf déjà immuable ; constructeur/accesseur encore signalés. -->
+    <Match>
+        <Class name="com.devicemanager.ai.AiProviders$Provider"/>
+        <Bug code="EI"/>
+    </Match>
+
+    <!-- Beans Spring injectés (JdbcTemplate, S3Client) : ownership applicatif. -->
+    <Match>
+        <Class name="com.devicemanager.service.LocalStorageService"/>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
+    <Match>
+        <Class name="com.devicemanager.service.S3StorageService"/>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
+
+    <!-- Validation config dans constructeurs Spring (@Value) : échec rapide voulu. -->
+    <Match>
+        <Class name="com.devicemanager.security.JwtService"/>
+        <Bug pattern="CT_CONSTRUCTOR_THROW"/>
+    </Match>
+    <Match>
+        <Class name="com.devicemanager.service.LocalStorageService"/>
+        <Bug pattern="CT_CONSTRUCTOR_THROW"/>
+    </Match>
+
+    <!-- Fallbacks Docker/Render (/app/uploads, /tmp) volontairement absolus. -->
+    <Match>
+        <Class name="com.devicemanager.service.LocalStorageService"/>
+        <Bug pattern="DMI_HARDCODED_ABSOLUTE_FILENAME"/>
+    </Match>
+
+    <!-- Corps e-mail / prompts IA : sauts de ligne \n intentionnels (pas %n JVM). -->
+    <Match>
+        <Class name="com.devicemanager.service.AiAssistantService"/>
+        <Bug pattern="VA_FORMAT_STRING_USES_NEWLINE"/>
+    </Match>
+    <Match>
+        <Class name="com.devicemanager.service.OrderRequestService"/>
+        <Bug pattern="VA_FORMAT_STRING_USES_NEWLINE"/>
+    </Match>
+</FindBugsFilter>

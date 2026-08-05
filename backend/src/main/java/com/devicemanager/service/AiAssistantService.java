@@ -300,8 +300,7 @@ public class AiAssistantService {
 
     /** Clé du fournisseur courant depuis la batterie .env uniquement. */
     private String resolveApiKey(String provider) {
-        String fromEnv = aiApiKeyBattery.keyFor(provider);
-        return fromEnv == null ? "" : fromEnv.trim();
+        return aiApiKeyBattery.keyFor(provider);
     }
 
     private String resolveProviderId() {

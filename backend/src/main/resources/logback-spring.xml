@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+
+    <springProperty name="DM_LOG_LEVEL" source="logging.level.com.devicemanager" defaultValue="INFO"/>
+
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>${CONSOLE_LOG_PATTERN}</pattern>
+            <charset>${CONSOLE_LOG_CHARSET}</charset>
+        </encoder>
+    </appender>
+
+    <!-- Persistance MySQL des logs com.devicemanager (consultation admin / Paramètres) -->
+    <appender name="ADMIN_DB" class="com.devicemanager.logging.AdminDbLogAppender"/>
+
+    <logger name="com.devicemanager" level="${DM_LOG_LEVEL}">
+        <appender-ref ref="ADMIN_DB"/>
+    </logger>
+
+    <logger name="com.devicemanager.logging.AppLogDbWriter" level="INFO" additivity="false">
+        <appender-ref ref="CONSOLE"/>
+    </logger>
+
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+    </root>
+</configuration>

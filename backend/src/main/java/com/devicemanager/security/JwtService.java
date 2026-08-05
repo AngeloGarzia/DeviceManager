@@ -20,7 +20,7 @@ import java.util.Date;
  * ({@link AppSettingsService#JWT_EXPIRATION_MS}).
  */
 @Component
-public class JwtService {
+public final class JwtService {
 
     private final SecretKey key;
     private final long defaultExpirationMs;

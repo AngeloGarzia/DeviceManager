@@ -57,7 +57,7 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ApiError> handleIntegrity(DataIntegrityViolationException ex, HttpServletRequest request) {
-        String raw = ex.getMostSpecificCause() != null ? ex.getMostSpecificCause().getMessage() : ex.getMessage();
+        String raw = ex.getMostSpecificCause().getMessage();
         String lower = raw == null ? "" : raw.toLowerCase();
         String message;
         if (lower.contains("uk_mas_numero") || lower.contains("numero")) {

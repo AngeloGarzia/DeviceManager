@@ -33,7 +33,7 @@ import java.util.List;
  * Sessions désactivées ({@link SessionCreationPolicy#STATELESS}).
  * <p>
  * Accès public : authentification ({@code /api/auth/**}), santé Actuator, fichiers uploadés
- * et requêtes OPTIONS. Gestion des utilisateurs et setup réservés aux admins ; le reste de
+ * et requêtes OPTIONS. Gestion des utilisateurs, setup et logs réservés aux admins ; le reste de
  * l'API métier exige le rôle admin ou technicien.
  */
 @Configuration
@@ -67,6 +67,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/api/users", "/api/users/**").hasRole(Roles.ADMIN)
                         .requestMatchers("/api/setup", "/api/setup/**").hasRole(Roles.ADMIN)
+                        .requestMatchers("/api/logs", "/api/logs/**").hasRole(Roles.ADMIN)
                         .requestMatchers("/api/ateliers", "/api/ateliers/**")
                             .hasAnyRole(Roles.ADMIN, Roles.TECHNICIEN)
                         .requestMatchers("/api/devices", "/api/devices/**")

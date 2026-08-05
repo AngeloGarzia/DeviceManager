@@ -27,6 +27,10 @@ public final class AiProviders {
             String baseUrl,
             List<Model> models
     ) {
+        /** Copie défensive : la liste exposée reste immuable. */
+        public Provider {
+            models = List.copyOf(models);
+        }
     }
 
     /**

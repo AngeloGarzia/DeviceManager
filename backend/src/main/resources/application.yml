@@ -109,6 +109,11 @@ app:
     url: ${APP_KEEPALIVE_URL:}
     interval-ms: ${APP_KEEPALIVE_INTERVAL_MS:840000}
     initial-delay-ms: ${APP_KEEPALIVE_INITIAL_DELAY_MS:60000}
+  logs:
+    # Rétention des logs SLF4J persistés en table app_log (consultation admin)
+    retention-max: ${ADMIN_LOG_RETENTION_MAX:5000}
+    flush-interval-ms: ${ADMIN_LOG_FLUSH_INTERVAL_MS:1000}
+    flush-batch-size: ${ADMIN_LOG_FLUSH_BATCH_SIZE:100}
 
 logging:
   level:

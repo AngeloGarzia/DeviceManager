@@ -12,6 +12,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Initialisation des données de démonstration au démarrage (ordre 2, après {@link SchemaMigrationRunner}).
@@ -87,16 +88,13 @@ public class DataInitializer implements CommandLineRunner {
         });
 
         if (defaultAtelier != null) {
-            Long countSfm = jdbcTemplate.queryForObject(
-                    "SELECT COUNT(*) FROM sfm", Integer.class) == null
-                    ? 0L
-                    : jdbcTemplate.queryForObject("SELECT COUNT(*) FROM sfm", Integer.class).longValue();
+            int countSfm = Optional.ofNullable(
+                    jdbcTemplate.queryForObject("SELECT COUNT(*) FROM sfm", Integer.class)).orElse(0);
             if (countSfm == 0) {
                 seedSfm(defaultAtelier);
             }
-            Long countMas = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM mas", Integer.class) == null
-                    ? 0L
-                    : jdbcTemplate.queryForObject("SELECT COUNT(*) FROM mas", Integer.class).longValue();
+            int countMas = Optional.ofNullable(
+                    jdbcTemplate.queryForObject("SELECT COUNT(*) FROM mas", Integer.class)).orElse(0);
             if (countMas == 0) {
                 seedMas(defaultAtelier);
             }

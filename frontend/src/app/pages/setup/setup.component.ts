@@ -5,6 +5,7 @@ import {
   FormBuilder,
   FormControl,
   FormGroup,
+  FormsModule,
   ReactiveFormsModule,
   Validators
 } from '@angular/forms';
@@ -30,18 +31,21 @@ import { SetupService } from '../../services/setup.service';
 import { AtelierService } from '../../services/atelier.service';
 import { AuthService } from '../../services/auth.service';
 import { AiService } from '../../services/ai.service';
+import { AdminLogEntry, AdminLogService } from '../../services/admin-log.service';
 import { ConfirmDialogComponent } from '../../shared/confirm-dialog.component';
 
 /**
  * Page d'administration initiale et des paramètres applicatifs.
- * Permet la configuration mail, S3, IA, la gestion des ateliers
- * et l'accès réservé aux administrateurs.
+ * Permet la configuration mail, S3, IA, la gestion des ateliers,
+ * la consultation des logs SLF4J en base, et l'accès réservé aux administrateurs.
+ * Les tuiles sont repliées par défaut.
  */
 @Component({
   selector: 'app-setup',
   standalone: true,
   imports: [
     CommonModule,
+    FormsModule,
     ReactiveFormsModule,
     MatButtonModule,
     MatFormFieldModule,
@@ -60,9 +64,13 @@ import { ConfirmDialogComponent } from '../../shared/confirm-dialog.component';
 export class SetupComponent implements OnInit {
   private readonly setupService = inject(SetupService);
   private readonly atelierService = inject(AtelierService);
+  private readonly adminLogService = inject(AdminLogService);
   readonly aiService = inject(AiService);
   readonly auth = inject(AuthService);
   private readonly fb = inject(FormBuilder);
+
+  /** Tuiles ouvertes (vide = toutes fermées par défaut). */
+  private readonly openTiles = signal<Set<string>>(new Set());
 
   readonly loading = signal(false);
   readonly saving = signal(false);
@@ -84,6 +92,17 @@ export class SetupComponent implements OnInit {
   readonly confirmDeleteOpen = signal(false);
   readonly pendingDeleteNom = signal('');
   private pendingDelete: AtelierSummary | null = null;
+
+  readonly logsLoading = signal(false);
+  readonly logsError = signal<string | null>(null);
+  readonly logItems = signal<AdminLogEntry[]>([]);
+  readonly logTotal = signal(0);
+  readonly logRetention = signal(0);
+  readonly confirmClearLogs = signal(false);
+  logLevel = 'INFO';
+  logLogger = '';
+  logQuery = '';
+  private logsLoadedOnce = false;
 
   readonly reseauTypes: { value: TypeReseauSocial; label: string }[] = [
     { value: 'SITE_WEB', label: 'Site web' },
@@ -257,6 +276,77 @@ export class SetupComponent implements OnInit {
     this.aiService.refreshStatus();
     this.load();
     this.loadAteliers();
+  }
+
+  isTileOpen(id: string): boolean {
+    return this.openTiles().has(id);
+  }
+
+  toggleTile(id: string): void {
+    this.openTiles.update((current) => {
+      const next = new Set(current);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+        if (id === 'logs' && !this.logsLoadedOnce) {
+          this.reloadLogs();
+        }
+      }
+      return next;
+    });
+  }
+
+  reloadLogs(): void {
+    this.logsLoading.set(true);
+    this.logsError.set(null);
+    this.logsLoadedOnce = true;
+    this.adminLogService
+      .list({
+        level: this.logLevel || undefined,
+        logger: this.logLogger.trim() || undefined,
+        q: this.logQuery.trim() || undefined,
+        limit: 200
+      })
+      .subscribe({
+        next: (res) => {
+          this.logItems.set(res.items);
+          this.logTotal.set(res.totalCount);
+          this.logRetention.set(res.retentionMax);
+          this.logsLoading.set(false);
+        },
+        error: (err) => {
+          this.logsError.set(err?.error?.message || 'Impossible de charger les logs.');
+          this.logsLoading.set(false);
+        }
+      });
+  }
+
+  askClearLogs(): void {
+    this.confirmClearLogs.set(true);
+  }
+
+  doClearLogs(): void {
+    this.confirmClearLogs.set(false);
+    this.adminLogService.clear().subscribe({
+      next: () => this.reloadLogs(),
+      error: (err) => this.logsError.set(err?.error?.message || 'Échec du vidage des logs.')
+    });
+  }
+
+  logLevelClass(level: string): string {
+    switch ((level || '').toUpperCase()) {
+      case 'ERROR':
+        return 'lvl-error';
+      case 'WARN':
+      case 'WARNING':
+        return 'lvl-warn';
+      case 'DEBUG':
+      case 'TRACE':
+        return 'lvl-debug';
+      default:
+        return 'lvl-info';
+    }
   }
 
   /** Charge la liste des paramètres depuis l'API. */
