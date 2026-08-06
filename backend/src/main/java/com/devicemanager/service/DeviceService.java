@@ -158,8 +158,8 @@ public class DeviceService {
         syncPrimaryPhoto(entity);
 
         Device saved = deviceRepository.save(entity);
-        log.info("Pièce créée: {} / {} ({} photo(s), atelier={})",
-                saved.getNom(), saved.getReference(), saved.getPhotos().size(), atelier.getId());
+        log.info("Création en base — Pièce id={} nom={} référence={} photos={} atelier={}",
+                saved.getId(), saved.getNom(), saved.getReference(), saved.getPhotos().size(), atelier.getId());
         return toResponse(saved);
     }
 
@@ -235,7 +235,14 @@ public class DeviceService {
         addNewPhotos(entity, newFiles);
         syncPrimaryPhoto(entity);
 
-        return toResponse(deviceRepository.save(entity));
+        Device saved = deviceRepository.save(entity);
+        log.info("Modification en base — Pièce id={} nom={} référence={} photos={} atelier={}",
+                saved.getId(),
+                saved.getNom(),
+                saved.getReference(),
+                saved.getPhotos().size(),
+                saved.getAtelier() != null ? saved.getAtelier().getId() : null);
+        return toResponse(saved);
     }
 
     /**
@@ -246,6 +253,9 @@ public class DeviceService {
      */
     public void delete(Long id) {
         Device entity = getEntity(id);
+        Long atelierId = entity.getAtelier() != null ? entity.getAtelier().getId() : null;
+        String nom = entity.getNom();
+        String reference = entity.getReference();
         for (DevicePhoto photo : entity.getPhotos()) {
             if (photo.getPhotoKey() != null) {
                 storageService.delete(photo.getPhotoKey());
@@ -256,6 +266,8 @@ public class DeviceService {
             storageService.delete(entity.getPhotoKey());
         }
         deviceRepository.delete(entity);
+        log.info("Suppression en base — Pièce id={} nom={} référence={} atelier={}",
+                id, nom, reference, atelierId);
     }
 
     private void addNewPhotos(Device entity, List<MultipartFile> files) {

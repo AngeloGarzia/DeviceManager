@@ -42,10 +42,16 @@ public class AuthService {
      */
     @Transactional(readOnly = true)
     public AuthResponse login(LoginRequest request) {
-        User user = userRepository.findByUsername(request.getUsername())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Identifiants invalides"));
+        String attemptedUsername = request.getUsername() == null ? "" : request.getUsername().trim();
+        User user = userRepository.findByUsername(attemptedUsername).orElse(null);
+        if (user == null) {
+            log.warn("Connexion refusée (utilisateur inconnu) username={}", attemptedUsername);
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Identifiants invalides");
+        }
 
         if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
+            log.warn("Connexion refusée (mot de passe invalide) utilisateur={} rôle={}",
+                    user.getUsername(), user.getRole());
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Identifiants invalides");
         }
 
@@ -53,8 +59,11 @@ public class AuthService {
         Long atelierId = resolveLoginAtelierId(user, ateliers);
 
         String token = jwtService.generateToken(user.getUsername(), user.getRole());
-        log.info("Connexion réussie pour utilisateur={} rôle={} atelier={}",
-                user.getUsername(), user.getRole(), atelierId);
+        log.info("Connexion réussie utilisateur={} rôle={} atelier={} groupe={}",
+                user.getUsername(),
+                user.getRole(),
+                atelierId,
+                user.getGroupe() != null ? user.getGroupe().getNom() : null);
         return AuthResponse.builder()
                 .token(token)
                 .tokenType("Bearer")

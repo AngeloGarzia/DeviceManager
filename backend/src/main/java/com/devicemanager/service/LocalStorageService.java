@@ -26,7 +26,7 @@ import java.util.UUID;
 @Service
 @ConditionalOnProperty(name = "app.s3.enabled", havingValue = "false", matchIfMissing = true)
 @Slf4j
-public final class LocalStorageService implements StorageService {
+public class LocalStorageService implements StorageService {
 
     private final Path root;
     private final JdbcTemplate jdbcTemplate;

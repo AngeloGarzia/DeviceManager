@@ -99,7 +99,8 @@ public class MasService {
                 .code(uniqueCode)
                 .label(label)
                 .build());
-        log.info("Marque MAS créée: {} ({})", saved.getLabel(), saved.getCode());
+        log.info("Création en base — Marque MAS id={} label={} code={}",
+                saved.getId(), saved.getLabel(), saved.getCode());
         return toMarqueResponse(saved);
     }
 
@@ -121,7 +122,11 @@ public class MasService {
                 .atelier(atelier)
                 .build();
         Mas saved = masRepository.save(entity);
-        log.info("MAS créé: {} (atelier={})", saved.getNumero(), atelier.getId());
+        log.info("Création en base — MAS id={} numero={} marque={} atelier={}",
+                saved.getId(),
+                saved.getNumero(),
+                saved.getMarque() != null ? saved.getMarque().getLabel() : null,
+                atelier.getId());
         return toResponse(saved);
     }
 
@@ -141,7 +146,13 @@ public class MasService {
         entity.setNumero(numero);
         entity.setMarque(getMarque(request.getMarqueId()));
         entity.setUtilise(Boolean.TRUE.equals(request.getUtilise()));
-        return toResponse(masRepository.save(entity));
+        Mas saved = masRepository.save(entity);
+        log.info("Modification en base — MAS id={} numero={} marque={} atelier={}",
+                saved.getId(),
+                saved.getNumero(),
+                saved.getMarque() != null ? saved.getMarque().getLabel() : null,
+                saved.getAtelier() != null ? saved.getAtelier().getId() : null);
+        return toResponse(saved);
     }
 
     /**
@@ -152,7 +163,10 @@ public class MasService {
      */
     public void delete(Long id) {
         Mas entity = getEntity(id);
+        Long atelierId = entity.getAtelier() != null ? entity.getAtelier().getId() : null;
+        String numero = entity.getNumero();
         masRepository.delete(entity);
+        log.info("Suppression en base — MAS id={} numero={} atelier={}", id, numero, atelierId);
     }
 
     /**

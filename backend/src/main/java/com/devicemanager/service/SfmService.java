@@ -95,8 +95,8 @@ public class SfmService {
         applyMarques(entity, request.getMarqueIds());
         entity.syncPrimaryContactFields();
         Sfm saved = sfmRepository.save(entity);
-        log.info("SFM créé: {} ({} marque(s), atelier={})",
-                saved.getNom(), saved.getMarques().size(), atelier.getId());
+        log.info("Création en base — SFM id={} nom={} marques={} atelier={}",
+                saved.getId(), saved.getNom(), saved.getMarques().size(), atelier.getId());
         return toResponse(saved);
     }
 
@@ -118,7 +118,13 @@ public class SfmService {
         applyContacts(entity, request.getContacts());
         applyMarques(entity, request.getMarqueIds());
         entity.syncPrimaryContactFields();
-        return toResponse(sfmRepository.save(entity));
+        Sfm saved = sfmRepository.save(entity);
+        log.info("Modification en base — SFM id={} nom={} marques={} atelier={}",
+                saved.getId(),
+                saved.getNom(),
+                saved.getMarques().size(),
+                saved.getAtelier() != null ? saved.getAtelier().getId() : null);
+        return toResponse(saved);
     }
 
     /**
@@ -129,7 +135,10 @@ public class SfmService {
      */
     public void delete(Long id) {
         Sfm entity = getEntity(id);
+        Long atelierId = entity.getAtelier() != null ? entity.getAtelier().getId() : null;
+        String nom = entity.getNom();
         sfmRepository.delete(entity);
+        log.info("Suppression en base — SFM id={} nom={} atelier={}", id, nom, atelierId);
     }
 
     /**

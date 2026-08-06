@@ -28,6 +28,7 @@ import com.devicemanager.repository.UserRepository;
 import com.devicemanager.security.Roles;
 import com.devicemanager.tenancy.AtelierContext;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -50,6 +51,7 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
+@Slf4j
 public class AtelierService {
 
     private final AtelierRepository atelierRepository;
@@ -192,7 +194,10 @@ public class AtelierService {
                 .build();
         applyCoordonnees(atelier, request);
         applyResponsables(atelier, user, request.getResponsableIds());
-        return toSummary(atelierRepository.saveAndFlush(atelier));
+        Atelier saved = atelierRepository.saveAndFlush(atelier);
+        log.info("Création en base — Atelier id={} nom={} casino={} par={}",
+                saved.getId(), saved.getNom(), casino.getNom(), username);
+        return toSummary(saved);
     }
 
     /**
@@ -216,7 +221,10 @@ public class AtelierService {
         atelier.setCasino(casino);
         applyCoordonnees(atelier, request);
         applyResponsables(atelier, user, request.getResponsableIds());
-        return toSummary(atelierRepository.saveAndFlush(atelier));
+        Atelier saved = atelierRepository.saveAndFlush(atelier);
+        log.info("Modification en base — Atelier id={} nom={} casino={} par={}",
+                saved.getId(), saved.getNom(), casino.getNom(), username);
+        return toSummary(saved);
     }
 
     /**
@@ -238,12 +246,14 @@ public class AtelierService {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
                     "Impossible de supprimer : des pièces, MAS, SFM ou demandes sont liées à cet atelier.");
         }
+        String nom = atelier.getNom();
         userRepository.clearPreferredAtelier(id);
         if (atelier.getResponsables() != null) {
             atelier.getResponsables().clear();
         }
         atelierRepository.delete(atelier);
         atelierRepository.flush();
+        log.info("Suppression en base — Atelier id={} nom={} par={}", id, nom, username);
     }
 
     /**

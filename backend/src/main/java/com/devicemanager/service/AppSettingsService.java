@@ -7,6 +7,7 @@ import com.devicemanager.entity.AppSetting;
 import com.devicemanager.repository.AppSettingRepository;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,6 +26,7 @@ import java.util.concurrent.ConcurrentHashMap;
 @Service
 @RequiredArgsConstructor
 @Transactional
+@Slf4j
 public class AppSettingsService {
 
     public static final String MAIL_ENABLED = "MAIL_ENABLED";
@@ -161,6 +163,7 @@ public class AppSettingsService {
      */
     public List<AppSettingResponse> update(AppSettingsUpdateRequest request) {
         Map<String, String> values = request.getValues() == null ? Map.of() : request.getValues();
+        int updated = 0;
         for (Map.Entry<String, String> entry : values.entrySet()) {
             AppSetting setting = appSettingRepository.findById(entry.getKey()).orElse(null);
             if (setting == null) {
@@ -172,8 +175,12 @@ public class AppSettingsService {
             }
             setting.setSettingValue(value);
             appSettingRepository.save(setting);
+            updated++;
         }
         reloadCache();
+        if (updated > 0) {
+            log.info("Modification en base — Paramètres applicatifs ({} clé(s) mise(s) à jour)", updated);
+        }
         return list();
     }
 

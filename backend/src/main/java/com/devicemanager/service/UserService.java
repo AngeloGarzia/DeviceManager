@@ -95,8 +95,13 @@ public class UserService {
                 .groupe(atelierService.requireCurrentAtelier().getCasino().getGroupe())
                 .preferredAtelier(preferred)
                 .build());
-        log.info("Utilisateur créé: {} {} {} <{}> ({}) atelierPréféré={}",
-                saved.getPrenom(), saved.getNom(), saved.getUsername(), saved.getEmail(), saved.getRole(),
+        log.info("Création en base — Utilisateur id={} username={} {} {} <{}> rôle={} atelierPréféré={}",
+                saved.getId(),
+                saved.getUsername(),
+                saved.getPrenom(),
+                saved.getNom(),
+                saved.getEmail(),
+                saved.getRole(),
                 preferred != null ? preferred.getId() : null);
         return toResponse(saved);
     }
@@ -139,8 +144,13 @@ public class UserService {
             user.setPassword(passwordEncoder.encode(request.getPassword()));
         }
         User saved = userRepository.saveAndFlush(user);
-        log.info("Utilisateur mis à jour: {} {} <{}> ({}) atelierPréféré={}",
-                saved.getPrenom(), saved.getNom(), saved.getEmail(), saved.getUsername(),
+        log.info("Modification en base — Utilisateur id={} username={} {} {} <{}> rôle={} atelierPréféré={}",
+                saved.getId(),
+                saved.getUsername(),
+                saved.getPrenom(),
+                saved.getNom(),
+                saved.getEmail(),
+                saved.getRole(),
                 preferred != null ? preferred.getId() : null);
         return toResponse(saved);
     }
@@ -160,7 +170,11 @@ public class UserService {
         if (Roles.ADMIN.equals(user.getRole()) && countAdmins() <= 1) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Impossible de supprimer le dernier administrateur");
         }
+        String username = user.getUsername();
+        String role = user.getRole();
         userRepository.delete(user);
+        log.info("Suppression en base — Utilisateur id={} username={} rôle={} par={}",
+                id, username, role, currentUsername);
     }
 
     private User requireActor() {

@@ -107,8 +107,8 @@ public class OrderRequestService {
         } catch (Exception ex) {
             log.error("Demande #{} enregistrée mais e-mail admin non envoyé: {}", saved.getId(), ex.getMessage());
         }
-        log.info("Demande de commande #{} créée par {} ({} pièce(s))",
-                saved.getId(), technicien.getUsername(), quantities.size());
+        log.info("Création en base — Demande commande id={} par={} pièces={} atelier={}",
+                saved.getId(), technicien.getUsername(), quantities.size(), atelier.getId());
         return toResponse(saved);
     }
 
@@ -165,7 +165,8 @@ public class OrderRequestService {
 
         commande.setStatus(OrderStatuses.VALIDATED);
         Commande saved = commandeRepository.save(commande);
-        log.info("Demande #{} validée par {} — {} e-mail(s) SFM", id, adminUsername, mailsSent);
+        log.info("Modification en base — Demande commande id={} validée par={} emailsSfm={}",
+                id, adminUsername, mailsSent);
         if (!warnings.isEmpty()) {
             log.warn("Demande #{} validation — alertes: {}", id, String.join(" ; ", warnings));
         }
@@ -184,7 +185,8 @@ public class OrderRequestService {
         Commande commande = commandeRepository.findByIdWithRelations(id, atelierId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Demande introuvable"));
         commandeRepository.delete(commande);
-        log.info("Demande #{} supprimée par {}", id, adminUsername);
+        log.info("Suppression en base — Demande commande id={} par={} atelier={}",
+                id, adminUsername, atelierId);
     }
 
     /**
