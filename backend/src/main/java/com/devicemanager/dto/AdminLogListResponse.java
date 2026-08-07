@@ -16,4 +16,8 @@ public record AdminLogListResponse(
         int returned,
         List<AdminLogEntryResponse> items
 ) {
+    /** Copie défensive : la liste exposée reste immuable. */
+    public AdminLogListResponse {
+        items = items == null ? List.of() : List.copyOf(items);
+    }
 }
