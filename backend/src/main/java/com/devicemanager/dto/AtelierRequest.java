@@ -41,4 +41,7 @@ public class AtelierRequest {
 
     /** Identifiants des utilisateurs responsables de l'atelier. */
     private List<Long> responsableIds = new ArrayList<>();
+
+    /** Identifiants des utilisateurs pour lesquels cet atelier est l'atelier préféré. */
+    private List<Long> utilisateurPrefereIds = new ArrayList<>();
 }

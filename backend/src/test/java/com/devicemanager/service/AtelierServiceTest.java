@@ -63,11 +63,13 @@ class AtelierServiceTest {
         log.info("Test list ateliers");
         when(userRepository.findByUsername("admin")).thenReturn(Optional.of(TestFixtures.user("admin", Roles.ADMIN)));
         when(atelierRepository.findAllByGroupeId(1L)).thenReturn(List.of(TestFixtures.atelier()));
+        when(userRepository.findAllByPreferredAtelierId(100L)).thenReturn(List.of());
 
         List<AtelierSummary> list = atelierService.listForUser("admin");
 
         assertThat(list).hasSize(1);
         assertThat(list.getFirst().getLabel()).contains("Atelier Balaruc");
+        assertThat(list.getFirst().getUtilisateursPreferes()).isEmpty();
     }
 
     @Test
@@ -105,6 +107,7 @@ class AtelierServiceTest {
         when(userRepository.findByUsername("admin")).thenReturn(Optional.of(user));
         when(atelierRepository.findByIdWithCasino(100L)).thenReturn(Optional.of(atelier));
         when(userRepository.saveAndFlush(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(userRepository.findAllByPreferredAtelierId(100L)).thenReturn(List.of());
 
         AtelierSummary summary = atelierService.setPreferredAtelier("admin", 100L);
 
@@ -155,6 +158,7 @@ class AtelierServiceTest {
         tech.setPreferredAtelier(TestFixtures.atelier());
         when(userRepository.findByUsername("tech")).thenReturn(Optional.of(tech));
         when(atelierRepository.findByIdWithCasino(100L)).thenReturn(Optional.of(TestFixtures.atelier()));
+        when(userRepository.findAllByPreferredAtelierId(100L)).thenReturn(List.of(tech));
 
         List<AtelierSummary> list = atelierService.listForUser("tech");
 
@@ -188,6 +192,7 @@ class AtelierServiceTest {
             a.setId(200L);
             return a;
         });
+        when(userRepository.findAllByPreferredAtelierId(200L)).thenReturn(List.of(user));
 
         AtelierRequest req = new AtelierRequest();
         req.setNom("  Nouvel atelier  ");
@@ -209,6 +214,7 @@ class AtelierServiceTest {
         tel.setPrincipal(true);
         req.setTelephones(List.of(tel));
         req.setResponsableIds(List.of(1L));
+        req.setUtilisateurPrefereIds(List.of(1L));
 
         AtelierSummary created = atelierService.create("admin", req);
 
@@ -220,6 +226,9 @@ class AtelierServiceTest {
         assertThat(created.getCoordonnees().getTelephones()).hasSize(1);
         assertThat(created.getResponsables()).hasSize(1);
         assertThat(created.getResponsables().getFirst().getId()).isEqualTo(1L);
+        assertThat(created.getUtilisateursPreferes()).hasSize(1);
+        assertThat(created.getUtilisateursPreferes().getFirst().getId()).isEqualTo(1L);
+        verify(userRepository).saveAll(any());
     }
 
     @Test

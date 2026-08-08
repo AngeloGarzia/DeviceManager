@@ -24,6 +24,7 @@ import {
   AtelierRequest,
   AtelierResponsable,
   AtelierSummary,
+  CasinoRequest,
   CasinoSummary,
   TypeReseauSocial
 } from '../../models/models';
@@ -89,9 +90,57 @@ export class SetupComponent implements OnInit {
   readonly atelierError = signal<string | null>(null);
   readonly atelierSuccess = signal<string | null>(null);
   readonly editingAtelierId = signal<number | null>(null);
+  /** Modale création / édition d'atelier (paramètres inclus). */
+  readonly atelierDialogOpen = signal(false);
   readonly confirmDeleteOpen = signal(false);
   readonly pendingDeleteNom = signal('');
   private pendingDelete: AtelierSummary | null = null;
+
+  readonly casinoSaving = signal(false);
+  readonly casinoError = signal<string | null>(null);
+  readonly casinoSuccess = signal<string | null>(null);
+  readonly editingCasinoId = signal<number | null>(null);
+  /** Modale de gestion des casinos (CRUD). */
+  readonly casinoDialogOpen = signal(false);
+  readonly confirmDeleteCasinoOpen = signal(false);
+  readonly pendingDeleteCasinoNom = signal('');
+  private pendingDeleteCasino: CasinoSummary | null = null;
+
+  readonly casinoForm = this.fb.group({
+    nom: this.fb.nonNullable.control('', [Validators.required, Validators.maxLength(120)])
+  });
+
+  /** Ateliers groupés par casino pour l'affichage hiérarchique. */
+  readonly ateliersByCasino = computed(() => {
+    const casinos = this.casinos();
+    const ateliers = this.ateliers();
+    const byId = new Map<number, AtelierSummary[]>();
+    for (const a of ateliers) {
+      const list = byId.get(a.casinoId) ?? [];
+      list.push(a);
+      byId.set(a.casinoId, list);
+    }
+    const groups = casinos.map((c) => ({
+      casino: c,
+      ateliers: (byId.get(c.id) ?? []).sort((a, b) => a.nom.localeCompare(b.nom, 'fr'))
+    }));
+    // Ateliers orphelins (casino absent de la liste) — improbable mais sûr
+    for (const [casinoId, list] of byId) {
+      if (!casinos.some((c) => c.id === casinoId)) {
+        groups.push({
+          casino: {
+            id: casinoId,
+            nom: list[0]?.casinoNom || `Casino #${casinoId}`,
+            groupeId: list[0]?.groupeId || 0,
+            groupeNom: list[0]?.groupeNom || '',
+            atelierCount: list.length
+          },
+          ateliers: list.sort((a, b) => a.nom.localeCompare(b.nom, 'fr'))
+        });
+      }
+    }
+    return groups;
+  });
 
   readonly logsLoading = signal(false);
   readonly logsError = signal<string | null>(null);
@@ -125,7 +174,8 @@ export class SetupComponent implements OnInit {
     emails: this.fb.array([this.newEmailGroup()]),
     telephones: this.fb.array([this.newTelephoneGroup()]),
     reseauxSociaux: this.fb.array([] as FormGroup[]),
-    responsableIds: this.fb.nonNullable.control<number[]>([])
+    responsableIds: this.fb.nonNullable.control<number[]>([]),
+    utilisateurPrefereIds: this.fb.nonNullable.control<number[]>([])
   });
 
   readonly aiProviders = [
@@ -388,6 +438,7 @@ export class SetupComponent implements OnInit {
   loadAteliers(): void {
     this.ateliersLoading.set(true);
     this.atelierError.set(null);
+    this.casinoError.set(null);
     forkJoin({
       ateliers: this.atelierService.list(),
       casinos: this.atelierService.listCasinos(),
@@ -407,7 +458,112 @@ export class SetupComponent implements OnInit {
       },
       error: (err) => {
         this.ateliersLoading.set(false);
-        this.atelierError.set(err?.error?.message || 'Chargement des ateliers impossible.');
+        this.atelierError.set(err?.error?.message || 'Chargement casino / atelier impossible.');
+      }
+    });
+  }
+
+  casinoFormTitle(): string {
+    return this.editingCasinoId() == null ? 'Nouveau casino' : 'Modifier le casino';
+  }
+
+  /** Ouvre la modale de gestion des casinos. */
+  openCasinoDialog(): void {
+    this.casinoError.set(null);
+    this.casinoSuccess.set(null);
+    this.cancelCasinoEdit();
+    this.casinoDialogOpen.set(true);
+  }
+
+  /** Ferme la modale casinos. */
+  closeCasinoDialog(): void {
+    if (this.casinoSaving()) {
+      return;
+    }
+    this.casinoDialogOpen.set(false);
+    this.cancelCasinoEdit();
+    this.casinoError.set(null);
+  }
+
+  startCreateCasino(): void {
+    this.editingCasinoId.set(null);
+    this.casinoForm.reset({ nom: '' });
+    this.casinoError.set(null);
+    this.casinoSuccess.set(null);
+  }
+
+  startEditCasino(casino: CasinoSummary): void {
+    this.editingCasinoId.set(casino.id);
+    this.casinoForm.reset({ nom: casino.nom });
+    this.casinoError.set(null);
+    this.casinoSuccess.set(null);
+  }
+
+  cancelCasinoEdit(): void {
+    this.editingCasinoId.set(null);
+    this.casinoForm.reset({ nom: '' });
+  }
+
+  saveCasino(): void {
+    if (this.casinoForm.invalid) {
+      this.casinoForm.markAllAsTouched();
+      return;
+    }
+    const payload: CasinoRequest = { nom: this.casinoForm.controls.nom.value.trim() };
+    this.casinoSaving.set(true);
+    this.casinoError.set(null);
+    this.casinoSuccess.set(null);
+    const id = this.editingCasinoId();
+    const req$ =
+      id == null
+        ? this.atelierService.createCasino(payload)
+        : this.atelierService.updateCasino(id, payload);
+    req$.subscribe({
+      next: () => {
+        this.casinoSaving.set(false);
+        this.casinoSuccess.set(id == null ? 'Casino créé.' : 'Casino mis à jour.');
+        this.cancelCasinoEdit();
+        this.loadAteliers();
+      },
+      error: (err) => {
+        this.casinoSaving.set(false);
+        this.casinoError.set(err?.error?.message || 'Enregistrement du casino impossible.');
+      }
+    });
+  }
+
+  askDeleteCasino(casino: CasinoSummary): void {
+    this.pendingDeleteCasino = casino;
+    this.pendingDeleteCasinoNom.set(casino.nom);
+    this.confirmDeleteCasinoOpen.set(true);
+  }
+
+  cancelDeleteCasino(): void {
+    this.confirmDeleteCasinoOpen.set(false);
+    this.pendingDeleteCasino = null;
+    this.pendingDeleteCasinoNom.set('');
+  }
+
+  confirmDeleteCasino(): void {
+    const casino = this.pendingDeleteCasino;
+    this.cancelDeleteCasino();
+    if (!casino) {
+      return;
+    }
+    this.casinoSaving.set(true);
+    this.casinoError.set(null);
+    this.atelierService.deleteCasino(casino.id).subscribe({
+      next: () => {
+        this.casinoSaving.set(false);
+        this.casinoSuccess.set('Casino supprimé.');
+        if (this.editingCasinoId() === casino.id) {
+          this.cancelCasinoEdit();
+        }
+        this.loadAteliers();
+      },
+      error: (err) => {
+        this.casinoSaving.set(false);
+        this.casinoError.set(err?.error?.message || 'Suppression du casino impossible.');
       }
     });
   }
@@ -505,21 +661,41 @@ export class SetupComponent implements OnInit {
     this.reseauxSociaux.removeAt(index);
   }
 
-  /** Libellé affiché pour un responsable d'atelier dans la liste de sélection. */
+  /** Libellé affiché pour un utilisateur (responsable / préféré) dans les listes. */
   responsableLabel(user: AtelierResponsable): string {
     const name = `${user.prenom || ''} ${user.nom || ''}`.trim();
     return name ? `${name} (${user.username})` : user.username;
   }
 
-  /** Passe en mode création d'un nouvel atelier. */
-  startCreateAtelier(): void {
+  /** Libellé court pour l'affichage dans la liste des ateliers. */
+  userShortLabel(user: AtelierResponsable): string {
+    const name = `${user.prenom || ''} ${user.nom || ''}`.trim();
+    return name || user.username;
+  }
+
+  /** Liste de noms pour l'affichage compact (responsables / préférés). */
+  usersLabel(users: AtelierResponsable[] | undefined | null): string {
+    if (!users?.length) {
+      return '—';
+    }
+    return users.map((u) => this.userShortLabel(u)).join(', ');
+  }
+
+  /** Identifiant de tuile pour un casino dans la section Ateliers. */
+  casinoAtelierTileId(casinoId: number): string {
+    return `atelier-casino:${casinoId}`;
+  }
+
+  /** Ouvre la modale de création d'atelier (casino prérempli si fourni). */
+  startCreateAtelier(casinoId?: number): void {
     this.editingAtelierId.set(null);
     this.atelierSuccess.set(null);
     this.atelierError.set(null);
-    this.resetAtelierForm();
+    this.resetAtelierForm(casinoId);
+    this.atelierDialogOpen.set(true);
   }
 
-  /** Charge un atelier existant dans le formulaire pour édition. */
+  /** Ouvre la modale d'édition d'un atelier existant. */
   startEditAtelier(item: AtelierSummary): void {
     this.editingAtelierId.set(item.id);
     this.atelierSuccess.set(null);
@@ -548,13 +724,20 @@ export class SetupComponent implements OnInit {
       codePostal: adresse?.codePostal || '',
       ville: adresse?.ville || '',
       pays: adresse?.pays || 'France',
-      responsableIds: (item.responsables ?? []).map((r) => r.id)
+      responsableIds: (item.responsables ?? []).map((r) => r.id),
+      utilisateurPrefereIds: (item.utilisateursPreferes ?? []).map((u) => u.id)
     });
+    this.atelierDialogOpen.set(true);
   }
 
-  /** Annule l'édition et réinitialise le formulaire atelier. */
-  cancelAtelierEdit(): void {
-    this.startCreateAtelier();
+  /** Ferme la modale atelier et réinitialise le formulaire. */
+  closeAtelierDialog(): void {
+    if (this.atelierSaving()) {
+      return;
+    }
+    this.atelierDialogOpen.set(false);
+    this.editingAtelierId.set(null);
+    this.resetAtelierForm();
   }
 
   /** Enregistre un atelier (création ou mise à jour). */
@@ -587,7 +770,8 @@ export class SetupComponent implements OnInit {
       reseauxSociaux: (raw.reseauxSociaux as { type: TypeReseauSocial; url: string }[])
         .filter((r) => (r.url || '').trim())
         .map((r) => ({ type: r.type || 'AUTRE', url: r.url.trim() })),
-      responsableIds: raw.responsableIds || []
+      responsableIds: raw.responsableIds || [],
+      utilisateurPrefereIds: raw.utilisateurPrefereIds || []
     };
     this.atelierSaving.set(true);
     this.atelierError.set(null);
@@ -601,7 +785,9 @@ export class SetupComponent implements OnInit {
       next: () => {
         this.atelierSaving.set(false);
         this.atelierSuccess.set(editId == null ? 'Atelier créé.' : 'Atelier mis à jour.');
-        this.startCreateAtelier();
+        this.atelierDialogOpen.set(false);
+        this.editingAtelierId.set(null);
+        this.resetAtelierForm();
         this.loadAteliers();
         this.auth.refreshAteliers();
       },
@@ -635,7 +821,7 @@ export class SetupComponent implements OnInit {
         this.atelierSaving.set(false);
         this.atelierSuccess.set('Atelier supprimé.');
         if (this.editingAtelierId() === item.id) {
-          this.startCreateAtelier();
+          this.closeAtelierDialog();
         }
         this.loadAteliers();
         this.auth.refreshAteliers();
@@ -709,21 +895,26 @@ export class SetupComponent implements OnInit {
     });
   }
 
-  private resetAtelierForm(): void {
+  private resetAtelierForm(preferredCasinoId?: number): void {
     this.emails.clear();
     this.emails.push(this.newEmailGroup('', true));
     this.telephones.clear();
     this.telephones.push(this.newTelephoneGroup('', '', true));
     this.reseauxSociaux.clear();
+    const casinoId =
+      preferredCasinoId ??
+      this.casinos()[0]?.id ??
+      null;
     this.atelierForm.reset({
       nom: '',
-      casinoId: this.casinos()[0]?.id ?? null,
+      casinoId,
       ligne1: '',
       ligne2: '',
       codePostal: '',
       ville: '',
       pays: 'France',
-      responsableIds: []
+      responsableIds: [],
+      utilisateurPrefereIds: []
     });
   }
 

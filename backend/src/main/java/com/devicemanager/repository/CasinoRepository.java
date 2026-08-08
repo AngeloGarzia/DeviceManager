@@ -42,4 +42,8 @@ public interface CasinoRepository extends JpaRepository<Casino, Long> {
             WHERE c.id = :id
             """)
     Optional<Casino> findByIdWithGroupe(@Param("id") Long id);
+
+    boolean existsByNomIgnoreCaseAndGroupeId(String nom, Long groupeId);
+
+    boolean existsByNomIgnoreCaseAndGroupeIdAndIdNot(String nom, Long groupeId, Long id);
 }

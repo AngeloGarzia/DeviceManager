@@ -1,27 +1,34 @@
 <section class="grid gap-4">
   <header>
     <h1 class="page-title">Paramètres</h1>
-    <p class="page-subtitle">Réservés à l’administrateur — tuiles repliées par défaut</p>
+    <p class="page-subtitle">
+      Structure organisationnelle : casino → atelier → pièces détachées — tuiles repliées par défaut
+    </p>
   </header>
 
   <mat-card class="setup-tile !rounded-xl !border !border-line !shadow-soft">
     <button type="button" class="setup-tile-toggle" (click)="toggleTile('ateliers')" [attr.aria-expanded]="isTileOpen('ateliers')">
       <div class="min-w-0 text-left">
         <h2 class="m-0 text-base font-semibold text-ink">Ateliers</h2>
-        <p class="mt-0.5 text-sm text-ink-soft">Gérez les ateliers du groupe ({{ auth.groupeNom() || '—' }}).</p>
+        <p class="mt-0.5 text-sm text-ink-soft">
+          Une tuile par casino — ateliers et paramètres en popup.
+        </p>
       </div>
       <mat-icon>{{ isTileOpen('ateliers') ? 'expand_less' : 'expand_more' }}</mat-icon>
     </button>
     @if (isTileOpen('ateliers')) {
       <mat-card-content class="!pt-0">
         <div class="mb-4 flex flex-wrap justify-end gap-2">
-          <button mat-stroked-button type="button" color="primary" (click)="startCreateAtelier()">
-            <mat-icon>add</mat-icon>
-            Nouvel atelier
+          <button mat-stroked-button type="button" color="primary" (click)="openCasinoDialog()">
+            <mat-icon>apartment</mat-icon>
+            Gérer les casinos
           </button>
         </div>
 
-        @if (atelierError()) {
+        @if (casinoSuccess() && !casinoDialogOpen()) {
+          <p class="mb-3 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800">{{ casinoSuccess() }}</p>
+        }
+        @if (atelierError() && !atelierDialogOpen()) {
           <p class="mb-3 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{{ atelierError() }}</p>
         }
         @if (atelierSuccess()) {
@@ -30,173 +37,341 @@
 
         @if (ateliersLoading()) {
           <div class="flex justify-center py-8"><mat-spinner diameter="32"></mat-spinner></div>
+        } @else if (casinos().length === 0) {
+          <p class="m-0 text-sm text-ink-soft">
+            Aucun casino. Utilisez « Gérer les casinos » pour en créer un, puis ajoutez des ateliers.
+          </p>
         } @else {
-          <div class="mb-5 grid gap-2">
-            @if (ateliers().length === 0) {
-              <p class="m-0 text-sm text-ink-soft">Aucun atelier pour ce groupe.</p>
-            } @else {
-              @for (item of ateliers(); track item.id) {
-                <div class="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-line px-3 py-2.5">
-                  <div class="min-w-0">
-                    <div class="font-medium text-ink">{{ item.nom }}</div>
-                    <div class="text-xs text-ink-soft">{{ item.casinoNom }}</div>
-                    @if (item.coordonnees?.emails?.length || item.coordonnees?.telephones?.length || item.responsables?.length) {
-                      <div class="mt-1 text-xs text-ink-faint">
-                        @if (item.coordonnees?.emails?.[0]?.valeur) {
-                          {{ item.coordonnees?.emails?.[0]?.valeur }}
-                        }
-                        @if (item.coordonnees?.telephones?.[0]?.valeur) {
-                          · {{ item.coordonnees?.telephones?.[0]?.valeur }}
-                        }
-                        @if (item.responsables?.length) {
-                          · {{ item.responsables?.length }} resp.
+          <div class="grid gap-3">
+            @for (group of ateliersByCasino(); track group.casino.id) {
+              <mat-card class="setup-tile !rounded-xl !border !border-line !shadow-none">
+                <button
+                  type="button"
+                  class="setup-tile-toggle"
+                  (click)="toggleTile(casinoAtelierTileId(group.casino.id))"
+                  [attr.aria-expanded]="isTileOpen(casinoAtelierTileId(group.casino.id))"
+                >
+                  <div class="min-w-0 text-left">
+                    <h3 class="m-0 text-sm font-semibold text-ink">{{ group.casino.nom }}</h3>
+                    <p class="mt-0.5 text-xs text-ink-soft">
+                      {{ group.ateliers.length }} atelier{{ group.ateliers.length > 1 ? 's' : '' }}
+                    </p>
+                  </div>
+                  <mat-icon>{{ isTileOpen(casinoAtelierTileId(group.casino.id)) ? 'expand_less' : 'expand_more' }}</mat-icon>
+                </button>
+                @if (isTileOpen(casinoAtelierTileId(group.casino.id))) {
+                  <mat-card-content class="!pt-0">
+                    <div class="mb-3 flex flex-wrap justify-end gap-2">
+                      <button
+                        mat-stroked-button
+                        type="button"
+                        color="primary"
+                        (click)="startCreateAtelier(group.casino.id)"
+                      >
+                        <mat-icon>add</mat-icon>
+                        Nouvel atelier
+                      </button>
+                    </div>
+                    @if (group.ateliers.length === 0) {
+                      <p class="m-0 text-sm text-ink-soft">Aucun atelier dans ce casino.</p>
+                    } @else {
+                      <div class="grid gap-2">
+                        @for (item of group.ateliers; track item.id) {
+                          <div class="flex flex-wrap items-start justify-between gap-2 rounded-lg border border-line px-3 py-2.5">
+                            <div class="min-w-0 flex-1">
+                              <div class="font-medium text-ink">{{ item.nom }}</div>
+                              <div class="mt-1.5 grid gap-0.5 text-xs text-ink-soft">
+                                <div>
+                                  <span class="text-ink-faint">Responsables :</span>
+                                  {{ usersLabel(item.responsables) }}
+                                </div>
+                                <div>
+                                  <span class="text-ink-faint">Atelier préféré :</span>
+                                  {{ usersLabel(item.utilisateursPreferes) }}
+                                </div>
+                              </div>
+                            </div>
+                            <div class="flex shrink-0 gap-1">
+                              <button mat-button type="button" (click)="startEditAtelier(item)">Éditer</button>
+                              <button mat-button type="button" color="warn" (click)="askDeleteAtelier(item)">Suppr.</button>
+                            </div>
+                          </div>
                         }
                       </div>
                     }
-                  </div>
-                  <div class="flex shrink-0 gap-1">
-                    <button mat-button type="button" (click)="startEditAtelier(item)">Éditer</button>
-                    <button mat-button type="button" color="warn" (click)="askDeleteAtelier(item)">Suppr.</button>
-                  </div>
-                </div>
-              }
+                  </mat-card-content>
+                }
+              </mat-card>
             }
           </div>
-
-          <form class="grid gap-3 sm:grid-cols-2" [formGroup]="atelierForm" (ngSubmit)="saveAtelier()">
-            <h3 class="sm:col-span-2 m-0 text-sm font-semibold text-ink">{{ atelierFormTitle() }}</h3>
-            <mat-form-field appearance="outline">
-              <mat-label>Nom de l’atelier</mat-label>
-              <input matInput formControlName="nom" maxlength="160" />
-            </mat-form-field>
-            <mat-form-field appearance="outline">
-              <mat-label>Casino</mat-label>
-              <mat-select formControlName="casinoId">
-                @for (c of casinos(); track c.id) {
-                  <mat-option [value]="c.id">{{ c.nom }}</mat-option>
-                }
-              </mat-select>
-            </mat-form-field>
-
-            <h4 class="sm:col-span-2 m-0 mt-2 text-sm font-semibold text-ink">Adresse</h4>
-            <mat-form-field appearance="outline" class="sm:col-span-2">
-              <mat-label>Ligne 1</mat-label>
-              <input matInput formControlName="ligne1" />
-            </mat-form-field>
-            <mat-form-field appearance="outline" class="sm:col-span-2">
-              <mat-label>Ligne 2</mat-label>
-              <input matInput formControlName="ligne2" />
-            </mat-form-field>
-            <mat-form-field appearance="outline">
-              <mat-label>Code postal</mat-label>
-              <input matInput formControlName="codePostal" />
-            </mat-form-field>
-            <mat-form-field appearance="outline">
-              <mat-label>Ville</mat-label>
-              <input matInput formControlName="ville" />
-            </mat-form-field>
-            <mat-form-field appearance="outline" class="sm:col-span-2">
-              <mat-label>Pays</mat-label>
-              <input matInput formControlName="pays" />
-            </mat-form-field>
-
-            <div class="sm:col-span-2 mt-2 flex items-center justify-between">
-              <h4 class="m-0 text-sm font-semibold text-ink">E-mails</h4>
-              <button mat-stroked-button type="button" (click)="addEmail()">
-                <mat-icon>add</mat-icon>
-                Ajouter
-              </button>
-            </div>
-            <div class="sm:col-span-2 grid gap-2" formArrayName="emails">
-              @for (ctrl of emails.controls; track $index; let i = $index) {
-                <div class="grid gap-2 rounded-lg border border-line p-3 sm:grid-cols-[1fr_auto_auto]" [formGroupName]="i">
-                  <mat-form-field appearance="outline">
-                    <mat-label>E-mail</mat-label>
-                    <input matInput type="email" formControlName="valeur" />
-                  </mat-form-field>
-                  <mat-checkbox formControlName="principal" class="self-center">Principal</mat-checkbox>
-                  <button mat-button type="button" color="warn" class="self-center" (click)="removeEmail(i)">Retirer</button>
-                </div>
-              }
-            </div>
-
-            <div class="sm:col-span-2 mt-2 flex items-center justify-between">
-              <h4 class="m-0 text-sm font-semibold text-ink">Téléphones</h4>
-              <button mat-stroked-button type="button" (click)="addTelephone()">
-                <mat-icon>add</mat-icon>
-                Ajouter
-              </button>
-            </div>
-            <div class="sm:col-span-2 grid gap-2" formArrayName="telephones">
-              @for (ctrl of telephones.controls; track $index; let i = $index) {
-                <div class="grid gap-2 rounded-lg border border-line p-3 sm:grid-cols-[1fr_1fr_auto_auto]" [formGroupName]="i">
-                  <mat-form-field appearance="outline">
-                    <mat-label>Numéro</mat-label>
-                    <input matInput formControlName="valeur" />
-                  </mat-form-field>
-                  <mat-form-field appearance="outline">
-                    <mat-label>Libellé</mat-label>
-                    <input matInput formControlName="label" placeholder="Mobile, fixe…" />
-                  </mat-form-field>
-                  <mat-checkbox formControlName="principal" class="self-center">Principal</mat-checkbox>
-                  <button mat-button type="button" color="warn" class="self-center" (click)="removeTelephone(i)">Retirer</button>
-                </div>
-              }
-            </div>
-
-            <div class="sm:col-span-2 mt-2 flex items-center justify-between">
-              <h4 class="m-0 text-sm font-semibold text-ink">Réseaux sociaux</h4>
-              <button mat-stroked-button type="button" (click)="addReseau()">
-                <mat-icon>add</mat-icon>
-                Ajouter
-              </button>
-            </div>
-            <div class="sm:col-span-2 grid gap-2" formArrayName="reseauxSociaux">
-              @if (reseauxSociaux.length === 0) {
-                <p class="m-0 text-sm text-ink-soft">Aucun réseau social.</p>
-              }
-              @for (ctrl of reseauxSociaux.controls; track $index; let i = $index) {
-                <div class="grid gap-2 rounded-lg border border-line p-3 sm:grid-cols-[10rem_1fr_auto]" [formGroupName]="i">
-                  <mat-form-field appearance="outline">
-                    <mat-label>Type</mat-label>
-                    <mat-select formControlName="type">
-                      @for (t of reseauTypes; track t.value) {
-                        <mat-option [value]="t.value">{{ t.label }}</mat-option>
-                      }
-                    </mat-select>
-                  </mat-form-field>
-                  <mat-form-field appearance="outline">
-                    <mat-label>URL</mat-label>
-                    <input matInput formControlName="url" />
-                  </mat-form-field>
-                  <button mat-button type="button" color="warn" class="self-center" (click)="removeReseau(i)">Retirer</button>
-                </div>
-              }
-            </div>
-
-            <mat-form-field appearance="outline" class="sm:col-span-2">
-              <mat-label>Responsables</mat-label>
-              <mat-select formControlName="responsableIds" multiple>
-                @for (u of groupeUsers(); track u.id) {
-                  <mat-option [value]="u.id">{{ responsableLabel(u) }}</mat-option>
-                }
-              </mat-select>
-              <mat-hint>Comptes utilisateurs du groupe liés à cet atelier</mat-hint>
-            </mat-form-field>
-
-            <div class="sm:col-span-2 flex flex-wrap justify-end gap-2">
-              @if (editingAtelierId() != null) {
-                <button mat-stroked-button type="button" (click)="cancelAtelierEdit()">Annuler</button>
-              }
-              <button mat-flat-button color="primary" type="submit" [disabled]="atelierSaving() || casinos().length === 0">
-                {{ atelierSaving() ? 'Enregistrement…' : editingAtelierId() == null ? 'Créer l’atelier' : 'Enregistrer' }}
-              </button>
-            </div>
-          </form>
         }
       </mat-card-content>
     }
   </mat-card>
+
+  @if (atelierDialogOpen()) {
+    <div
+      class="atelier-dialog-backdrop fixed inset-0 z-[100] flex items-end justify-center bg-slate-900/40 p-0 sm:items-center sm:p-4"
+      (click)="closeAtelierDialog()"
+    >
+      <div
+        class="atelier-dialog panel w-full max-h-[92vh] overflow-hidden rounded-t-2xl border border-line bg-white shadow-soft sm:max-w-3xl sm:rounded-2xl"
+        role="dialog"
+        aria-modal="true"
+        [attr.aria-label]="atelierFormTitle()"
+        (click)="$event.stopPropagation()"
+      >
+        <div class="flex items-start justify-between gap-3 border-b border-line px-4 py-3 sm:px-5">
+          <div class="min-w-0">
+            <h2 class="m-0 text-base font-semibold text-ink sm:text-lg">{{ atelierFormTitle() }}</h2>
+            <p class="mt-0.5 text-xs text-ink-soft sm:text-sm">
+              Nom, adresse, contacts, responsables et atelier préféré
+            </p>
+          </div>
+          <button mat-icon-button type="button" aria-label="Fermer" (click)="closeAtelierDialog()" [disabled]="atelierSaving()">
+            <mat-icon>close</mat-icon>
+          </button>
+        </div>
+
+        <form class="atelier-dialog-body grid gap-3 overflow-y-auto px-4 py-4 sm:grid-cols-2 sm:px-5" [formGroup]="atelierForm" (ngSubmit)="saveAtelier()">
+          @if (atelierError()) {
+            <p class="sm:col-span-2 mb-0 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{{ atelierError() }}</p>
+          }
+
+          <mat-form-field appearance="outline">
+            <mat-label>Nom de l’atelier</mat-label>
+            <input matInput formControlName="nom" maxlength="160" />
+          </mat-form-field>
+          <mat-form-field appearance="outline">
+            <mat-label>Casino</mat-label>
+            <mat-select formControlName="casinoId">
+              @for (c of casinos(); track c.id) {
+                <mat-option [value]="c.id">{{ c.nom }}</mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+
+          <h3 class="sm:col-span-2 m-0 mt-1 text-sm font-semibold text-ink">Adresse</h3>
+          <mat-form-field appearance="outline" class="sm:col-span-2">
+            <mat-label>Ligne 1</mat-label>
+            <input matInput formControlName="ligne1" />
+          </mat-form-field>
+          <mat-form-field appearance="outline" class="sm:col-span-2">
+            <mat-label>Ligne 2</mat-label>
+            <input matInput formControlName="ligne2" />
+          </mat-form-field>
+          <mat-form-field appearance="outline">
+            <mat-label>Code postal</mat-label>
+            <input matInput formControlName="codePostal" />
+          </mat-form-field>
+          <mat-form-field appearance="outline">
+            <mat-label>Ville</mat-label>
+            <input matInput formControlName="ville" />
+          </mat-form-field>
+          <mat-form-field appearance="outline" class="sm:col-span-2">
+            <mat-label>Pays</mat-label>
+            <input matInput formControlName="pays" />
+          </mat-form-field>
+
+          <div class="sm:col-span-2 mt-1 flex flex-wrap items-center justify-between gap-2">
+            <h3 class="m-0 text-sm font-semibold text-ink">E-mails</h3>
+            <button mat-stroked-button type="button" (click)="addEmail()">
+              <mat-icon>add</mat-icon>
+              Ajouter
+            </button>
+          </div>
+          <div class="sm:col-span-2 grid gap-2" formArrayName="emails">
+            @for (ctrl of emails.controls; track $index; let i = $index) {
+              <div class="grid gap-2 rounded-lg border border-line p-3 sm:grid-cols-[1fr_auto_auto]" [formGroupName]="i">
+                <mat-form-field appearance="outline">
+                  <mat-label>E-mail</mat-label>
+                  <input matInput type="email" formControlName="valeur" />
+                </mat-form-field>
+                <mat-checkbox formControlName="principal" class="self-center">Principal</mat-checkbox>
+                <button mat-button type="button" color="warn" class="self-center" (click)="removeEmail(i)">Retirer</button>
+              </div>
+            }
+          </div>
+
+          <div class="sm:col-span-2 mt-1 flex flex-wrap items-center justify-between gap-2">
+            <h3 class="m-0 text-sm font-semibold text-ink">Téléphones</h3>
+            <button mat-stroked-button type="button" (click)="addTelephone()">
+              <mat-icon>add</mat-icon>
+              Ajouter
+            </button>
+          </div>
+          <div class="sm:col-span-2 grid gap-2" formArrayName="telephones">
+            @for (ctrl of telephones.controls; track $index; let i = $index) {
+              <div class="grid gap-2 rounded-lg border border-line p-3 sm:grid-cols-[1fr_1fr_auto_auto]" [formGroupName]="i">
+                <mat-form-field appearance="outline">
+                  <mat-label>Numéro</mat-label>
+                  <input matInput formControlName="valeur" />
+                </mat-form-field>
+                <mat-form-field appearance="outline">
+                  <mat-label>Libellé</mat-label>
+                  <input matInput formControlName="label" placeholder="Mobile, fixe…" />
+                </mat-form-field>
+                <mat-checkbox formControlName="principal" class="self-center">Principal</mat-checkbox>
+                <button mat-button type="button" color="warn" class="self-center" (click)="removeTelephone(i)">Retirer</button>
+              </div>
+            }
+          </div>
+
+          <div class="sm:col-span-2 mt-1 flex flex-wrap items-center justify-between gap-2">
+            <h3 class="m-0 text-sm font-semibold text-ink">Réseaux sociaux</h3>
+            <button mat-stroked-button type="button" (click)="addReseau()">
+              <mat-icon>add</mat-icon>
+              Ajouter
+            </button>
+          </div>
+          <div class="sm:col-span-2 grid gap-2" formArrayName="reseauxSociaux">
+            @if (reseauxSociaux.length === 0) {
+              <p class="m-0 text-sm text-ink-soft">Aucun réseau social.</p>
+            }
+            @for (ctrl of reseauxSociaux.controls; track $index; let i = $index) {
+              <div class="grid gap-2 rounded-lg border border-line p-3 sm:grid-cols-[10rem_1fr_auto]" [formGroupName]="i">
+                <mat-form-field appearance="outline">
+                  <mat-label>Type</mat-label>
+                  <mat-select formControlName="type">
+                    @for (t of reseauTypes; track t.value) {
+                      <mat-option [value]="t.value">{{ t.label }}</mat-option>
+                    }
+                  </mat-select>
+                </mat-form-field>
+                <mat-form-field appearance="outline">
+                  <mat-label>URL</mat-label>
+                  <input matInput formControlName="url" />
+                </mat-form-field>
+                <button mat-button type="button" color="warn" class="self-center" (click)="removeReseau(i)">Retirer</button>
+              </div>
+            }
+          </div>
+
+          <mat-form-field appearance="outline" class="sm:col-span-2">
+            <mat-label>Responsables d’atelier</mat-label>
+            <mat-select formControlName="responsableIds" multiple>
+              @for (u of groupeUsers(); track u.id) {
+                <mat-option [value]="u.id">{{ responsableLabel(u) }}</mat-option>
+              }
+            </mat-select>
+            <mat-hint>Personnes en charge de cet atelier</mat-hint>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" class="sm:col-span-2">
+            <mat-label>Utilisateurs (atelier préféré)</mat-label>
+            <mat-select formControlName="utilisateurPrefereIds" multiple>
+              @for (u of groupeUsers(); track u.id) {
+                <mat-option [value]="u.id">{{ responsableLabel(u) }}</mat-option>
+              }
+            </mat-select>
+            <mat-hint>
+              Comptes pour lesquels cet atelier est l’atelier préféré (un seul préféré par utilisateur)
+            </mat-hint>
+          </mat-form-field>
+        </form>
+
+        <div class="flex flex-wrap justify-end gap-2 border-t border-line px-4 py-3 sm:px-5">
+          <button mat-stroked-button type="button" (click)="closeAtelierDialog()" [disabled]="atelierSaving()">Annuler</button>
+          <button
+            mat-flat-button
+            color="primary"
+            type="button"
+            [disabled]="atelierSaving() || casinos().length === 0"
+            (click)="saveAtelier()"
+          >
+            {{ atelierSaving() ? 'Enregistrement…' : editingAtelierId() == null ? 'Créer l’atelier' : 'Enregistrer' }}
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
+  @if (casinoDialogOpen()) {
+    <div
+      class="atelier-dialog-backdrop fixed inset-0 z-[100] flex items-end justify-center bg-slate-900/40 p-0 sm:items-center sm:p-4"
+      (click)="closeCasinoDialog()"
+    >
+      <div
+        class="atelier-dialog panel w-full max-h-[92vh] overflow-hidden rounded-t-2xl border border-line bg-white shadow-soft sm:max-w-xl sm:rounded-2xl"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Gérer les casinos"
+        (click)="$event.stopPropagation()"
+      >
+        <div class="flex items-start justify-between gap-3 border-b border-line px-4 py-3 sm:px-5">
+          <div class="min-w-0">
+            <h2 class="m-0 text-base font-semibold text-ink sm:text-lg">Gérer les casinos</h2>
+            <p class="mt-0.5 text-xs text-ink-soft sm:text-sm">
+              Groupe {{ auth.groupeNom() || '—' }} — un casino regroupe un ou plusieurs ateliers
+            </p>
+          </div>
+          <button mat-icon-button type="button" aria-label="Fermer" (click)="closeCasinoDialog()" [disabled]="casinoSaving()">
+            <mat-icon>close</mat-icon>
+          </button>
+        </div>
+
+        <div class="atelier-dialog-body grid gap-4 overflow-y-auto px-4 py-4 sm:px-5">
+          @if (casinoError()) {
+            <p class="m-0 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{{ casinoError() }}</p>
+          }
+          @if (casinoSuccess()) {
+            <p class="m-0 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800">{{ casinoSuccess() }}</p>
+          }
+
+          @if (ateliersLoading()) {
+            <div class="flex justify-center py-6"><mat-spinner diameter="32"></mat-spinner></div>
+          } @else {
+            <div class="grid gap-2">
+              @if (casinos().length === 0) {
+                <p class="m-0 text-sm text-ink-soft">Aucun casino pour le moment.</p>
+              } @else {
+                @for (c of casinos(); track c.id) {
+                  <div class="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-line px-3 py-2.5">
+                    <div class="min-w-0">
+                      <div class="font-medium text-ink">{{ c.nom }}</div>
+                      <div class="text-xs text-ink-soft">
+                        {{ c.atelierCount ?? 0 }} atelier{{ (c.atelierCount ?? 0) > 1 ? 's' : '' }}
+                      </div>
+                    </div>
+                    <div class="flex shrink-0 gap-1">
+                      <button mat-button type="button" (click)="startEditCasino(c)">Éditer</button>
+                      <button
+                        mat-button
+                        type="button"
+                        color="warn"
+                        [disabled]="(c.atelierCount ?? 0) > 0 || casinoSaving()"
+                        (click)="askDeleteCasino(c)"
+                      >
+                        Suppr.
+                      </button>
+                    </div>
+                  </div>
+                }
+              }
+            </div>
+
+            <form class="grid gap-3" [formGroup]="casinoForm" (ngSubmit)="saveCasino()">
+              <h3 class="m-0 text-sm font-semibold text-ink">{{ casinoFormTitle() }}</h3>
+              <mat-form-field appearance="outline">
+                <mat-label>Nom du casino</mat-label>
+                <input matInput formControlName="nom" maxlength="120" />
+              </mat-form-field>
+              <div class="flex flex-wrap justify-end gap-2">
+                @if (editingCasinoId() != null) {
+                  <button mat-stroked-button type="button" (click)="cancelCasinoEdit()" [disabled]="casinoSaving()">
+                    Annuler
+                  </button>
+                }
+                <button mat-flat-button color="primary" type="submit" [disabled]="casinoSaving()">
+                  {{ casinoSaving() ? 'Enregistrement…' : editingCasinoId() == null ? 'Créer le casino' : 'Enregistrer' }}
+                </button>
+              </div>
+            </form>
+          }
+        </div>
+      </div>
+    </div>
+  }
 
   @if (loading()) {
     <div class="flex justify-center py-10"><mat-spinner diameter="36"></mat-spinner></div>
@@ -390,11 +565,23 @@
     title="Supprimer l’atelier ?"
     [message]="
       pendingDeleteNom()
-        ? 'Confirmer la suppression de « ' + pendingDeleteNom() + ' » ? Impossible s’il contient des données.'
+        ? 'Confirmer la suppression de « ' + pendingDeleteNom() + ' » ? Impossible s’il contient des pièces, MAS, SFM ou demandes.'
         : ''
     "
     (confirm)="confirmDeleteAtelier()"
     (cancel)="cancelDeleteAtelier()"
+  />
+
+  <app-confirm-dialog
+    [open]="confirmDeleteCasinoOpen()"
+    title="Supprimer le casino ?"
+    [message]="
+      pendingDeleteCasinoNom()
+        ? 'Confirmer la suppression de « ' + pendingDeleteCasinoNom() + ' » ? Impossible s’il possède encore des ateliers.'
+        : ''
+    "
+    (confirm)="confirmDeleteCasino()"
+    (cancel)="cancelDeleteCasino()"
   />
 
   <app-confirm-dialog

@@ -24,4 +24,7 @@ public class AtelierSummary {
     private CoordonneesDto coordonnees;
     @Builder.Default
     private List<AtelierResponsableDto> responsables = new ArrayList<>();
+    /** Utilisateurs ayant cet atelier comme atelier préféré. */
+    @Builder.Default
+    private List<AtelierResponsableDto> utilisateursPreferes = new ArrayList<>();
 }

@@ -2,7 +2,13 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../environments/environment';
-import { AtelierRequest, AtelierResponsable, AtelierSummary, CasinoSummary } from '../models/models';
+import {
+  AtelierRequest,
+  AtelierResponsable,
+  AtelierSummary,
+  CasinoRequest,
+  CasinoSummary
+} from '../models/models';
 
 @Injectable({ providedIn: 'root' })
 export class AtelierService {
@@ -15,6 +21,18 @@ export class AtelierService {
 
   listCasinos(): Observable<CasinoSummary[]> {
     return this.http.get<CasinoSummary[]>(`${this.base}/casinos`);
+  }
+
+  createCasino(payload: CasinoRequest): Observable<CasinoSummary> {
+    return this.http.post<CasinoSummary>(`${this.base}/casinos`, payload);
+  }
+
+  updateCasino(id: number, payload: CasinoRequest): Observable<CasinoSummary> {
+    return this.http.put<CasinoSummary>(`${this.base}/casinos/${id}`, payload);
+  }
+
+  deleteCasino(id: number): Observable<void> {
+    return this.http.delete<void>(`${this.base}/casinos/${id}`);
   }
 
   listUsers(): Observable<AtelierResponsable[]> {

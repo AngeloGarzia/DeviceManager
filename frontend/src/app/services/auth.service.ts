@@ -42,6 +42,23 @@ export class AuthService {
     return this.ateliers().find((a) => a.id === id) ?? null;
   });
 
+  /** Ateliers regroupés par casino pour le sélecteur (structure casino → atelier). */
+  readonly ateliersByCasino = computed(() => {
+    const groups = new Map<string, AtelierSummary[]>();
+    for (const atelier of this.ateliers()) {
+      const key = atelier.casinoNom?.trim() || 'Casino';
+      const list = groups.get(key) ?? [];
+      list.push(atelier);
+      groups.set(key, list);
+    }
+    return [...groups.entries()]
+      .sort(([a], [b]) => a.localeCompare(b, 'fr'))
+      .map(([casinoNom, ateliers]) => ({
+        casinoNom,
+        ateliers: [...ateliers].sort((a, b) => (a.nom || '').localeCompare(b.nom || '', 'fr'))
+      }));
+  });
+
   private sessionExpiredHandled = false;
 
   constructor(private http: HttpClient, private router: Router) {

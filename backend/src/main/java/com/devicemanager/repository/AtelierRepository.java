@@ -52,4 +52,14 @@ public interface AtelierRepository extends JpaRepository<Atelier, Long> {
      * @return atelier trouvé ou vide
      */
     Optional<Atelier> findByNomIgnoreCaseAndCasinoId(String nom, Long casinoId);
+
+    /**
+     * @param casinoId identifiant du casino
+     * @return nombre d'ateliers rattachés
+     */
+    long countByCasinoId(Long casinoId);
+
+    boolean existsByNomIgnoreCaseAndCasinoId(String nom, Long casinoId);
+
+    boolean existsByNomIgnoreCaseAndCasinoIdAndIdNot(String nom, Long casinoId, Long id);
 }

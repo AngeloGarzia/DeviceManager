@@ -90,4 +90,18 @@ public interface UserRepository extends JpaRepository<User, Long> {
             WHERE u.id IN :ids
             """)
     List<User> findAllByIdInWithGroupe(@Param("ids") Collection<Long> ids);
+
+    /**
+     * Liste les utilisateurs ayant cet atelier comme atelier préféré.
+     *
+     * @param atelierId identifiant de l'atelier
+     * @return utilisateurs concernés, triés par nom
+     */
+    @Query("""
+            SELECT u FROM User u
+            LEFT JOIN FETCH u.groupe
+            WHERE u.preferredAtelier.id = :atelierId
+            ORDER BY u.nom, u.prenom, u.username
+            """)
+    List<User> findAllByPreferredAtelierId(@Param("atelierId") Long atelierId);
 }

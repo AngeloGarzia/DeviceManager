@@ -3,6 +3,7 @@ package com.devicemanager.controller;
 import com.devicemanager.dto.AtelierRequest;
 import com.devicemanager.dto.AtelierResponsableDto;
 import com.devicemanager.dto.AtelierSummary;
+import com.devicemanager.dto.CasinoRequest;
 import com.devicemanager.dto.CasinoSummary;
 import com.devicemanager.dto.PreferredAtelierRequest;
 import com.devicemanager.service.AtelierService;
@@ -25,11 +26,11 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 /**
- * Contrôleur REST de gestion des ateliers techniques casino.
+ * Contrôleur REST de la hiérarchie organisationnelle casino → atelier.
  * <p>
- * Permet de lister, créer et modifier les ateliers d'un groupe multi-tenant.
- * Le technicien ne voit que son atelier préféré ; l'admin bascule via
- * {@code X-Atelier-Id} ou l'endpoint {@code /preferred}.
+ * Un casino possède un ou plusieurs ateliers ; chaque atelier regroupe les pièces
+ * détachées, MAS, SFM et commandes. Le technicien ne voit que son atelier préféré ;
+ * l'admin bascule via {@code X-Atelier-Id} ou l'endpoint {@code /preferred}.
  */
 @RestController
 @RequestMapping("/api/ateliers")
@@ -59,6 +60,52 @@ public class AtelierController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<List<CasinoSummary>> listCasinos(Authentication authentication) {
         return ResponseEntity.ok(atelierService.listCasinosForUser(authentication.getName()));
+    }
+
+    /**
+     * Crée un casino dans le groupe de l'administrateur.
+     *
+     * @param authentication administrateur
+     * @param request        nom du casino
+     * @return casino créé
+     */
+    @PostMapping("/casinos")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<CasinoSummary> createCasino(
+            Authentication authentication,
+            @Valid @RequestBody CasinoRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(atelierService.createCasino(authentication.getName(), request));
+    }
+
+    /**
+     * Met à jour le nom d'un casino du groupe.
+     *
+     * @param authentication administrateur
+     * @param id             casino
+     * @param request        nouveau nom
+     * @return casino modifié
+     */
+    @PutMapping("/casinos/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<CasinoSummary> updateCasino(
+            Authentication authentication,
+            @PathVariable Long id,
+            @Valid @RequestBody CasinoRequest request) {
+        return ResponseEntity.ok(atelierService.updateCasino(authentication.getName(), id, request));
+    }
+
+    /**
+     * Supprime un casino sans atelier rattaché.
+     *
+     * @param authentication administrateur
+     * @param id             casino
+     */
+    @DeleteMapping("/casinos/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteCasino(Authentication authentication, @PathVariable Long id) {
+        atelierService.deleteCasino(authentication.getName(), id);
     }
 
     /**

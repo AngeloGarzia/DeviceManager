@@ -27,6 +27,8 @@ export interface AtelierSummary {
   label: string;
   coordonnees?: Coordonnees;
   responsables?: AtelierResponsable[];
+  /** Utilisateurs ayant cet atelier comme atelier préféré. */
+  utilisateursPreferes?: AtelierResponsable[];
 }
 
 export interface CasinoSummary {
@@ -34,6 +36,12 @@ export interface CasinoSummary {
   nom: string;
   groupeId: number;
   groupeNom: string;
+  /** Nombre d'ateliers rattachés (casino → atelier). */
+  atelierCount?: number;
+}
+
+export interface CasinoRequest {
+  nom: string;
 }
 
 export interface AtelierResponsable {
@@ -96,6 +104,7 @@ export interface AtelierRequest {
   telephones?: TelephoneCoord[];
   reseauxSociaux?: ReseauSocial[];
   responsableIds?: number[];
+  utilisateurPrefereIds?: number[];
 }
 
 export interface SfmContact {

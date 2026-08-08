@@ -16,21 +16,29 @@
 
         @if (auth.ateliers().length > 0) {
           <mat-form-field appearance="outline" class="atelier-select" subscriptSizing="dynamic">
-            <mat-label>Atelier</mat-label>
+            <mat-label>Casino → Atelier</mat-label>
             @if (auth.isAdmin()) {
               <mat-select
                 [value]="auth.atelierId()"
                 (selectionChange)="auth.switchAtelier($event.value)"
               >
-                @for (a of auth.ateliers(); track a.id) {
-                  <mat-option [value]="a.id">{{ a.nom || a.label }}</mat-option>
+                @for (group of auth.ateliersByCasino(); track group.casinoNom) {
+                  <mat-optgroup [label]="group.casinoNom">
+                    @for (a of group.ateliers; track a.id) {
+                      <mat-option [value]="a.id">{{ a.nom || a.label }}</mat-option>
+                    }
+                  </mat-optgroup>
                 }
               </mat-select>
             } @else {
               <input
                 matInput
                 readonly
-                [value]="auth.currentAtelier()?.nom || auth.currentAtelier()?.label || ''"
+                [value]="
+                  auth.currentAtelier()
+                    ? (auth.currentAtelier()?.casinoNom || '') + ' → ' + (auth.currentAtelier()?.nom || auth.currentAtelier()?.label || '')
+                    : ''
+                "
               />
             }
           </mat-form-field>

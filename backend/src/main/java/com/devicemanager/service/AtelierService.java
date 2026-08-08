@@ -3,6 +3,7 @@ package com.devicemanager.service;
 import com.devicemanager.dto.AtelierRequest;
 import com.devicemanager.dto.AtelierResponsableDto;
 import com.devicemanager.dto.AtelierSummary;
+import com.devicemanager.dto.CasinoRequest;
 import com.devicemanager.dto.CasinoSummary;
 import com.devicemanager.dto.coordonnees.AdressePostaleDto;
 import com.devicemanager.dto.coordonnees.CoordonneesDto;
@@ -101,10 +102,10 @@ public class AtelierService {
     }
 
     /**
-     * Liste les casinos du groupe de l'utilisateur.
+     * Liste les casinos du groupe de l'utilisateur (chaque casino possède 0..N ateliers).
      *
      * @param username nom d'utilisateur connecté
-     * @return casinos triés par nom
+     * @return casinos triés par nom, avec nombre d'ateliers
      */
     public List<CasinoSummary> listCasinosForUser(String username) {
         User user = requireUser(username);
@@ -112,13 +113,79 @@ public class AtelierService {
             return List.of();
         }
         return casinoRepository.findByGroupeIdOrderByNomAsc(user.getGroupe().getId()).stream()
-                .map(c -> CasinoSummary.builder()
-                        .id(c.getId())
-                        .nom(c.getNom())
-                        .groupeId(c.getGroupe() != null ? c.getGroupe().getId() : null)
-                        .groupeNom(c.getGroupe() != null ? c.getGroupe().getNom() : "")
-                        .build())
+                .map(this::toCasinoSummary)
                 .toList();
+    }
+
+    /**
+     * Crée un casino dans le groupe de l'administrateur.
+     *
+     * @param username administrateur
+     * @param request  nom du casino
+     * @return casino créé
+     */
+    @Transactional
+    public CasinoSummary createCasino(String username, CasinoRequest request) {
+        User user = requireUser(username);
+        if (user.getGroupe() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Groupe utilisateur manquant");
+        }
+        String nom = normalizeNom(request.getNom());
+        Long groupeId = user.getGroupe().getId();
+        if (casinoRepository.existsByNomIgnoreCaseAndGroupeId(nom, groupeId)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Nom de casino déjà utilisé dans ce groupe");
+        }
+        Casino saved = casinoRepository.saveAndFlush(Casino.builder()
+                .nom(nom)
+                .groupe(user.getGroupe())
+                .build());
+        log.info("Création en base — Casino id={} nom={} groupe={} par={}",
+                saved.getId(), saved.getNom(), user.getGroupe().getNom(), username);
+        return toCasinoSummary(saved);
+    }
+
+    /**
+     * Renomme un casino du groupe.
+     *
+     * @param username administrateur
+     * @param id       casino
+     * @param request  nouveau nom
+     * @return casino modifié
+     */
+    @Transactional
+    public CasinoSummary updateCasino(String username, Long id, CasinoRequest request) {
+        User user = requireUser(username);
+        Casino casino = requireCasinoInUserGroupe(user, id);
+        String nom = normalizeNom(request.getNom());
+        Long groupeId = user.getGroupe().getId();
+        if (casinoRepository.existsByNomIgnoreCaseAndGroupeIdAndIdNot(nom, groupeId, id)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Nom de casino déjà utilisé dans ce groupe");
+        }
+        casino.setNom(nom);
+        Casino saved = casinoRepository.saveAndFlush(casino);
+        log.info("Modification en base — Casino id={} nom={} par={}", saved.getId(), saved.getNom(), username);
+        return toCasinoSummary(saved);
+    }
+
+    /**
+     * Supprime un casino sans atelier rattaché.
+     *
+     * @param username administrateur
+     * @param id       casino
+     */
+    @Transactional
+    public void deleteCasino(String username, Long id) {
+        User user = requireUser(username);
+        Casino casino = requireCasinoInUserGroupe(user, id);
+        long ateliers = atelierRepository.countByCasinoId(id);
+        if (ateliers > 0) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Impossible de supprimer : ce casino possède encore " + ateliers + " atelier(s).");
+        }
+        String nom = casino.getNom();
+        casinoRepository.delete(casino);
+        casinoRepository.flush();
+        log.info("Suppression en base — Casino id={} nom={} par={}", id, nom, username);
     }
 
     /**
@@ -195,6 +262,7 @@ public class AtelierService {
         applyCoordonnees(atelier, request);
         applyResponsables(atelier, user, request.getResponsableIds());
         Atelier saved = atelierRepository.saveAndFlush(atelier);
+        applyUtilisateursPreferes(saved, user, request.getUtilisateurPrefereIds());
         log.info("Création en base — Atelier id={} nom={} casino={} par={}",
                 saved.getId(), saved.getNom(), casino.getNom(), username);
         return toSummary(saved);
@@ -222,6 +290,7 @@ public class AtelierService {
         applyCoordonnees(atelier, request);
         applyResponsables(atelier, user, request.getResponsableIds());
         Atelier saved = atelierRepository.saveAndFlush(atelier);
+        applyUtilisateursPreferes(saved, user, request.getUtilisateurPrefereIds());
         log.info("Modification en base — Atelier id={} nom={} casino={} par={}",
                 saved.getId(), saved.getNom(), casino.getNom(), username);
         return toSummary(saved);
@@ -277,18 +346,43 @@ public class AtelierService {
                 .groupeNom(groupeNom)
                 .label(atelier.getNom() + " — " + casinoNom)
                 .coordonnees(toCoordonneesDto(atelier.getCoordonnees()))
-                .responsables(atelier.getResponsables() == null
+                .responsables(sortedUserDtos(atelier.getResponsables() == null
                         ? List.of()
-                        : atelier.getResponsables().stream()
+                        : atelier.getResponsables().stream().map(this::toResponsableDto).toList()))
+                .utilisateursPreferes(atelier.getId() == null
+                        ? List.of()
+                        : sortedUserDtos(userRepository.findAllByPreferredAtelierId(atelier.getId()).stream()
                                 .map(this::toResponsableDto)
-                                .sorted((a, b) -> {
-                                    String la = ((a.getNom() == null ? "" : a.getNom())
-                                            + " " + (a.getPrenom() == null ? "" : a.getPrenom())).trim();
-                                    String lb = ((b.getNom() == null ? "" : b.getNom())
-                                            + " " + (b.getPrenom() == null ? "" : b.getPrenom())).trim();
-                                    return la.compareToIgnoreCase(lb);
-                                })
-                                .toList())
+                                .toList()))
+                .build();
+    }
+
+    private List<AtelierResponsableDto> sortedUserDtos(List<AtelierResponsableDto> users) {
+        return users.stream()
+                .sorted((a, b) -> {
+                    String la = ((a.getNom() == null ? "" : a.getNom())
+                            + " " + (a.getPrenom() == null ? "" : a.getPrenom())).trim();
+                    String lb = ((b.getNom() == null ? "" : b.getNom())
+                            + " " + (b.getPrenom() == null ? "" : b.getPrenom())).trim();
+                    if (la.isBlank()) {
+                        la = a.getUsername() == null ? "" : a.getUsername();
+                    }
+                    if (lb.isBlank()) {
+                        lb = b.getUsername() == null ? "" : b.getUsername();
+                    }
+                    return la.compareToIgnoreCase(lb);
+                })
+                .toList();
+    }
+
+    private CasinoSummary toCasinoSummary(Casino casino) {
+        long atelierCount = casino.getId() == null ? 0L : atelierRepository.countByCasinoId(casino.getId());
+        return CasinoSummary.builder()
+                .id(casino.getId())
+                .nom(casino.getNom())
+                .groupeId(casino.getGroupe() != null ? casino.getGroupe().getId() : null)
+                .groupeNom(casino.getGroupe() != null ? casino.getGroupe().getNom() : "")
+                .atelierCount(atelierCount)
                 .build();
     }
 
@@ -372,12 +466,7 @@ public class AtelierService {
                     throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Responsable introuvable");
                 }
                 for (User candidate : users) {
-                    if (actor.getGroupe() == null
-                            || candidate.getGroupe() == null
-                            || !actor.getGroupe().getId().equals(candidate.getGroupe().getId())) {
-                        throw new ResponseStatusException(HttpStatus.FORBIDDEN,
-                                "Responsable hors du groupe de l'atelier");
-                    }
+                    ensureSameGroupe(actor, candidate, "Responsable hors du groupe de l'atelier");
                     next.add(candidate);
                 }
             }
@@ -387,6 +476,51 @@ public class AtelierService {
         } else {
             atelier.getResponsables().clear();
             atelier.getResponsables().addAll(next);
+        }
+    }
+
+    /**
+     * Définit les utilisateurs ayant cet atelier comme préféré.
+     * Les utilisateurs retirés voient leur atelier préféré remis à null ;
+     * ceux ajoutés pointent vers cet atelier (un seul préféré par compte).
+     */
+    private void applyUtilisateursPreferes(Atelier atelier, User actor, List<Long> utilisateurPrefereIds) {
+        if (atelier.getId() == null) {
+            return;
+        }
+        List<Long> desiredIds = utilisateurPrefereIds == null
+                ? List.of()
+                : utilisateurPrefereIds.stream().filter(Objects::nonNull).distinct().toList();
+        Set<Long> desired = new HashSet<>(desiredIds);
+
+        List<User> currentlyPreferring = userRepository.findAllByPreferredAtelierId(atelier.getId());
+        List<User> toClear = currentlyPreferring.stream()
+                .filter(current -> !desired.contains(current.getId()))
+                .peek(current -> current.setPreferredAtelier(null))
+                .toList();
+        if (!toClear.isEmpty()) {
+            userRepository.saveAll(toClear);
+        }
+
+        if (desiredIds.isEmpty()) {
+            return;
+        }
+        List<User> candidates = userRepository.findAllByIdInWithGroupe(desiredIds);
+        if (candidates.size() != desiredIds.size()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Utilisateur préféré introuvable");
+        }
+        for (User candidate : candidates) {
+            ensureSameGroupe(actor, candidate, "Utilisateur préféré hors du groupe de l'atelier");
+            candidate.setPreferredAtelier(atelier);
+        }
+        userRepository.saveAll(candidates);
+    }
+
+    private void ensureSameGroupe(User actor, User candidate, String forbiddenMessage) {
+        if (actor.getGroupe() == null
+                || candidate.getGroupe() == null
+                || !actor.getGroupe().getId().equals(candidate.getGroupe().getId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, forbiddenMessage);
         }
     }
 

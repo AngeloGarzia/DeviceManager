@@ -13,4 +13,6 @@ public class CasinoSummary {
     private String nom;
     private Long groupeId;
     private String groupeNom;
+    /** Nombre d'ateliers rattachés (structure casino → atelier). */
+    private long atelierCount;
 }
