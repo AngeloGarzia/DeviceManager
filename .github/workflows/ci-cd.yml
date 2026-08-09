@@ -49,7 +49,7 @@ jobs:
 
       - name: Upload JaCoCo report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: jacoco-report
           path: backend/target/site/jacoco/
@@ -109,7 +109,7 @@ jobs:
         run: docker build -t device-manager-backend:ci ./backend
 
       - name: Trivy scan
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: device-manager-backend:ci
           severity: CRITICAL,HIGH

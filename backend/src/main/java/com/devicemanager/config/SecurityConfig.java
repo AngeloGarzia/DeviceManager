@@ -71,7 +71,7 @@ public class SecurityConfig {
                     headers.frameOptions(frame -> frame.deny());
                     headers.referrerPolicy(referrer ->
                             referrer.policy(ReferrerPolicyHeaderWriter.ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN));
-                    headers.permissionsPolicy(permissions ->
+                    headers.permissionsPolicyHeader(permissions ->
                             permissions.policy("camera=(), microphone=(), geolocation=()"));
                     headers.contentSecurityPolicy(csp ->
                             csp.policyDirectives("default-src 'none'; frame-ancestors 'none'; base-uri 'none'"));

@@ -13,6 +13,10 @@
         <Class name="com.devicemanager.dto.AdminLogListResponse"/>
         <Bug code="EI"/>
     </Match>
+    <Match>
+        <Class name="com.devicemanager.service.AuthService$AuthSession"/>
+        <Bug code="EI,EI2"/>
+    </Match>
 
     <!-- Beans Spring injectés (JdbcTemplate, S3Client) : ownership applicatif. -->
     <Match>

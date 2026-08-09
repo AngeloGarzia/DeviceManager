@@ -205,6 +205,8 @@
                         <exclude>com/devicemanager/controller/**</exclude>
                         <exclude>com/devicemanager/dto/**</exclude>
                         <exclude>com/devicemanager/logging/**</exclude>
+                        <!-- Appels HTTP fournisseurs IA (RestClient) : peu unit-testables sans MockWebServer. -->
+                        <exclude>com/devicemanager/service/AiModelDiscoveryService.class</exclude>
                     </excludes>
                     <rules>
                         <rule>

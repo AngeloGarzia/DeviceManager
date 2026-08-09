@@ -313,7 +313,7 @@ public class AiModelDiscoveryService {
 
     private static String friendlyFetchError(String providerId, RestClientResponseException ex) {
         int code = ex.getStatusCode().value();
-        String body = ex.getResponseBodyAsString() == null ? "" : ex.getResponseBodyAsString();
+        String body = ex.getResponseBodyAsString();
         if (code == 401 || code == 403
                 || body.contains("ACCESS_TOKEN_TYPE_UNSUPPORTED")
                 || body.contains("UNAUTHENTICATED")
