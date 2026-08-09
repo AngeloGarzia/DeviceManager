@@ -22,7 +22,9 @@
         <java.version>21</java.version>
         <jjwt.version>0.12.7</jjwt.version>
         <aws.sdk.version>2.31.78</aws.sdk.version>
-        <spring-ai.version>1.1.5</spring-ai.version>
+        <spring-ai.version>1.1.6</spring-ai.version>
+        <!-- Trivy HIGH : Netty DoS CVEs (4.1.135 → 4.1.136). -->
+        <netty.version>4.1.136.Final</netty.version>
         <spotbugs-maven-plugin.version>4.10.3.0</spotbugs-maven-plugin.version>
         <spotbugs.version>4.10.3</spotbugs.version>
         <jacoco.version>0.8.15</jacoco.version>
@@ -40,6 +42,17 @@
                 <version>${spring-ai.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
+            </dependency>
+            <!-- Trivy HIGH CVE-2026-35568 (DNS rebinding) — Spring AI 1.1.6 tire encore 0.18.2. -->
+            <dependency>
+                <groupId>io.modelcontextprotocol.sdk</groupId>
+                <artifactId>mcp-core</artifactId>
+                <version>1.0.0</version>
+            </dependency>
+            <dependency>
+                <groupId>io.modelcontextprotocol.sdk</groupId>
+                <artifactId>mcp-json-jackson2</artifactId>
+                <version>1.0.0</version>
             </dependency>
         </dependencies>
     </dependencyManagement>
