@@ -1,0 +1,239 @@
+/* Layout shell en CSS global — évite le bug Angular 19 (styles composant absents en prod). */
+
+.shell {
+  min-height: 100dvh;
+  background: #f4f6f8;
+  color: #1f2933;
+}
+
+.shell-header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1rem;
+  padding: 0.65rem 0.85rem;
+  background: #fff;
+  border-bottom: 1px solid #d9e2ec;
+}
+
+@media (min-width: 640px) {
+  .shell-header {
+    padding: 0.75rem 1.25rem;
+  }
+}
+
+.shell-header__brand {
+  min-width: 0;
+  flex: 1 1 10rem;
+}
+
+.shell-brand {
+  display: block;
+  font-size: 1.05rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: #2f5d7a;
+  text-decoration: none;
+}
+
+.shell-brand:hover {
+  opacity: 0.85;
+}
+
+.shell-user {
+  margin-top: 0.1rem;
+  font-size: 0.75rem;
+  color: #52606d;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.shell-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.15rem;
+  margin-left: auto;
+}
+
+.logout-btn {
+  min-width: 0 !important;
+}
+
+.logout-label {
+  display: none;
+}
+
+@media (min-width: 480px) {
+  .logout-label {
+    display: inline;
+  }
+}
+
+.atelier-select {
+  width: min(16rem, 100%);
+  flex: 0 1 16rem;
+  font-size: 0.875rem;
+}
+
+.atelier-select .mat-mdc-form-field-subscript-wrapper {
+  display: none;
+}
+
+.atelier-select .mat-mdc-text-field-wrapper {
+  background: #fff;
+}
+
+.atelier-select .mat-mdc-form-field-infix {
+  min-height: 2.75rem;
+  padding-top: 0.65rem;
+  padding-bottom: 0.65rem;
+}
+
+.shell-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 30;
+  border-top: 1px solid #d9e2ec;
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(8px);
+}
+
+.nav-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.15rem;
+  width: 100%;
+  max-width: 48rem;
+  margin: 0 auto;
+  padding: 0.25rem 0.35rem max(0.35rem, env(safe-area-inset-bottom));
+}
+
+.nav-link {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.15rem;
+  min-height: 3.75rem;
+  min-width: 0;
+  width: 100%;
+  padding: 0.25rem 0.2rem;
+  overflow: hidden;
+  border: 0;
+  border-radius: 0.5rem;
+  background: transparent;
+  color: #52606d;
+  font: inherit;
+  font-size: 0.62rem;
+  font-weight: 500;
+  line-height: 1.15;
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.nav-link > span:not(.nav-icon-wrap) {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  max-width: 100%;
+  word-break: break-word;
+}
+
+.nav-link mat-icon {
+  font-size: 1.25rem;
+  width: 1.25rem;
+  height: 1.25rem;
+  flex-shrink: 0;
+}
+
+.nav-link.active-nav {
+  background: #e8f0f5;
+  color: #2f5d7a;
+}
+
+.nav-icon-wrap {
+  position: relative;
+  display: inline-flex;
+  line-height: 0;
+  flex-shrink: 0;
+}
+
+.pending-badge {
+  position: absolute;
+  top: -0.35rem;
+  right: -0.55rem;
+  min-width: 1.05rem;
+  height: 1.05rem;
+  padding: 0 0.2rem;
+  border-radius: 999px;
+  background: #c62828;
+  color: #fff;
+  font-size: 0.62rem;
+  font-weight: 700;
+  line-height: 1.05rem;
+  text-align: center;
+  animation: pending-blink 1.1s ease-in-out infinite;
+}
+
+.pending-label-blink {
+  animation: pending-blink 1.1s ease-in-out infinite;
+  color: #c62828;
+  font-weight: 700;
+}
+
+.nav-link.active-nav .pending-label-blink {
+  color: #c62828;
+}
+
+@keyframes pending-blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.25;
+  }
+}
+
+a.admin-active mat-icon,
+button.admin-active mat-icon {
+  color: #0b6bcb;
+}
+
+@media (min-width: 640px) {
+  .nav-link {
+    min-height: 3.5rem;
+    font-size: 0.72rem;
+  }
+}
+
+.orders-nav-menu .orders-menu-count {
+  margin-left: auto;
+  min-width: 1.25rem;
+  height: 1.25rem;
+  padding: 0 0.35rem;
+  border-radius: 999px;
+  background: #c62828;
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 700;
+  line-height: 1.25rem;
+  text-align: center;
+}
+
+.orders-nav-menu .orders-menu-active,
+.devices-nav-menu .devices-menu-active {
+  color: #0b6bcb;
+  background: rgba(11, 107, 203, 0.08);
+}
