@@ -213,7 +213,8 @@ public class SfmService {
             contact.setTelephone(telephone);
             contact.setEmail(email);
             contact.setReceiveOrderMails(receiveMails);
-            contact.setTechnicienSfm(technicien || contact.isTechnicienSfm());
+            // Respecter la case à cocher (y compris pour décocher un technicien).
+            contact.setTechnicienSfm(technicien);
         }
         return sfmContactRepository.save(contact);
     }

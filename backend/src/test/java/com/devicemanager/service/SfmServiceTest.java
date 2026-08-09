@@ -241,4 +241,53 @@ class SfmServiceTest {
         assertThat(response.getContacts().get(0).isTechnicienSfm()).isTrue();
         verify(sfmContactRepository, never()).delete(any());
     }
+
+    @Test
+    void update_canUncheckTechnicienSfmFlag() {
+        SfmContact tech = SfmContact.builder()
+                .id(10L)
+                .nom("Paul")
+                .telephone("0611223344")
+                .email("paul@example.com")
+                .technicienSfm(true)
+                .receiveOrderMails(true)
+                .sfms(new HashSet<>())
+                .build();
+
+        Sfm sfmA = Sfm.builder()
+                .id(1L)
+                .nom("SFM A")
+                .responsable("Paul")
+                .telephone("0611223344")
+                .email("paul@example.com")
+                .contacts(new ArrayList<>(List.of(tech)))
+                .marques(new HashSet<>(List.of(TestFixtures.marque())))
+                .atelier(TestFixtures.atelier())
+                .build();
+        tech.getSfms().add(sfmA);
+
+        when(sfmRepository.findByIdWithContacts(1L, 100L)).thenReturn(Optional.of(sfmA));
+        when(sfmRepository.existsByNomIgnoreCaseAndAtelierIdAndIdNot("SFM A", 100L, 1L)).thenReturn(false);
+        when(sfmContactRepository.findById(10L)).thenReturn(Optional.of(tech));
+        when(sfmContactRepository.save(any(SfmContact.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(marqueMasRepository.findAllById(anyCollection())).thenReturn(List.of(TestFixtures.marque()));
+        when(sfmRepository.save(any(Sfm.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        SfmRequest.SfmContactRequest contactReq = new SfmRequest.SfmContactRequest();
+        contactReq.setId(10L);
+        contactReq.setNom("Paul");
+        contactReq.setTelephone("0611223344");
+        contactReq.setEmail("paul@example.com");
+        contactReq.setTechnicienSfm(false);
+
+        SfmRequest request = new SfmRequest();
+        request.setNom("SFM A");
+        request.setContacts(List.of(contactReq));
+        request.setMarqueIds(List.of(5L));
+
+        SfmResponse response = sfmService.update(1L, request);
+
+        assertThat(response.getContacts().get(0).isTechnicienSfm()).isFalse();
+        assertThat(tech.isTechnicienSfm()).isFalse();
+    }
 }
