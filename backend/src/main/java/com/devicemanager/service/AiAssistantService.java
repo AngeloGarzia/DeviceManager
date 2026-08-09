@@ -1,6 +1,7 @@
 package com.devicemanager.service;
 
 import com.devicemanager.ai.AiApiKeyBattery;
+import com.devicemanager.ai.AiPromptDefaults;
 import com.devicemanager.ai.AiProviders;
 import com.devicemanager.dto.AiChatResponse;
 import com.devicemanager.dto.AiLabelScanResponse;
@@ -9,8 +10,11 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import com.google.genai.Client;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.content.Media;
+import org.springframework.ai.google.genai.GoogleGenAiChatModel;
+import org.springframework.ai.google.genai.GoogleGenAiChatOptions;
 import org.springframework.ai.openai.OpenAiChatModel;
 import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.ai.openai.api.OpenAiApi;
@@ -35,38 +39,9 @@ import java.util.List;
 @Slf4j
 public class AiAssistantService {
 
-    public static final String SYSTEM_PROMPT = """
-            Tu es l'assistant DeviceManager, une application de gestion de pièces détachées
-            pour machines à sous (casinos / ateliers techniques).
-
-            Tu aides les administrateurs et techniciens à :
-            - comprendre le catalogue pièces, MAS, SFM et demandes de commande ;
-            - rédiger un message de demande de commande clair ;
-            - expliquer les statuts (PENDING / VALIDATED) et le flux de validation ;
-            - proposer des bonnes pratiques (références, photos, contacts SFM).
-
-            Réponds en français, de façon concise et professionnelle.
-            Si tu manques d'information métier précise (stock réel, IDs), dis-le clairement
-            plutôt que d'inventer.
-            """;
-
-    private static final String LABEL_EXTRACT_PROMPT = """
-            Tu analyses une photo d'étiquette / plaque signalétique d'une pièce détachée
-            (électronique, mécanique, casino / machines à sous).
-
-            Extrais les informations visibles et réponds UNIQUEMENT avec un JSON valide, sans markdown :
-            {
-              "nom": "nom commercial du produit si lisible, sinon null",
-              "reference": "référence / part number / P/N si lisible, sinon null",
-              "marque": "marque / fabricant si lisible, sinon null",
-              "rawText": "texte utile lu sur l'étiquette (court)",
-              "notes": "autres infos utiles (lot, voltage, etc.) ou null"
-            }
-            Ne invente pas de valeurs absentes de l'image : utilise null.
-            """;
-
     private final AppSettingsService appSettingsService;
     private final AiApiKeyBattery aiApiKeyBattery;
+    private final AiModelDiscoveryService aiModelDiscoveryService;
     private final ImageOptimizationService imageOptimizationService;
     private final WebEnrichmentService webEnrichmentService;
     private final ObjectMapper objectMapper;
@@ -91,22 +66,24 @@ public class AiAssistantService {
      */
     public AiChatResponse status() {
         String provider = resolveProviderId();
-        String model = appSettingsService.get(AppSettingsService.AI_MODEL, AiProviders.defaultModel(provider));
+        String model = resolveChatModel(provider);
         String providerLabel = AiProviders.require(provider).label();
         boolean flagOn = appSettingsService.getBoolean(AppSettingsService.AI_ENABLED, false);
         String apiKey = resolveApiKey(provider);
-        boolean enabled = flagOn && !apiKey.isBlank();
+        boolean enabled = flagOn && !apiKey.isBlank() && model != null && !model.isBlank();
 
         String reply;
         if (enabled) {
             reply = "Assistant IA prêt (" + providerLabel + " / " + model + ").";
         } else if (!flagOn) {
             reply = "Assistant IA désactivé dans les paramètres — activez « Activer l'assistant IA ».";
-        } else {
+        } else if (apiKey.isBlank()) {
             String envVar = AiApiKeyBattery.envVarName(provider);
             reply = "Fournisseur « " + providerLabel + " » sélectionné mais " + envVar
-                    + " est vide. Choisissez un fournisseur avec clé (ex. Groq) "
+                    + " est vide. Choisissez un fournisseur avec clé "
                     + "ou renseignez " + envVar + " dans le .env / Render.";
+        } else {
+            reply = "Aucun modèle IA sélectionné — choisissez un modèle dans Paramètres (liste en ligne).";
         }
 
         return AiChatResponse.builder()
@@ -146,7 +123,7 @@ public class AiAssistantService {
         try {
             ChatClient chatClient = buildChatClient(apiKey, provider, model, 0.3);
             String reply = chatClient.prompt()
-                    .system(SYSTEM_PROMPT)
+                    .system(systemPrompt())
                     .user(message.trim())
                     .call()
                     .content();
@@ -158,8 +135,7 @@ public class AiAssistantService {
             throw ex;
         } catch (Exception ex) {
             log.error("Échec appel Spring AI (model={}): {}", model, ex.getMessage());
-            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
-                    "Échec de l'appel au modèle IA: " + ex.getMessage());
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, friendlyAiError(provider, ex));
         }
     }
 
@@ -195,7 +171,7 @@ public class AiAssistantService {
         try {
             ChatClient visionClient = buildChatClient(apiKey, provider, visionModel, 0.1);
             String extractRaw = visionClient.prompt()
-                    .user(u -> u.text(LABEL_EXTRACT_PROMPT)
+                    .user(u -> u.text(labelExtractPrompt())
                             .media(new Media(MimeTypeUtils.IMAGE_JPEG, new ByteArrayResource(bytes))))
                     .call()
                     .content();
@@ -225,8 +201,42 @@ public class AiAssistantService {
         } catch (Exception ex) {
             log.error("Échec scan étiquette IA: {}", ex.getMessage(), ex);
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
-                    "Échec de l'analyse IA de l'étiquette: " + ex.getMessage());
+                    "Échec de l'analyse IA de l'étiquette: " + friendlyAiError(provider, ex));
         }
+    }
+
+    /** Message utilisateur plus clair (notamment clés Gemini AQ. rejetées par Google). */
+    private String friendlyAiError(String provider, Exception ex) {
+        String chain = exceptionChain(ex);
+        boolean geminiAuth = "gemini".equalsIgnoreCase(provider)
+                && (chain.contains("401")
+                || chain.contains("UNAUTHENTICATED")
+                || chain.contains("ACCESS_TOKEN_TYPE_UNSUPPORTED")
+                || chain.contains("invalid authentication"));
+        if (geminiAuth) {
+            return "Clé Gemini refusée par Google (souvent les nouvelles clés « AQ. »). "
+                    + "Dans Paramètres, choisissez OpenRouter + un modèle vision "
+                    + "(ex. google/gemini-3.1-flash-lite), ou OpenAI gpt-4o-mini.";
+        }
+        String msg = ex.getMessage();
+        if (msg == null || msg.isBlank()) {
+            return "Échec de l'appel au modèle IA";
+        }
+        return "Échec de l'appel au modèle IA: " + msg;
+    }
+
+    private static String exceptionChain(Throwable ex) {
+        StringBuilder sb = new StringBuilder();
+        for (Throwable t = ex; t != null; t = t.getCause()) {
+            if (!sb.isEmpty()) {
+                sb.append(" | ");
+            }
+            sb.append(t.getClass().getSimpleName());
+            if (t.getMessage() != null) {
+                sb.append(": ").append(t.getMessage());
+            }
+        }
+        return sb.toString();
     }
 
     private String generateUsage(
@@ -239,35 +249,18 @@ public class AiAssistantService {
             String rawText,
             String notes,
             String webContext) {
-        String prompt = """
-                Rédige un texte COURT (2 à 4 phrases max, français) pour le champ « usage »
-                d'une fiche pièce détachée casino / machines à sous.
-
-                Données lues sur l'étiquette :
-                - nom: %s
-                - référence: %s
-                - marque: %s
-                - texte brut: %s
-                - notes: %s
-
-                Contexte web (peut être vide ou partiel) :
-                %s
-
-                Consigne : décrire à quoi sert typiquement la pièce, son contexte d'utilisation,
-                sans inventer de références absentes. Si peu d'infos, rester prudent et générique.
-                Réponds uniquement avec le texte d'usage, sans titre ni JSON.
-                """.formatted(
-                nullToDash(nom),
-                nullToDash(reference),
-                nullToDash(marque),
-                nullToDash(rawText),
-                nullToDash(notes),
-                webContext == null || webContext.isBlank() ? "(aucun résultat web)" : webContext
-        );
+        String prompt = applyUsagePlaceholders(
+                usagePromptTemplate(),
+                nom,
+                reference,
+                marque,
+                rawText,
+                notes,
+                webContext);
 
         ChatClient chatClient = buildChatClient(apiKey, provider, model, 0.4);
         String reply = chatClient.prompt()
-                .system(SYSTEM_PROMPT)
+                .system(systemPrompt())
                 .user(prompt)
                 .call()
                 .content();
@@ -307,19 +300,63 @@ public class AiAssistantService {
         return AiProviders.normalizeProvider(appSettingsService.get(AppSettingsService.AI_PROVIDER, "openai"));
     }
 
+    private String systemPrompt() {
+        return firstNonBlank(
+                appSettingsService.get(AppSettingsService.AI_SYSTEM_PROMPT, ""),
+                AiPromptDefaults.SYSTEM);
+    }
+
+    private String labelExtractPrompt() {
+        return firstNonBlank(
+                appSettingsService.get(AppSettingsService.AI_LABEL_EXTRACT_PROMPT, ""),
+                AiPromptDefaults.LABEL_EXTRACT);
+    }
+
+    private String usagePromptTemplate() {
+        return firstNonBlank(
+                appSettingsService.get(AppSettingsService.AI_USAGE_PROMPT, ""),
+                AiPromptDefaults.USAGE);
+    }
+
+    private static String applyUsagePlaceholders(
+            String template,
+            String nom,
+            String reference,
+            String marque,
+            String rawText,
+            String notes,
+            String webContext) {
+        String web = webContext == null || webContext.isBlank() ? "(aucun résultat web)" : webContext;
+        return template
+                .replace("{{nom}}", nullToDash(nom))
+                .replace("{{reference}}", nullToDash(reference))
+                .replace("{{marque}}", nullToDash(marque))
+                .replace("{{rawText}}", nullToDash(rawText))
+                .replace("{{notes}}", nullToDash(notes))
+                .replace("{{webContext}}", web);
+    }
+
+    private static String firstNonBlank(String value, String fallback) {
+        if (value != null && !value.isBlank()) {
+            return value.trim();
+        }
+        return fallback;
+    }
+
     private String resolveChatModel(String provider) {
         return resolveChatModelForProvider(provider);
     }
 
     private String resolveChatModelForProvider(String provider) {
-        // Pour le fournisseur courant, respecter le modèle Setup ; sinon modèle par défaut du fournisseur.
+        // Pour le fournisseur courant, respecter le modèle Setup ; sinon premier modèle découvert en ligne.
         if (provider.equals(resolveProviderId())) {
-            String model = appSettingsService.get(AppSettingsService.AI_MODEL, AiProviders.defaultModel(provider));
+            String model = appSettingsService.get(AppSettingsService.AI_MODEL, "");
             if (model != null && !model.isBlank()) {
                 return model.trim();
             }
         }
-        return AiProviders.defaultModel(provider);
+        String online = aiModelDiscoveryService.firstModelId(provider);
+        return online == null ? "" : online;
     }
 
     private record VisionEndpoint(String providerId, String model, String apiKey) {
@@ -358,10 +395,10 @@ public class AiAssistantService {
         }
         String configured = resolveChatModelForProvider(providerId);
         String visionModel;
-        if (AiProviders.supportsVision(providerId, configured)) {
+        if (configured != null && !configured.isBlank() && AiProviders.supportsVision(providerId, configured)) {
             visionModel = configured;
         } else {
-            visionModel = AiProviders.visionFallbackModel(providerId);
+            visionModel = aiModelDiscoveryService.firstVisionModelId(providerId);
         }
         if (visionModel == null || visionModel.isBlank()) {
             return null;
@@ -370,11 +407,27 @@ public class AiAssistantService {
     }
 
     private ChatClient buildChatClient(String apiKey, String providerId, String model, double temperature) {
+        // Les clés Gemini récentes (préfixe AQ.) refusent l'endpoint OpenAI-compatible + Bearer.
+        // On passe par l'API native (x-goog-api-key) via le client Google GenAI.
+        if ("gemini".equalsIgnoreCase(providerId)) {
+            Client genAiClient = Client.builder()
+                    .apiKey(apiKey)
+                    .build();
+            GoogleGenAiChatModel geminiModel = GoogleGenAiChatModel.builder()
+                    .genAiClient(genAiClient)
+                    .defaultOptions(GoogleGenAiChatOptions.builder()
+                            .model(model)
+                            .temperature(temperature)
+                            .build())
+                    .build();
+            return ChatClient.builder(geminiModel).build();
+        }
+
         AiProviders.Provider provider = AiProviders.require(providerId);
-        OpenAiApi.Builder apiBuilder = OpenAiApi.builder()
+        OpenAiApi openAiApi = OpenAiApi.builder()
                 .apiKey(apiKey)
-                .baseUrl(provider.baseUrl());
-        OpenAiApi openAiApi = apiBuilder.build();
+                .baseUrl(provider.baseUrl())
+                .build();
         OpenAiChatModel chatModel = OpenAiChatModel.builder()
                 .openAiApi(openAiApi)
                 .defaultOptions(OpenAiChatOptions.builder()

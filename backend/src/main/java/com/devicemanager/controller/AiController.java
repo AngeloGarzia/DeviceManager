@@ -3,7 +3,9 @@ package com.devicemanager.controller;
 import com.devicemanager.dto.AiChatRequest;
 import com.devicemanager.dto.AiChatResponse;
 import com.devicemanager.dto.AiLabelScanResponse;
+import com.devicemanager.dto.AiModelsResponse;
 import com.devicemanager.service.AiAssistantService;
+import com.devicemanager.service.AiModelDiscoveryService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
@@ -13,6 +15,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
@@ -30,6 +33,7 @@ import org.springframework.web.multipart.MultipartFile;
 public class AiController {
 
     private final AiAssistantService aiAssistantService;
+    private final AiModelDiscoveryService aiModelDiscoveryService;
 
     /**
      * Retourne la disponibilité de l'assistant IA et la liste des fournisseurs configurés.
@@ -40,6 +44,18 @@ public class AiController {
     @PreAuthorize("hasAnyRole('ADMIN', 'TECHNICIEN')")
     public ResponseEntity<AiChatResponse> status() {
         return ResponseEntity.ok(aiAssistantService.status());
+    }
+
+    /**
+     * Liste les modèles chat disponibles en ligne chez le fournisseur (pas de catalogue en dur).
+     *
+     * @param provider identifiant fournisseur (ex. {@code gemini}, {@code openrouter})
+     */
+    @GetMapping("/models")
+    @PreAuthorize("hasAnyRole('ADMIN', 'TECHNICIEN')")
+    public ResponseEntity<AiModelsResponse> models(
+            @RequestParam(value = "provider", required = false) String provider) {
+        return ResponseEntity.ok(aiModelDiscoveryService.listModels(provider));
     }
 
     /**

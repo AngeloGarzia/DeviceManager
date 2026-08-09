@@ -25,6 +25,20 @@ export interface AiLabelScanResponse {
   notes?: string | null;
 }
 
+export interface AiModelOption {
+  id: string;
+  label: string;
+  vision: boolean;
+}
+
+export interface AiModelsResponse {
+  providerId: string;
+  providerLabel: string;
+  hasApiKey: boolean;
+  message?: string | null;
+  models: AiModelOption[];
+}
+
 @Injectable({ providedIn: 'root' })
 export class AiService {
   private readonly base = `${environment.apiUrl}/api/ai`;
@@ -35,6 +49,8 @@ export class AiService {
   readonly statusLoaded = signal(false);
   /** id fournisseur → clé .env présente */
   readonly providerKeyStatus = signal<Record<string, boolean>>({});
+  /** Fournisseurs renvoyés par /api/ai/status (id + label). */
+  readonly providers = signal<AiProviderAvailability[]>([]);
 
   readonly disabledReason = computed(() =>
     this.enabled()
@@ -56,6 +72,7 @@ export class AiService {
         this.enabled.set(false);
         this.statusMessage.set('Impossible de contacter l’assistant IA.');
         this.providerKeyStatus.set({});
+        this.providers.set([]);
         this.statusLoaded.set(true);
       }
     });
@@ -71,6 +88,7 @@ export class AiService {
     this.enabled.set(false);
     this.statusMessage.set(null);
     this.providerKeyStatus.set({});
+    this.providers.set([]);
     this.statusLoaded.set(false);
   }
 
@@ -88,6 +106,13 @@ export class AiService {
     return this.http.post<AiLabelScanResponse>(`${this.base}/label-scan`, form);
   }
 
+  /** Modèles chat disponibles en ligne pour un fournisseur (pas de catalogue en dur). */
+  listModels(provider: string): Observable<AiModelsResponse> {
+    return this.http.get<AiModelsResponse>(`${this.base}/models`, {
+      params: { provider }
+    });
+  }
+
   private applyStatus(res: AiChatResponse): void {
     this.enabled.set(!!res.enabled);
     this.statusMessage.set(res.reply || null);
@@ -99,6 +124,7 @@ export class AiService {
     // Si l'API ne renvoie pas encore la liste, marquer explicitement l'absence
     // pour éviter d'afficher tous les fournisseurs comme disponibles.
     this.providerKeyStatus.set(map);
+    this.providers.set(list);
     this.statusLoaded.set(true);
   }
 }

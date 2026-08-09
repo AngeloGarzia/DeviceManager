@@ -4,7 +4,9 @@ import com.devicemanager.dto.SfmRequest;
 import com.devicemanager.dto.SfmResponse;
 import com.devicemanager.entity.MarqueMas;
 import com.devicemanager.entity.Sfm;
+import com.devicemanager.entity.SfmContact;
 import com.devicemanager.repository.MarqueMasRepository;
+import com.devicemanager.repository.SfmContactRepository;
 import com.devicemanager.repository.SfmRepository;
 import com.devicemanager.support.TestFixtures;
 import org.junit.jupiter.api.BeforeEach;
@@ -18,9 +20,11 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicLong;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -34,13 +38,25 @@ class SfmServiceTest {
     private static final Logger log = LoggerFactory.getLogger(SfmServiceTest.class);
 
     @Mock private SfmRepository sfmRepository;
+    @Mock private SfmContactRepository sfmContactRepository;
     @Mock private MarqueMasRepository marqueMasRepository;
     @Mock private AtelierService atelierService;
     @InjectMocks private SfmService sfmService;
 
+    private final AtomicLong contactIds = new AtomicLong(1);
+
     @BeforeEach
     void setUp() {
         lenient().when(atelierService.requireCurrentAtelier()).thenReturn(TestFixtures.atelier());
+        lenient().when(sfmContactRepository.save(any(SfmContact.class))).thenAnswer(inv -> {
+            SfmContact c = inv.getArgument(0);
+            if (c.getId() == null) {
+                c.setId(contactIds.getAndIncrement());
+            }
+            return c;
+        });
+        lenient().when(sfmContactRepository.findByEmailIgnoreCase(anyString())).thenReturn(Optional.empty());
+        lenient().when(sfmContactRepository.countSfmsByContactId(anyLong())).thenReturn(0L);
     }
 
     @Test
@@ -175,5 +191,54 @@ class SfmServiceTest {
 
         assertThat(sfmService.findAll(" Nord ")).hasSize(1);
         verify(sfmRepository).search(100L, "Nord");
+    }
+
+    @Test
+    void update_reattachesSameTechnicienWithoutDeletingOtherLink() {
+        SfmContact tech = SfmContact.builder()
+                .id(10L)
+                .nom("Paul")
+                .telephone("0611223344")
+                .email("paul@example.com")
+                .technicienSfm(true)
+                .receiveOrderMails(true)
+                .sfms(new HashSet<>())
+                .build();
+
+        Sfm sfmA = Sfm.builder()
+                .id(1L)
+                .nom("SFM A")
+                .responsable("Paul")
+                .telephone("0611223344")
+                .email("paul@example.com")
+                .contacts(new ArrayList<>(List.of(tech)))
+                .marques(new HashSet<>(List.of(TestFixtures.marque())))
+                .atelier(TestFixtures.atelier())
+                .build();
+        tech.getSfms().add(sfmA);
+
+        when(sfmRepository.findByIdWithContacts(1L, 100L)).thenReturn(Optional.of(sfmA));
+        when(sfmRepository.existsByNomIgnoreCaseAndAtelierIdAndIdNot("SFM A", 100L, 1L)).thenReturn(false);
+        when(sfmContactRepository.findById(10L)).thenReturn(Optional.of(tech));
+        when(marqueMasRepository.findAllById(anyCollection())).thenReturn(List.of(TestFixtures.marque()));
+        when(sfmRepository.save(any(Sfm.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        SfmRequest.SfmContactRequest contactReq = new SfmRequest.SfmContactRequest();
+        contactReq.setId(10L);
+        contactReq.setNom("Paul");
+        contactReq.setTelephone("0611223344");
+        contactReq.setEmail("paul@example.com");
+        contactReq.setTechnicienSfm(true);
+
+        SfmRequest request = new SfmRequest();
+        request.setNom("SFM A");
+        request.setContacts(List.of(contactReq));
+        request.setMarqueIds(List.of(5L));
+
+        SfmResponse response = sfmService.update(1L, request);
+
+        assertThat(response.getContacts()).hasSize(1);
+        assertThat(response.getContacts().get(0).isTechnicienSfm()).isTrue();
+        verify(sfmContactRepository, never()).delete(any());
     }
 }

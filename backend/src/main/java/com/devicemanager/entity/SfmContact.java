@@ -3,9 +3,12 @@ package com.devicemanager.entity;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.util.HashSet;
+import java.util.Set;
+
 /**
- * Contact rattaché à un SFM (fournisseur).
- * Peut être configuré pour recevoir les e-mails de commande validée.
+ * Contact SFM (fiche personne partageable).
+ * Peut être rattaché à plusieurs SFM (N–N) et marqué « Technicien SFM ».
  */
 @Entity
 @Table(name = "sfm_contact")
@@ -20,11 +23,6 @@ public class SfmContact {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne(optional = false, fetch = FetchType.LAZY)
-    @JoinColumn(name = "sfm_id", nullable = false,
-            foreignKey = @ForeignKey(name = "fk_sfm_contact_sfm"))
-    private Sfm sfm;
-
     @Column(nullable = false, length = 120)
     private String nom;
 
@@ -38,6 +36,15 @@ public class SfmContact {
     @Column(name = "receive_order_mails")
     @Builder.Default
     private Boolean receiveOrderMails = Boolean.TRUE;
+
+    /** Technicien SFM — peut appartenir à plusieurs SFM. */
+    @Column(name = "technicien_sfm", nullable = false)
+    @Builder.Default
+    private boolean technicienSfm = false;
+
+    @ManyToMany(mappedBy = "contacts")
+    @Builder.Default
+    private Set<Sfm> sfms = new HashSet<>();
 
     public boolean isReceiveOrderMails() {
         return receiveOrderMails == null || receiveOrderMails;

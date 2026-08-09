@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, effect, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -44,8 +44,20 @@ export class AiAssistantComponent implements OnInit {
   readonly turns = signal<ChatTurn[]>([]);
 
   readonly form = this.fb.group({
-    message: ['', [Validators.required, Validators.maxLength(4000)]]
+    message: [{ value: '', disabled: true }, [Validators.required, Validators.maxLength(4000)]]
   });
+
+  constructor() {
+    effect(() => {
+      const ctrl = this.form.controls.message;
+      const allow = this.ai.enabled() && !this.sending();
+      if (allow) {
+        ctrl.enable({ emitEvent: false });
+      } else {
+        ctrl.disable({ emitEvent: false });
+      }
+    });
+  }
 
   ngOnInit(): void {
     this.ai.status().subscribe({
@@ -68,9 +80,9 @@ export class AiAssistantComponent implements OnInit {
       this.form.markAllAsTouched();
       return;
     }
-    const message = this.form.controls.message.value!.trim();
+    const message = (this.form.controls.message.getRawValue() || '').trim();
     this.turns.update((list) => [...list, { role: 'user', text: message }]);
-    this.form.reset();
+    this.form.reset({ message: '' });
     this.sending.set(true);
     this.error.set(null);
     this.ai.chat(message).subscribe({

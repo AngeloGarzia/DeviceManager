@@ -157,12 +157,15 @@ public class DataInitializer implements CommandLineRunner {
                 .nom("Marie Dupont")
                 .telephone("0612345678")
                 .email("marie.dupont@casino.local")
+                .technicienSfm(false)
                 .build());
-        salle.addContact(SfmContact.builder()
+        SfmContact techPaul = SfmContact.builder()
                 .nom("Paul Bernard")
                 .telephone("0611223344")
                 .email("paul.bernard@casino.local")
-                .build());
+                .technicienSfm(true)
+                .build();
+        salle.addContact(techPaul);
         sfmRepository.save(salle);
 
         Sfm vip = Sfm.builder()
@@ -176,7 +179,10 @@ public class DataInitializer implements CommandLineRunner {
                 .nom("Jean Martin")
                 .telephone("0698765432")
                 .email("jean.martin@casino.local")
+                .technicienSfm(false)
                 .build());
+        // Même technicien SFM rattaché à deux SFM
+        vip.addContact(techPaul);
         sfmRepository.save(vip);
     }
 

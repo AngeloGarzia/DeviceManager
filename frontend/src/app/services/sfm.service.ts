@@ -2,7 +2,7 @@ import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../environments/environment';
-import { Sfm, SfmForm } from '../models/models';
+import { Sfm, SfmForm, SfmTechnicien } from '../models/models';
 
 @Injectable({ providedIn: 'root' })
 export class SfmService {
@@ -16,6 +16,10 @@ export class SfmService {
       params = params.set('q', q.trim());
     }
     return this.http.get<Sfm[]>(this.base, { params });
+  }
+
+  listTechniciens(): Observable<SfmTechnicien[]> {
+    return this.http.get<SfmTechnicien[]>(`${this.base}/contacts/techniciens`);
   }
 
   get(id: number): Observable<Sfm> {

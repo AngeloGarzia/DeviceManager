@@ -31,7 +31,7 @@ import {
 import { SetupService } from '../../services/setup.service';
 import { AtelierService } from '../../services/atelier.service';
 import { AuthService } from '../../services/auth.service';
-import { AiService } from '../../services/ai.service';
+import { AiModelOption, AiService } from '../../services/ai.service';
 import { AdminLogEntry, AdminLogService } from '../../services/admin-log.service';
 import { ConfirmDialogComponent } from '../../shared/confirm-dialog.component';
 
@@ -178,116 +178,39 @@ export class SetupComponent implements OnInit {
     utilisateurPrefereIds: this.fb.nonNullable.control<number[]>([])
   });
 
-  readonly aiProviders = [
-    {
-      id: 'gemini',
-      label: 'Google Gemini',
-      models: [
-        { value: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash (vision)' },
-        { value: 'gemini-2.0-flash-lite', label: 'Gemini 2.0 Flash Lite (vision)' },
-        { value: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash (vision)' },
-        { value: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro (vision)' },
-        { value: 'gemini-1.5-flash', label: 'Gemini 1.5 Flash (vision)' },
-        { value: 'gemini-1.5-pro', label: 'Gemini 1.5 Pro (vision)' }
-      ]
-    },
-    {
-      id: 'openai',
-      label: 'OpenAI',
-      models: [
-        { value: 'gpt-4o-mini', label: 'gpt-4o-mini — économique (vision)' },
-        { value: 'gpt-4o', label: 'gpt-4o — polyvalent (vision)' },
-        { value: 'gpt-4.1-mini', label: 'gpt-4.1-mini' },
-        { value: 'gpt-4.1', label: 'gpt-4.1' },
-        { value: 'gpt-4.1-nano', label: 'gpt-4.1-nano' },
-        { value: 'o4-mini', label: 'o4-mini — raisonnement' },
-        { value: 'o3-mini', label: 'o3-mini — raisonnement' },
-        { value: 'gpt-4-turbo', label: 'gpt-4-turbo' },
-        { value: 'gpt-3.5-turbo', label: 'gpt-3.5-turbo' },
-        { value: 'chatgpt-4o-latest', label: 'chatgpt-4o-latest' }
-      ]
-    },
-    {
-      id: 'groq',
-      label: 'Groq',
-      models: [
-        { value: 'llama-3.3-70b-versatile', label: 'Llama 3.3 70B Versatile' },
-        { value: 'llama-3.1-8b-instant', label: 'Llama 3.1 8B Instant' },
-        { value: 'openai/gpt-oss-120b', label: 'GPT-OSS 120B' },
-        { value: 'openai/gpt-oss-20b', label: 'GPT-OSS 20B' },
-        { value: 'qwen/qwen3.6-27b', label: 'Qwen3.6 27B' },
-        { value: 'groq/compound', label: 'Groq Compound' }
-      ]
-    },
-    {
-      id: 'mistral',
-      label: 'Mistral AI',
-      models: [
-        { value: 'mistral-small-latest', label: 'Mistral Small' },
-        { value: 'mistral-medium-latest', label: 'Mistral Medium' },
-        { value: 'mistral-large-latest', label: 'Mistral Large' },
-        { value: 'open-mistral-nemo', label: 'Mistral Nemo' },
-        { value: 'codestral-latest', label: 'Codestral' },
-        { value: 'pixtral-12b-2409', label: 'Pixtral 12B (vision)' },
-        { value: 'pixtral-large-latest', label: 'Pixtral Large (vision)' }
-      ]
-    },
-    {
-      id: 'openrouter',
-      label: 'OpenRouter (Claude, Gemini, Llama…)',
-      models: [
-        { value: 'openai/gpt-4o-mini', label: 'OpenAI GPT-4o mini (vision)' },
-        { value: 'openai/gpt-4o', label: 'OpenAI GPT-4o (vision)' },
-        { value: 'anthropic/claude-3.5-sonnet', label: 'Anthropic Claude 3.5 Sonnet' },
-        { value: 'anthropic/claude-sonnet-4', label: 'Anthropic Claude Sonnet 4' },
-        { value: 'google/gemini-2.0-flash-001', label: 'Google Gemini 2.0 Flash (vision)' },
-        { value: 'google/gemini-2.5-pro-preview', label: 'Google Gemini 2.5 Pro' },
-        { value: 'meta-llama/llama-3.3-70b-instruct', label: 'Meta Llama 3.3 70B' },
-        { value: 'mistralai/mistral-large', label: 'Mistral Large' },
-        { value: 'deepseek/deepseek-chat', label: 'DeepSeek Chat' },
-        { value: 'qwen/qwen-2.5-72b-instruct', label: 'Qwen 2.5 72B' }
-      ]
-    },
-    {
-      id: 'deepseek',
-      label: 'DeepSeek',
-      models: [
-        { value: 'deepseek-chat', label: 'DeepSeek Chat' },
-        { value: 'deepseek-reasoner', label: 'DeepSeek Reasoner' }
-      ]
-    },
-    {
-      id: 'together',
-      label: 'Together AI',
-      models: [
-        { value: 'meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo', label: 'Llama 3.1 70B Turbo' },
-        { value: 'meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo', label: 'Llama 3.1 8B Turbo' },
-        { value: 'mistralai/Mixtral-8x7B-Instruct-v0.1', label: 'Mixtral 8x7B' },
-        { value: 'Qwen/Qwen2.5-72B-Instruct-Turbo', label: 'Qwen2.5 72B Turbo' },
-        { value: 'meta-llama/Llama-Vision-Free', label: 'Llama Vision Free' }
-      ]
-    },
-    {
-      id: 'fireworks',
-      label: 'Fireworks AI',
-      models: [
-        { value: 'accounts/fireworks/models/llama-v3p3-70b-instruct', label: 'Llama 3.3 70B' },
-        { value: 'accounts/fireworks/models/llama-v3p1-8b-instruct', label: 'Llama 3.1 8B' },
-        { value: 'accounts/fireworks/models/mixtral-8x22b-instruct', label: 'Mixtral 8x22B' },
-        { value: 'accounts/fireworks/models/qwen2p5-72b-instruct', label: 'Qwen2.5 72B' }
-      ]
+  /** Fournisseurs issus du statut API (pas de catalogue modèles en dur). */
+  readonly aiProviders = computed(() => {
+    const list = this.aiService.providers();
+    if (list.length) {
+      return list.map((p) => ({ id: p.id, label: p.label }));
     }
-  ] as const;
+    return [
+      { id: 'gemini', label: 'Google Gemini' },
+      { id: 'openai', label: 'OpenAI' },
+      { id: 'groq', label: 'Groq' },
+      { id: 'mistral', label: 'Mistral AI' },
+      { id: 'openrouter', label: 'OpenRouter (multi-IA)' },
+      { id: 'deepseek', label: 'DeepSeek' },
+      { id: 'together', label: 'Together AI' },
+      { id: 'fireworks', label: 'Fireworks AI' }
+    ];
+  });
 
   readonly selectedAiProvider = signal<string>('openai');
+  readonly onlineAiModels = signal<AiModelOption[]>([]);
+  readonly aiModelsLoading = signal(false);
+  readonly aiModelsMessage = signal<string | null>(null);
+  readonly aiModelFilter = signal('');
 
   readonly aiModelsForProvider = computed(() => {
-    const selected = this.selectedAiProvider();
-    const provider =
-      this.aiProviders.find((p) => p.id === selected) ??
-      this.aiProviders.find((p) => p.id === 'openai') ??
-      this.aiProviders.find(() => true);
-    return provider ? [...provider.models] : [];
+    const q = this.aiModelFilter().trim().toLowerCase();
+    const models = this.onlineAiModels();
+    if (!q) {
+      return models;
+    }
+    return models.filter(
+      (m) => m.id.toLowerCase().includes(q) || m.label.toLowerCase().includes(q)
+    );
   });
 
   readonly categories = computed(() => {
@@ -323,7 +246,15 @@ export class SetupComponent implements OnInit {
 
   /** Charge les paramètres applicatifs et initialise les ateliers. */
   ngOnInit(): void {
-    this.aiService.refreshStatus();
+    this.aiService.status().subscribe({
+      next: () => {
+        const provider = (this.form.get('AI_PROVIDER')?.value || this.selectedAiProvider() || 'openai').toString();
+        this.loadOnlineAiModels(provider, false);
+      },
+      error: () => {
+        /* statut déjà géré dans AiService */
+      }
+    });
     this.load();
     this.loadAteliers();
   }
@@ -416,15 +347,13 @@ export class SetupComponent implements OnInit {
         this.form.get('AI_PROVIDER')?.valueChanges.subscribe((value) => {
           const next = (value || 'openai').toString();
           this.selectedAiProvider.set(next);
-          const models = [
-            ...(this.aiProviders.find((p) => p.id === next)?.models ?? [])
-          ];
-          const currentModel = this.form.get('AI_MODEL')?.value;
-          const firstModel = models.at(0);
-          if (firstModel && !models.some((m) => m.value === currentModel)) {
-            this.form.get('AI_MODEL')?.setValue(firstModel.value);
-          }
+          this.aiModelFilter.set('');
+          this.loadOnlineAiModels(next, true);
         });
+        // Attendre le statut des clés si pas encore prêt, sinon charger tout de suite.
+        if (this.aiService.statusLoaded()) {
+          this.loadOnlineAiModels(provider, false);
+        }
         this.loading.set(false);
       },
       error: (err) => {
@@ -588,6 +517,13 @@ export class SetupComponent implements OnInit {
     return key === 'AI_MODEL';
   }
 
+  /** Prompts IA éditables (textarea dans Setup). */
+  isAiPromptSetting(key: string): boolean {
+    return key === 'AI_SYSTEM_PROMPT'
+      || key === 'AI_LABEL_EXTRACT_PROMPT'
+      || key === 'AI_USAGE_PROMPT';
+  }
+
   /** Vérifie si une clé API est configurée pour le fournisseur IA donné. */
   hasAiProviderKey(providerId: string): boolean {
     if (!this.aiService.statusLoaded()) {
@@ -606,10 +542,62 @@ export class SetupComponent implements OnInit {
       : `${provider.label} (clé absente)`;
   }
 
-  /** Indique si le modèle IA sélectionné n'est pas dans la liste prédéfinie. */
+  /** Indique si le modèle IA sélectionné n'est pas dans la liste en ligne. */
   isCustomAiModel(key: string): boolean {
     const value = this.control(key)?.value;
-    return !!value && !this.aiModelsForProvider().some((m) => m.value === value);
+    return !!value && !this.onlineAiModels().some((m) => m.id === value);
+  }
+
+  /** Recharge les modèles online du fournisseur sélectionné. */
+  refreshOnlineAiModels(): void {
+    this.loadOnlineAiModels(this.selectedAiProvider(), false);
+  }
+
+  private loadOnlineAiModels(provider: string, resetIfMissing: boolean): void {
+    const modelCtrl = this.form.get('AI_MODEL');
+    if (!provider) {
+      this.onlineAiModels.set([]);
+      this.aiModelsMessage.set(null);
+      this.aiModelsLoading.set(false);
+      modelCtrl?.enable({ emitEvent: false });
+      return;
+    }
+    // Ne pas charger tant que le statut des clés n'est pas connu (évite une liste vide trompeuse).
+    if (!this.aiService.statusLoaded()) {
+      return;
+    }
+    if (!this.hasAiProviderKey(provider)) {
+      this.onlineAiModels.set([]);
+      this.aiModelsMessage.set('Clé API absente pour ce fournisseur — modèles non disponibles.');
+      this.aiModelsLoading.set(false);
+      modelCtrl?.enable({ emitEvent: false });
+      return;
+    }
+    this.aiModelsLoading.set(true);
+    this.aiModelsMessage.set(null);
+    modelCtrl?.disable({ emitEvent: false });
+    this.aiService.listModels(provider).subscribe({
+      next: (res) => {
+        const models = res.models ?? [];
+        this.onlineAiModels.set(models);
+        this.aiModelsMessage.set(res.message || null);
+        this.aiModelsLoading.set(false);
+        modelCtrl?.enable({ emitEvent: false });
+        const current = modelCtrl?.value;
+        const first = models[0]?.id;
+        if (resetIfMissing && first && !models.some((m) => m.id === current)) {
+          modelCtrl?.setValue(first);
+        } else if (!current && first) {
+          modelCtrl?.setValue(first);
+        }
+      },
+      error: (err) => {
+        this.onlineAiModels.set([]);
+        this.aiModelsLoading.set(false);
+        modelCtrl?.enable({ emitEvent: false });
+        this.aiModelsMessage.set(err?.error?.message || 'Impossible de charger les modèles en ligne.');
+      }
+    });
   }
 
   /** Interprète la valeur textuelle d'un paramètre booléen. */

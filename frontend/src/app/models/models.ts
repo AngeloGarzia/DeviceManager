@@ -116,6 +116,19 @@ export interface SfmContact {
   email: string;
   /** Si true, reçoit les e-mails de commande validée. */
   receiveOrderMails?: boolean;
+  /** Technicien SFM — peut être rattaché à plusieurs SFM. */
+  technicienSfm?: boolean;
+}
+
+/** Technicien SFM existant (réutilisation multi-SFM). */
+export interface SfmTechnicien {
+  id: number;
+  nom: string;
+  telephone: string;
+  email: string;
+  receiveOrderMails?: boolean;
+  sfmIds?: number[];
+  sfmNoms?: string[];
 }
 
 export interface MarqueMasOption {

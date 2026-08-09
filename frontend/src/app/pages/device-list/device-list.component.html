@@ -119,7 +119,23 @@
         </ng-container>
         <ng-container matColumnDef="reference">
           <th mat-header-cell *matHeaderCellDef>Référence</th>
-          <td mat-cell *matCellDef="let item">{{ item.reference || '—' }}</td>
+          <td mat-cell *matCellDef="let item">
+            <div class="device-ref-cell">
+              @if (item.photoUrl) {
+                <img
+                  class="device-ref-thumb"
+                  [src]="photoUrl(item)"
+                  [alt]="item.nom"
+                  loading="lazy"
+                />
+              } @else {
+                <span class="device-ref-thumb device-ref-thumb--empty" aria-hidden="true">
+                  <mat-icon>image_not_supported</mat-icon>
+                </span>
+              }
+              <span>{{ item.reference || '—' }}</span>
+            </div>
+          </td>
         </ng-container>
         <ng-container matColumnDef="sfm">
           <th mat-header-cell *matHeaderCellDef>SFM</th>

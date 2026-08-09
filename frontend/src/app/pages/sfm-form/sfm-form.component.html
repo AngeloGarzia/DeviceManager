@@ -83,27 +83,84 @@
               </button>
             </div>
 
+            @if (unusedTechniciens.length) {
+              <mat-form-field appearance="outline" class="mb-3 w-full">
+                <mat-label>Affecter un technicien SFM déjà en base</mat-label>
+                <mat-select [value]="assignSelectValue()" (selectionChange)="onAssignSelect($event.value)">
+                  <mat-option [value]="null" disabled>Choisir un technicien…</mat-option>
+                  @for (t of unusedTechniciens; track t.id) {
+                    <mat-option [value]="t.id">
+                      {{ t.nom }} — {{ t.email }}
+                      @if (t.sfmNoms?.length) {
+                        (déjà sur : {{ t.sfmNoms!.join(', ') }})
+                      }
+                    </mat-option>
+                  }
+                </mat-select>
+                <mat-hint>Rattache la fiche existante à ce SFM (création ou édition), sans doublon.</mat-hint>
+              </mat-form-field>
+            } @else if (techniciens().length === 0) {
+              <p class="mb-3 text-xs text-ink-soft">
+                Aucun technicien SFM en base pour cet atelier. Cochez « Technicien SFM » sur un contact pour en créer un ;
+                vous pourrez ensuite l’affecter à d’autres SFM.
+              </p>
+            }
+
             <div class="grid gap-3" formArrayName="contacts">
               @for (ctrl of contacts.controls; track $index; let i = $index) {
                 <div class="rounded-xl border border-line p-3" [formGroupName]="i">
-                  <div class="mb-2 flex items-center justify-between">
-                    <span class="text-sm font-medium text-ink-soft">Contact {{ i + 1 }}</span>
+                  <div class="mb-2 flex items-center justify-between gap-2">
+                    <div class="flex flex-wrap items-center gap-2">
+                      <span class="text-sm font-medium text-ink-soft">Contact {{ i + 1 }}</span>
+                      @if (isLinkedTechnicien(i)) {
+                        <span class="rounded-full bg-sky-50 px-2 py-0.5 text-xs font-medium text-sky-800">
+                          Technicien existant
+                        </span>
+                      }
+                    </div>
                     <button mat-icon-button type="button" color="warn" (click)="removeContact(i)" [disabled]="contacts.length <= 1">
                       <mat-icon>delete</mat-icon>
                     </button>
                   </div>
                   <div class="grid gap-3 sm:grid-cols-2 sm:gap-x-4">
+                    <div class="sm:col-span-2">
+                      <mat-checkbox formControlName="technicienSfm" color="primary">
+                        Technicien SFM
+                      </mat-checkbox>
+                      <p class="m-0 mt-1 text-xs text-ink-soft">
+                        Un technicien SFM peut être rattaché à plusieurs SFM.
+                      </p>
+                    </div>
+                    @if (contacts.at(i).get('technicienSfm')?.value && (availableTechniciens(i).length || isLinkedTechnicien(i))) {
+                      <mat-form-field appearance="outline" class="sm:col-span-2">
+                        <mat-label>Technicien en base</mat-label>
+                        <mat-select
+                          [value]="contacts.at(i).get('id')?.value"
+                          (selectionChange)="reuseTechnicien(i, $event.value)"
+                        >
+                          <mat-option [value]="null">— Nouveau technicien —</mat-option>
+                          @for (t of availableTechniciens(i); track t.id) {
+                            <mat-option [value]="t.id">
+                              {{ t.nom }} ({{ t.email }})
+                              @if (t.sfmNoms?.length) {
+                                — {{ t.sfmNoms!.join(', ') }}
+                              }
+                            </mat-option>
+                          }
+                        </mat-select>
+                      </mat-form-field>
+                    }
                     <mat-form-field appearance="outline" class="sm:col-span-2">
                       <mat-label>Nom</mat-label>
-                      <input matInput formControlName="nom" />
+                      <input matInput formControlName="nom" [readonly]="isLinkedTechnicien(i)" />
                     </mat-form-field>
                     <mat-form-field appearance="outline">
                       <mat-label>Téléphone</mat-label>
-                      <input matInput type="tel" formControlName="telephone" />
+                      <input matInput type="tel" formControlName="telephone" [readonly]="isLinkedTechnicien(i)" />
                     </mat-form-field>
                     <mat-form-field appearance="outline">
                       <mat-label>Email</mat-label>
-                      <input matInput type="email" formControlName="email" />
+                      <input matInput type="email" formControlName="email" [readonly]="isLinkedTechnicien(i)" />
                     </mat-form-field>
                     <div class="sm:col-span-2">
                       <mat-checkbox formControlName="receiveOrderMails" color="primary">

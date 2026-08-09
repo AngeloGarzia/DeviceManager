@@ -21,7 +21,7 @@ public class AppSetting {
     @Column(name = "setting_key", length = 80)
     private String settingKey;
 
-    @Column(name = "setting_value", length = 1000)
+    @Column(name = "setting_value", columnDefinition = "TEXT")
     private String settingValue;
 
     /** Libellé affiché dans l'interface d'administration. */

@@ -49,6 +49,11 @@ export class SfmListComponent implements OnInit {
     return item.marques?.map((m) => m.label).join(', ') || '—';
   }
 
+  /** Nombre de techniciens SFM parmi les contacts. */
+  technicienCount(item: Sfm): number {
+    return (item.contacts ?? []).filter((c) => c.technicienSfm).length;
+  }
+
   /** Charge les SFM selon le filtre de recherche courant. */
   load(): void {
     this.loading.set(true); this.error.set(null);

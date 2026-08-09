@@ -37,12 +37,7 @@
         <form class="grid gap-3" [formGroup]="form" (ngSubmit)="send()">
           <mat-form-field appearance="outline" class="w-full">
             <mat-label>Votre question</mat-label>
-            <textarea
-              matInput
-              rows="3"
-              formControlName="message"
-              [disabled]="!ai.enabled() || sending()"
-            ></textarea>
+            <textarea matInput rows="3" formControlName="message"></textarea>
           </mat-form-field>
           <button
             mat-flat-button

@@ -2,6 +2,7 @@ package com.devicemanager.controller;
 
 import com.devicemanager.dto.SfmRequest;
 import com.devicemanager.dto.SfmResponse;
+import com.devicemanager.dto.SfmTechnicienResponse;
 import com.devicemanager.service.SfmService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -33,6 +34,14 @@ public class SfmController {
     @GetMapping
     public ResponseEntity<List<SfmResponse>> list(@RequestParam(required = false) String q) {
         return ResponseEntity.ok(sfmService.findAll(q));
+    }
+
+    /**
+     * Liste les techniciens SFM (contacts externes) réutilisables dans l'atelier courant.
+     */
+    @GetMapping("/contacts/techniciens")
+    public ResponseEntity<List<SfmTechnicienResponse>> listTechniciens() {
+        return ResponseEntity.ok(sfmService.listTechniciens());
     }
 
     /**

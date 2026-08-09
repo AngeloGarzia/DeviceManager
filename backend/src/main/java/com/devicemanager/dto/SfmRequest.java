@@ -51,5 +51,8 @@ public class SfmRequest {
 
         /** Défaut {@code true} si absent (compatibilité clients anciens). */
         private Boolean receiveOrderMails;
+
+        /** Technicien SFM — partageable entre plusieurs SFM. */
+        private Boolean technicienSfm;
     }
 }

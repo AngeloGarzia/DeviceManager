@@ -1,5 +1,6 @@
 package com.devicemanager.service;
 
+import com.devicemanager.ai.AiPromptDefaults;
 import com.devicemanager.ai.AiProviders;
 import com.devicemanager.dto.AppSettingResponse;
 import com.devicemanager.dto.AppSettingsUpdateRequest;
@@ -15,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -46,6 +48,9 @@ public class AppSettingsService {
     public static final String AI_PROVIDER = "AI_PROVIDER";
     public static final String AI_API_KEY = "AI_API_KEY";
     public static final String AI_MODEL = "AI_MODEL";
+    public static final String AI_SYSTEM_PROMPT = "AI_SYSTEM_PROMPT";
+    public static final String AI_LABEL_EXTRACT_PROMPT = "AI_LABEL_EXTRACT_PROMPT";
+    public static final String AI_USAGE_PROMPT = "AI_USAGE_PROMPT";
 
     private final AppSettingRepository appSettingRepository;
     private final Map<String, String> cache = new ConcurrentHashMap<>();
@@ -121,13 +126,56 @@ public class AppSettingsService {
         ensure(LOCAL_UPLOAD_DIR, defaultLocalUploadDir, "Dossier local des uploads", "Stockage", false);
 
         String provider = AiProviders.normalizeProvider(defaultAiProvider);
-        String model = firstNonBlank(defaultAiModel, legacyOpenAiChatModel, AiProviders.defaultModel(provider));
+        // Pas de catalogue de modèles en dur : seed éventuel via env, sinon vide (choix Setup online).
+        String model = firstNonBlank(defaultAiModel, legacyOpenAiChatModel);
 
         ensure(AI_ENABLED, defaultAiEnabled, "Activer l'assistant IA", "Intelligence artificielle", false);
         ensure(AI_PROVIDER, provider, "Fournisseur IA", "Intelligence artificielle", false);
         ensure(AI_MODEL, model, "Modèle IA", "Intelligence artificielle", false);
+        ensure(AI_SYSTEM_PROMPT, AiPromptDefaults.SYSTEM,
+                "Prompt système (chat)", "Intelligence artificielle", false);
+        ensure(AI_LABEL_EXTRACT_PROMPT, AiPromptDefaults.LABEL_EXTRACT,
+                "Prompt scan étiquette (vision)", "Intelligence artificielle", false);
+        ensure(AI_USAGE_PROMPT, AiPromptDefaults.USAGE,
+                "Prompt rédaction usage (placeholders {{nom}}, {{reference}}, …)",
+                "Intelligence artificielle", false);
+        migrateLegacyGeminiModel();
         // Clés API : uniquement batterie .env (GEMINI_API_KEY, OPENAI_API_KEY, …) — pas exposées dans Setup
         reloadCache();
+    }
+
+    /**
+     * Passe les anciens modèles Gemini Flash par défaut vers {@code gemini-3.1-flash-lite}
+     * (ou l'équivalent OpenRouter), sans écraser un choix Pro / custom.
+     */
+    private void migrateLegacyGeminiModel() {
+        AppSetting providerSetting = appSettingRepository.findById(AI_PROVIDER).orElse(null);
+        AppSetting modelSetting = appSettingRepository.findById(AI_MODEL).orElse(null);
+        if (providerSetting == null || modelSetting == null) {
+            return;
+        }
+        String provider = AiProviders.normalizeProvider(providerSetting.getSettingValue());
+        String current = modelSetting.getSettingValue() == null ? "" : modelSetting.getSettingValue().trim();
+        String target = switch (provider) {
+            case "gemini" -> Set.of(
+                    "gemini-2.0-flash",
+                    "gemini-2.0-flash-lite",
+                    "gemini-2.5-flash",
+                    "gemini-1.5-flash"
+            ).contains(current) ? "gemini-3.1-flash-lite" : null;
+            case "openrouter" -> Set.of(
+                    "google/gemini-2.0-flash-001",
+                    "google/gemini-2.5-flash",
+                    "google/gemini-2.5-flash-preview"
+            ).contains(current) ? "google/gemini-3.1-flash-lite" : null;
+            default -> null;
+        };
+        if (target == null || target.equals(current)) {
+            return;
+        }
+        modelSetting.setSettingValue(target);
+        appSettingRepository.save(modelSetting);
+        log.info("Migration IA — AI_MODEL {} → {} (fournisseur {})", current, target, provider);
     }
 
     private static String firstNonBlank(String... values) {

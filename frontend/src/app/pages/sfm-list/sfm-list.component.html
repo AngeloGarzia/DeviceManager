@@ -36,6 +36,9 @@
               } @else if (item.responsable) {
                 · {{ item.responsable }}
               }
+              @if (technicienCount(item) > 0) {
+                · {{ technicienCount(item) }} tech.
+              }
             </p>
             @if (item.marques?.length) {
               <p class="mt-1 text-sm text-ink-soft">Marques : {{ marquesLabel(item) }}</p>

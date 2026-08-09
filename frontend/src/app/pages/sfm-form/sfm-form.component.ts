@@ -12,7 +12,7 @@ import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { SfmService } from '../../services/sfm.service';
 import { MasService } from '../../services/mas.service';
-import { MarqueMasOption, SfmContact, SfmForm } from '../../models/models';
+import { MarqueMasOption, SfmContact, SfmForm, SfmTechnicien } from '../../models/models';
 
 /**
  * Formulaire de création ou modification d'un SFM (fournisseur de pièces).
@@ -50,6 +50,9 @@ export class SfmFormComponent implements OnInit {
   readonly error = signal<string | null>(null);
   readonly marqueError = signal<string | null>(null);
   readonly marques = signal<MarqueMasOption[]>([]);
+  readonly techniciens = signal<SfmTechnicien[]>([]);
+  /** Remise à null après chaque affectation (sélecteur global). */
+  readonly assignSelectValue = signal<number | null>(null);
   id: number | null = null;
   returnDevice: string | null = null;
   private returnForOrderRequest = false;
@@ -77,6 +80,7 @@ export class SfmFormComponent implements OnInit {
     this.returnDevice = this.route.snapshot.queryParamMap.get('returnDevice');
     this.returnForOrderRequest = this.route.snapshot.queryParamMap.get('forOrderRequest') === '1';
     this.loadMarques();
+    this.loadTechniciens();
 
     const rawId = this.route.snapshot.paramMap.get('id');
     if (!rawId) {
@@ -104,6 +108,24 @@ export class SfmFormComponent implements OnInit {
         this.loading.set(false);
       }
     });
+  }
+
+  /** Charge les techniciens SFM déjà connus dans l'atelier (réutilisation). */
+  loadTechniciens(): void {
+    this.sfmService.listTechniciens().subscribe({
+      next: (data) => this.techniciens.set(data ?? []),
+      error: () => this.techniciens.set([])
+    });
+  }
+
+  /** Techniciens encore disponibles pour rattachement (non déjà choisis dans ce formulaire). */
+  get unusedTechniciens(): SfmTechnicien[] {
+    const usedIds = new Set(
+      this.contacts.controls
+        .map((c) => c.get('id')?.value as number | null)
+        .filter((id): id is number => id != null)
+    );
+    return this.techniciens().filter((t) => !usedIds.has(t.id));
   }
 
   /** Charge la liste des marques disponibles pour le SFM. */
@@ -166,16 +188,90 @@ export class SfmFormComponent implements OnInit {
   /** Crée un groupe de formulaire pour un contact SFM. */
   createContactGroup(contact?: Partial<SfmContact>) {
     return this.fb.group({
+      id: [contact?.id ?? null as number | null],
       nom: [contact?.nom || '', [Validators.required, Validators.maxLength(120)]],
       telephone: [contact?.telephone || '', [Validators.required, Validators.maxLength(40)]],
       email: [contact?.email || '', [Validators.required, Validators.email, Validators.maxLength(160)]],
-      receiveOrderMails: [contact?.receiveOrderMails !== false]
+      receiveOrderMails: [contact?.receiveOrderMails !== false],
+      technicienSfm: [!!contact?.technicienSfm]
     });
   }
 
   /** Ajoute une ligne contact au formulaire SFM. */
   addContact(): void {
     this.contacts.push(this.createContactGroup());
+  }
+
+  /** Sélection depuis le sélecteur global « Affecter un technicien… ». */
+  onAssignSelect(techId: number | null): void {
+    this.assignExistingTechnicien(techId);
+    this.assignSelectValue.set(null);
+  }
+
+  /**
+   * Ajoute (ou remplit la 1ʳᵉ ligne vide) un technicien déjà en base.
+   * Utilisé par le sélecteur global au-dessus de la liste des contacts.
+   */
+  assignExistingTechnicien(techId: number | null): void {
+    if (techId == null) {
+      return;
+    }
+    const emptyIndex = this.contacts.controls.findIndex((c) => {
+      const id = c.get('id')?.value;
+      const nom = String(c.get('nom')?.value || '').trim();
+      const email = String(c.get('email')?.value || '').trim();
+      return id == null && !nom && !email;
+    });
+    if (emptyIndex >= 0) {
+      this.reuseTechnicien(emptyIndex, techId);
+      return;
+    }
+    this.addContact();
+    this.reuseTechnicien(this.contacts.length - 1, techId);
+  }
+
+  /** Préremplit une ligne avec un technicien SFM existant (multi-SFM). */
+  reuseTechnicien(index: number, techId: number | null): void {
+    const group = this.contacts.at(index);
+    if (techId == null) {
+      group.patchValue({
+        id: null,
+        nom: '',
+        telephone: '',
+        email: '',
+        receiveOrderMails: true,
+        technicienSfm: true
+      });
+      return;
+    }
+    const tech = this.techniciens().find((t) => t.id === techId);
+    if (!tech) {
+      return;
+    }
+    group.patchValue({
+      id: tech.id,
+      nom: tech.nom,
+      telephone: tech.telephone,
+      email: tech.email,
+      receiveOrderMails: tech.receiveOrderMails !== false,
+      technicienSfm: true
+    });
+  }
+
+  /** Indique si la ligne pointe vers une fiche technicien déjà en base. */
+  isLinkedTechnicien(index: number): boolean {
+    const group = this.contacts.at(index);
+    return !!group.get('technicienSfm')?.value && group.get('id')?.value != null;
+  }
+
+  /** Techniciens disponibles pour une ligne (hors déjà sélectionnés ailleurs). */
+  availableTechniciens(index: number): SfmTechnicien[] {
+    const usedIds = new Set(
+      this.contacts.controls
+        .map((c, i) => (i === index ? null : c.get('id')?.value as number | null))
+        .filter((id): id is number => id != null)
+    );
+    return this.techniciens().filter((t) => !usedIds.has(t.id));
   }
 
   /** Supprime une ligne contact (minimum un contact requis). */
@@ -206,15 +302,20 @@ export class SfmFormComponent implements OnInit {
       nom: raw.nom!.trim(),
       marqueIds: [...marqueIds],
       contacts: (raw.contacts || []).map((c) => ({
+        id: c?.id != null ? Number(c.id) : undefined,
         nom: String(c?.nom || '').trim(),
         telephone: String(c?.telephone || '').trim(),
         email: String(c?.email || '').trim(),
-        receiveOrderMails: c?.receiveOrderMails !== false
+        receiveOrderMails: c?.receiveOrderMails !== false,
+        technicienSfm: !!c?.technicienSfm
       }))
     };
     const req$ = this.id ? this.sfmService.update(this.id, payload) : this.sfmService.create(payload);
     req$.subscribe({
-      next: (saved) => this.navigateAfterSave(saved.id),
+      next: (saved) => {
+        this.loadTechniciens();
+        this.navigateAfterSave(saved.id);
+      },
       error: (err) => {
         this.saving.set(false);
         this.error.set(err?.error?.message || 'Enregistrement impossible.');

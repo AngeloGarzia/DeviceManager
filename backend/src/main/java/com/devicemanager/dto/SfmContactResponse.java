@@ -15,4 +15,6 @@ public class SfmContactResponse {
     private String email;
     /** Indique si ce contact reçoit les e-mails de commande validée. */
     private boolean receiveOrderMails;
+    /** Technicien SFM (peut être rattaché à plusieurs SFM). */
+    private boolean technicienSfm;
 }

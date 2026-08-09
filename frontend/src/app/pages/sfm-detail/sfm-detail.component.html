@@ -27,7 +27,12 @@
           <div class="grid gap-3">
             @for (c of sfm.contacts; track c.id || c.email) {
               <div class="rounded-xl border border-line px-3 py-3">
-                <div class="font-medium text-ink">{{ c.nom }}</div>
+                <div class="flex flex-wrap items-center gap-2">
+                  <div class="font-medium text-ink">{{ c.nom }}</div>
+                  @if (c.technicienSfm) {
+                    <span class="rounded-full bg-sky-50 px-2 py-0.5 text-xs font-medium text-sky-800">Technicien SFM</span>
+                  }
+                </div>
                 <div class="mt-1 text-sm"><a class="text-brand no-underline" [href]="'tel:' + c.telephone">{{ c.telephone }}</a></div>
                 <div class="mt-1 text-sm"><a class="text-brand no-underline" [href]="'mailto:' + c.email">{{ c.email }}</a></div>
                 <div class="mt-2 text-xs" [class.text-emerald-700]="c.receiveOrderMails !== false" [class.text-ink-soft]="c.receiveOrderMails === false">

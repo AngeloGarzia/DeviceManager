@@ -164,7 +164,7 @@ Exemple Gemini :
 APP_AI_ENABLED=true
 GEMINI_API_KEY=...
 AI_DEFAULT_PROVIDER=gemini
-AI_DEFAULT_MODEL=gemini-2.0-flash
+AI_DEFAULT_MODEL=gemini-3.1-flash-lite
 ```
 
 ---

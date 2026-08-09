@@ -23,6 +23,8 @@ class AiAssistantServiceTest {
     @Mock
     private AiApiKeyBattery aiApiKeyBattery;
     @Mock
+    private AiModelDiscoveryService aiModelDiscoveryService;
+    @Mock
     private ImageOptimizationService imageOptimizationService;
     @Mock
     private WebEnrichmentService webEnrichmentService;
@@ -36,7 +38,7 @@ class AiAssistantServiceTest {
     void status_reportsDisabledWhenFlagOff() {
         when(appSettingsService.getBoolean(AppSettingsService.AI_ENABLED, false)).thenReturn(false);
         when(appSettingsService.get(AppSettingsService.AI_PROVIDER, "openai")).thenReturn("openai");
-        when(appSettingsService.get(AppSettingsService.AI_MODEL, "gpt-4o-mini")).thenReturn("gpt-4o-mini");
+        when(appSettingsService.get(AppSettingsService.AI_MODEL, "")).thenReturn("gpt-4o-mini");
 
         assertThat(aiAssistantService.isEnabled()).isFalse();
         assertThat(aiAssistantService.status().isEnabled()).isFalse();
@@ -72,7 +74,7 @@ class AiAssistantServiceTest {
         when(appSettingsService.getBoolean(AppSettingsService.AI_ENABLED, false)).thenReturn(true);
         when(appSettingsService.get(AppSettingsService.AI_PROVIDER, "openai")).thenReturn("openai");
         when(aiApiKeyBattery.keyFor("openai")).thenReturn("sk-test");
-        when(appSettingsService.get(AppSettingsService.AI_MODEL, "gpt-4o-mini")).thenReturn("gpt-4o-mini");
+        when(appSettingsService.get(AppSettingsService.AI_MODEL, "")).thenReturn("gpt-4o-mini");
 
         assertThat(aiAssistantService.isEnabled()).isTrue();
         assertThat(aiAssistantService.status().getReply()).contains("OpenAI");
@@ -84,7 +86,7 @@ class AiAssistantServiceTest {
         when(appSettingsService.getBoolean(AppSettingsService.AI_ENABLED, false)).thenReturn(true);
         when(appSettingsService.get(AppSettingsService.AI_PROVIDER, "openai")).thenReturn("gemini");
         when(aiApiKeyBattery.keyFor("gemini")).thenReturn("gem-test");
-        when(appSettingsService.get(AppSettingsService.AI_MODEL, "gemini-2.0-flash")).thenReturn("gemini-2.0-flash");
+        when(appSettingsService.get(AppSettingsService.AI_MODEL, "")).thenReturn("gemini-3.1-flash-lite");
 
         assertThat(aiAssistantService.isEnabled()).isTrue();
         assertThat(aiAssistantService.status().getReply()).contains("Gemini");

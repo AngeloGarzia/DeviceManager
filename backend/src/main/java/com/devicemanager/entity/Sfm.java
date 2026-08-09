@@ -46,7 +46,17 @@ public class Sfm {
     @Column(nullable = false, length = 160)
     private String email;
 
-    @OneToMany(mappedBy = "sfm", cascade = CascadeType.ALL, orphanRemoval = true)
+    /**
+     * Contacts rattachés (N–N) — les techniciens SFM peuvent être liés à plusieurs SFM.
+     */
+    @ManyToMany(fetch = FetchType.LAZY, cascade = {CascadeType.PERSIST, CascadeType.MERGE})
+    @JoinTable(
+            name = "sfm_sfm_contact",
+            joinColumns = @JoinColumn(name = "sfm_id", foreignKey = @ForeignKey(name = "fk_sfm_sfm_contact_sfm")),
+            inverseJoinColumns = @JoinColumn(name = "contact_id", foreignKey = @ForeignKey(name = "fk_sfm_sfm_contact_contact"))
+    )
+    @OrderColumn(name = "position")
+    @BatchSize(size = 50)
     @Builder.Default
     private List<SfmContact> contacts = new ArrayList<>();
 
@@ -69,8 +79,21 @@ public class Sfm {
     private Atelier atelier;
 
     public void addContact(SfmContact contact) {
+        if (contacts.contains(contact)) {
+            return;
+        }
         contacts.add(contact);
-        contact.setSfm(this);
+        if (contact.getSfms() == null) {
+            contact.setSfms(new HashSet<>());
+        }
+        contact.getSfms().add(this);
+    }
+
+    public void removeContact(SfmContact contact) {
+        contacts.remove(contact);
+        if (contact.getSfms() != null) {
+            contact.getSfms().remove(this);
+        }
     }
 
     public void syncPrimaryContactFields() {

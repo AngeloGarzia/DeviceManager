@@ -419,7 +419,7 @@
                     <mat-form-field appearance="outline" class="sm:col-span-2">
                       <mat-label>{{ item.label }}</mat-label>
                       <mat-select [formControl]="control(item.key)">
-                        @for (provider of aiProviders; track provider.id) {
+                        @for (provider of aiProviders(); track provider.id) {
                           <mat-option
                             [value]="provider.id"
                             [disabled]="!hasAiProviderKey(provider.id)"
@@ -441,17 +441,68 @@
                       </mat-hint>
                     </mat-form-field>
                   } @else if (isAiModelSetting(item.key)) {
+                    <div class="sm:col-span-2 grid gap-2">
+                      <div class="flex flex-wrap items-center gap-2">
+                        <mat-form-field appearance="outline" class="min-w-[12rem] flex-1">
+                          <mat-label>Filtrer les modèles</mat-label>
+                          <input
+                            matInput
+                            [ngModel]="aiModelFilter()"
+                            (ngModelChange)="aiModelFilter.set($event)"
+                            [ngModelOptions]="{ standalone: true }"
+                            placeholder="ex. gemini, flash, vision…"
+                          />
+                        </mat-form-field>
+                        <button mat-stroked-button type="button" (click)="refreshOnlineAiModels()" [disabled]="aiModelsLoading()">
+                          <mat-icon>refresh</mat-icon>
+                          Actualiser
+                        </button>
+                      </div>
+                      <mat-form-field appearance="outline" class="w-full">
+                        <mat-label>{{ item.label }}</mat-label>
+                        <mat-select [formControl]="control(item.key)">
+                          @for (model of aiModelsForProvider(); track model.id) {
+                            <mat-option [value]="model.id">{{ model.label }}</mat-option>
+                          }
+                          @if (isCustomAiModel(item.key)) {
+                            <mat-option [value]="control(item.key).value">{{ control(item.key).value }} (actuel)</mat-option>
+                          }
+                        </mat-select>
+                        <mat-hint>
+                          @if (aiModelsLoading()) {
+                            Chargement des modèles en ligne…
+                          } @else if (onlineAiModels().length) {
+                            {{ onlineAiModels().length }} modèle(s) en ligne
+                            @if (aiModelFilter()) {
+                              — {{ aiModelsForProvider().length }} affiché(s) après filtre
+                            }
+                            . Privilégiez un modèle « vision » pour le scan.
+                          } @else if (aiModelsMessage()) {
+                            {{ aiModelsMessage() }}
+                          } @else {
+                            Aucun modèle — cliquez sur Actualiser.
+                          }
+                        </mat-hint>
+                      </mat-form-field>
+                    </div>
+                  } @else if (isAiPromptSetting(item.key)) {
                     <mat-form-field appearance="outline" class="sm:col-span-2">
                       <mat-label>{{ item.label }}</mat-label>
-                      <mat-select [formControl]="control(item.key)">
-                        @for (model of aiModelsForProvider(); track model.value) {
-                          <mat-option [value]="model.value">{{ model.label }}</mat-option>
-                        }
-                        @if (isCustomAiModel(item.key)) {
-                          <mat-option [value]="control(item.key).value">{{ control(item.key).value }} (actuel)</mat-option>
-                        }
-                      </mat-select>
-                      <mat-hint>Privilégiez un modèle « vision » pour le scan d’étiquette</mat-hint>
+                      <textarea
+                        matInput
+                        rows="8"
+                        [formControl]="control(item.key)"
+                        class="!font-mono !text-xs"
+                      ></textarea>
+                      @if (item.key === 'AI_USAGE_PROMPT') {
+                        <mat-hint>
+                          Placeholders entre doubles accolades : nom, reference, marque, rawText, notes, webContext.
+                        </mat-hint>
+                      } @else if (item.key === 'AI_LABEL_EXTRACT_PROMPT') {
+                        <mat-hint>Doit demander un JSON (nom, reference, marque, rawText, notes).</mat-hint>
+                      } @else {
+                        <mat-hint>Contexte métier de l’assistant chat.</mat-hint>
+                      }
                     </mat-form-field>
                   } @else {
                     <mat-form-field appearance="outline" class="sm:col-span-2">
