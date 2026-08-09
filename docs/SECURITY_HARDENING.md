@@ -48,4 +48,9 @@ E2E_BASE_URL=http://localhost:4200 npm run e2e
 cd backend && mvn -B test
 cd backend && mvn -B -DskipITs=false verify   # Docker requis
 cd backend && mvn -B -DskipTests org.owasp:dependency-check-maven:check
+# Astuce : définir NVD_API_KEY (https://nvd.nist.gov/developers/request-an-api-key)
+# sinon le téléchargement NVD est rate-limité et très long.
 ```
+
+En CI, OWASP Dependency-Check tourne en job séparé (hors chemin deploy), avec cache de la DB NVD,
+uniquement hors PR (push `main`, `workflow_dispatch`, cron hebdo). Trivy couvre l’image Docker à chaque run.

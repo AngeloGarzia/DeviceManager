@@ -275,6 +275,8 @@
                 <configuration>
                     <failBuildOnCVSS>7</failBuildOnCVSS>
                     <nvdApiKey>${env.NVD_API_KEY}</nvdApiKey>
+                    <!-- Répertoire cacheable en CI (actions/cache → ~/.cache/dependency-check). -->
+                    <dataDirectory>${user.home}/.cache/dependency-check</dataDirectory>
                 </configuration>
             </plugin>
             <plugin>
