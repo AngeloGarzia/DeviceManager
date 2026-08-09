@@ -55,24 +55,40 @@ jobs:
 
   # Hors chemin deploy. Sans NVD_API_KEY le sync NVD (~370k CVE) est rate-limité
   # et finit souvent annulé (>1h) — on skip plutôt que bloquer la CI.
+  # Note: `secrets` interdit dans if de job → on mappe vers env puis if de step.
   owasp-dependency-check:
     name: OWASP Dependency-Check
-    if: github.event_name != 'pull_request' && secrets.NVD_API_KEY != ''
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    env:
+      NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
     defaults:
       run:
         working-directory: backend
     steps:
+      - name: Guard NVD API key
+        id: guard
+        run: |
+          if [ -z "$NVD_API_KEY" ]; then
+            echo "::notice::Secret NVD_API_KEY manquant — OWASP Dependency-Check skippé (évite un sync NVD de plusieurs heures)."
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - uses: actions/checkout@v5
+        if: steps.guard.outputs.run == 'true'
 
       - uses: actions/setup-java@v5
+        if: steps.guard.outputs.run == 'true'
         with:
           distribution: temurin
           java-version: "21"
           cache: maven
 
       - name: Cache NVD / Dependency-Check DB
+        if: steps.guard.outputs.run == 'true'
         uses: actions/cache@v4
         with:
           path: ~/.cache/dependency-check
@@ -81,8 +97,7 @@ jobs:
             odc-${{ runner.os }}-
 
       - name: OWASP Dependency-Check
-        env:
-          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+        if: steps.guard.outputs.run == 'true'
         run: >
           mvn -B -DskipTests org.owasp:dependency-check-maven:check
           -DdataDirectory="$HOME/.cache/dependency-check"
