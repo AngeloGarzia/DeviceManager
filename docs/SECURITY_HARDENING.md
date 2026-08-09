@@ -47,12 +47,11 @@ E2E_BASE_URL=http://localhost:4200 npm run e2e
 
 cd backend && mvn -B test
 cd backend && mvn -B -DskipITs=false verify   # Docker requis
-cd backend && mvn -B -DskipTests org.owasp:dependency-check-maven:check
-# Astuce : définir NVD_API_KEY (https://nvd.nist.gov/developers/request-an-api-key)
-# sinon le téléchargement NVD est rate-limité et très long.
+# Optionnel / local uniquement (très long sans clé NVD) :
+#   set NVD_API_KEY=...   # https://nvd.nist.gov/developers/request-an-api-key
+#   mvn -B -DskipTests org.owasp:dependency-check-maven:check
 ```
 
-En CI, OWASP Dependency-Check tourne en job séparé (hors chemin deploy), avec cache de la DB NVD,
-uniquement hors PR **et seulement si** le secret repo `NVD_API_KEY` est défini
-(sinon le job est skippé : sans clé NIST le téléchargement est rate-limité et annulé).
-Trivy couvre l’image Docker à chaque run.
+En CI, le scan CVE des dépendances image est fait par **Trivy** (rapide).
+OWASP Dependency-Check n’est plus dans le workflow : sans clé NIST il télécharge ~370k CVE
+et finit souvent annulé. Garder la commande Maven ci-dessus pour un audit local ponctuel.
