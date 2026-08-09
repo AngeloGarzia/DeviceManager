@@ -6,6 +6,7 @@ import com.devicemanager.security.Roles;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.core.annotation.Order;
+import org.springframework.core.env.Environment;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
@@ -15,11 +16,11 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Initialisation des données de démonstration au démarrage (ordre 2, après {@link SchemaMigrationRunner}).
+ * Initialisation des données de référence / démonstration au démarrage.
  * <p>
  * Crée le groupe Circus, des casinos et ateliers, le catalogue de marques MAS, rattache les
- * données orphelines à l'atelier par défaut, provisionne les comptes {@code admin} et {@code tech},
- * et seed les SFM/MAS si les tables sont vides.
+ * données orphelines à l'atelier par défaut, et seed les SFM/MAS si les tables sont vides.
+ * Les comptes demo {@code admin} / {@code tech} ne sont provisionnés que hors profil {@code production}.
  */
 @Component
 @Order(2)
@@ -35,6 +36,7 @@ public class DataInitializer implements CommandLineRunner {
     private final AtelierRepository atelierRepository;
     private final PasswordEncoder passwordEncoder;
     private final JdbcTemplate jdbcTemplate;
+    private final Environment environment;
 
     /**
      * Exécute le seed idempotent : entités de référence, utilisateurs demo et données SFM/MAS.
@@ -77,15 +79,17 @@ public class DataInitializer implements CommandLineRunner {
 
         assignExistingDataToAtelier(defaultAtelier);
 
-        upsertUser("admin", "admin123", Roles.ADMIN, circus, null);
-        upsertUser("tech", "tech123", Roles.TECHNICIEN, circus, defaultAtelier);
+        if (!environment.matchesProfiles("production")) {
+            upsertUser("admin", "admin123", Roles.ADMIN, circus, null);
+            upsertUser("tech", "tech123", Roles.TECHNICIEN, circus, defaultAtelier);
 
-        userRepository.findByUsername("tech").ifPresent(user -> {
-            if ("TECH".equals(user.getRole())) {
-                user.setRole(Roles.TECHNICIEN);
-                userRepository.save(user);
-            }
-        });
+            userRepository.findByUsername("tech").ifPresent(user -> {
+                if ("TECH".equals(user.getRole())) {
+                    user.setRole(Roles.TECHNICIEN);
+                    userRepository.save(user);
+                }
+            });
+        }
 
         if (defaultAtelier != null) {
             int countSfm = Optional.ofNullable(
@@ -245,6 +249,7 @@ public class DataInitializer implements CommandLineRunner {
                 .role(role)
                 .groupe(groupe)
                 .preferredAtelier(preferredAtelier)
+                .mustChangePassword(true)
                 .build()));
     }
 }

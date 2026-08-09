@@ -26,7 +26,7 @@ class JwtServiceTest {
 
     @BeforeEach
     void setUp() {
-        jwtService = new JwtService(SECRET, 3_600_000L, appSettingsService);
+        jwtService = new JwtService(SECRET, 3_600_000L, 604_800_000L, appSettingsService);
         when(appSettingsService.getLong(AppSettingsService.JWT_EXPIRATION_MS, 3_600_000L)).thenReturn(3_600_000L);
     }
 
@@ -39,6 +39,8 @@ class JwtServiceTest {
         assertThat(jwtService.isTokenValid(token, "admin")).isTrue();
         assertThat(jwtService.isTokenValid(token, "other")).isFalse();
         assertThat(jwtService.getExpirationMs()).isEqualTo(3_600_000L);
+        assertThat(jwtService.generateAccessToken("admin", Roles.ADMIN)).isNotBlank();
+        assertThat(jwtService.hashToken(jwtService.generateRefreshTokenValue())).hasSize(64);
     }
 
     @Test

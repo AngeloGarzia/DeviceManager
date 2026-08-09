@@ -123,7 +123,7 @@ export class DeviceStockComponent implements OnInit {
     if (this.items().length === 0) {
       return;
     }
-    this.exportService.exportExcel(this.groups(), this.groupMode());
+    void this.exportService.exportExcel(this.groups(), this.groupMode());
   }
 
   /** Exporte le stock courant au format PDF. */

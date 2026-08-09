@@ -166,8 +166,8 @@
       [title]="confirmTitle()"
       [message]="confirmMessage()"
       [confirmLabel]="confirmLabel()"
-      (confirm)="confirmDelete()"
-      (cancel)="cancelDelete()"
+      (confirmed)="confirmDelete()"
+      (dismissed)="cancelDelete()"
     />
   }
 </section>

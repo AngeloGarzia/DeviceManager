@@ -227,7 +227,11 @@ export class SfmFormComponent implements OnInit {
     if (this.returnToDeviceForm()) {
       return;
     }
-    this.id ? this.router.navigate(['/sfm', this.id]) : this.router.navigate(['/sfm']);
+    if (this.id) {
+      this.router.navigate(['/sfm', this.id]);
+    } else {
+      this.router.navigate(['/sfm']);
+    }
   }
 
   private navigateAfterSave(sfmId: number): void {

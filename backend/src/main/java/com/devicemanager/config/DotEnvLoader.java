@@ -37,6 +37,7 @@ public final class DotEnvLoader {
             // Sur Render / Docker les variables viennent de l'environnement plateforme
             System.out.println("[dotenv] Pas de fichier " + filename
                     + " — utilisation des variables d'environnement système");
+            ensureSpringProfileActive(resolveProfile());
             return Map.of();
         }
 
@@ -47,12 +48,27 @@ public final class DotEnvLoader {
                     System.setProperty(key, value);
                 }
             });
+            // Après dotenv, APP_ENV peut être disponible → activer le profil Spring si besoin.
+            profile = resolveProfile();
+            ensureSpringProfileActive(profile);
             System.out.println("[dotenv] Chargé: " + envFile.toAbsolutePath()
                     + " (" + values.size() + " variables, profil=" + profile + ")");
             return values;
         } catch (IOException ex) {
             throw new IllegalStateException("Impossible de lire " + envFile, ex);
         }
+    }
+
+    /**
+     * Active {@code spring.profiles.active} (production / development) si non déjà défini
+     * via l'environnement ou les propriétés JVM.
+     */
+    private static void ensureSpringProfileActive(String profile) {
+        if (System.getenv("SPRING_PROFILES_ACTIVE") != null
+                || System.getProperty("spring.profiles.active") != null) {
+            return;
+        }
+        System.setProperty("spring.profiles.active", profile);
     }
 
     private static String resolveProfile() {

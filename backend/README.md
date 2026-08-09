@@ -24,7 +24,7 @@ mvn spring-boot:run
 $env:APP_ENV="production"
 mvn spring-boot:run
 # ou
-java -jar target/device-manager-1.0.0.jar --spring.profiles.active=prod
+java -jar target/device-manager-1.1.0.jar --spring.profiles.active=prod
 
 # Qualité : SpotBugs 4.10.3 + Checkstyle 13.8.0 + JaCoCo 0.8.15
 mvn -DskipTests verify

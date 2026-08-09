@@ -44,5 +44,5 @@
   }
   <app-confirm-dialog [open]="confirmOpen()" title="Supprimer le SFM"
     [message]="item() ? 'Confirmer la suppression de « ' + item()!.nom + ' » ?' : ''"
-    (confirm)="confirmDelete()" (cancel)="confirmOpen.set(false)" />
+    (confirmed)="confirmDelete()" (dismissed)="confirmOpen.set(false)" />
 </section>

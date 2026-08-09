@@ -7,13 +7,13 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
-import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { AuthService } from '../../services/auth.service';
 
 /**
  * Page de connexion à DeviceManager.
- * Authentifie l'utilisateur et redirige vers la liste des pièces détachées.
+ * Authentifie l'utilisateur et redirige vers la liste des pièces détachées
+ * (ou le changement de mot de passe obligatoire).
  */
 @Component({
   selector: 'app-login',
@@ -26,7 +26,6 @@ import { AuthService } from '../../services/auth.service';
     MatInputModule,
     MatButtonModule,
     MatIconModule,
-    MatCheckboxModule,
     MatProgressSpinnerModule
   ],
   templateUrl: './login.component.html',
@@ -44,25 +43,16 @@ export class LoginComponent {
 
   readonly form = this.fb.nonNullable.group({
     username: ['', Validators.required],
-    password: ['', Validators.required],
-    rememberPassword: [false]
+    password: ['', Validators.required]
   });
 
   constructor() {
     if (this.auth.isLoggedIn()) {
-      this.router.navigate(['/devices']);
+      void this.router.navigate([this.auth.mustChangePassword() ? '/change-password' : '/devices']);
       return;
     }
     if (this.route.snapshot.queryParamMap.get('reason') === 'expired') {
       this.error.set('Session expirée. Veuillez vous reconnecter.');
-    }
-    const saved = this.auth.getRememberedCredentials();
-    if (saved) {
-      this.form.patchValue({
-        username: saved.username,
-        password: saved.password,
-        rememberPassword: true
-      });
     }
   }
 
@@ -79,16 +69,11 @@ export class LoginComponent {
     }
     this.loading.set(true);
     this.error.set(null);
-    const { username, password, rememberPassword } = this.form.getRawValue();
+    const { username, password } = this.form.getRawValue();
     this.auth.login({ username, password }).subscribe({
       next: () => {
-        if (rememberPassword) {
-          this.auth.rememberCredentials(username, password);
-        } else {
-          this.auth.clearRememberedCredentials();
-        }
         this.loading.set(false);
-        this.router.navigate(['/devices']);
+        void this.router.navigate([this.auth.mustChangePassword() ? '/change-password' : '/devices']);
       },
       error: (err) => {
         this.loading.set(false);

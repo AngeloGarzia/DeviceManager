@@ -5,6 +5,7 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
@@ -41,6 +42,11 @@ jobs:
       - name: Package
         run: mvn -B -DskipTests package
 
+      - name: OWASP Dependency-Check
+        env:
+          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+        run: mvn -B -DskipTests org.owasp:dependency-check-maven:check
+
       - name: Upload JaCoCo report
         if: always()
         uses: actions/upload-artifact@v4
@@ -67,6 +73,21 @@ jobs:
       - name: Install
         run: npm ci
 
+      - name: Lint
+        run: npm run lint
+
+      # Seuil bloquant: critical (les high Angular 19 n'ont pas encore de patch mineur).
+      - name: npm audit prod (critical)
+        run: npm audit --omit=dev --audit-level=critical
+
+      - name: npm audit prod high (report)
+        continue-on-error: true
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: npm audit all (report)
+        continue-on-error: true
+        run: npm audit --audit-level=high || true
+
       - name: Unit tests
         run: npm run test:ci
 
@@ -78,11 +99,29 @@ jobs:
           node scripts/inject-api-url.mjs
           npm run build -- --configuration=production
 
+  trivy-backend-image:
+    name: Trivy (backend image)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Build backend image
+        run: docker build -t device-manager-backend:ci ./backend
+
+      - name: Trivy scan
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: device-manager-backend:ci
+          severity: CRITICAL,HIGH
+          exit-code: "1"
+          ignore-unfixed: true
+
   deploy:
     name: Deploy Render
-    needs: [backend, frontend]
+    needs: [backend, frontend, trivy-backend-image]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    environment: production
     steps:
       - name: Trigger API deploy
         env:
@@ -105,3 +144,26 @@ jobs:
           fi
           curl -fsS -X POST "$HOOK"
           echo "Frontend deploy triggered"
+
+  smoke-prod:
+    name: Smoke (production health)
+    needs: [deploy]
+    if: |
+      always() && (
+        github.event_name == 'workflow_dispatch' ||
+        (needs.deploy.result == 'success')
+      )
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Curl actuator health
+        env:
+          API_URL: ${{ vars.API_URL }}
+        run: |
+          if [ -z "$API_URL" ]; then
+            echo "vars.API_URL missing — skip smoke-prod gracefully"
+            exit 0
+          fi
+          curl -fsS --retry 5 --retry-delay 10 --retry-all-errors "${API_URL%/}/actuator/health"
+          echo
+          echo "Health check OK"

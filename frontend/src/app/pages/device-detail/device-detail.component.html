@@ -109,7 +109,7 @@
     [open]="confirmOpen()"
     title="Supprimer la pièce"
     [message]="item() ? 'Confirmer la suppression de « ' + item()!.nom + ' » ?' : ''"
-    (confirm)="confirmDelete()"
-    (cancel)="confirmOpen.set(false)"
+    (confirmed)="confirmDelete()"
+    (dismissed)="confirmOpen.set(false)"
   />
 </section>

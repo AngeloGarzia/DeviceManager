@@ -1,6 +1,7 @@
 import { Routes } from '@angular/router';
 import { authGuard } from './guards/auth.guard';
 import { adminGuard } from './guards/admin.guard';
+import { passwordChangeGuard, requirePasswordChangeGuard } from './guards/password-change.guard';
 
 export const routes: Routes = [
   { path: '', pathMatch: 'full', redirectTo: 'devices' },
@@ -9,8 +10,14 @@ export const routes: Routes = [
     loadComponent: () => import('./pages/login/login.component').then((m) => m.LoginComponent)
   },
   {
+    path: 'change-password',
+    canActivate: [requirePasswordChangeGuard],
+    loadComponent: () =>
+      import('./pages/change-password/change-password.component').then((m) => m.ChangePasswordComponent)
+  },
+  {
     path: '',
-    canActivate: [authGuard],
+    canActivate: [authGuard, passwordChangeGuard],
     runGuardsAndResolvers: 'always',
     loadComponent: () => import('./layout/shell.component').then((m) => m.ShellComponent),
     children: [

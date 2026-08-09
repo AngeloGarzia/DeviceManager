@@ -1,0 +1,7 @@
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: validate
+app:
+  cors:
+    allow-dev-localhost: false

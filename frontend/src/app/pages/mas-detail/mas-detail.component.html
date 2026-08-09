@@ -28,5 +28,5 @@
   }
   <app-confirm-dialog [open]="confirmOpen()" title="Supprimer la MAS"
     [message]="item() ? 'Confirmer la suppression de « ' + item()!.numero + ' » ?' : ''"
-    (confirm)="confirmDelete()" (cancel)="confirmOpen.set(false)" />
+    (confirmed)="confirmDelete()" (dismissed)="confirmOpen.set(false)" />
 </section>

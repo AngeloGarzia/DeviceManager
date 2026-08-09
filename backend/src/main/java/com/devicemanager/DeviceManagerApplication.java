@@ -16,6 +16,8 @@ public class DeviceManagerApplication {
 
     /**
      * Démarre l'application après chargement du fichier dotenv adapté au profil actif.
+     * {@link DotEnvLoader} active aussi {@code spring.profiles.active}
+     * ({@code production} / {@code development}) selon {@code APP_ENV} si non déjà défini.
      *
      * @param args arguments de ligne de commande passés à Spring Boot
      */

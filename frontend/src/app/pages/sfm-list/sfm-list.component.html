@@ -81,5 +81,5 @@
 
   <app-confirm-dialog [open]="confirmOpen()" title="Supprimer le SFM"
     [message]="pendingDelete ? 'Confirmer la suppression de « ' + pendingDelete.nom + ' » ?' : ''"
-    (confirm)="confirmDelete()" (cancel)="cancelDelete()" />
+    (confirmed)="confirmDelete()" (dismissed)="cancelDelete()" />
 </section>

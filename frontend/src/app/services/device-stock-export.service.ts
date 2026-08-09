@@ -1,7 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import { Device } from '../models/models';
 import { AuthService } from './auth.service';
 import { StockGroup, StockGroupMode } from '../pages/device-stock/device-stock.types';
@@ -23,13 +23,32 @@ export interface StockExportRow {
 export class DeviceStockExportService {
   private readonly auth = inject(AuthService);
 
-  exportExcel(groups: StockGroup[], mode: StockGroupMode): void {
+  async exportExcel(groups: StockGroup[], mode: StockGroupMode): Promise<void> {
     const rows = this.toRows(groups, mode);
     const sheetRows = rows.map((r) => this.toSheetRow(r, mode));
-    const worksheet = XLSX.utils.json_to_sheet(sheetRows);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Stock');
-    XLSX.writeFile(workbook, this.fileName('xlsx'));
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Stock');
+    if (sheetRows.length === 0) {
+      worksheet.addRow(['Aucune pièce']);
+    } else {
+      const headers = Object.keys(sheetRows[0]);
+      worksheet.addRow(headers);
+      for (const row of sheetRows) {
+        worksheet.addRow(headers.map((h) => row[h] ?? ''));
+      }
+      worksheet.getRow(1).font = { bold: true };
+      worksheet.columns = headers.map((h) => ({ header: h, key: h, width: Math.min(40, Math.max(12, h.length + 2)) }));
+    }
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = this.fileName('xlsx');
+    anchor.click();
+    URL.revokeObjectURL(url);
   }
 
   exportPdf(groups: StockGroup[], mode: StockGroupMode): void {
@@ -127,8 +146,8 @@ export class DeviceStockExportService {
     return base;
   }
 
-  private pdfColumns(mode: StockGroupMode): Array<{ header: string; key: keyof StockExportRow }> {
-    const cols: Array<{ header: string; key: keyof StockExportRow }> = [];
+  private pdfColumns(mode: StockGroupMode): { header: string; key: keyof StockExportRow }[] {
+    const cols: { header: string; key: keyof StockExportRow }[] = [];
     if (mode === 'sfm' || mode === 'both') {
       cols.push({ header: 'Groupe SFM', key: 'groupeSfm' });
     }
@@ -162,7 +181,7 @@ export class DeviceStockExportService {
 
   private fileName(ext: string): string {
     const stamp = new Date().toISOString().slice(0, 10);
-    const atelier = this.auth.currentAtelier()?.nom?.replace(/[^\w\-]+/g, '_') || 'atelier';
+    const atelier = this.auth.currentAtelier()?.nom?.replace(/[^\w-]+/g, '_') || 'atelier';
     return `stock-pieces-${atelier}-${stamp}.${ext}`;
   }
 

@@ -17,6 +17,8 @@ services:
     envVars:
       - key: APP_ENV
         value: production
+      - key: SPRING_PROFILES_ACTIVE
+        value: production
       - key: SERVER_PORT
         value: "8080"
       # À renseigner dans le Dashboard (Aiven Free MySQL)
@@ -26,17 +28,26 @@ services:
         sync: false
       - key: SPRING_DATASOURCE_PASSWORD
         sync: false
+      # Schéma géré par Flyway — validate uniquement
       - key: SPRING_JPA_HIBERNATE_DDL_AUTO
-        value: update
+        value: validate
       - key: SPRING_JPA_SHOW_SQL
         value: "false"
       - key: APP_JWT_SECRET
         generateValue: true
+      - key: APP_JWT_ACCESS_EXPIRATION_MS
+        value: "900000"
+      - key: APP_JWT_REFRESH_EXPIRATION_MS
+        value: "604800000"
       - key: APP_JWT_EXPIRATION_MS
-        value: "43200000"
-      # URL du front static (ex: https://device-manager-web.onrender.com)
+        value: "900000"
+      # Origine exacte du frontend (ex: https://device-manager-web.onrender.com) — pas de wildcard
       - key: APP_CORS_ALLOWED_ORIGINS
         sync: false
+      - key: APP_CORS_ALLOW_DEV_LOCALHOST
+        value: "false"
+      - key: APP_LOGIN_RATE_LIMIT_PER_MINUTE
+        value: "20"
       - key: APP_MAIL_ENABLED
         value: "false"
       - key: APP_MAIL_FROM

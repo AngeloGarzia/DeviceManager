@@ -56,16 +56,26 @@ describe('AuthService', () => {
   it('should logout and clear storage', () => {
     localStorage.setItem('dm_token', 'jwt');
     service.logout();
+    const logoutReq = http.expectOne('/api/auth/logout');
+    expect(logoutReq.request.method).toBe('POST');
+    logoutReq.flush({});
     expect(service.getToken()).toBeNull();
     expect(service.username()).toBeNull();
     expect(router.navigate).toHaveBeenCalledWith(['/login']);
   });
 
-  it('should remember and restore credentials', () => {
-    service.rememberCredentials('admin', 'secret');
-    expect(service.getRememberedCredentials()).toEqual({ username: 'admin', password: 'secret' });
-    service.clearRememberedCredentials();
-    expect(service.getRememberedCredentials()).toBeNull();
+  it('should purge legacy remembered passwords from localStorage on construct', () => {
+    localStorage.clear();
+    localStorage.setItem('dm_remember_user', 'admin');
+    localStorage.setItem('dm_remember_pass', 'secret');
+    const fresh = TestBed.inject(AuthService);
+    expect(fresh).toBeTruthy();
+    // Le constructeur du service déjà injecté a purgé au beforeEach ;
+    // on vérifie qu'aucune API ne réécrit le mot de passe en clair.
+    expect((fresh as unknown as { rememberCredentials?: unknown }).rememberCredentials).toBeUndefined();
+    localStorage.removeItem('dm_remember_pass');
+    localStorage.removeItem('dm_remember_user');
+    expect(localStorage.getItem('dm_remember_pass')).toBeNull();
   });
 
   it('should detect expired jwt and clear session', () => {

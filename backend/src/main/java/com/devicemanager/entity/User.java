@@ -54,6 +54,11 @@ public class User {
     @JoinColumn(name = "preferred_atelier_id", foreignKey = @ForeignKey(name = "fk_user_preferred_atelier"))
     private Atelier preferredAtelier;
 
+    /** Si {@code true}, l'utilisateur doit changer son mot de passe avant d'utiliser l'API métier. */
+    @Column(name = "must_change_password", nullable = false)
+    @Builder.Default
+    private boolean mustChangePassword = false;
+
     @Column(nullable = false, updatable = false)
     private Instant createdAt;
 

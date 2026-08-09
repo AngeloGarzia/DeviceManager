@@ -84,5 +84,5 @@
 
   <app-confirm-dialog [open]="confirmOpen()" title="Supprimer la MAS"
     [message]="pendingDelete ? 'Confirmer la suppression de « ' + pendingDelete.numero + ' » ?' : ''"
-    (confirm)="confirmDelete()" (cancel)="cancelDelete()" />
+    (confirmed)="confirmDelete()" (dismissed)="cancelDelete()" />
 </section>

@@ -30,4 +30,6 @@ public class AuthResponse {
     private Long atelierId;
     /** Liste des ateliers accessibles à l'utilisateur. */
     private List<AtelierSummary> ateliers;
+    /** Si {@code true}, le client doit forcer un changement de mot de passe. */
+    private Boolean mustChangePassword;
 }

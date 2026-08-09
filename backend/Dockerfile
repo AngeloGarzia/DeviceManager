@@ -11,7 +11,7 @@ WORKDIR /app
 RUN useradd -r -u 10001 appuser \
     && mkdir -p /app/uploads \
     && chown -R appuser:appuser /app
-COPY --from=build /app/target/device-manager-1.0.0.jar app.jar
+COPY --from=build /app/target/device-manager-*.jar app.jar
 USER appuser
 ENV APP_ENV=production
 ENV APP_S3_LOCAL_FALLBACK_DIR=/app/uploads

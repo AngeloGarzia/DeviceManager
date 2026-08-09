@@ -1,5 +1,6 @@
 package com.devicemanager.service;
 
+import com.devicemanager.security.FileMagicBytesValidator;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -47,7 +48,9 @@ public class ImageOptimizationService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La photo est obligatoire");
         }
         try {
-            BufferedImage source = ImageIO.read(file.getInputStream());
+            byte[] rawBytes = file.getBytes();
+            FileMagicBytesValidator.validateImageMagicBytes(rawBytes);
+            BufferedImage source = ImageIO.read(new ByteArrayInputStream(rawBytes));
             if (source == null) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Image illisible ou format non supporté");
             }

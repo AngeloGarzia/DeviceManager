@@ -283,8 +283,8 @@
     confirmLabel="Enregistrer quand même"
     cancelLabel="Modifier le choix"
     confirmColor="primary"
-    (confirm)="confirmMarqueMismatch()"
-    (cancel)="cancelMarqueMismatch()"
+    (confirmed)="confirmMarqueMismatch()"
+    (dismissed)="cancelMarqueMismatch()"
   />
 
   <app-confirm-dialog
@@ -294,7 +294,7 @@
     confirmLabel="Oui, ajouter"
     cancelLabel="Non, voir la fiche"
     confirmColor="primary"
-    (confirm)="addAnotherDevice()"
-    (cancel)="skipAnotherDevice()"
+    (confirmed)="addAnotherDevice()"
+    (dismissed)="skipAnotherDevice()"
   />
 </section>

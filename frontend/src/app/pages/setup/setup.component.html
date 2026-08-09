@@ -112,14 +112,21 @@
   @if (atelierDialogOpen()) {
     <div
       class="atelier-dialog-backdrop fixed inset-0 z-[100] flex items-end justify-center bg-slate-900/40 p-0 sm:items-center sm:p-4"
+      role="button"
+      tabindex="0"
+      aria-label="Fermer le dialogue atelier"
       (click)="closeAtelierDialog()"
+      (keydown.enter)="closeAtelierDialog()"
+      (keydown.space)="closeAtelierDialog()"
     >
       <div
         class="atelier-dialog panel w-full max-h-[92vh] overflow-hidden rounded-t-2xl border border-line bg-white shadow-soft sm:max-w-3xl sm:rounded-2xl"
         role="dialog"
         aria-modal="true"
+        tabindex="-1"
         [attr.aria-label]="atelierFormTitle()"
         (click)="$event.stopPropagation()"
+        (keydown)="$event.stopPropagation()"
       >
         <div class="flex items-start justify-between gap-3 border-b border-line px-4 py-3 sm:px-5">
           <div class="min-w-0">
@@ -279,7 +286,7 @@
             [disabled]="atelierSaving() || casinos().length === 0"
             (click)="saveAtelier()"
           >
-            {{ atelierSaving() ? 'Enregistrement…' : editingAtelierId() == null ? 'Créer l’atelier' : 'Enregistrer' }}
+            {{ atelierSaving() ? 'Enregistrement…' : editingAtelierId() === null ? 'Créer l’atelier' : 'Enregistrer' }}
           </button>
         </div>
       </div>
@@ -289,14 +296,21 @@
   @if (casinoDialogOpen()) {
     <div
       class="atelier-dialog-backdrop fixed inset-0 z-[100] flex items-end justify-center bg-slate-900/40 p-0 sm:items-center sm:p-4"
+      role="button"
+      tabindex="0"
+      aria-label="Fermer le dialogue casino"
       (click)="closeCasinoDialog()"
+      (keydown.enter)="closeCasinoDialog()"
+      (keydown.space)="closeCasinoDialog()"
     >
       <div
         class="atelier-dialog panel w-full max-h-[92vh] overflow-hidden rounded-t-2xl border border-line bg-white shadow-soft sm:max-w-xl sm:rounded-2xl"
         role="dialog"
         aria-modal="true"
+        tabindex="-1"
         aria-label="Gérer les casinos"
         (click)="$event.stopPropagation()"
+        (keydown)="$event.stopPropagation()"
       >
         <div class="flex items-start justify-between gap-3 border-b border-line px-4 py-3 sm:px-5">
           <div class="min-w-0">
@@ -357,13 +371,13 @@
                 <input matInput formControlName="nom" maxlength="120" />
               </mat-form-field>
               <div class="flex flex-wrap justify-end gap-2">
-                @if (editingCasinoId() != null) {
+                @if (editingCasinoId() !== null) {
                   <button mat-stroked-button type="button" (click)="cancelCasinoEdit()" [disabled]="casinoSaving()">
                     Annuler
                   </button>
                 }
                 <button mat-flat-button color="primary" type="submit" [disabled]="casinoSaving()">
-                  {{ casinoSaving() ? 'Enregistrement…' : editingCasinoId() == null ? 'Créer le casino' : 'Enregistrer' }}
+                  {{ casinoSaving() ? 'Enregistrement…' : editingCasinoId() === null ? 'Créer le casino' : 'Enregistrer' }}
                 </button>
               </div>
             </form>
@@ -568,8 +582,8 @@
         ? 'Confirmer la suppression de « ' + pendingDeleteNom() + ' » ? Impossible s’il contient des pièces, MAS, SFM ou demandes.'
         : ''
     "
-    (confirm)="confirmDeleteAtelier()"
-    (cancel)="cancelDeleteAtelier()"
+    (confirmed)="confirmDeleteAtelier()"
+    (dismissed)="cancelDeleteAtelier()"
   />
 
   <app-confirm-dialog
@@ -580,8 +594,8 @@
         ? 'Confirmer la suppression de « ' + pendingDeleteCasinoNom() + ' » ? Impossible s’il possède encore des ateliers.'
         : ''
     "
-    (confirm)="confirmDeleteCasino()"
-    (cancel)="cancelDeleteCasino()"
+    (confirmed)="confirmDeleteCasino()"
+    (dismissed)="cancelDeleteCasino()"
   />
 
   <app-confirm-dialog
@@ -589,7 +603,7 @@
     title="Vider les logs ?"
     message="Toutes les entrées de la table app_log seront supprimées."
     confirmLabel="Vider"
-    (confirm)="doClearLogs()"
-    (cancel)="confirmClearLogs.set(false)"
+    (confirmed)="doClearLogs()"
+    (dismissed)="confirmClearLogs.set(false)"
   />
 </section>

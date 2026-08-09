@@ -1,6 +1,6 @@
 # Toutes les valeurs sensibles viennent de :
 #   .env.development  (défaut)
-#   .env.production   (APP_ENV=production ou spring.profiles.active=prod)
+#   .env.production   (APP_ENV=production ou spring.profiles.active=production)
 # Aucune de ces variables n'est exposée au frontend.
 
 server:
@@ -41,13 +41,18 @@ spring:
   jpa:
     database-platform: org.hibernate.dialect.MySQLDialect
     hibernate:
-      ddl-auto: ${SPRING_JPA_HIBERNATE_DDL_AUTO:update}
+      ddl-auto: ${SPRING_JPA_HIBERNATE_DDL_AUTO:validate}
     show-sql: ${SPRING_JPA_SHOW_SQL:false}
     properties:
       hibernate:
         format_sql: true
         dialect: org.hibernate.dialect.MySQLDialect
         boot.allow_jdbc_metadata_access: false
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    baseline-version: 1
+    locations: classpath:db/migration
   servlet:
     multipart:
       max-file-size: 15MB
@@ -83,9 +88,15 @@ spring:
 app:
   jwt:
     secret: ${APP_JWT_SECRET:}
-    expiration-ms: ${APP_JWT_EXPIRATION_MS:86400000}
+    access-expiration-ms: ${APP_JWT_ACCESS_EXPIRATION_MS:900000}
+    refresh-expiration-ms: ${APP_JWT_REFRESH_EXPIRATION_MS:604800000}
+    # Alias rétrocompatible (durée access) — APP_JWT_EXPIRATION_MS ou access
+    expiration-ms: ${APP_JWT_EXPIRATION_MS:${APP_JWT_ACCESS_EXPIRATION_MS:900000}}
   cors:
     allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:}
+    allow-dev-localhost: ${APP_CORS_ALLOW_DEV_LOCALHOST:true}
+  security:
+    login-rate-limit-per-minute: ${APP_LOGIN_RATE_LIMIT_PER_MINUTE:20}
   mail:
     enabled: ${APP_MAIL_ENABLED:false}
     from: ${APP_MAIL_FROM:noreply@devicemanager.local}

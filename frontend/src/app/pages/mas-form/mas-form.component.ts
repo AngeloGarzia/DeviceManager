@@ -175,7 +175,11 @@ export class MasFormComponent implements OnInit {
     if (this.returnToDeviceForm()) {
       return;
     }
-    this.id ? this.router.navigate(['/mas', this.id]) : this.router.navigate(['/mas']);
+    if (this.id) {
+      this.router.navigate(['/mas', this.id]);
+    } else {
+      this.router.navigate(['/mas']);
+    }
   }
 
   private navigateAfterSave(masId: number): void {
