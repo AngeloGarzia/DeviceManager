@@ -61,4 +61,19 @@ class GlobalExceptionHandlerTest {
 
         assertThat(response.getBody().getMessage()).contains("référencé");
     }
+
+    @Test
+    void handleIntegrity_mysqlFkWithReferences_doesNotLookLikeDeviceReference() {
+        when(request.getRequestURI()).thenReturn("/api/devices/40");
+
+        String mysql = "Cannot delete or update a parent row: a foreign key constraint fails "
+                + "(`dm`.`commande_ligne`, CONSTRAINT `fk_commande_ligne_device` "
+                + "FOREIGN KEY (`device_id`) REFERENCES `device` (`id`))";
+        ResponseEntity<ApiError> response = handler.handleIntegrity(
+                new DataIntegrityViolationException("FK", new RuntimeException(mysql)),
+                request);
+
+        assertThat(response.getBody().getMessage()).contains("encore référencé");
+        assertThat(response.getBody().getMessage()).doesNotContain("Référence déjà utilisée");
+    }
 }

@@ -60,17 +60,25 @@ public class GlobalExceptionHandler {
         String raw = ex.getMostSpecificCause().getMessage();
         String lower = raw == null ? "" : raw.toLowerCase();
         String message;
-        if (lower.contains("uk_mas_numero") || lower.contains("numero")) {
+        // FK d'abord : le message MySQL contient "REFERENCES", qui ne doit pas
+        // être confondu avec l'unicité de la colonne device.reference.
+        if (lower.contains("foreign key")
+                || lower.contains("cannot delete or update a parent row")
+                || lower.contains("a foreign key constraint fails")) {
+            message = "Suppression impossible : cet enregistrement est encore référencé "
+                    + "(ex. pièce liée à une demande de commande)";
+        } else if (lower.contains("uk_mas_numero") || lower.contains("numero")) {
             message = "Numéro MAS déjà utilisé";
         } else if (lower.contains("uk_sfm_nom") || (lower.contains("sfm") && lower.contains("nom"))) {
             message = "Nom SFM déjà utilisé";
         } else if (lower.contains("uk_device_nom") || (lower.contains("device") && lower.contains("nom"))) {
             message = "Nom de pièce déjà utilisé";
-        } else if (lower.contains("uk_device_reference") || lower.contains("reference")) {
+        } else if (lower.contains("uk_device_reference")
+                || (lower.contains("duplicate") && lower.contains("reference"))) {
             message = "Référence déjà utilisée";
         } else if (lower.contains("marque") || lower.contains("label") || lower.contains("code")) {
             message = "Nom de marque déjà utilisé";
-        } else if (lower.contains("foreign key") || lower.contains("constraint")) {
+        } else if (lower.contains("constraint")) {
             message = "Suppression impossible : cet enregistrement est encore référencé";
         } else {
             message = "Contrainte d'unicité violée";
