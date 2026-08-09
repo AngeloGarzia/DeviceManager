@@ -53,4 +53,6 @@ cd backend && mvn -B -DskipTests org.owasp:dependency-check-maven:check
 ```
 
 En CI, OWASP Dependency-Check tourne en job séparé (hors chemin deploy), avec cache de la DB NVD,
-uniquement hors PR (push `main`, `workflow_dispatch`, cron hebdo). Trivy couvre l’image Docker à chaque run.
+uniquement hors PR **et seulement si** le secret repo `NVD_API_KEY` est défini
+(sinon le job est skippé : sans clé NIST le téléchargement est rate-limité et annulé).
+Trivy couvre l’image Docker à chaque run.

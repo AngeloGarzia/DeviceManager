@@ -53,12 +53,13 @@ jobs:
           path: backend/target/site/jacoco/
           if-no-files-found: ignore
 
-  # Hors du chemin critique deploy : base NVD ~centaines de Mo, très lent à froid.
-  # Cache + clé NVD + skip PR → CI PR/main beaucoup plus rapide.
+  # Hors chemin deploy. Sans NVD_API_KEY le sync NVD (~370k CVE) est rate-limité
+  # et finit souvent annulé (>1h) — on skip plutôt que bloquer la CI.
   owasp-dependency-check:
     name: OWASP Dependency-Check
-    if: github.event_name != 'pull_request'
+    if: github.event_name != 'pull_request' && secrets.NVD_API_KEY != ''
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     defaults:
       run:
         working-directory: backend
@@ -75,7 +76,6 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/dependency-check
-          # Même clé → la DB NVD mise à jour est réenregistrée en fin de job.
           key: odc-${{ runner.os }}-${{ hashFiles('backend/pom.xml') }}
           restore-keys: |
             odc-${{ runner.os }}-
@@ -83,12 +83,9 @@ jobs:
       - name: OWASP Dependency-Check
         env:
           NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
-        run: |
-          if [ -z "$NVD_API_KEY" ]; then
-            echo "::warning::Secret NVD_API_KEY manquant — le scan sera très lent (rate-limit NIST)."
-          fi
-          mvn -B -DskipTests org.owasp:dependency-check-maven:check \
-            -DdataDirectory="$HOME/.cache/dependency-check"
+        run: >
+          mvn -B -DskipTests org.owasp:dependency-check-maven:check
+          -DdataDirectory="$HOME/.cache/dependency-check"
 
   frontend:
     name: Frontend (Angular)
