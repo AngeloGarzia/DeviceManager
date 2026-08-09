@@ -73,8 +73,17 @@ public class SecurityConfig {
                             referrer.policy(ReferrerPolicyHeaderWriter.ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN));
                     headers.permissionsPolicyHeader(permissions ->
                             permissions.policy("camera=(), microphone=(), geolocation=()"));
-                    headers.contentSecurityPolicy(csp ->
-                            csp.policyDirectives("default-src 'none'; frame-ancestors 'none'; base-uri 'none'"));
+                    // CSP stricte hors /uploads (photos servies au front Render cross-origin).
+                    headers.addHeaderWriter((request, response) -> {
+                        String uri = request.getRequestURI();
+                        if (uri != null && uri.contains("/uploads/")) {
+                            response.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+                            return;
+                        }
+                        response.setHeader(
+                                "Content-Security-Policy",
+                                "default-src 'none'; frame-ancestors 'none'; base-uri 'none'");
+                    });
                     if (environment.matchesProfiles("production")) {
                         headers.httpStrictTransportSecurity(hsts ->
                                 hsts.includeSubDomains(true).maxAgeInSeconds(31_536_000L));

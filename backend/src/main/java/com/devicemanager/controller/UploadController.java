@@ -44,6 +44,7 @@ public class UploadController {
                     }
                     return ResponseEntity.ok()
                             .header(HttpHeaders.CACHE_CONTROL, "public, max-age=86400")
+                            .header("Cross-Origin-Resource-Policy", "cross-origin")
                             .contentType(mediaType)
                             .body(obj.data());
                 })
