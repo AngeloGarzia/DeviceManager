@@ -56,6 +56,11 @@ export class DeviceListComponent implements OnInit {
     return this.deviceService.resolvePhotoUrl(item.photoUrl);
   }
 
+  /** Relance le chargement si l'API Render est encore endormie. */
+  onPhotoError(event: Event): void {
+    this.deviceService.retryPhotoOnError(event);
+  }
+
   ngOnInit(): void {
     this.load();
   }

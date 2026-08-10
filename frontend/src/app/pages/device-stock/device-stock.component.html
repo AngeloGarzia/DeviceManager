@@ -156,7 +156,7 @@
           <tr>
             <td class="stock-col-photo">
               @if (item.photoUrl) {
-                <img [src]="photoUrl(item)" [alt]="item.nom" class="stock-thumb" />
+                <img [src]="photoUrl(item)" [alt]="item.nom" class="stock-thumb" (error)="onPhotoError($event)" />
               } @else {
                 <span class="stock-thumb stock-thumb--empty">
                   <mat-icon>image</mat-icon>
@@ -193,7 +193,7 @@
       <article class="stock-card">
         <div class="flex gap-3">
           @if (item.photoUrl) {
-            <img [src]="photoUrl(item)" [alt]="item.nom" class="stock-thumb" />
+            <img [src]="photoUrl(item)" [alt]="item.nom" class="stock-thumb" (error)="onPhotoError($event)" />
           }
           <div class="min-w-0 flex-1">
             <h3 class="m-0 text-sm font-semibold">{{ item.nom }}</h3>

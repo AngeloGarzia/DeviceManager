@@ -36,6 +36,7 @@
                 [src]="urls[0]"
                 [alt]="device.nom"
                 class="mb-4 max-h-72 w-full rounded-xl object-cover"
+                (error)="onPhotoError($event)"
               />
             } @else if (urls.length > 1) {
               <div class="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
@@ -46,6 +47,7 @@
                     class="max-h-48 w-full rounded-xl object-cover"
                     [class.sm:col-span-2]="i === 0"
                     [class.max-h-72]="i === 0"
+                    (error)="onPhotoError($event)"
                   />
                 }
               </div>

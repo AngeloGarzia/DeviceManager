@@ -64,6 +64,11 @@ export class DeviceDetailComponent implements OnInit {
     return this.deviceService.resolvePhotoUrl(device.photoUrl);
   }
 
+  /** Relance le chargement si l'API Render est encore endormie. */
+  onPhotoError(event: Event): void {
+    this.deviceService.retryPhotoOnError(event);
+  }
+
   /** Liste des URLs de la galerie photos, triées par position. */
   galleryUrls(device: Device): string[] {
     if (device.photos && device.photos.length > 0) {

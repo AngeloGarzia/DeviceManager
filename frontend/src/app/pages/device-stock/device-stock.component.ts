@@ -139,6 +139,11 @@ export class DeviceStockComponent implements OnInit {
     return this.deviceService.resolvePhotoUrl(item.photoUrl);
   }
 
+  /** Relance le chargement si l'API Render est encore endormie. */
+  onPhotoError(event: Event): void {
+    this.deviceService.retryPhotoOnError(event);
+  }
+
   /** Libellé de marque affiché pour une pièce. */
   marqueLabel(item: Device): string {
     return item.marqueLabel || item.marque || item.masMarque || 'Sans marque';

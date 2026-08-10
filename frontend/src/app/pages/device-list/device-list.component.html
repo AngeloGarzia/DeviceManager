@@ -64,7 +64,7 @@
                 [alt]="item.nom"
                 class="mb-3 h-40 w-full rounded-lg object-cover"
                 loading="lazy"
-                referrerpolicy="no-referrer"
+                (error)="onPhotoError($event)"
               />
             }
             <div class="flex items-start justify-between gap-2">
@@ -129,7 +129,7 @@
                   [src]="photoUrl(item)"
                   [alt]="item.nom"
                   loading="lazy"
-                  referrerpolicy="no-referrer"
+                  (error)="onPhotoError($event)"
                 />
               } @else {
                 <span class="device-ref-thumb device-ref-thumb--empty" aria-hidden="true">

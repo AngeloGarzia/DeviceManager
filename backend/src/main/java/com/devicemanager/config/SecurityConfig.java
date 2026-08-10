@@ -22,6 +22,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter;
+import org.springframework.security.web.header.writers.CrossOriginResourcePolicyHeaderWriter.CrossOriginResourcePolicy;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -69,15 +70,17 @@ public class SecurityConfig {
                 .headers(headers -> {
                     headers.contentTypeOptions(Customizer.withDefaults());
                     headers.frameOptions(frame -> frame.deny());
+                    // Obligatoire pour afficher les photos depuis le Static Site Render (autre origine).
+                    headers.crossOriginResourcePolicy(corp ->
+                            corp.policy(CrossOriginResourcePolicy.CROSS_ORIGIN));
                     headers.referrerPolicy(referrer ->
                             referrer.policy(ReferrerPolicyHeaderWriter.ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN));
                     headers.permissionsPolicyHeader(permissions ->
                             permissions.policy("camera=(), microphone=(), geolocation=()"));
-                    // CSP stricte hors /uploads (photos servies au front Render cross-origin).
+                    // CSP stricte hors /uploads (évite de bloquer le contenu binaire des photos).
                     headers.addHeaderWriter((request, response) -> {
                         String uri = request.getRequestURI();
                         if (uri != null && uri.contains("/uploads/")) {
-                            response.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
                             return;
                         }
                         response.setHeader(
@@ -131,7 +134,6 @@ public class SecurityConfig {
      */
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
-        CorsConfiguration config = new CorsConfiguration();
         List<String> configured = List.of(allowedOrigins.split(",")).stream()
                 .map(String::trim)
                 .filter(s -> !s.isBlank())
@@ -144,15 +146,25 @@ public class SecurityConfig {
             patterns.add("http://127.0.0.1:*");
         }
 
-        config.setAllowedOriginPatterns(new ArrayList<>(patterns));
-        config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
-        config.setAllowedHeaders(List.of("*"));
-        config.setExposedHeaders(List.of("Authorization"));
-        config.setAllowCredentials(true);
-        config.setMaxAge(3600L);
+        CorsConfiguration api = new CorsConfiguration();
+        api.setAllowedOriginPatterns(new ArrayList<>(patterns));
+        api.setAllowedMethods(List.of("GET", "HEAD", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
+        api.setAllowedHeaders(List.of("*"));
+        api.setExposedHeaders(List.of("Authorization"));
+        api.setAllowCredentials(true);
+        api.setMaxAge(3600L);
+
+        // Photos publiques : CORS permissif sans credentials (évite 403 HEAD/GET cross-origin).
+        CorsConfiguration uploads = new CorsConfiguration();
+        uploads.setAllowedOriginPatterns(List.of("*"));
+        uploads.setAllowedMethods(List.of("GET", "HEAD", "OPTIONS"));
+        uploads.setAllowedHeaders(List.of("*"));
+        uploads.setAllowCredentials(false);
+        uploads.setMaxAge(3600L);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/**", config);
+        source.registerCorsConfiguration("/uploads/**", uploads);
+        source.registerCorsConfiguration("/**", api);
         return source;
     }
 

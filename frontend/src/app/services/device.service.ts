@@ -44,6 +44,21 @@ export class DeviceService {
     return `${environment.apiUrl}${photoUrl}`;
   }
 
+  /**
+   * Relance une fois le chargement d'une photo (API Render free souvent froide → 502).
+   */
+  retryPhotoOnError(event: Event): void {
+    const img = event.target as HTMLImageElement | null;
+    if (!img?.src || img.dataset['dmPhotoRetried'] === '1') {
+      return;
+    }
+    img.dataset['dmPhotoRetried'] = '1';
+    const base = img.src.split('?')[0];
+    window.setTimeout(() => {
+      img.src = `${base}?r=${Date.now()}`;
+    }, 2500);
+  }
+
   private toFormData(payload: DeviceForm, photos: File[] = []): FormData {
     const formData = new FormData();
     formData.append(
