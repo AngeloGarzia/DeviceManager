@@ -30,6 +30,11 @@ export class DeviceService {
     return this.http.put<Device>(`${this.base}/${id}`, this.toFormData(payload, photos));
   }
 
+  /** Met à jour uniquement la quantité en stock. */
+  updateStock(id: number, stock: number): Observable<Device> {
+    return this.http.patch<Device>(`${this.base}/${id}/stock`, { stock });
+  }
+
   delete(id: number): Observable<void> {
     return this.http.delete<void>(`${this.base}/${id}`);
   }

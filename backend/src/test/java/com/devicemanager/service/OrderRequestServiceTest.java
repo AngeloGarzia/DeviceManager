@@ -205,4 +205,107 @@ class OrderRequestServiceTest {
                 .extracting(ex -> ((ResponseStatusException) ex).getReason())
                 .isEqualTo("Demande introuvable");
     }
+
+    @Test
+    void update_adjustsQuantitiesWhenValidated() {
+        var device = TestFixtures.device();
+        device.setStock(1);
+        Commande commande = Commande.builder()
+                .id(80L)
+                .technicien(TestFixtures.user("tech", Roles.TECHNICIEN))
+                .technicienNom("tech")
+                .message("msg")
+                .dateDemande(LocalDateTime.now())
+                .status(OrderStatuses.VALIDATED)
+                .atelier(TestFixtures.atelier())
+                .lignes(new ArrayList<>())
+                .build();
+        commande.addLigne(CommandeLigne.builder().id(1L).device(device).quantite(5).build());
+
+        when(commandeRepository.findByIdWithRelations(80L, 100L)).thenReturn(Optional.of(commande));
+        when(deviceRepository.findByIdWithRelations(40L, 100L)).thenReturn(Optional.of(device));
+        when(commandeRepository.save(any(Commande.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        OrderRequestDto.OrderRequestLineDto line = new OrderRequestDto.OrderRequestLineDto();
+        line.setDeviceId(40L);
+        line.setQuantite(3);
+        OrderRequestDto request = new OrderRequestDto();
+        request.setMessage("Réception partielle");
+        request.setLignes(List.of(line));
+
+        OrderRequestResponse response = orderRequestService.update(80L, request, "admin");
+
+        assertThat(response.getStatus()).isEqualTo(OrderStatuses.VALIDATED);
+        assertThat(response.getTotalQuantite()).isEqualTo(3);
+        assertThat(response.getMessage()).isEqualTo("Réception partielle");
+    }
+
+    @Test
+    void receive_incrementsStockAndMarksReceived() {
+        var device = TestFixtures.device();
+        device.setStock(2);
+        Commande commande = Commande.builder()
+                .id(81L)
+                .technicien(TestFixtures.user("tech", Roles.TECHNICIEN))
+                .technicienNom("tech")
+                .message("msg")
+                .dateDemande(LocalDateTime.now())
+                .status(OrderStatuses.VALIDATED)
+                .atelier(TestFixtures.atelier())
+                .lignes(new ArrayList<>())
+                .build();
+        commande.addLigne(CommandeLigne.builder().id(1L).device(device).quantite(4).build());
+
+        when(commandeRepository.findByIdWithRelations(81L, 100L)).thenReturn(Optional.of(commande));
+        when(deviceRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(commandeRepository.save(any(Commande.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        OrderRequestResponse response = orderRequestService.receive(81L, null, "admin");
+
+        assertThat(response.getStatus()).isEqualTo(OrderStatuses.RECEIVED);
+        assertThat(device.getStock()).isEqualTo(6);
+        verify(deviceRepository).save(device);
+    }
+
+    @Test
+    void receive_rejectsPendingOrder() {
+        Commande commande = Commande.builder()
+                .id(82L)
+                .technicien(TestFixtures.user("tech", Roles.TECHNICIEN))
+                .technicienNom("tech")
+                .message("x")
+                .dateDemande(LocalDateTime.now())
+                .status(OrderStatuses.PENDING)
+                .atelier(TestFixtures.atelier())
+                .lignes(new ArrayList<>())
+                .build();
+        when(commandeRepository.findByIdWithRelations(82L, 100L)).thenReturn(Optional.of(commande));
+
+        assertThatThrownBy(() -> orderRequestService.receive(82L, null, "admin"))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getReason())
+                .asString()
+                .contains("validée");
+    }
+
+    @Test
+    void delete_rejectsReceivedOrder() {
+        Commande commande = Commande.builder()
+                .id(83L)
+                .technicien(TestFixtures.user("tech", Roles.TECHNICIEN))
+                .technicienNom("tech")
+                .message("x")
+                .dateDemande(LocalDateTime.now())
+                .status(OrderStatuses.RECEIVED)
+                .atelier(TestFixtures.atelier())
+                .lignes(new ArrayList<>())
+                .build();
+        when(commandeRepository.findByIdWithRelations(83L, 100L)).thenReturn(Optional.of(commande));
+
+        assertThatThrownBy(() -> orderRequestService.delete(83L, "admin"))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getReason())
+                .asString()
+                .contains("réceptionnée");
+    }
 }

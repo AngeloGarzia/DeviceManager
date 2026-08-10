@@ -54,6 +54,7 @@ public final class TestFixtures {
                 .usage("Remplacement")
                 .dateAcquisition(java.time.LocalDate.of(2024, 1, 1))
                 .obsolete(false)
+                .stock(0)
                 .photoKey("key")
                 .photoUrl("/uploads/key")
                 .contentType("image/jpeg")

@@ -13,6 +13,7 @@ describe('DeviceService', () => {
     usage: 'Usage',
     dateAcquisition: '2024-01-01',
     obsolete: false,
+    stock: 0,
     sfmId: 1,
     masId: 2
   };

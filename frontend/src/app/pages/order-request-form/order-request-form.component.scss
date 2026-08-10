@@ -1,3 +1,106 @@
+/* Même hauteur / largeur ; styles Material (stroked / flat / couleurs) conservés. */
+$order-btn-width: 14rem;
+$order-btn-height: 2.75rem;
+
+:host ::ng-deep a.order-action-btn.mat-mdc-button,
+:host ::ng-deep a.order-action-btn.mat-mdc-outlined-button,
+:host ::ng-deep a.order-action-btn.mat-mdc-unelevated-button,
+:host ::ng-deep button.order-action-btn.mat-mdc-button,
+:host ::ng-deep button.order-action-btn.mat-mdc-outlined-button,
+:host ::ng-deep button.order-action-btn.mat-mdc-unelevated-button {
+  width: $order-btn-width !important;
+  min-width: $order-btn-width !important;
+  max-width: $order-btn-width !important;
+  height: $order-btn-height !important;
+  min-height: $order-btn-height !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  justify-content: center;
+  white-space: nowrap;
+  line-height: 1.25;
+}
+
+@media (max-width: 639px) {
+  :host ::ng-deep a.order-action-btn.mat-mdc-button,
+  :host ::ng-deep a.order-action-btn.mat-mdc-outlined-button,
+  :host ::ng-deep a.order-action-btn.mat-mdc-unelevated-button,
+  :host ::ng-deep button.order-action-btn.mat-mdc-button,
+  :host ::ng-deep button.order-action-btn.mat-mdc-outlined-button,
+  :host ::ng-deep button.order-action-btn.mat-mdc-unelevated-button {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: none !important;
+  }
+}
+
+/* Hors tuile : même grille que la colonne d’actions dans la carte. */
+.order-page-header {
+  display: grid;
+  gap: 0.75rem;
+  align-items: start;
+}
+
+@media (min-width: 640px) {
+  .order-page-header {
+    grid-template-columns: minmax(0, 1fr) $order-btn-width;
+    column-gap: 1rem;
+    /* Compense le padding horizontal de mat-card-content (~16px). */
+    padding-right: 16px;
+  }
+}
+
+.order-picker-layout {
+  display: grid;
+  gap: 0.75rem;
+}
+
+@media (min-width: 640px) {
+  .order-picker-layout {
+    grid-template-columns: minmax(0, 1fr) $order-btn-width;
+    grid-template-areas:
+      'search create'
+      'qty add';
+    column-gap: 1rem;
+    row-gap: 0.75rem;
+    align-items: start;
+  }
+
+  .order-picker-search {
+    grid-area: search;
+  }
+
+  .order-picker-create {
+    grid-area: create;
+    align-self: start;
+    margin-top: 0.2rem;
+  }
+
+  .order-picker-qty {
+    grid-area: qty;
+  }
+
+  /* Même ligne horizontale que Quantité / Pièce détachée. */
+  .order-picker-add {
+    grid-area: add;
+    align-self: center;
+  }
+}
+
+.order-actions-footer {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.75rem;
+  justify-items: stretch;
+}
+
+@media (min-width: 640px) {
+  .order-actions-footer {
+    grid-template-columns: repeat(3, $order-btn-width);
+    justify-content: start;
+    justify-items: start;
+  }
+}
+
 .suggest-row {
   display: flex;
   align-items: center;
@@ -26,24 +129,67 @@
   height: 20px;
 }
 
+.qty-piece-row {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.75rem;
+  width: 100%;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+@media (min-width: 640px) {
+  .qty-piece-row {
+    grid-template-columns: 1fr 1fr;
+    align-items: stretch;
+  }
+}
+
+/* Même hauteur de contourne que le champ « Rechercher une pièce ». */
+$order-field-height: var(--mat-form-field-container-height, 56px);
+
+.search-field,
+.qty-field-main {
+  width: 100%;
+  min-width: 0;
+}
+
+.qty-field-main {
+  margin-bottom: 0 !important;
+}
+
+.qty-field-main .mat-mdc-form-field-subscript-wrapper {
+  display: none;
+}
+
+:host ::ng-deep .search-field .mat-mdc-text-field-wrapper,
+:host ::ng-deep .qty-field-main .mat-mdc-text-field-wrapper {
+  height: $order-field-height;
+}
+
+:host ::ng-deep .search-field .mat-mdc-form-field-infix,
+:host ::ng-deep .qty-field-main .mat-mdc-form-field-infix {
+  min-height: $order-field-height;
+  display: flex;
+  align-items: center;
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
+  box-sizing: border-box;
+}
+
 .piece-thumb {
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  min-height: 56px;
+  box-sizing: border-box;
+  height: $order-field-height;
+  min-height: $order-field-height;
   min-width: 0;
-  padding: 0.5rem 0.75rem;
-  border: 1px solid #d7e0ea;
-  border-radius: 0.75rem;
+  width: 100%;
+  padding: 0 0.75rem;
+  border: 1px solid var(--mdc-outlined-text-field-outline-color, #d7e0ea);
+  border-radius: var(--mdc-outlined-text-field-container-shape, 4px);
   background: #f8fafc;
-  flex: 1 1 auto;
-  max-width: 100%;
-}
-
-@media (min-width: 640px) {
-  .piece-thumb {
-    max-width: 28rem;
-  }
 }
 
 .piece-thumb.has-piece {
@@ -53,9 +199,9 @@
 
 .piece-thumb img,
 .thumb-fallback {
-  width: 56px;
-  height: 56px;
-  border-radius: 0.5rem;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 0.375rem;
   object-fit: cover;
   flex-shrink: 0;
 }

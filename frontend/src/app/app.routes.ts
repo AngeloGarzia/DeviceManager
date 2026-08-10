@@ -10,6 +10,11 @@ export const routes: Routes = [
     loadComponent: () => import('./pages/login/login.component').then((m) => m.LoginComponent)
   },
   {
+    path: 'confidentialite',
+    loadComponent: () =>
+      import('./pages/privacy/privacy.component').then((m) => m.PrivacyComponent)
+  },
+  {
     path: 'change-password',
     canActivate: [requirePasswordChangeGuard],
     loadComponent: () =>

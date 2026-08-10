@@ -209,6 +209,14 @@
             }
           </mat-form-field>
 
+          <mat-form-field appearance="outline">
+            <mat-label>Stock</mat-label>
+            <input matInput type="number" min="0" step="1" formControlName="stock" />
+            @if (form.controls.stock.invalid && form.controls.stock.touched) {
+              <mat-error>Entier ≥ 0</mat-error>
+            }
+          </mat-form-field>
+
           <div class="flex items-center py-1 sm:pb-2">
             <mat-checkbox formControlName="obsolete">Pièce obsolète</mat-checkbox>
           </div>

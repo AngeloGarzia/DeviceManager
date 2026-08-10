@@ -114,6 +114,7 @@ export class DeviceFormComponent implements OnInit, AfterViewInit, OnDestroy {
     usage: ['', [Validators.required, Validators.maxLength(500)]],
     dateAcquisition: [this.todayIso(), Validators.required],
     obsolete: [false],
+    stock: [0, [Validators.required, Validators.min(0)]],
     sfmId: [null as number | null],
     masId: [null as number | null]
   });
@@ -202,6 +203,7 @@ export class DeviceFormComponent implements OnInit, AfterViewInit, OnDestroy {
             usage: device.usage,
             dateAcquisition: device.dateAcquisition,
             obsolete: device.obsolete,
+            stock: device.stock ?? 0,
             sfmId: device.sfmId ?? null,
             masId: device.masId ?? null
           });
@@ -704,6 +706,7 @@ export class DeviceFormComponent implements OnInit, AfterViewInit, OnDestroy {
       usage: '',
       dateAcquisition: this.todayIso(),
       obsolete: false,
+      stock: 0,
       sfmId: keepSfmId,
       masId: keepMasId
     });
@@ -738,6 +741,7 @@ export class DeviceFormComponent implements OnInit, AfterViewInit, OnDestroy {
         usage: raw.usage ?? '',
         dateAcquisition: raw.dateAcquisition || this.todayIso(),
         obsolete: !!raw.obsolete,
+        stock: Number(raw.stock) || 0,
         sfmId: raw.sfmId ?? null,
         masId: raw.masId ?? null
       },

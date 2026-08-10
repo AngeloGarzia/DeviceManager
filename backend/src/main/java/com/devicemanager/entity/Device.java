@@ -48,6 +48,11 @@ public class Device {
     @Column(nullable = false)
     private boolean obsolete;
 
+    /** Quantité disponible en stock (0 = rupture). */
+    @Column(nullable = false)
+    @Builder.Default
+    private int stock = 0;
+
     /** Photo principale (1re) — synchronisée pour listes et commandes. */
     @Column(name = "photo_key", length = 512)
     private String photoKey;

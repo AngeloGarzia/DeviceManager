@@ -1,0 +1,263 @@
+<section class="privacy-page mx-auto grid w-full max-w-5xl gap-4 px-3 pt-4 sm:px-4">
+  <header class="grid gap-2">
+    <a mat-button routerLink="/login" class="!justify-self-start !pl-0">
+      <mat-icon>arrow_back</mat-icon>
+      Retour à la connexion
+    </a>
+    <h1 class="page-title">Confidentialité &amp; mentions légales</h1>
+    <p class="page-subtitle">
+      Informations relatives au traitement des données personnelles dans DeviceManager
+      (conformité RGPD). Dernière mise à jour : {{ updatedAt }}.
+    </p>
+    <p class="privacy-notice">
+      Les mentions marquées
+      <span class="privacy-placeholder">[À COMPLÉTER]</span>
+      doivent être renseignées et validées par le responsable du traitement / un juriste ou DPO.
+      Cette page constitue un modèle d’information, non un avis juridique.
+    </p>
+  </header>
+
+  <nav class="panel" aria-label="Sommaire">
+    <ul class="privacy-toc">
+      <li><a href="#mentions">Mentions légales</a></li>
+      <li><a href="#responsable">Responsable</a></li>
+      <li><a href="#finalites">Finalités</a></li>
+      <li><a href="#donnees">Données</a></li>
+      <li><a href="#bases">Bases légales</a></li>
+      <li><a href="#destinataires">Destinataires</a></li>
+      <li><a href="#conservation">Conservation</a></li>
+      <li><a href="#transferts">Transferts</a></li>
+      <li><a href="#droits">Droits</a></li>
+      <li><a href="#securite">Sécurité</a></li>
+      <li><a href="#cookies">Cookies</a></li>
+      <li><a href="#contact">Contact</a></li>
+    </ul>
+  </nav>
+
+  <article class="panel grid">
+    <section id="mentions" class="privacy-section">
+      <h2>1. Mentions légales</h2>
+      <p>
+        <strong>Éditeur de l’application :</strong>
+        <span class="privacy-placeholder">[À COMPLÉTER — raison sociale, forme juridique, capital, RCS, siège]</span>
+      </p>
+      <p>
+        <strong>Directeur de la publication :</strong>
+        <span class="privacy-placeholder">[À COMPLÉTER]</span>
+      </p>
+      <p>
+        <strong>Contact :</strong>
+        <span class="privacy-placeholder">[À COMPLÉTER — email / téléphone]</span>
+      </p>
+      <p>
+        <strong>Hébergement :</strong>
+        application web et API hébergées notamment via des prestataires cloud
+        (ex. Render pour l’application, base de données MySQL managée type Aiven — à confirmer selon l’environnement déployé).
+        Coordonnées exactes :
+        <span class="privacy-placeholder">[À COMPLÉTER — nom et adresse de l’hébergeur]</span>.
+      </p>
+    </section>
+
+    <section id="responsable" class="privacy-section">
+      <h2>2. Responsable du traitement</h2>
+      <p>
+        Le responsable du traitement des données personnelles collectées via DeviceManager est :
+        <span class="privacy-placeholder">[À COMPLÉTER — entité (ex. société / groupe casino)]</span>.
+      </p>
+      <p>
+        DeviceManager est un outil professionnel destiné à l’inventaire des pièces détachées des machines à sous,
+        à la gestion des SFM / MAS, des comptes utilisateurs et des demandes de commande.
+      </p>
+    </section>
+
+    <section id="finalites" class="privacy-section">
+      <h2>3. Finalités du traitement</h2>
+      <p>Les données sont traitées pour les finalités suivantes :</p>
+      <ul>
+        <li>authentification et gestion des comptes (rôles administrateur / technicien) ;</li>
+        <li>gestion de l’inventaire des pièces détachées (références, usage, photos, statut obsolète) ;</li>
+        <li>rattachement aux ateliers, casinos, machines à sous (MAS) et fournisseurs (SFM) ;</li>
+        <li>gestion des contacts SFM (coordonnées professionnelles) ;</li>
+        <li>création et suivi des demandes de commande par email ;</li>
+        <li>assistance éventuelle via module IA (analyse d’étiquette / chat), lorsque activé ;</li>
+        <li>journalisation technique et sécurité de l’application (logs) ;</li>
+        <li>sélection de l’atelier de travail courant.</li>
+      </ul>
+    </section>
+
+    <section id="donnees" class="privacy-section">
+      <h2>4. Données collectées</h2>
+      <p>Selon l’usage, DeviceManager peut traiter notamment :</p>
+      <ul>
+        <li>
+          <strong>Comptes utilisateurs :</strong> identifiant, mot de passe (hashé), nom, prénom, email,
+          rôle, atelier(s) préféré(s), indicateur de changement de mot de passe obligatoire ;
+        </li>
+        <li>
+          <strong>Contacts SFM / coordonnées :</strong> nom, téléphone, email, et le cas échéant adresse
+          ou autres coordonnées professionnelles rattachées à un atelier ;
+        </li>
+        <li>
+          <strong>Données métier :</strong> fiches pièces (nom, référence, usage, dates, photos),
+          machines à sous, fournisseurs, demandes de commande ;
+        </li>
+        <li>
+          <strong>Données techniques :</strong> jetons d’accès (JWT), cookie de rafraîchissement de session,
+          journaux applicatifs (événements, erreurs), métadonnées de fichiers uploadés.
+        </li>
+      </ul>
+      <p>
+        Les photos concernent principalement des étiquettes / pièces détachées. Il convient d’éviter
+        d’y faire figurer des personnes ou données sensibles non nécessaires.
+      </p>
+    </section>
+
+    <section id="bases" class="privacy-section">
+      <h2>5. Bases légales</h2>
+      <p>Selon les cas, le traitement repose notamment sur :</p>
+      <ul>
+        <li>
+          l’exécution d’un contrat ou de mesures précontractuelles / obligations liées à l’activité
+          professionnelle (<span class="privacy-placeholder">[À COMPLÉTER — préciser]</span>) ;
+        </li>
+        <li>
+          l’intérêt légitime du responsable à assurer la maintenance, la traçabilité des pièces et
+          la sécurité du système d’information ;
+        </li>
+        <li>
+          le cas échéant, une obligation légale
+          (<span class="privacy-placeholder">[À COMPLÉTER si applicable]</span>).
+        </li>
+      </ul>
+    </section>
+
+    <section id="destinataires" class="privacy-section">
+      <h2>6. Destinataires et sous-traitants</h2>
+      <p>Les données sont accessibles :</p>
+      <ul>
+        <li>aux utilisateurs habilités (administrateurs et techniciens) selon leur rôle et atelier ;</li>
+        <li>
+          aux sous-traitants techniques nécessaires au fonctionnement du service
+          (hébergement applicatif, base de données, envoi d’emails SMTP le cas échéant,
+          fournisseur d’API d’intelligence artificielle si le module IA est activé) ;
+        </li>
+        <li>
+          à toute autorité lorsque la loi l’exige.
+        </li>
+      </ul>
+      <p>
+        Liste des sous-traitants principaux :
+        <span class="privacy-placeholder">[À COMPLÉTER — ex. Render, Aiven, prestataire mail, Google Gemini]</span>.
+      </p>
+    </section>
+
+    <section id="conservation" class="privacy-section">
+      <h2>7. Durées de conservation</h2>
+      <ul>
+        <li>
+          Comptes utilisateurs : pendant la durée d’activité du compte, puis
+          <span class="privacy-placeholder">[À COMPLÉTER — ex. 12 mois après désactivation]</span> ;
+        </li>
+        <li>
+          Données métier (pièces, SFM, MAS, commandes) : pendant la durée d’utilité opérationnelle, puis
+          <span class="privacy-placeholder">[À COMPLÉTER]</span> ;
+        </li>
+        <li>
+          Logs techniques :
+          <span class="privacy-placeholder">[À COMPLÉTER — ex. 90 jours]</span> ;
+        </li>
+        <li>
+          Sessions / jetons de rafraîchissement : jusqu’à expiration, déconnexion ou révocation.
+        </li>
+      </ul>
+    </section>
+
+    <section id="transferts" class="privacy-section">
+      <h2>8. Transferts hors Union européenne</h2>
+      <p>
+        Selon la configuration de production, des données peuvent être hébergées ou traitées
+        en dehors de l’Espace économique européen (EEE) par des sous-traitants cloud.
+      </p>
+      <p>
+        Dans ce cas, le responsable du traitement s’assure de l’existence de garanties appropriées
+        (clauses contractuelles types, décisions d’adéquation, etc.) :
+        <span class="privacy-placeholder">[À COMPLÉTER — mécanisme et localisation]</span>.
+      </p>
+    </section>
+
+    <section id="droits" class="privacy-section">
+      <h2>9. Vos droits</h2>
+      <p>
+        Conformément au RGPD, les personnes concernées disposent des droits suivants,
+        dans les conditions prévues par la loi :
+      </p>
+      <ul>
+        <li>droit d’accès ;</li>
+        <li>droit de rectification ;</li>
+        <li>droit à l’effacement ;</li>
+        <li>droit à la limitation du traitement ;</li>
+        <li>droit d’opposition ;</li>
+        <li>droit à la portabilité, lorsque applicable ;</li>
+        <li>droit d’introduire une réclamation auprès de la CNIL (www.cnil.fr).</li>
+      </ul>
+      <p>
+        Pour exercer ces droits : contacter
+        <span class="privacy-placeholder">[À COMPLÉTER — email privacy / DPO]</span>.
+        Une procédure interne peut être définie pour les demandes des collaborateurs.
+      </p>
+    </section>
+
+    <section id="securite" class="privacy-section">
+      <h2>10. Sécurité</h2>
+      <p>Des mesures techniques et organisationnelles sont mises en œuvre, notamment :</p>
+      <ul>
+        <li>authentification par mot de passe et jetons à durée limitée ;</li>
+        <li>cookie de rafraîchissement HttpOnly ;</li>
+        <li>contrôle d’accès par rôles (administrateur / technicien) et contexte atelier ;</li>
+        <li>communications HTTPS en production ;</li>
+        <li>en-têtes de sécurité HTTP (CSP, etc.) ;</li>
+        <li>stockage des mots de passe sous forme de hash (BCrypt).</li>
+      </ul>
+    </section>
+
+    <section id="cookies" class="privacy-section">
+      <h2>11. Cookies et stockage local</h2>
+      <p>
+        DeviceManager utilise des mécanismes strictement nécessaires au fonctionnement du service :
+      </p>
+      <ul>
+        <li>
+          <strong>Cookie de rafraîchissement de session</strong> (HttpOnly) : maintien de la connexion
+          de manière sécurisée ;
+        </li>
+        <li>
+          <strong>Stockage local du navigateur</strong> : jeton d’accès, informations de session
+          (identité affichée, rôle, atelier sélectionné) pour le bon fonctionnement de l’interface.
+        </li>
+      </ul>
+      <p>
+        Aucun cookie publicitaire ou de mesure d’audience tierce n’est déployé par défaut.
+        Un bandeau de consentement n’est donc pas requis pour ces seuls cookies nécessaires.
+        Si des traceurs non essentiels étaient ajoutés ultérieurement, un mécanisme de consentement
+        serait mis en place.
+      </p>
+    </section>
+
+    <section id="contact" class="privacy-section">
+      <h2>12. Contact</h2>
+      <p>
+        Pour toute question relative à la protection des données ou à la présente politique :
+      </p>
+      <ul>
+        <li>
+          Email :
+          <span class="privacy-placeholder">[À COMPLÉTER — ex. dpo&#64;votredomaine.com]</span>
+        </li>
+        <li>
+          Adresse postale :
+          <span class="privacy-placeholder">[À COMPLÉTER]</span>
+        </li>
+      </ul>
+    </section>
+  </article>
+</section>

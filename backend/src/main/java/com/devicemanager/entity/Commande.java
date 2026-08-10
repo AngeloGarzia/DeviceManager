@@ -40,7 +40,7 @@ public class Commande {
     @Column(name = "date_demande", nullable = false)
     private LocalDateTime dateDemande;
 
-    /** Statut du cycle de vie (ex. {@code PENDING}, {@code VALIDATED}). */
+    /** Statut du cycle de vie (ex. {@code PENDING}, {@code VALIDATED}, {@code RECEIVED}). */
     @Column(nullable = false, length = 30)
     private String status;
 

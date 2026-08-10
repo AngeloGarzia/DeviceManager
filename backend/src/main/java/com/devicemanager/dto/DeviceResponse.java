@@ -18,6 +18,8 @@ public class DeviceResponse {
     private String usage;
     private LocalDate dateAcquisition;
     private boolean obsolete;
+    /** Quantité disponible en stock. */
+    private int stock;
     /** URL de la photo principale (compatibilité listes et commandes). */
     private String photoUrl;
     private String contentType;

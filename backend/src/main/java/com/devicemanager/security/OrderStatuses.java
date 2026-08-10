@@ -11,6 +11,9 @@ public final class OrderStatuses {
     /** Validée par un admin — courriels de notification envoyés aux contacts SFM. */
     public static final String VALIDATED = "VALIDATED";
 
+    /** Réception confirmée par un admin — stock des pièces mis à jour. */
+    public static final String RECEIVED = "RECEIVED";
+
     /** Ancien statut legacy, équivalent à {@link #PENDING}. */
     public static final String SENT = "SENT";
 
@@ -25,5 +28,26 @@ public final class OrderStatuses {
      */
     public static boolean isPending(String status) {
         return PENDING.equals(status) || SENT.equals(status);
+    }
+
+    /**
+     * Indique si la demande est validée et en attente de réception physique.
+     */
+    public static boolean isValidated(String status) {
+        return VALIDATED.equals(status);
+    }
+
+    /**
+     * Indique si la réception a déjà été confirmée.
+     */
+    public static boolean isReceived(String status) {
+        return RECEIVED.equals(status);
+    }
+
+    /**
+     * Les lignes peuvent être ajustées tant que la réception n'est pas confirmée.
+     */
+    public static boolean canEditLines(String status) {
+        return isPending(status) || isValidated(status);
     }
 }

@@ -147,6 +147,7 @@ public class DeviceService {
                 .usage(request.getUsage().trim())
                 .dateAcquisition(request.getDateAcquisition())
                 .obsolete(Boolean.TRUE.equals(request.getObsolete()))
+                .stock(normalizeStock(request.getStock()))
                 .photos(new ArrayList<>())
                 .sfm(sfm)
                 .mas(mas)
@@ -160,6 +161,22 @@ public class DeviceService {
         Device saved = deviceRepository.save(entity);
         log.info("Création en base — Pièce id={} nom={} référence={} photos={} atelier={}",
                 saved.getId(), saved.getNom(), saved.getReference(), saved.getPhotos().size(), atelier.getId());
+        return toResponse(saved);
+    }
+
+    /**
+     * Met à jour uniquement la quantité en stock d'une pièce.
+     *
+     * @param id identifiant de la pièce
+     * @param stock quantité (≥ 0)
+     * @return pièce mise à jour
+     * @throws org.springframework.web.server.ResponseStatusException {@code 404} si introuvable
+     */
+    public DeviceResponse updateStock(Long id, Integer stock) {
+        Device entity = getEntity(id);
+        entity.setStock(normalizeStock(stock));
+        Device saved = deviceRepository.save(entity);
+        log.info("Mise à jour stock — Pièce id={} stock={}", saved.getId(), saved.getStock());
         return toResponse(saved);
     }
 
@@ -184,6 +201,7 @@ public class DeviceService {
         entity.setUsage(request.getUsage().trim());
         entity.setDateAcquisition(request.getDateAcquisition());
         entity.setObsolete(Boolean.TRUE.equals(request.getObsolete()));
+        entity.setStock(normalizeStock(request.getStock()));
         Sfm sfm = resolveOptionalSfm(request.getSfmId());
         Mas mas = resolveOptionalMas(request.getMasId());
         if (sfm != null && mas != null) {
@@ -404,6 +422,13 @@ public class DeviceService {
         }
     }
 
+    private static int normalizeStock(Integer stock) {
+        if (stock == null) {
+            return 0;
+        }
+        return Math.max(0, stock);
+    }
+
     private DeviceResponse toResponse(Device entity) {
         Mas mas = entity.getMas();
         MarqueMas marque = entity.getMarque();
@@ -436,6 +461,7 @@ public class DeviceService {
                 .usage(entity.getUsage())
                 .dateAcquisition(entity.getDateAcquisition())
                 .obsolete(entity.isObsolete())
+                .stock(entity.getStock())
                 .photoUrl(primaryUrl)
                 .contentType(entity.getContentType())
                 .fileSize(entity.getFileSize())

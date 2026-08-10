@@ -134,6 +134,52 @@
   white-space: nowrap;
 }
 
+.stock-col-qty {
+  width: 5.5rem;
+}
+
+.stock-qty-input {
+  width: 4.5rem;
+  height: 2rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0.5rem;
+  padding: 0 0.45rem;
+  font: inherit;
+  font-weight: 600;
+  text-align: center;
+  color: #0f172a;
+  background: #fff;
+}
+
+.stock-qty-input:focus {
+  outline: 2px solid #93c5fd;
+  outline-offset: 1px;
+  border-color: #0b6bcb;
+}
+
+.stock-qty-input:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.stock-qty-input--zero {
+  border-color: #fda4af;
+  background: #fff1f2;
+  color: #be123c;
+}
+
+.stock-card__qty {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.65rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
 .stock-thumb {
   width: 2.5rem;
   height: 2.5rem;

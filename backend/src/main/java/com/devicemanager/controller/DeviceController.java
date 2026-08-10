@@ -2,6 +2,7 @@ package com.devicemanager.controller;
 
 import com.devicemanager.dto.DeviceRequest;
 import com.devicemanager.dto.DeviceResponse;
+import com.devicemanager.dto.DeviceStockUpdateRequest;
 import com.devicemanager.service.DeviceService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -66,6 +67,21 @@ public class DeviceController {
         List<MultipartFile> list = photos == null ? List.of() : Arrays.asList(photos);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(deviceService.create(data, list));
+    }
+
+    /**
+     * Met à jour uniquement la quantité en stock d'une pièce détachée.
+     *
+     * @param id identifiant de la pièce
+     * @param body quantité en stock (≥ 0)
+     * @return pièce mise à jour
+     * @throws org.springframework.web.server.ResponseStatusException {@code 404} si introuvable
+     */
+    @PatchMapping("/{id}/stock")
+    public ResponseEntity<DeviceResponse> updateStock(
+            @PathVariable Long id,
+            @Valid @RequestBody DeviceStockUpdateRequest body) {
+        return ResponseEntity.ok(deviceService.updateStock(id, body.getStock()));
     }
 
     /**

@@ -7,6 +7,7 @@ export interface DeviceFormDraftValues {
   usage: string;
   dateAcquisition: string;
   obsolete: boolean;
+  stock: number;
   sfmId: number | null;
   masId: number | null;
 }

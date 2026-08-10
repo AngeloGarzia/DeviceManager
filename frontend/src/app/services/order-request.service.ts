@@ -37,6 +37,19 @@ export class OrderRequestService {
     );
   }
 
+  /** Ajuste les quantités / lignes d'une demande non réceptionnée (admin). */
+  update(id: number, payload: OrderRequestForm): Observable<OrderRequest> {
+    return this.http.put<OrderRequest>(`${this.base}/${id}`, payload);
+  }
+
+  /**
+   * Confirme la réception : statut RECEIVED + mise à jour du stock.
+   * Si `payload` est fourni, les quantités sont ajustées avant la réception.
+   */
+  receive(id: number, payload?: OrderRequestForm): Observable<OrderRequest> {
+    return this.http.post<OrderRequest>(`${this.base}/${id}/receive`, payload ?? {});
+  }
+
   delete(id: number): Observable<void> {
     return this.http.delete<void>(`${this.base}/${id}`).pipe(
       tap(() => this.refreshPendingCount())

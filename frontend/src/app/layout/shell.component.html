@@ -1,76 +1,77 @@
 <div class="shell">
   <header class="shell-header">
-    <div class="shell-header__brand">
-      <a routerLink="/devices" class="shell-brand">DeviceManager</a>
-      <div class="shell-user">
-        {{ auth.displayName() }} · {{ auth.roleLabel() }}
-        @if (auth.groupeNom()) {
-          · {{ auth.groupeNom() }}
+    <div class="shell-header__inner">
+      <div class="shell-header__brand">
+        <a routerLink="/devices" class="shell-brand">DeviceManager</a>
+        <div class="shell-user">
+          {{ auth.displayName() }} · {{ auth.roleLabel() }}
+          @if (auth.groupeNom()) {
+            · {{ auth.groupeNom() }}
+          }
+        </div>
+        @if (auth.ateliers().length > 0) {
+          <mat-form-field appearance="outline" class="atelier-select" subscriptSizing="dynamic">
+            <mat-label>Casino → Atelier</mat-label>
+            @if (auth.isAdmin()) {
+              <mat-select
+                [value]="auth.atelierId()"
+                (selectionChange)="auth.switchAtelier($event.value)"
+              >
+                @for (group of auth.ateliersByCasino(); track group.casinoNom) {
+                  <mat-optgroup [label]="group.casinoNom">
+                    @for (a of group.ateliers; track a.id) {
+                      <mat-option [value]="a.id">{{ a.nom || a.label }}</mat-option>
+                    }
+                  </mat-optgroup>
+                }
+              </mat-select>
+            } @else {
+              <input
+                matInput
+                readonly
+                [value]="
+                  auth.currentAtelier()
+                    ? (auth.currentAtelier()?.casinoNom || '') + ' → ' + (auth.currentAtelier()?.nom || auth.currentAtelier()?.label || '')
+                    : ''
+                "
+              />
+            }
+          </mat-form-field>
         }
       </div>
-    </div>
 
-    @if (auth.ateliers().length > 0) {
-      <mat-form-field appearance="outline" class="atelier-select" subscriptSizing="dynamic">
-        <mat-label>Casino → Atelier</mat-label>
+      <div class="shell-actions">
+        <button
+          mat-icon-button
+          type="button"
+          [class.admin-active]="ai.enabled() && router.url.startsWith('/ai')"
+          [disabled]="!ai.enabled()"
+          [matTooltip]="ai.enabled() ? 'Assistant IA' : (ai.disabledReason() || 'IA désactivée')"
+          (click)="openAiAssistant()"
+          aria-label="Assistant IA"
+        >
+          <mat-icon>smart_toy</mat-icon>
+        </button>
         @if (auth.isAdmin()) {
-          <mat-select
-            [value]="auth.atelierId()"
-            (selectionChange)="auth.switchAtelier($event.value)"
-          >
-            @for (group of auth.ateliersByCasino(); track group.casinoNom) {
-              <mat-optgroup [label]="group.casinoNom">
-                @for (a of group.ateliers; track a.id) {
-                  <mat-option [value]="a.id">{{ a.nom || a.label }}</mat-option>
-                }
-              </mat-optgroup>
-            }
-          </mat-select>
-        } @else {
-          <input
-            matInput
-            readonly
-            [value]="
-              auth.currentAtelier()
-                ? (auth.currentAtelier()?.casinoNom || '') + ' → ' + (auth.currentAtelier()?.nom || auth.currentAtelier()?.label || '')
-                : ''
-            "
-          />
+          <a mat-icon-button routerLink="/users" routerLinkActive="admin-active" matTooltip="Comptes">
+            <mat-icon>manage_accounts</mat-icon>
+          </a>
+          <a mat-icon-button routerLink="/setup" routerLinkActive="admin-active" matTooltip="Paramètres">
+            <mat-icon>settings</mat-icon>
+          </a>
         }
-      </mat-form-field>
-    }
-
-    <div class="shell-actions">
-      <button
-        mat-icon-button
-        type="button"
-        [class.admin-active]="ai.enabled() && router.url.startsWith('/ai')"
-        [disabled]="!ai.enabled()"
-        [matTooltip]="ai.enabled() ? 'Assistant IA' : (ai.disabledReason() || 'IA désactivée')"
-        (click)="openAiAssistant()"
-        aria-label="Assistant IA"
-      >
-        <mat-icon>smart_toy</mat-icon>
-      </button>
-      @if (auth.isAdmin()) {
-        <a mat-icon-button routerLink="/users" routerLinkActive="admin-active" matTooltip="Comptes">
-          <mat-icon>manage_accounts</mat-icon>
-        </a>
-        <a mat-icon-button routerLink="/setup" routerLinkActive="admin-active" matTooltip="Paramètres">
-          <mat-icon>settings</mat-icon>
-        </a>
-      }
-      <button
-        mat-stroked-button
-        type="button"
-        color="primary"
-        class="logout-btn"
-        (click)="logout()"
-        aria-label="Déconnexion"
-      >
-        <mat-icon>logout</mat-icon>
-        <span class="logout-label">Déconnexion</span>
-      </button>
+        <button
+          mat-stroked-button
+          type="button"
+          color="primary"
+          class="logout-btn"
+          (click)="logout()"
+          aria-label="Déconnexion"
+        >
+          <mat-icon>logout</mat-icon>
+          <span class="logout-label">Déconnexion</span>
+        </button>
+      </div>
     </div>
   </header>
 
@@ -79,6 +80,10 @@
       <router-outlet />
     }
   </main>
+
+  <footer class="shell-footer">
+    <a routerLink="/confidentialite">Confidentialité / RGPD</a>
+  </footer>
 
   <nav class="shell-nav" aria-label="Navigation principale">
     <div class="nav-grid">

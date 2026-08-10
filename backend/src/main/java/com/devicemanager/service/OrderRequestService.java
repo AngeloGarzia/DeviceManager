@@ -36,8 +36,9 @@ import java.util.stream.Collectors;
 /**
  * Service métier des demandes de commande de pièces détachées.
  * <p>
- * Création par technicien/admin, notification admin, validation et envoi
- * d'e-mails aux SFM, le tout scopé à l'atelier courant ({@code X-Atelier-Id}).
+ * Flux : création ({@code PENDING}) → validation admin + e-mails SFM ({@code VALIDATED})
+ * → vérification/ajustement des quantités → réception ({@code RECEIVED}) avec mise à jour
+ * du stock des pièces. Scopé à l'atelier courant ({@code X-Atelier-Id}).
  */
 @Service
 @RequiredArgsConstructor
@@ -126,6 +127,10 @@ public class OrderRequestService {
         Commande commande = commandeRepository.findByIdWithRelations(id, atelierId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Demande introuvable"));
 
+        if (OrderStatuses.isReceived(commande.getStatus())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Cette demande est déjà réceptionnée");
+        }
         if (!OrderStatuses.isPending(commande.getStatus())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
                     "Cette demande est déjà validée (statut=" + commande.getStatus() + ")");
@@ -174,6 +179,88 @@ public class OrderRequestService {
     }
 
     /**
+     * Ajuste les lignes (et éventuellement le message) d'une demande non encore réceptionnée.
+     * Permet à l'admin de corriger les quantités réellement reçues avant confirmation.
+     *
+     * @param id identifiant de la demande
+     * @param request nouvelles lignes (fusionnées par pièce) et message
+     * @param adminUsername administrateur
+     * @return demande mise à jour
+     */
+    public OrderRequestResponse update(Long id, OrderRequestDto request, String adminUsername) {
+        Long atelierId = atelierService.requireCurrentAtelier().getId();
+        Commande commande = commandeRepository.findByIdWithRelations(id, atelierId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Demande introuvable"));
+
+        if (!OrderStatuses.canEditLines(commande.getStatus())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Impossible de modifier une demande déjà réceptionnée");
+        }
+
+        replaceLines(commande, request, atelierId);
+        if (request.getMessage() != null && !request.getMessage().isBlank()) {
+            commande.setMessage(request.getMessage().trim());
+        }
+
+        Commande saved = commandeRepository.save(commande);
+        log.info("Modification en base — Demande commande id={} lignes ajustées par={}", id, adminUsername);
+        return toResponse(saved);
+    }
+
+    /**
+     * Confirme la réception physique : statut {@code RECEIVED} et incrément du stock
+     * pour chaque ligne (quantités éventuellement ajustées dans le corps de requête).
+     *
+     * @param id identifiant de la demande
+     * @param request lignes finales optionnelles ; si présentes, remplacent les lignes avant réception
+     * @param adminUsername administrateur confirmant
+     * @return demande réceptionnée
+     */
+    public OrderRequestResponse receive(Long id, OrderRequestDto request, String adminUsername) {
+        Long atelierId = atelierService.requireCurrentAtelier().getId();
+        Commande commande = commandeRepository.findByIdWithRelations(id, atelierId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Demande introuvable"));
+
+        if (OrderStatuses.isReceived(commande.getStatus())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Cette demande est déjà réceptionnée");
+        }
+        if (!OrderStatuses.isValidated(commande.getStatus())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Seule une demande validée peut être réceptionnée (statut=" + commande.getStatus() + ")");
+        }
+
+        if (request != null && request.getLignes() != null && !request.getLignes().isEmpty()) {
+            replaceLines(commande, request, atelierId);
+            if (request.getMessage() != null && !request.getMessage().isBlank()) {
+                commande.setMessage(request.getMessage().trim());
+            }
+        }
+
+        if (commande.getLignes() == null || commande.getLignes().isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Impossible de réceptionner une demande sans ligne");
+        }
+
+        for (CommandeLigne ligne : commande.getLignes()) {
+            Device device = ligne.getDevice();
+            if (device == null) {
+                continue;
+            }
+            int qty = ligne.getQuantite() == null ? 0 : Math.max(0, ligne.getQuantite());
+            device.setStock(Math.max(0, device.getStock()) + qty);
+            deviceRepository.save(device);
+            log.info("Stock mis à jour — Pièce id={} +{} → stock={}", device.getId(), qty, device.getStock());
+        }
+
+        commande.setStatus(OrderStatuses.RECEIVED);
+        Commande saved = commandeRepository.save(commande);
+        log.info("Réception en base — Demande commande id={} par={} pièces={}",
+                id, adminUsername, saved.getLignes().size());
+        return toResponse(saved);
+    }
+
+    /**
      * Supprime une demande de commande de l'atelier courant.
      *
      * @param id identifiant de la demande
@@ -184,9 +271,35 @@ public class OrderRequestService {
         Long atelierId = atelierService.requireCurrentAtelier().getId();
         Commande commande = commandeRepository.findByIdWithRelations(id, atelierId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Demande introuvable"));
+        if (OrderStatuses.isReceived(commande.getStatus())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Impossible de supprimer une demande déjà réceptionnée (stock déjà mis à jour)");
+        }
         commandeRepository.delete(commande);
         log.info("Suppression en base — Demande commande id={} par={} atelier={}",
                 id, adminUsername, atelierId);
+    }
+
+    private void replaceLines(Commande commande, OrderRequestDto request, Long atelierId) {
+        if (request.getLignes() == null || request.getLignes().isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Ajoutez au moins une pièce à la demande");
+        }
+
+        Map<Long, Integer> quantities = new LinkedHashMap<>();
+        for (OrderRequestDto.OrderRequestLineDto line : request.getLignes()) {
+            quantities.merge(line.getDeviceId(), line.getQuantite(), Integer::sum);
+        }
+
+        commande.getLignes().clear();
+        for (Map.Entry<Long, Integer> entry : quantities.entrySet()) {
+            Device device = deviceRepository.findByIdWithRelations(entry.getKey(), atelierId)
+                    .orElseThrow(() -> new ResponseStatusException(
+                            HttpStatus.BAD_REQUEST, "Pièce détachée introuvable: " + entry.getKey()));
+            commande.addLigne(CommandeLigne.builder()
+                    .device(device)
+                    .quantite(entry.getValue())
+                    .build());
+        }
     }
 
     /**

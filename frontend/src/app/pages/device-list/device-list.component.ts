@@ -41,6 +41,7 @@ import { ConfirmDialogComponent } from '../../shared/confirm-dialog.component';
 })
 export class DeviceListComponent implements OnInit {
   readonly auth = inject(AuthService);
+  private readonly deviceService = inject(DeviceService);
   readonly items = signal<Device[]>([]);
   readonly loading = signal(false);
   readonly error = signal<string | null>(null);
@@ -48,8 +49,6 @@ export class DeviceListComponent implements OnInit {
   pendingDelete: Device | null = null;
   query = '';
   readonly displayedColumns = ['nom', 'reference', 'sfm', 'mas', 'marque', 'date', 'statut', 'actions'];
-
-  constructor(private deviceService: DeviceService) {}
 
   /** URL absolue de la photo principale d'une pièce. */
   photoUrl(item: Device): string {
@@ -73,6 +72,11 @@ export class DeviceListComponent implements OnInit {
   /** Nombre de pièces marquées comme obsolètes. */
   get obsoleteCount(): number {
     return this.items().filter((d) => d.obsolete).length;
+  }
+
+  /** Nombre de pièces avec un stock à zéro. */
+  get zeroStockCount(): number {
+    return this.items().filter((d) => (d.stock ?? 0) <= 0).length;
   }
 
   /** Charge les pièces selon le filtre de recherche courant. */

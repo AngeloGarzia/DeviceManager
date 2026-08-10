@@ -54,6 +54,12 @@ html {
   @apply mx-auto w-full max-w-5xl px-3 pb-28 pt-4 sm:px-4;
 }
 
+/* Bouton d’action principal (ex. + Nouvelle pièce) — largeur partagée avec Déconnexion. */
+.btn-nouvelle-piece {
+  min-width: 11rem !important;
+  justify-content: center;
+}
+
 .page-title {
   @apply text-xl font-semibold tracking-tight text-ink sm:text-2xl;
 }

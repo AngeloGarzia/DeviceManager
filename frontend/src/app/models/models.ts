@@ -185,6 +185,8 @@ export interface Device {
   usage: string;
   dateAcquisition: string;
   obsolete: boolean;
+  /** Quantité disponible en stock (0 = rupture). */
+  stock: number;
   photoUrl?: string;
   contentType?: string;
   fileSize?: number;
@@ -205,6 +207,7 @@ export interface DeviceForm {
   usage: string;
   dateAcquisition: string;
   obsolete: boolean;
+  stock: number;
   sfmId: number | null;
   masId: number | null;
   keepPhotoIds?: number[];

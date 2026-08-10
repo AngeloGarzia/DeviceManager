@@ -1,10 +1,10 @@
-<section class="grid gap-4">
-  <header class="flex flex-wrap items-start justify-between gap-3">
+<section class="order-page grid gap-4">
+  <header class="order-page-header">
     <div>
       <h1 class="page-title">Demande de commande</h1>
       <p class="page-subtitle">Ajoutez plusieurs pièces, modifiez la liste, puis envoyez</p>
     </div>
-    <a mat-stroked-button routerLink="/order-requests">
+    <a mat-stroked-button class="order-action-btn order-demandes-btn" routerLink="/order-requests">
       <mat-icon>inbox</mat-icon>
       Demandes en cours
     </a>
@@ -12,86 +12,84 @@
 
   <mat-card class="!rounded-xl !border !border-line !shadow-soft">
     <mat-card-content class="!pt-5">
-      <div class="grid gap-3 sm:grid-cols-2 sm:gap-x-4" [formGroup]="picker">
-        <div class="sm:col-span-2 flex flex-col gap-3 sm:flex-row sm:items-start">
-          <mat-form-field appearance="outline" class="w-full min-w-0 flex-1">
-            <mat-label>Rechercher une pièce</mat-label>
-            <input
-              matInput
-              [formControl]="searchCtrl"
-              [matAutocomplete]="deviceAuto"
-              placeholder="Nom, référence, usage, marque, MAS, SFM…"
-              autocomplete="off"
-            />
-            @if (searching()) {
-              <mat-spinner matSuffix diameter="18"></mat-spinner>
-            } @else if (searchQueryText() || selectedDevice()) {
-              <button
-                matSuffix
-                mat-icon-button
-                type="button"
-                aria-label="Effacer"
-                (click)="clearSearch()"
-              >
-                <mat-icon>close</mat-icon>
-              </button>
-            } @else {
-              <mat-icon matSuffix>search</mat-icon>
-            }
-            <mat-hint>Recherche aussi dans le champ usage</mat-hint>
-          </mat-form-field>
+      <div class="order-picker-layout" [formGroup]="picker">
+        <mat-form-field appearance="outline" class="search-field order-picker-search w-full min-w-0">
+          <mat-label>Rechercher une pièce</mat-label>
+          <input
+            matInput
+            [formControl]="searchCtrl"
+            [matAutocomplete]="deviceAuto"
+            placeholder="Nom, référence, usage, marque, MAS, SFM…"
+            autocomplete="off"
+          />
+          @if (searching()) {
+            <mat-spinner matSuffix diameter="18"></mat-spinner>
+          } @else if (searchQueryText() || selectedDevice()) {
+            <button
+              matSuffix
+              mat-icon-button
+              type="button"
+              aria-label="Effacer"
+              (click)="clearSearch()"
+            >
+              <mat-icon>close</mat-icon>
+            </button>
+          } @else {
+            <mat-icon matSuffix>search</mat-icon>
+          }
+          <mat-hint>Recherche aussi dans le champ usage</mat-hint>
+        </mat-form-field>
 
-          <mat-autocomplete
-            #deviceAuto="matAutocomplete"
-            [displayWith]="displayDevice"
-            (optionSelected)="onDeviceSelected($event)"
-          >
-            @for (d of suggestions(); track d.id) {
-              <mat-option [value]="d" class="!h-auto !leading-normal !py-2">
-                <div class="suggest-row">
-                  @if (photoUrl(d)) {
-                    <img [src]="photoUrl(d)" [alt]="d.nom" class="suggest-thumb" />
-                  } @else {
-                    <div class="suggest-thumb fallback"><mat-icon>precision_manufacturing</mat-icon></div>
-                  }
-                  <div class="min-w-0 flex-1">
-                    <div class="truncate text-sm font-semibold text-ink">{{ d.nom }}</div>
-                    <div class="truncate text-xs text-ink-soft">
-                      {{ d.reference || 'Sans référence' }}
-                      @if (deviceHint(d)) {
-                        · {{ deviceHint(d) }}
-                      }
-                    </div>
-                    @if (d.usage) {
-                      <div class="truncate text-xs text-ink-faint">{{ d.usage }}</div>
+        <mat-autocomplete
+          #deviceAuto="matAutocomplete"
+          [displayWith]="displayDevice"
+          (optionSelected)="onDeviceSelected($event)"
+        >
+          @for (d of suggestions(); track d.id) {
+            <mat-option [value]="d" class="!h-auto !leading-normal !py-2">
+              <div class="suggest-row">
+                @if (photoUrl(d)) {
+                  <img [src]="photoUrl(d)" [alt]="d.nom" class="suggest-thumb" />
+                } @else {
+                  <div class="suggest-thumb fallback"><mat-icon>precision_manufacturing</mat-icon></div>
+                }
+                <div class="min-w-0 flex-1">
+                  <div class="truncate text-sm font-semibold text-ink">{{ d.nom }}</div>
+                  <div class="truncate text-xs text-ink-soft">
+                    {{ d.reference || 'Sans référence' }}
+                    @if (deviceHint(d)) {
+                      · {{ deviceHint(d) }}
                     }
                   </div>
+                  @if (d.usage) {
+                    <div class="truncate text-xs text-ink-faint">{{ d.usage }}</div>
+                  }
                 </div>
-              </mat-option>
-            }
-            @if (!searching() && searchQueryText() && !selectedDevice() && suggestions().length === 0) {
-              <mat-option disabled>Aucune pièce trouvée</mat-option>
-            }
-          </mat-autocomplete>
+              </div>
+            </mat-option>
+          }
+          @if (!searching() && searchQueryText() && !selectedDevice() && suggestions().length === 0) {
+            <mat-option disabled>Aucune pièce trouvée</mat-option>
+          }
+        </mat-autocomplete>
 
-          <a
-            mat-stroked-button
-            color="primary"
-            class="w-full shrink-0 sm:mt-1 sm:w-auto"
-            routerLink="/devices/new"
-            [queryParams]="{ forOrderRequest: 1 }"
-          >
-            Créer pièce détachée
-          </a>
-        </div>
+        <a
+          mat-stroked-button
+          color="primary"
+          class="order-action-btn order-picker-create"
+          routerLink="/devices/new"
+          [queryParams]="{ forOrderRequest: 1 }"
+        >
+          Créer pièce détachée
+        </a>
 
-        <div class="sm:col-span-2 flex flex-col gap-3 sm:flex-row sm:items-start">
-          <mat-form-field appearance="outline" class="w-full sm:max-w-xs">
+        <div class="qty-piece-row order-picker-qty">
+          <mat-form-field appearance="outline" class="qty-field-main" subscriptSizing="dynamic">
             <mat-label>Quantité</mat-label>
             <input matInput type="number" min="1" formControlName="quantite" />
           </mat-form-field>
 
-          <div class="piece-thumb w-full min-w-0" [class.has-piece]="!!selectedDevice()">
+          <div class="piece-thumb" [class.has-piece]="!!selectedDevice()">
             @if (selectedDevice(); as device) {
               @if (photoUrl(device)) {
                 <img [src]="photoUrl(device)" [alt]="device.nom" />
@@ -105,17 +103,23 @@
             } @else {
               <div class="thumb-fallback"><mat-icon>image_not_supported</mat-icon></div>
               <div class="thumb-meta">
-                <span class="thumb-title">Aucune pièce</span>
+                <span class="thumb-title">Pièce détachée</span>
                 <span class="thumb-ref">Recherchez puis choisissez une suggestion</span>
               </div>
             }
           </div>
-
-          <button mat-flat-button color="primary" type="button" class="w-full shrink-0 sm:mt-1 sm:w-auto" (click)="addLine()">
-            <mat-icon>add</mat-icon>
-            Ajouter à la liste
-          </button>
         </div>
+
+        <button
+          mat-flat-button
+          color="primary"
+          type="button"
+          class="order-action-btn order-picker-add"
+          (click)="addLine()"
+        >
+          <mat-icon>add</mat-icon>
+          Ajouter à la liste
+        </button>
       </div>
 
       <div class="mt-5">
@@ -175,19 +179,26 @@
           <p class="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{{ error() }}</p>
         }
 
-        <div class="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <a mat-stroked-button routerLink="/devices">Retour</a>
+        <div class="order-actions-footer mt-2">
+          <a mat-stroked-button class="order-action-btn" routerLink="/devices">Retour</a>
           <button
             mat-stroked-button
             color="primary"
             type="button"
+            class="order-action-btn"
             [disabled]="previewing() || lines().length === 0"
             (click)="loadMailPreview()"
           >
             <mat-icon>preview</mat-icon>
             {{ previewing() ? 'Aperçu…' : 'Aperçu e-mail' }}
           </button>
-          <button mat-flat-button color="primary" type="submit" [disabled]="saving()">
+          <button
+            mat-flat-button
+            color="primary"
+            type="submit"
+            class="order-action-btn"
+            [disabled]="saving()"
+          >
             {{ saving() ? 'Envoi…' : 'Envoyer la demande' }}
           </button>
         </div>

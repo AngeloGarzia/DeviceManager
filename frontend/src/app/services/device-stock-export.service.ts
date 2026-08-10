@@ -15,6 +15,7 @@ export interface StockExportRow {
   mas: string;
   marque: string;
   statut: string;
+  stock: string;
   usage: string;
   dateAcquisition: string;
 }
@@ -120,6 +121,7 @@ export class DeviceStockExportService {
       mas: item.masNumero || '',
       marque: this.marqueLabel(item),
       statut: item.obsolete ? 'Obsolète' : 'Active',
+      stock: String(item.stock ?? 0),
       usage: item.usage || '',
       dateAcquisition: item.dateAcquisition
         ? new Date(item.dateAcquisition).toLocaleDateString('fr-FR')
@@ -141,6 +143,7 @@ export class DeviceStockExportService {
     base['MAS'] = row.mas;
     base['Marque'] = row.marque;
     base['Statut'] = row.statut;
+    base['Stock'] = row.stock;
     base['Usage'] = row.usage;
     base['Date acquisition'] = row.dateAcquisition;
     return base;
@@ -161,6 +164,7 @@ export class DeviceStockExportService {
       { header: 'MAS', key: 'mas' },
       { header: 'Marque', key: 'marque' },
       { header: 'Statut', key: 'statut' },
+      { header: 'Stock', key: 'stock' },
       { header: 'Acquisition', key: 'dateAcquisition' }
     );
     return cols;

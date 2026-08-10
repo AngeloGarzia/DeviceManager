@@ -116,6 +116,10 @@ export class OrderRequestFormComponent implements OnInit {
   }
 
   ngOnInit(): void {
+    if (this.route.snapshot.queryParamMap.get('zeroStock') === '1') {
+      this.prefillZeroStockLines();
+      return;
+    }
     const raw = this.route.snapshot.queryParamMap.get('deviceId');
     if (!raw) {
       return;
@@ -128,6 +132,31 @@ export class OrderRequestFormComponent implements OnInit {
       next: (device) => {
         this.applyDevice(device);
         this.addLine();
+      }
+    });
+  }
+
+  /** Préremplit la demande avec toutes les pièces en stock à zéro. */
+  private prefillZeroStockLines(): void {
+    this.deviceService.list('').subscribe({
+      next: (devices) => {
+        const zeroStock = devices.filter((d) => (d.stock ?? 0) <= 0);
+        this.lines.set(
+          zeroStock.map((device) => ({
+            deviceId: device.id,
+            quantite: 1,
+            nom: device.nom,
+            reference: device.reference,
+            photoUrl: device.photoUrl || '',
+            sfmNom: device.sfmNom
+          }))
+        );
+        if (zeroStock.length === 0) {
+          this.error.set('Aucune pièce en stock à zéro pour cet atelier.');
+        }
+      },
+      error: () => {
+        this.error.set('Impossible de charger les pièces en stock à zéro.');
       }
     });
   }

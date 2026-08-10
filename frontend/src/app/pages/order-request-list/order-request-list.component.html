@@ -4,7 +4,7 @@
       <h1 class="page-title">Demandes de commande</h1>
       <p class="page-subtitle">
         @if (auth.isAdmin()) {
-          Validez, consultez ou supprimez les demandes — l’envoi aux SFM se fait à la validation
+          Validez, ajustez les quantités à la réception, puis confirmez pour mettre le stock à jour
         } @else {
           Consultation uniquement — vous ne pouvez ni valider ni modifier une demande
         }
@@ -52,16 +52,25 @@
                 class="rounded-full px-2 py-0.5 text-xs font-medium"
                 [class.bg-amber-50]="isPending(item.status)"
                 [class.text-amber-800]="isPending(item.status)"
-                [class.bg-emerald-50]="item.status === 'VALIDATED'"
-                [class.text-emerald-700]="item.status === 'VALIDATED'"
+                [class.bg-sky-50]="isValidated(item.status)"
+                [class.text-sky-800]="isValidated(item.status)"
+                [class.bg-emerald-50]="isReceived(item.status)"
+                [class.text-emerald-700]="isReceived(item.status)"
               >
                 {{ statusLabel(item.status) }}
               </span>
             </div>
 
+            @if (auth.isAdmin() && isValidated(item.status)) {
+              <p class="mt-3 rounded-lg bg-sky-50 px-3 py-2 text-xs text-sky-900">
+                Vérifiez les quantités réellement réceptionnées, ajustez-les si besoin, puis confirmez la
+                réception pour mettre le stock à jour.
+              </p>
+            }
+
             <div class="mt-3 grid gap-2">
-              @for (line of item.lignes || []; track line.deviceId) {
-                <div class="flex items-center gap-3 rounded-lg border border-line bg-slate-50 px-3 py-2">
+              @for (line of linesOf(item); track line.deviceId) {
+                <div class="flex flex-wrap items-center gap-3 rounded-lg border border-line bg-slate-50 px-3 py-2">
                   <div class="min-w-0 flex-1">
                     <div class="truncate text-sm font-medium text-ink">{{ line.pieceNom }}</div>
                     <div class="text-xs text-ink-soft">
@@ -73,7 +82,41 @@
                       }
                     </div>
                   </div>
-                  <div class="text-sm font-semibold text-brand">× {{ line.quantite }}</div>
+                  @if (auth.isAdmin() && canEdit(item) && isValidated(item.status)) {
+                    <label class="order-qty-field">
+                      <span>Qté reçue</span>
+                      <input
+                        type="number"
+                        min="1"
+                        step="1"
+                        class="order-qty-input"
+                        [ngModel]="line.quantite"
+                        (ngModelChange)="onQtyChange(item.id, line.deviceId, $event)"
+                        [disabled]="
+                          savingId() === item.id ||
+                          receivingId() === item.id ||
+                          deletingId() === item.id
+                        "
+                      />
+                    </label>
+                    <button
+                      mat-button
+                      type="button"
+                      color="warn"
+                      class="!min-w-0"
+                      [disabled]="
+                        savingId() === item.id ||
+                        receivingId() === item.id ||
+                        linesOf(item).length <= 1
+                      "
+                      (click)="removeLine(item.id, line.deviceId)"
+                      aria-label="Retirer la pièce"
+                    >
+                      <mat-icon>close</mat-icon>
+                    </button>
+                  } @else {
+                    <div class="text-sm font-semibold text-brand">× {{ line.quantite }}</div>
+                  }
                 </div>
               } @empty {
                 <p class="m-0 text-sm text-ink-soft">
@@ -115,17 +158,57 @@
                     {{ validatingId() === item.id ? 'Validation…' : 'Valider et envoyer aux SFM' }}
                   </button>
                 }
-                <button
-                  mat-stroked-button
-                  color="warn"
-                  type="button"
-                  class="w-full sm:w-auto"
-                  [disabled]="deletingId() === item.id || validatingId() === item.id"
-                  (click)="askDelete(item)"
-                >
-                  <mat-icon>delete</mat-icon>
-                  {{ deletingId() === item.id ? 'Suppression…' : 'Supprimer' }}
-                </button>
+
+                @if (isValidated(item.status)) {
+                  <button
+                    mat-stroked-button
+                    type="button"
+                    class="w-full sm:w-auto"
+                    [disabled]="
+                      savingId() === item.id ||
+                      receivingId() === item.id ||
+                      deletingId() === item.id
+                    "
+                    (click)="saveQuantities(item)"
+                  >
+                    <mat-icon>save</mat-icon>
+                    {{ savingId() === item.id ? 'Enregistrement…' : 'Enregistrer les quantités' }}
+                  </button>
+                  <button
+                    mat-flat-button
+                    color="primary"
+                    type="button"
+                    class="w-full sm:w-auto"
+                    [disabled]="
+                      savingId() === item.id ||
+                      receivingId() === item.id ||
+                      deletingId() === item.id
+                    "
+                    (click)="askReceive(item)"
+                  >
+                    <mat-icon>inventory_2</mat-icon>
+                    {{ receivingId() === item.id ? 'Réception…' : 'Confirmer la réception' }}
+                  </button>
+                }
+
+                @if (!isReceived(item.status)) {
+                  <button
+                    mat-stroked-button
+                    color="warn"
+                    type="button"
+                    class="w-full sm:w-auto"
+                    [disabled]="
+                      deletingId() === item.id ||
+                      validatingId() === item.id ||
+                      receivingId() === item.id ||
+                      savingId() === item.id
+                    "
+                    (click)="askDelete(item)"
+                  >
+                    <mat-icon>delete</mat-icon>
+                    {{ deletingId() === item.id ? 'Suppression…' : 'Supprimer' }}
+                  </button>
+                }
               </div>
 
               @if (isPending(item.status) && previewsById()[item.id]; as mails) {
@@ -166,8 +249,8 @@
       [title]="confirmTitle()"
       [message]="confirmMessage()"
       [confirmLabel]="confirmLabel()"
-      (confirmed)="confirmDelete()"
-      (dismissed)="cancelDelete()"
+      (confirmed)="confirmAction()"
+      (dismissed)="cancelConfirm()"
     />
   }
 </section>

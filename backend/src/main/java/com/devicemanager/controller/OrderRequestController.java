@@ -18,8 +18,9 @@ import java.util.Map;
 /**
  * Contrôleur REST des demandes de commande de pièces détachées.
  * <p>
- * Flux technicien → validation admin → envoi e-mails aux SFM, scopé à l'atelier
- * courant ({@code X-Atelier-Id}). Statuts {@code PENDING} puis {@code VALIDATED}.
+ * Flux : création → validation admin + e-mails SFM → ajustement quantités →
+ * réception ({@code RECEIVED}) avec mise à jour du stock. Scopé à l'atelier
+ * courant ({@code X-Atelier-Id}).
  */
 @RestController
 @RequestMapping("/api/order-requests")
@@ -117,7 +118,42 @@ public class OrderRequestController {
     }
 
     /**
-     * Suppression — admin uniquement.
+     * Ajuste les lignes / quantités d'une demande non réceptionnée — admin uniquement.
+     *
+     * @param id identifiant de la demande
+     * @param request nouvelles lignes et message
+     * @param authentication administrateur
+     * @return demande mise à jour
+     */
+    @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<OrderRequestResponse> update(
+            @PathVariable Long id,
+            @Valid @RequestBody OrderRequestDto request,
+            Authentication authentication) {
+        return ResponseEntity.ok(orderRequestService.update(id, request, authentication.getName()));
+    }
+
+    /**
+     * Confirme la réception : statut {@code RECEIVED} + incrément du stock des pièces.
+     * Le corps peut contenir les quantités réellement reçues (ajustement avant réception).
+     *
+     * @param id identifiant de la demande
+     * @param request lignes finales optionnelles
+     * @param authentication administrateur
+     * @return demande réceptionnée
+     */
+    @PostMapping("/{id}/receive")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<OrderRequestResponse> receive(
+            @PathVariable Long id,
+            @RequestBody(required = false) OrderRequestDto request,
+            Authentication authentication) {
+        return ResponseEntity.ok(orderRequestService.receive(id, request, authentication.getName()));
+    }
+
+    /**
+     * Suppression — admin uniquement (interdit si déjà réceptionnée).
      *
      * @param id identifiant de la demande
      * @param authentication administrateur effectuant la suppression

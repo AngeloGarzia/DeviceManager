@@ -48,6 +48,9 @@ export class DeviceStockComponent implements OnInit {
   readonly error = signal<string | null>(null);
   readonly groupMode = signal<StockGroupMode>('sfm');
   readonly collapsed = signal<Record<string, boolean>>({});
+  readonly savingStockIds = signal<Record<number, boolean>>({});
+  /** Stock déjà persisté, pour ne sauvegarder que si la saisie a changé. */
+  private readonly persistedStock = new Map<number, number>();
   query = '';
 
   readonly groups = computed(() => this.buildGroups(this.items(), this.groupMode()));
@@ -76,6 +79,10 @@ export class DeviceStockComponent implements OnInit {
     this.deviceService.list(this.query).subscribe({
       next: (data) => {
         this.items.set(data);
+        this.persistedStock.clear();
+        for (const item of data) {
+          this.persistedStock.set(item.id, item.stock ?? 0);
+        }
         this.loading.set(false);
       },
       error: () => {
@@ -142,6 +149,48 @@ export class DeviceStockComponent implements OnInit {
   /** Relance le chargement si l'API Render est encore endormie. */
   onPhotoError(event: Event): void {
     this.deviceService.retryPhotoOnError(event);
+  }
+
+  /** Indique si la sauvegarde du stock est en cours pour une pièce. */
+  isSavingStock(id: number): boolean {
+    return !!this.savingStockIds()[id];
+  }
+
+  /** Met à jour la quantité affichée pendant la saisie. */
+  onStockDraft(item: Device, value: number | string | null): void {
+    const n = Number(value);
+    item.stock = Number.isFinite(n) ? Math.max(0, Math.trunc(n)) : 0;
+  }
+
+  /** Enregistre la quantité en stock saisie pour une pièce. */
+  saveStock(item: Device): void {
+    const next = Math.max(0, Math.trunc(Number(item.stock) || 0));
+    item.stock = next;
+    const previous = this.persistedStock.get(item.id) ?? 0;
+    if (next === previous || this.isSavingStock(item.id)) {
+      return;
+    }
+    this.savingStockIds.update((map) => ({ ...map, [item.id]: true }));
+    this.deviceService.updateStock(item.id, next).subscribe({
+      next: (updated) => {
+        this.persistedStock.set(item.id, updated.stock);
+        this.items.update((list) =>
+          list.map((d) => (d.id === item.id ? { ...d, stock: updated.stock } : d))
+        );
+        this.savingStockIds.update((map) => {
+          const { [item.id]: _, ...rest } = map;
+          return rest;
+        });
+      },
+      error: () => {
+        item.stock = previous;
+        this.error.set(`Impossible de mettre à jour le stock de « ${item.nom} ».`);
+        this.savingStockIds.update((map) => {
+          const { [item.id]: _, ...rest } = map;
+          return rest;
+        });
+      }
+    });
   }
 
   /** Libellé de marque affiché pour une pièce. */

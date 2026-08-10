@@ -1,5 +1,6 @@
 package com.devicemanager.dto;
 
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -31,6 +32,10 @@ public class DeviceRequest {
 
     @NotNull
     private Boolean obsolete;
+
+    /** Quantité en stock (≥ 0). Défaut 0 si absent. */
+    @Min(0)
+    private Integer stock;
 
     /** Identifiant SFM associé (optionnel). */
     private Long sfmId;
