@@ -11,8 +11,8 @@
 Blueprint : [`render.yaml`](./render.yaml)
 
 > L’API free **s’endort** après ~15 min d’inactivité (1er appel un peu lent).  
-> Un **keep-alive** interne pingue `/actuator/health` toutes les **14 min** via l’URL publique
-> (`RENDER_EXTERNAL_URL`) pour retarder la veille tant que le service tourne déjà.  
+> Le keep-alive interne est **désactivé** par défaut (trop de charge sur le free tier).  
+> Opt-in uniquement : `APP_KEEPALIVE_ENABLED=true` (+ `APP_KEEPALIVE_URL` si besoin).  
 > Les photos sont stockées sur disque éphémère (peuvent disparaître au redéploiement).
 
 ---
