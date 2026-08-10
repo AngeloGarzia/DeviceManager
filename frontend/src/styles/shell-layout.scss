@@ -72,6 +72,12 @@
   padding-top: 0.15rem;
 }
 
+.shell-admin-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+}
+
 /* Même largeur que le bouton « + Nouvelle pièce » des pages pièces. */
 .logout-btn {
   min-width: 11rem !important;
@@ -108,6 +114,10 @@
   margin: 0 auto;
   padding: 0.35rem 0.75rem 5.5rem;
   text-align: center;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.75rem 1.25rem;
 }
 
 @media (min-width: 640px) {
@@ -117,13 +127,20 @@
   }
 }
 
-.shell-footer a {
+.shell-footer a,
+.shell-footer__link {
   color: #7b8794;
   font-size: 0.75rem;
   text-decoration: none;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  font: inherit;
 }
 
-.shell-footer a:hover {
+.shell-footer a:hover,
+.shell-footer__link:hover {
   color: #2f5d7a;
   text-decoration: underline;
 }

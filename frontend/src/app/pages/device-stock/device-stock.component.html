@@ -1,7 +1,7 @@
 <section class="grid gap-4">
   <header class="flex flex-wrap items-start justify-between gap-3">
     <div>
-      <h1 class="page-title">Stock des pièces détachées</h1>
+      <h1 class="page-title" data-tour="page-stock">Stock des pièces détachées</h1>
       <p class="page-subtitle">
         Inventaire regroupable par SFM, marque de MAS, ou les deux
       </p>
@@ -10,6 +10,7 @@
       <button
         mat-stroked-button
         type="button"
+        data-tour="btn-stock-export"
         [matMenuTriggerFor]="exportMenu"
         [disabled]="items().length === 0 || loading()"
       >

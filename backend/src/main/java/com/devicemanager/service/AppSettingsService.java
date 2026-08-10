@@ -52,6 +52,32 @@ public class AppSettingsService {
     public static final String AI_LABEL_EXTRACT_PROMPT = "AI_LABEL_EXTRACT_PROMPT";
     public static final String AI_USAGE_PROMPT = "AI_USAGE_PROMPT";
 
+    /** Catégorie Setup + page publique /confidentialite. */
+    public static final String PRIVACY_CATEGORY = "RGPD / Mentions légales";
+    public static final String PRIVACY_EDITOR_LEGAL = "PRIVACY_EDITOR_LEGAL";
+    public static final String PRIVACY_PUBLICATION_DIRECTOR = "PRIVACY_PUBLICATION_DIRECTOR";
+    public static final String PRIVACY_EDITOR_CONTACT = "PRIVACY_EDITOR_CONTACT";
+    public static final String PRIVACY_HOSTING = "PRIVACY_HOSTING";
+    public static final String PRIVACY_CONTROLLER = "PRIVACY_CONTROLLER";
+    public static final String PRIVACY_PROCESSORS = "PRIVACY_PROCESSORS";
+    public static final String PRIVACY_TRANSFER = "PRIVACY_TRANSFER";
+    public static final String PRIVACY_RIGHTS_EMAIL = "PRIVACY_RIGHTS_EMAIL";
+    public static final String PRIVACY_POSTAL_ADDRESS = "PRIVACY_POSTAL_ADDRESS";
+    public static final String PRIVACY_LAST_UPDATED = "PRIVACY_LAST_UPDATED";
+
+    public static final List<String> PRIVACY_PUBLIC_KEYS = List.of(
+            PRIVACY_EDITOR_LEGAL,
+            PRIVACY_PUBLICATION_DIRECTOR,
+            PRIVACY_EDITOR_CONTACT,
+            PRIVACY_HOSTING,
+            PRIVACY_CONTROLLER,
+            PRIVACY_PROCESSORS,
+            PRIVACY_TRANSFER,
+            PRIVACY_RIGHTS_EMAIL,
+            PRIVACY_POSTAL_ADDRESS,
+            PRIVACY_LAST_UPDATED
+    );
+
     private final AppSettingRepository appSettingRepository;
     private final Map<String, String> cache = new ConcurrentHashMap<>();
 
@@ -139,9 +165,45 @@ public class AppSettingsService {
         ensure(AI_USAGE_PROMPT, AiPromptDefaults.USAGE,
                 "Prompt rédaction usage (placeholders {{nom}}, {{reference}}, …)",
                 "Intelligence artificielle", false);
+        ensurePrivacyDefaults();
         migrateLegacyGeminiModel();
         // Clés API : uniquement batterie .env (GEMINI_API_KEY, OPENAI_API_KEY, …) — pas exposées dans Setup
         reloadCache();
+    }
+
+    private void ensurePrivacyDefaults() {
+        ensure(PRIVACY_EDITOR_LEGAL, "",
+                "Éditeur — raison sociale, forme, capital, RCS, siège", PRIVACY_CATEGORY, false);
+        ensure(PRIVACY_PUBLICATION_DIRECTOR, "",
+                "Directeur de la publication", PRIVACY_CATEGORY, false);
+        ensure(PRIVACY_EDITOR_CONTACT, "",
+                "Contact éditeur (email / téléphone)", PRIVACY_CATEGORY, false);
+        ensure(PRIVACY_HOSTING, "",
+                "Hébergeur(s) — nom et adresse", PRIVACY_CATEGORY, false);
+        ensure(PRIVACY_CONTROLLER, "",
+                "Responsable du traitement", PRIVACY_CATEGORY, false);
+        ensure(PRIVACY_PROCESSORS, "",
+                "Sous-traitants (ex. Render, Aiven, SMTP, fournisseur IA)", PRIVACY_CATEGORY, false);
+        ensure(PRIVACY_TRANSFER, "",
+                "Transferts hors UE — localisation et garanties (CCT, etc.)", PRIVACY_CATEGORY, false);
+        ensure(PRIVACY_RIGHTS_EMAIL, "",
+                "Email DPO / privacy (exercice des droits)", PRIVACY_CATEGORY, false);
+        ensure(PRIVACY_POSTAL_ADDRESS, "",
+                "Adresse postale (contact RGPD)", PRIVACY_CATEGORY, false);
+        ensure(PRIVACY_LAST_UPDATED, "10 août 2026",
+                "Date de dernière mise à jour de la politique", PRIVACY_CATEGORY, false);
+    }
+
+    /**
+     * Valeurs RGPD publiques pour la page /confidentialite (sans authentification).
+     */
+    @Transactional(readOnly = true)
+    public Map<String, String> publicPrivacyValues() {
+        Map<String, String> out = new HashMap<>();
+        for (String key : PRIVACY_PUBLIC_KEYS) {
+            out.put(key, get(key, ""));
+        }
+        return out;
     }
 
     /**

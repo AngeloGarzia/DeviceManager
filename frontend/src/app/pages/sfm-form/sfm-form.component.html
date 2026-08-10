@@ -3,7 +3,7 @@
     <mat-icon>arrow_back</mat-icon> Annuler
   </button>
   <header>
-    <h1 class="page-title">{{ isEdit ? 'Modifier le SFM' : 'Nouveau SFM' }}</h1>
+    <h1 class="page-title" data-tour="page-sfm-form">{{ isEdit ? 'Modifier le SFM' : 'Nouveau SFM' }}</h1>
     <p class="page-subtitle">
       {{
         returnDevice
@@ -74,10 +74,16 @@
             </div>
           }
 
-          <div>
+          <div data-tour="sfm-contacts">
             <div class="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <h2 class="m-0 text-base font-semibold text-ink">Contacts ({{ contacts.length }})</h2>
-              <button mat-stroked-button type="button" class="w-full sm:w-auto" (click)="addContact()">
+              <button
+                mat-stroked-button
+                type="button"
+                class="w-full sm:w-auto"
+                data-tour="sfm-add-contact"
+                (click)="addContact()"
+              >
                 <mat-icon>person_add</mat-icon>
                 Ajouter un contact
               </button>

@@ -27,6 +27,7 @@
     "@angular/platform-browser": "^19.2.0",
     "@angular/platform-browser-dynamic": "^19.2.0",
     "@angular/router": "^19.2.0",
+    "driver.js": "^1.8.0",
     "exceljs": "^4.4.0",
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.8",

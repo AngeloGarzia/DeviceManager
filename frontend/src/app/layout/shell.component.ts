@@ -10,6 +10,7 @@ import { MatMenuModule } from '@angular/material/menu';
 import { AuthService } from '../services/auth.service';
 import { OrderRequestService } from '../services/order-request.service';
 import { AiService } from '../services/ai.service';
+import { AppTourService } from '../services/app-tour.service';
 
 /**
  * Coque principale de l'application après connexion.
@@ -39,6 +40,7 @@ export class ShellComponent implements OnInit {
   readonly orders = inject(OrderRequestService);
   readonly ai = inject(AiService);
   readonly router = inject(Router);
+  private readonly tour = inject(AppTourService);
 
   constructor() {
     effect(() => {
@@ -56,7 +58,16 @@ export class ShellComponent implements OnInit {
     if (this.auth.getToken()) {
       this.orders.refreshPendingCount();
       this.ai.refreshStatus();
+      // Premier login : lance le parcours après rendu du shell
+      window.setTimeout(() => {
+        void this.tour.startTour(false);
+      }, 600);
     }
+  }
+
+  /** Relance le parcours guidé (pied de page). */
+  restartTour(): void {
+    void this.tour.restartTour();
   }
 
   /** Indique si la section « Pièces détachées » est active dans la barre de navigation. */

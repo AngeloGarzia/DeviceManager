@@ -9,255 +9,397 @@
       Informations relatives au traitement des données personnelles dans DeviceManager
       (conformité RGPD). Dernière mise à jour : {{ updatedAt }}.
     </p>
-    <p class="privacy-notice">
-      Les mentions marquées
-      <span class="privacy-placeholder">[À COMPLÉTER]</span>
-      doivent être renseignées et validées par le responsable du traitement / un juriste ou DPO.
-      Cette page constitue un modèle d’information, non un avis juridique.
-    </p>
+    @if (hasIncomplete) {
+      <p class="privacy-notice">
+        Les mentions marquées
+        <span class="privacy-placeholder">[À COMPLÉTER]</span>
+        sont éditables par un administrateur dans
+        <strong>Paramètres → RGPD / Mentions légales</strong>.
+        Cette page constitue une information utilisateurs, non un avis juridique.
+      </p>
+    }
   </header>
 
-  <nav class="panel" aria-label="Sommaire">
-    <ul class="privacy-toc">
-      <li><a href="#mentions">Mentions légales</a></li>
-      <li><a href="#responsable">Responsable</a></li>
-      <li><a href="#finalites">Finalités</a></li>
-      <li><a href="#donnees">Données</a></li>
-      <li><a href="#bases">Bases légales</a></li>
-      <li><a href="#destinataires">Destinataires</a></li>
-      <li><a href="#conservation">Conservation</a></li>
-      <li><a href="#transferts">Transferts</a></li>
-      <li><a href="#droits">Droits</a></li>
-      <li><a href="#securite">Sécurité</a></li>
-      <li><a href="#cookies">Cookies</a></li>
-      <li><a href="#contact">Contact</a></li>
-    </ul>
-  </nav>
+  @if (loading()) {
+    <div class="flex justify-center py-10"><mat-spinner diameter="36"></mat-spinner></div>
+  } @else {
+    @if (error()) {
+      <p class="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">{{ error() }}</p>
+    }
 
-  <article class="panel grid">
-    <section id="mentions" class="privacy-section">
-      <h2>1. Mentions légales</h2>
-      <p>
-        <strong>Éditeur de l’application :</strong>
-        <span class="privacy-placeholder">[À COMPLÉTER — raison sociale, forme juridique, capital, RCS, siège]</span>
-      </p>
-      <p>
-        <strong>Directeur de la publication :</strong>
-        <span class="privacy-placeholder">[À COMPLÉTER]</span>
-      </p>
-      <p>
-        <strong>Contact :</strong>
-        <span class="privacy-placeholder">[À COMPLÉTER — email / téléphone]</span>
-      </p>
-      <p>
-        <strong>Hébergement :</strong>
-        application web et API hébergées notamment via des prestataires cloud
-        (ex. Render pour l’application, base de données MySQL managée type Aiven — à confirmer selon l’environnement déployé).
-        Coordonnées exactes :
-        <span class="privacy-placeholder">[À COMPLÉTER — nom et adresse de l’hébergeur]</span>.
-      </p>
-    </section>
-
-    <section id="responsable" class="privacy-section">
-      <h2>2. Responsable du traitement</h2>
-      <p>
-        Le responsable du traitement des données personnelles collectées via DeviceManager est :
-        <span class="privacy-placeholder">[À COMPLÉTER — entité (ex. société / groupe casino)]</span>.
-      </p>
-      <p>
-        DeviceManager est un outil professionnel destiné à l’inventaire des pièces détachées des machines à sous,
-        à la gestion des SFM / MAS, des comptes utilisateurs et des demandes de commande.
-      </p>
-    </section>
-
-    <section id="finalites" class="privacy-section">
-      <h2>3. Finalités du traitement</h2>
-      <p>Les données sont traitées pour les finalités suivantes :</p>
-      <ul>
-        <li>authentification et gestion des comptes (rôles administrateur / technicien) ;</li>
-        <li>gestion de l’inventaire des pièces détachées (références, usage, photos, statut obsolète) ;</li>
-        <li>rattachement aux ateliers, casinos, machines à sous (MAS) et fournisseurs (SFM) ;</li>
-        <li>gestion des contacts SFM (coordonnées professionnelles) ;</li>
-        <li>création et suivi des demandes de commande par email ;</li>
-        <li>assistance éventuelle via module IA (analyse d’étiquette / chat), lorsque activé ;</li>
-        <li>journalisation technique et sécurité de l’application (logs) ;</li>
-        <li>sélection de l’atelier de travail courant.</li>
+    <nav class="panel" aria-label="Sommaire">
+      <ul class="privacy-toc">
+        <li><a href="#mentions">Mentions légales</a></li>
+        <li><a href="#responsable">Responsable</a></li>
+        <li><a href="#finalites">Finalités &amp; bases légales</a></li>
+        <li><a href="#donnees">Données</a></li>
+        <li><a href="#obligatoire">Caractère obligatoire</a></li>
+        <li><a href="#destinataires">Destinataires</a></li>
+        <li><a href="#conservation">Conservation</a></li>
+        <li><a href="#ia">Module IA</a></li>
+        <li><a href="#transferts">Transferts</a></li>
+        <li><a href="#droits">Droits</a></li>
+        <li><a href="#securite">Sécurité</a></li>
+        <li><a href="#cookies">Cookies</a></li>
+        <li><a href="#contact">Contact</a></li>
       </ul>
-    </section>
+    </nav>
 
-    <section id="donnees" class="privacy-section">
-      <h2>4. Données collectées</h2>
-      <p>Selon l’usage, DeviceManager peut traiter notamment :</p>
-      <ul>
-        <li>
-          <strong>Comptes utilisateurs :</strong> identifiant, mot de passe (hashé), nom, prénom, email,
-          rôle, atelier(s) préféré(s), indicateur de changement de mot de passe obligatoire ;
-        </li>
-        <li>
-          <strong>Contacts SFM / coordonnées :</strong> nom, téléphone, email, et le cas échéant adresse
-          ou autres coordonnées professionnelles rattachées à un atelier ;
-        </li>
-        <li>
-          <strong>Données métier :</strong> fiches pièces (nom, référence, usage, dates, photos),
-          machines à sous, fournisseurs, demandes de commande ;
-        </li>
-        <li>
-          <strong>Données techniques :</strong> jetons d’accès (JWT), cookie de rafraîchissement de session,
-          journaux applicatifs (événements, erreurs), métadonnées de fichiers uploadés.
-        </li>
-      </ul>
-      <p>
-        Les photos concernent principalement des étiquettes / pièces détachées. Il convient d’éviter
-        d’y faire figurer des personnes ou données sensibles non nécessaires.
-      </p>
-    </section>
+    <article class="panel grid">
+      <section id="mentions" class="privacy-section">
+        <h2>1. Mentions légales</h2>
+        <p>
+          <strong>Éditeur de l’application :</strong>
+          <span [class.privacy-placeholder]="display('PRIVACY_EDITOR_LEGAL') === '[À COMPLÉTER]'">
+            {{ display('PRIVACY_EDITOR_LEGAL') }}
+          </span>
+        </p>
+        <p>
+          <strong>Directeur de la publication :</strong>
+          <span [class.privacy-placeholder]="display('PRIVACY_PUBLICATION_DIRECTOR') === '[À COMPLÉTER]'">
+            {{ display('PRIVACY_PUBLICATION_DIRECTOR') }}
+          </span>
+        </p>
+        <p>
+          <strong>Contact :</strong>
+          <span [class.privacy-placeholder]="display('PRIVACY_EDITOR_CONTACT') === '[À COMPLÉTER]'">
+            {{ display('PRIVACY_EDITOR_CONTACT') }}
+          </span>
+        </p>
+        <p>
+          <strong>Hébergement :</strong>
+          <span [class.privacy-placeholder]="display('PRIVACY_HOSTING') === '[À COMPLÉTER]'">
+            {{ display('PRIVACY_HOSTING') }}
+          </span>
+        </p>
+      </section>
 
-    <section id="bases" class="privacy-section">
-      <h2>5. Bases légales</h2>
-      <p>Selon les cas, le traitement repose notamment sur :</p>
-      <ul>
-        <li>
-          l’exécution d’un contrat ou de mesures précontractuelles / obligations liées à l’activité
-          professionnelle (<span class="privacy-placeholder">[À COMPLÉTER — préciser]</span>) ;
-        </li>
-        <li>
-          l’intérêt légitime du responsable à assurer la maintenance, la traçabilité des pièces et
-          la sécurité du système d’information ;
-        </li>
-        <li>
-          le cas échéant, une obligation légale
-          (<span class="privacy-placeholder">[À COMPLÉTER si applicable]</span>).
-        </li>
-      </ul>
-    </section>
+      <section id="responsable" class="privacy-section">
+        <h2>2. Responsable du traitement</h2>
+        <p>
+          Le responsable du traitement des données personnelles collectées via DeviceManager est :
+          <span [class.privacy-placeholder]="display('PRIVACY_CONTROLLER') === '[À COMPLÉTER]'">
+            {{ display('PRIVACY_CONTROLLER') }}
+          </span>.
+        </p>
+        <p>
+          DeviceManager est un outil professionnel destiné à l’inventaire des pièces détachées des machines à sous,
+          à la gestion des SFM / MAS, des comptes utilisateurs et des demandes de commande.
+        </p>
+      </section>
 
-    <section id="destinataires" class="privacy-section">
-      <h2>6. Destinataires et sous-traitants</h2>
-      <p>Les données sont accessibles :</p>
-      <ul>
-        <li>aux utilisateurs habilités (administrateurs et techniciens) selon leur rôle et atelier ;</li>
-        <li>
-          aux sous-traitants techniques nécessaires au fonctionnement du service
-          (hébergement applicatif, base de données, envoi d’emails SMTP le cas échéant,
-          fournisseur d’API d’intelligence artificielle si le module IA est activé) ;
-        </li>
-        <li>
-          à toute autorité lorsque la loi l’exige.
-        </li>
-      </ul>
-      <p>
-        Liste des sous-traitants principaux :
-        <span class="privacy-placeholder">[À COMPLÉTER — ex. Render, Aiven, prestataire mail, Google Gemini]</span>.
-      </p>
-    </section>
+      <section id="finalites" class="privacy-section">
+        <h2>3. Finalités et bases légales (art. 6 RGPD)</h2>
+        <p>
+          Chaque finalité est associée à une base légale précise. Les références ci-dessous renvoient à
+          l’article 6, paragraphe 1, du RGPD.
+        </p>
+        <div class="privacy-table-wrap">
+          <table class="privacy-table">
+            <thead>
+              <tr>
+                <th>Finalité</th>
+                <th>Base légale</th>
+                <th>Justification</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Authentification et gestion des comptes (rôles admin / technicien)</td>
+                <td>Art. 6.1.b</td>
+                <td>
+                  Exécution du contrat de travail / relation professionnelle : fournir l’accès à l’outil
+                  nécessaire à l’exercice des fonctions.
+                </td>
+              </tr>
+              <tr>
+                <td>Gestion de l’inventaire (pièces, photos, stock, obsolescence)</td>
+                <td>Art. 6.1.f</td>
+                <td>
+                  Intérêt légitime du responsable à assurer la maintenance, la traçabilité des pièces
+                  et la continuité opérationnelle des ateliers.
+                </td>
+              </tr>
+              <tr>
+                <td>Rattachement ateliers, casinos, MAS, SFM et contacts professionnels</td>
+                <td>Art. 6.1.f</td>
+                <td>
+                  Intérêt légitime d’organiser le référentiel métier et les flux de commande fournisseurs.
+                </td>
+              </tr>
+              <tr>
+                <td>Demandes de commande et envoi d’e-mails associés</td>
+                <td>Art. 6.1.b / 6.1.f</td>
+                <td>
+                  Mesures liées à l’activité professionnelle (approvisionnement) et intérêt légitime
+                  de traiter les demandes dans le système d’information.
+                </td>
+              </tr>
+              <tr>
+                <td>Journalisation technique (logs) et sécurité du SI</td>
+                <td>Art. 6.1.f</td>
+                <td>
+                  Intérêt légitime de garantir la sécurité, détecter les incidents et assurer la
+                  traçabilité technique — pondéré au regard des droits des personnes.
+                </td>
+              </tr>
+              <tr>
+                <td>Module IA (chat / analyse d’étiquette), lorsqu’il est activé</td>
+                <td>Art. 6.1.f</td>
+                <td>
+                  Intérêt légitime d’assister les utilisateurs dans la saisie et la rédaction ;
+                  aucune décision produisant des effets juridiques n’est prise sur cette seule base
+                  (voir § Module IA).
+                </td>
+              </tr>
+              <tr>
+                <td>Sélection de l’atelier de travail courant</td>
+                <td>Art. 6.1.b / 6.1.f</td>
+                <td>
+                  Nécessaire au fonctionnement du compte dans le périmètre multi-ateliers et à
+                  l’intérêt légitime de cloisonner les données.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
 
-    <section id="conservation" class="privacy-section">
-      <h2>7. Durées de conservation</h2>
-      <ul>
-        <li>
-          Comptes utilisateurs : pendant la durée d’activité du compte, puis
-          <span class="privacy-placeholder">[À COMPLÉTER — ex. 12 mois après désactivation]</span> ;
-        </li>
-        <li>
-          Données métier (pièces, SFM, MAS, commandes) : pendant la durée d’utilité opérationnelle, puis
-          <span class="privacy-placeholder">[À COMPLÉTER]</span> ;
-        </li>
-        <li>
-          Logs techniques :
-          <span class="privacy-placeholder">[À COMPLÉTER — ex. 90 jours]</span> ;
-        </li>
-        <li>
-          Sessions / jetons de rafraîchissement : jusqu’à expiration, déconnexion ou révocation.
-        </li>
-      </ul>
-    </section>
+      <section id="donnees" class="privacy-section">
+        <h2>4. Données collectées</h2>
+        <p>Selon l’usage, DeviceManager peut traiter notamment :</p>
+        <ul>
+          <li>
+            <strong>Comptes utilisateurs :</strong> identifiant, mot de passe (hashé), nom, prénom, email,
+            rôle, atelier(s) préféré(s), indicateur de changement de mot de passe obligatoire ;
+          </li>
+          <li>
+            <strong>Contacts SFM / coordonnées :</strong> nom, téléphone, email, et le cas échéant adresse
+            ou autres coordonnées professionnelles rattachées à un atelier ;
+          </li>
+          <li>
+            <strong>Données métier :</strong> fiches pièces (nom, référence, usage, dates, photos, stock),
+            machines à sous, fournisseurs, demandes de commande ;
+          </li>
+          <li>
+            <strong>Données techniques :</strong> jetons d’accès (JWT), cookie de rafraîchissement de session,
+            journaux applicatifs, métadonnées de fichiers uploadés ;
+          </li>
+          <li>
+            <strong>Module IA (si activé) :</strong> texte des prompts, extraits / images d’étiquettes
+            transmis au prestataire IA pour analyse.
+          </li>
+        </ul>
+        <p>
+          Les photos concernent principalement des étiquettes / pièces détachées. Il convient d’éviter
+          d’y faire figurer des personnes ou données sensibles non nécessaires.
+        </p>
+      </section>
 
-    <section id="transferts" class="privacy-section">
-      <h2>8. Transferts hors Union européenne</h2>
-      <p>
-        Selon la configuration de production, des données peuvent être hébergées ou traitées
-        en dehors de l’Espace économique européen (EEE) par des sous-traitants cloud.
-      </p>
-      <p>
-        Dans ce cas, le responsable du traitement s’assure de l’existence de garanties appropriées
-        (clauses contractuelles types, décisions d’adéquation, etc.) :
-        <span class="privacy-placeholder">[À COMPLÉTER — mécanisme et localisation]</span>.
-      </p>
-    </section>
+      <section id="obligatoire" class="privacy-section">
+        <h2>5. Caractère obligatoire ou facultatif</h2>
+        <p>
+          Lors de la <strong>création d’un compte utilisateur</strong> par un administrateur, les champs
+          suivants sont <strong>obligatoires</strong> :
+        </p>
+        <ul>
+          <li>identifiant (username) ;</li>
+          <li>mot de passe initial ;</li>
+          <li>nom ;</li>
+          <li>prénom ;</li>
+          <li>adresse e-mail.</li>
+        </ul>
+        <p>
+          <strong>Conséquence d’un défaut de fourniture :</strong> le compte ne peut pas être créé ni
+          utilisé ; l’accès à DeviceManager est impossible sans ces informations. Les autres éléments
+          (atelier préféré, etc.) peuvent être renseignés ultérieurement selon les besoins métier.
+        </p>
+        <p>
+          Pour les fiches métier (pièces, SFM, MAS), les champs indiqués comme requis dans les formulaires
+          sont nécessaires à l’enregistrement ; un enregistrement incomplet est refusé par l’application.
+        </p>
+      </section>
 
-    <section id="droits" class="privacy-section">
-      <h2>9. Vos droits</h2>
-      <p>
-        Conformément au RGPD, les personnes concernées disposent des droits suivants,
-        dans les conditions prévues par la loi :
-      </p>
-      <ul>
-        <li>droit d’accès ;</li>
-        <li>droit de rectification ;</li>
-        <li>droit à l’effacement ;</li>
-        <li>droit à la limitation du traitement ;</li>
-        <li>droit d’opposition ;</li>
-        <li>droit à la portabilité, lorsque applicable ;</li>
-        <li>droit d’introduire une réclamation auprès de la CNIL (www.cnil.fr).</li>
-      </ul>
-      <p>
-        Pour exercer ces droits : contacter
-        <span class="privacy-placeholder">[À COMPLÉTER — email privacy / DPO]</span>.
-        Une procédure interne peut être définie pour les demandes des collaborateurs.
-      </p>
-    </section>
+      <section id="destinataires" class="privacy-section">
+        <h2>6. Destinataires et sous-traitants</h2>
+        <p>Les données sont accessibles :</p>
+        <ul>
+          <li>aux utilisateurs habilités (administrateurs et techniciens) selon leur rôle et atelier ;</li>
+          <li>
+            aux sous-traitants techniques nécessaires au fonctionnement du service
+            (hébergement, base de données, messagerie, fournisseur d’API d’intelligence artificielle
+            si le module IA est activé) ;
+          </li>
+          <li>à toute autorité lorsque la loi l’exige.</li>
+        </ul>
+        <p>
+          Liste des sous-traitants principaux :
+          <span [class.privacy-placeholder]="display('PRIVACY_PROCESSORS') === '[À COMPLÉTER]'">
+            {{ display('PRIVACY_PROCESSORS') }}
+          </span>.
+        </p>
+      </section>
 
-    <section id="securite" class="privacy-section">
-      <h2>10. Sécurité</h2>
-      <p>Des mesures techniques et organisationnelles sont mises en œuvre, notamment :</p>
-      <ul>
-        <li>authentification par mot de passe et jetons à durée limitée ;</li>
-        <li>cookie de rafraîchissement HttpOnly ;</li>
-        <li>contrôle d’accès par rôles (administrateur / technicien) et contexte atelier ;</li>
-        <li>communications HTTPS en production ;</li>
-        <li>en-têtes de sécurité HTTP (CSP, etc.) ;</li>
-        <li>stockage des mots de passe sous forme de hash (BCrypt).</li>
-      </ul>
-    </section>
+      <section id="conservation" class="privacy-section">
+        <h2>7. Durées de conservation</h2>
+        <p>
+          Les durées ci-dessous sont alignées sur les recommandations usuelles de la CNIL pour des
+          outils professionnels, sous réserve d’adaptation par le responsable du traitement :
+        </p>
+        <ul>
+          <li>
+            <strong>Comptes utilisateurs :</strong> pendant la durée d’activité du compte, puis
+            <strong>3 ans après désactivation</strong> (ou départ), sauf obligation légale contraire ;
+          </li>
+          <li>
+            <strong>Données métier</strong> (pièces, SFM, MAS, commandes, photos) : pendant la durée
+            d’utilité opérationnelle, puis <strong>5 ans après la dernière utilisation / modification</strong> ;
+          </li>
+          <li>
+            <strong>Logs techniques :</strong> <strong>90 jours</strong>, pouvant être portés jusqu’à
+            <strong>1 an maximum</strong> en cas d’investigation sécurité ou d’exigence documentée ;
+          </li>
+          <li>
+            <strong>Sessions :</strong> jeton d’accès JWT jusqu’à son expiration (typiquement 15 minutes),
+            cookie / jeton de rafraîchissement jusqu’à expiration (typiquement <strong>7 jours</strong>,
+            configurable jusqu’à <strong>30 jours</strong>), déconnexion ou révocation.
+          </li>
+        </ul>
+      </section>
 
-    <section id="cookies" class="privacy-section">
-      <h2>11. Cookies et stockage local</h2>
-      <p>
-        DeviceManager utilise des mécanismes strictement nécessaires au fonctionnement du service :
-      </p>
-      <ul>
-        <li>
-          <strong>Cookie de rafraîchissement de session</strong> (HttpOnly) : maintien de la connexion
-          de manière sécurisée ;
-        </li>
-        <li>
-          <strong>Stockage local du navigateur</strong> : jeton d’accès, informations de session
-          (identité affichée, rôle, atelier sélectionné) pour le bon fonctionnement de l’interface.
-        </li>
-      </ul>
-      <p>
-        Aucun cookie publicitaire ou de mesure d’audience tierce n’est déployé par défaut.
-        Un bandeau de consentement n’est donc pas requis pour ces seuls cookies nécessaires.
-        Si des traceurs non essentiels étaient ajoutés ultérieurement, un mécanisme de consentement
-        serait mis en place.
-      </p>
-    </section>
+      <section id="ia" class="privacy-section">
+        <h2>8. Module d’assistance par intelligence artificielle</h2>
+        <p>
+          Lorsque le module IA est activé dans les paramètres, DeviceManager peut :
+        </p>
+        <ul>
+          <li>
+            analyser une image d’étiquette via un <strong>réseau de neurones</strong> (modèle de vision /
+            reconnaissance de texte) afin d’extraire des informations (nom, référence, marque, texte brut)
+            pour préremplir une fiche pièce ;
+          </li>
+          <li>
+            proposer des réponses textuelles d’aide à la rédaction (chat) à partir du contexte fourni
+            par l’utilisateur.
+          </li>
+        </ul>
+        <p>
+          <strong>Aucune décision automatisée</strong> produisant des effets juridiques à l’égard d’une
+          personne, ou l’affectant de manière significative de façon similaire, n’est prise sur la seule
+          base de ces traitements (art. 22 RGPD). Les suggestions IA sont toujours contrôlées et
+          validées par un utilisateur habilité avant toute action métier (création de fiche, envoi de
+          commande, etc.).
+        </p>
+      </section>
 
-    <section id="contact" class="privacy-section">
-      <h2>12. Contact</h2>
-      <p>
-        Pour toute question relative à la protection des données ou à la présente politique :
-      </p>
-      <ul>
-        <li>
-          Email :
-          <span class="privacy-placeholder">[À COMPLÉTER — ex. dpo&#64;votredomaine.com]</span>
-        </li>
-        <li>
-          Adresse postale :
-          <span class="privacy-placeholder">[À COMPLÉTER]</span>
-        </li>
-      </ul>
-    </section>
-  </article>
+      <section id="transferts" class="privacy-section">
+        <h2>9. Transferts hors Union européenne</h2>
+        <p>
+          Selon la configuration de production, des données peuvent être hébergées ou traitées
+          en dehors de l’Espace économique européen (EEE) par des sous-traitants cloud.
+        </p>
+        <p>
+          Lorsque des prestataires situés hors EEE sont utilisés, le responsable du traitement
+          s’appuie notamment sur les <strong>Clauses Contractuelles Types (CCT)</strong> adoptées par
+          la Commission européenne, complétées le cas échéant par des
+          <strong>mesures additionnelles</strong> (chiffrement des données en transit via HTTPS/TLS,
+          chiffrement au repos chez l’hébergeur, contrôle d’accès, minimisation des données transmises
+          au module IA).
+        </p>
+        <p>
+          Détail de localisation et garanties applicables :
+          <span [class.privacy-placeholder]="display('PRIVACY_TRANSFER') === '[À COMPLÉTER]'">
+            {{ display('PRIVACY_TRANSFER') }}
+          </span>.
+        </p>
+      </section>
+
+      <section id="droits" class="privacy-section">
+        <h2>10. Vos droits</h2>
+        <p>
+          Conformément au RGPD, les personnes concernées disposent des droits suivants,
+          dans les conditions prévues par la loi :
+        </p>
+        <ul>
+          <li>droit d’accès ;</li>
+          <li>droit de rectification ;</li>
+          <li>droit à l’effacement ;</li>
+          <li>droit à la limitation du traitement ;</li>
+          <li>droit d’opposition ;</li>
+          <li>droit à la portabilité, lorsque applicable ;</li>
+          <li>droit d’introduire une réclamation auprès de la CNIL (www.cnil.fr).</li>
+        </ul>
+        <p>
+          Pour exercer ces droits : contacter
+          <span [class.privacy-placeholder]="display('PRIVACY_RIGHTS_EMAIL') === '[À COMPLÉTER]'">
+            {{ display('PRIVACY_RIGHTS_EMAIL') }}
+          </span>.
+          Une procédure interne peut être définie pour les demandes des collaborateurs.
+        </p>
+      </section>
+
+      <section id="securite" class="privacy-section">
+        <h2>11. Sécurité</h2>
+        <p>Des mesures techniques et organisationnelles sont mises en œuvre, notamment :</p>
+        <ul>
+          <li>authentification par mot de passe et jetons à durée limitée ;</li>
+          <li>cookie de rafraîchissement HttpOnly ;</li>
+          <li>contrôle d’accès par rôles (administrateur / technicien) et contexte atelier ;</li>
+          <li>communications HTTPS en production ;</li>
+          <li>en-têtes de sécurité HTTP (CSP, etc.) ;</li>
+          <li>stockage des mots de passe sous forme de hash (BCrypt).</li>
+        </ul>
+      </section>
+
+      <section id="cookies" class="privacy-section">
+        <h2>12. Cookies et stockage local</h2>
+        <p>
+          DeviceManager utilise des mécanismes strictement nécessaires au fonctionnement du service :
+        </p>
+        <ul>
+          <li>
+            <strong>Cookie de rafraîchissement de session</strong> (HttpOnly) : maintien de la connexion
+            de manière sécurisée ;
+          </li>
+          <li>
+            <strong>Stockage local du navigateur</strong> : jeton d’accès, informations de session
+            (identité affichée, rôle, atelier sélectionné, état du tutoriel) pour le bon fonctionnement
+            de l’interface.
+          </li>
+        </ul>
+        <p>
+          Aucun cookie publicitaire ou de mesure d’audience tierce n’est déployé par défaut.
+          Un bandeau de consentement n’est donc pas requis pour ces seuls cookies nécessaires.
+        </p>
+      </section>
+
+      <section id="contact" class="privacy-section">
+        <h2>13. Contact et délai de réponse</h2>
+        <p>
+          Pour toute question relative à la protection des données ou à la présente politique :
+        </p>
+        <ul>
+          <li>
+            Email :
+            <span [class.privacy-placeholder]="display('PRIVACY_RIGHTS_EMAIL') === '[À COMPLÉTER]'">
+              {{ display('PRIVACY_RIGHTS_EMAIL') }}
+            </span>
+          </li>
+          <li>
+            Adresse postale :
+            <span [class.privacy-placeholder]="display('PRIVACY_POSTAL_ADDRESS') === '[À COMPLÉTER]'">
+              {{ display('PRIVACY_POSTAL_ADDRESS') }}
+            </span>
+          </li>
+        </ul>
+        <p>
+          Conformément à l’<strong>article 12 du RGPD</strong>, le responsable du traitement répond
+          aux demandes d’exercice des droits dans un délai d’<strong>un mois</strong> à compter de
+          la réception. Ce délai peut être <strong>prorogé de deux mois</strong> supplémentaires
+          compte tenu de la complexité et du nombre de demandes ; la personne concernée en est alors
+          informée dans le délai d’un mois.
+        </p>
+      </section>
+    </article>
+  }
 </section>

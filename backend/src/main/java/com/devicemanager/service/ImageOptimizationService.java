@@ -33,8 +33,9 @@ import java.util.Iterator;
 @Slf4j
 public class ImageOptimizationService {
 
-    public static final int MAX_DIMENSION = 1200;
-    private static final float JPEG_QUALITY = 0.82f;
+    /** Plus grand côté conservé — compromis stockage / lisibilité étiquette (~900 px). */
+    public static final int MAX_DIMENSION = 900;
+    private static final float JPEG_QUALITY = 0.78f;
 
     /**
      * Redimensionne et compresse une image en JPEG optimisé.

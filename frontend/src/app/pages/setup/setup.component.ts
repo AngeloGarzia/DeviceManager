@@ -33,6 +33,7 @@ import { AtelierService } from '../../services/atelier.service';
 import { AuthService } from '../../services/auth.service';
 import { AiModelOption, AiService } from '../../services/ai.service';
 import { AdminLogEntry, AdminLogService } from '../../services/admin-log.service';
+import { AppTourService } from '../../services/app-tour.service';
 import { ConfirmDialogComponent } from '../../shared/confirm-dialog.component';
 
 /**
@@ -69,6 +70,7 @@ export class SetupComponent implements OnInit {
   readonly aiService = inject(AiService);
   readonly auth = inject(AuthService);
   private readonly fb = inject(FormBuilder);
+  private readonly tour = inject(AppTourService);
 
   /** Tuiles ouvertes (vide = toutes fermées par défaut). */
   private readonly openTiles = signal<Set<string>>(new Set());
@@ -276,6 +278,11 @@ export class SetupComponent implements OnInit {
       }
       return next;
     });
+  }
+
+  /** Relance le parcours guidé multi-pages. */
+  restartTour(): void {
+    void this.tour.restartTour();
   }
 
   reloadLogs(): void {
@@ -522,6 +529,11 @@ export class SetupComponent implements OnInit {
     return key === 'AI_SYSTEM_PROMPT'
       || key === 'AI_LABEL_EXTRACT_PROMPT'
       || key === 'AI_USAGE_PROMPT';
+  }
+
+  /** Champs RGPD / mentions (textarea). */
+  isPrivacySetting(key: string): boolean {
+    return key.startsWith('PRIVACY_');
   }
 
   /** Vérifie si une clé API est configurée pour le fournisseur IA donné. */

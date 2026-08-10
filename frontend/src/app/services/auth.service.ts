@@ -45,6 +45,20 @@ export class AuthService {
     return this.ateliers().find((a) => a.id === id) ?? null;
   });
 
+  /** Ville de l'atelier courant (adresse, sinon nom du casino). */
+  readonly atelierVille = computed(() => {
+    const atelier = this.currentAtelier();
+    if (!atelier) {
+      return null;
+    }
+    const ville = atelier.coordonnees?.adresse?.ville?.trim();
+    if (ville) {
+      return ville;
+    }
+    const casino = atelier.casinoNom?.trim();
+    return casino || null;
+  });
+
   /** Ateliers regroupés par casino pour le sélecteur (structure casino → atelier). */
   readonly ateliersByCasino = computed(() => {
     const groups = new Map<string, AtelierSummary[]>();

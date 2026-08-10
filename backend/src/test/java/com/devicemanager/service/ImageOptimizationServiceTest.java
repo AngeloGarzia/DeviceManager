@@ -22,8 +22,8 @@ class ImageOptimizationServiceTest {
     private final ImageOptimizationService service = new ImageOptimizationService();
 
     @Test
-    void optimize_resizesLargeImageToMax1200() throws Exception {
-        log.info("Test resize image > 1200px");
+    void optimize_resizesLargeImageToMaxDimension() throws Exception {
+        log.info("Test resize image > {}px", ImageOptimizationService.MAX_DIMENSION);
         MockMultipartFile input = imageFile("large.png", 2400, 1800);
 
         MultipartFile optimized = service.optimize(input);
@@ -31,8 +31,8 @@ class ImageOptimizationServiceTest {
 
         assertThat(result.getWidth()).isLessThanOrEqualTo(ImageOptimizationService.MAX_DIMENSION);
         assertThat(result.getHeight()).isLessThanOrEqualTo(ImageOptimizationService.MAX_DIMENSION);
-        assertThat(result.getWidth()).isEqualTo(1200);
-        assertThat(result.getHeight()).isEqualTo(900);
+        assertThat(result.getWidth()).isEqualTo(900);
+        assertThat(result.getHeight()).isEqualTo(675);
         assertThat(optimized.getContentType()).isEqualTo(MediaType.IMAGE_JPEG_VALUE);
         assertThat(optimized.getOriginalFilename()).endsWith(".jpg");
         assertThat(optimized.getSize()).isGreaterThan(0);

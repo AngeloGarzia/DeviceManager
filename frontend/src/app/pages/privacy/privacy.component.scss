@@ -72,3 +72,35 @@
   font-size: 0.875rem;
   line-height: 1.45;
 }
+
+.privacy-table-wrap {
+  overflow-x: auto;
+  margin-top: 0.75rem;
+}
+
+.privacy-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+}
+
+.privacy-table th,
+.privacy-table td {
+  border: 1px solid #d9e2ec;
+  padding: 0.55rem 0.65rem;
+  text-align: left;
+  vertical-align: top;
+  color: #52606d;
+}
+
+.privacy-table th {
+  background: #f1f5f9;
+  color: #1f2933;
+  font-weight: 600;
+}
+
+.privacy-table td:nth-child(2) {
+  white-space: nowrap;
+  font-weight: 600;
+  color: #0b6bcb;
+}

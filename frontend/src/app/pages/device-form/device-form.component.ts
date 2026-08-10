@@ -330,26 +330,30 @@ export class DeviceFormComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private async openCameraStream(deviceId: string | null): Promise<MediaStream> {
+    const aspect = { ideal: 4 / 3 } as const;
     if (deviceId) {
       return navigator.mediaDevices.getUserMedia({
-        video: { deviceId: { exact: deviceId } },
+        video: { deviceId: { exact: deviceId }, aspectRatio: aspect },
         audio: false
       });
     }
 
     try {
       return await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { exact: 'environment' } },
+        video: { facingMode: { exact: 'environment' }, aspectRatio: aspect },
         audio: false
       });
     } catch {
       try {
         return await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: { ideal: 'environment' } },
+          video: { facingMode: { ideal: 'environment' }, aspectRatio: aspect },
           audio: false
         });
       } catch {
-        return navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+        return navigator.mediaDevices.getUserMedia({
+          video: { aspectRatio: aspect },
+          audio: false
+        });
       }
     }
   }
@@ -494,7 +498,7 @@ export class DeviceFormComponent implements OnInit, AfterViewInit, OnDestroy {
     }
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
     const blob = await new Promise<Blob | null>((resolve) =>
-      canvas.toBlob((b) => resolve(b), 'image/jpeg', 0.9)
+      canvas.toBlob((b) => resolve(b), 'image/jpeg', 0.85)
     );
     if (!blob) {
       return null;

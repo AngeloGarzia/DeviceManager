@@ -1,5 +1,6 @@
 @use '@angular/material' as mat;
 @use './styles/shell-layout';
+@import 'driver.js/dist/driver.css';
 
 @tailwind base;
 @tailwind components;
@@ -136,4 +137,36 @@ a.mat-mdc-raised-button {
   min-height: 2.5rem;
   padding-top: 0.4rem !important;
   padding-bottom: 0.4rem !important;
+}
+
+/* Tutoriel UX (driver.js) — aligné brand DeviceManager */
+.driver-popover {
+  max-width: 22rem;
+  border-radius: 0.85rem !important;
+  font-family: 'IBM Plex Sans', 'Segoe UI', sans-serif !important;
+}
+
+.driver-popover-title {
+  font-size: 1rem !important;
+  font-weight: 650 !important;
+  color: #0f172a !important;
+}
+
+.driver-popover-description {
+  font-size: 0.875rem !important;
+  line-height: 1.45 !important;
+  color: #475569 !important;
+}
+
+.driver-popover-next-btn,
+.driver-popover-done-btn {
+  background: #0b6bcb !important;
+  border-color: #0b6bcb !important;
+  color: #fff !important;
+  text-shadow: none !important;
+}
+
+.driver-popover-prev-btn,
+.driver-popover-close-btn {
+  color: #334155 !important;
 }

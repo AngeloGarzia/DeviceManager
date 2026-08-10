@@ -7,9 +7,32 @@
   </header>
 
   <mat-card class="setup-tile !rounded-xl !border !border-line !shadow-soft">
-    <button type="button" class="setup-tile-toggle" (click)="toggleTile('ateliers')" [attr.aria-expanded]="isTileOpen('ateliers')">
+    <mat-card-content class="!py-4">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <div class="min-w-0">
+          <h2 class="m-0 text-base font-semibold text-ink">Tutoriel</h2>
+          <p class="mt-0.5 text-sm text-ink-soft">
+          Relancez le parcours guidé : atelier, SFM/contacts, MAS, pièces, export stock, commandes, IA.
+          </p>
+        </div>
+        <button mat-stroked-button type="button" color="primary" (click)="restartTour()">
+          <mat-icon>school</mat-icon>
+          Relancer le tutoriel
+        </button>
+      </div>
+    </mat-card-content>
+  </mat-card>
+
+  <mat-card class="setup-tile !rounded-xl !border !border-line !shadow-soft" data-tour="setup-ateliers">
+    <button
+      type="button"
+      class="setup-tile-toggle"
+      data-tour="setup-ateliers-toggle"
+      (click)="toggleTile('ateliers')"
+      [attr.aria-expanded]="isTileOpen('ateliers')"
+    >
       <div class="min-w-0 text-left">
-        <h2 class="m-0 text-base font-semibold text-ink">Ateliers</h2>
+        <h2 class="m-0 text-base font-semibold text-ink">Atelier par Casino</h2>
         <p class="mt-0.5 text-sm text-ink-soft">
           Une tuile par casino — ateliers et paramètres en popup.
         </p>
@@ -19,7 +42,13 @@
     @if (isTileOpen('ateliers')) {
       <mat-card-content class="!pt-0">
         <div class="mb-4 flex flex-wrap justify-end gap-2">
-          <button mat-stroked-button type="button" color="primary" (click)="openCasinoDialog()">
+          <button
+            mat-stroked-button
+            type="button"
+            color="primary"
+            data-tour="setup-manage-casinos"
+            (click)="openCasinoDialog()"
+          >
             <mat-icon>apartment</mat-icon>
             Gérer les casinos
           </button>
@@ -48,6 +77,7 @@
                 <button
                   type="button"
                   class="setup-tile-toggle"
+                  data-tour="setup-casino-toggle"
                   (click)="toggleTile(casinoAtelierTileId(group.casino.id))"
                   [attr.aria-expanded]="isTileOpen(casinoAtelierTileId(group.casino.id))"
                 >
@@ -66,6 +96,7 @@
                         mat-stroked-button
                         type="button"
                         color="primary"
+                        data-tour="setup-new-atelier"
                         (click)="startCreateAtelier(group.casino.id)"
                       >
                         <mat-icon>add</mat-icon>
@@ -485,16 +516,19 @@
                         </mat-hint>
                       </mat-form-field>
                     </div>
-                  } @else if (isAiPromptSetting(item.key)) {
+                  } @else if (isAiPromptSetting(item.key) || isPrivacySetting(item.key)) {
                     <mat-form-field appearance="outline" class="sm:col-span-2">
                       <mat-label>{{ item.label }}</mat-label>
                       <textarea
                         matInput
-                        rows="8"
+                        [rows]="isPrivacySetting(item.key) ? 3 : 8"
                         [formControl]="control(item.key)"
-                        class="!font-mono !text-xs"
+                        [class.!font-mono]="isAiPromptSetting(item.key)"
+                        [class.!text-xs]="isAiPromptSetting(item.key)"
                       ></textarea>
-                      @if (item.key === 'AI_USAGE_PROMPT') {
+                      @if (isPrivacySetting(item.key)) {
+                        <mat-hint>Affiché sur la page publique /confidentialite (laisser vide = « À COMPLÉTER »).</mat-hint>
+                      } @else if (item.key === 'AI_USAGE_PROMPT') {
                         <mat-hint>
                           Placeholders entre doubles accolades : nom, reference, marque, rawText, notes, webContext.
                         </mat-hint>
