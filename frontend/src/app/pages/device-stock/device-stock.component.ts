@@ -178,7 +178,8 @@ export class DeviceStockComponent implements OnInit {
           list.map((d) => (d.id === item.id ? { ...d, stock: updated.stock } : d))
         );
         this.savingStockIds.update((map) => {
-          const { [item.id]: _, ...rest } = map;
+          const rest = { ...map };
+          delete rest[item.id];
           return rest;
         });
       },
@@ -186,7 +187,8 @@ export class DeviceStockComponent implements OnInit {
         item.stock = previous;
         this.error.set(`Impossible de mettre à jour le stock de « ${item.nom} ».`);
         this.savingStockIds.update((map) => {
-          const { [item.id]: _, ...rest } = map;
+          const rest = { ...map };
+          delete rest[item.id];
           return rest;
         });
       }
