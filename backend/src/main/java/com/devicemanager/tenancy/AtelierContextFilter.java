@@ -87,7 +87,10 @@ public class AtelierContextFilter extends OncePerRequestFilter {
         } catch (ResponseStatusException ex) {
             response.setStatus(ex.getStatusCode().value());
             response.setContentType("application/json");
-            String reason = ex.getReason() == null ? "Impossible d'accéder à cet atelier." : ex.getReason();
+            String reason = ex.getReason();
+            if (reason == null || reason.isBlank()) {
+                reason = "Impossible d'accéder à cet atelier.";
+            }
             response.getWriter().write("{\"message\":\"" + reason.replace("\"", "\\\"") + "\"}");
         } catch (NumberFormatException ex) {
             response.setStatus(HttpStatus.BAD_REQUEST.value());
