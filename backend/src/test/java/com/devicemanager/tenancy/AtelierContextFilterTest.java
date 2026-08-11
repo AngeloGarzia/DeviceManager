@@ -121,7 +121,7 @@ class AtelierContextFilterTest {
         filter.doFilter(request, response, filterChain);
 
         assertThat(response.getStatus()).isEqualTo(400);
-        assertThat(response.getContentAsString()).contains("Identifiant atelier invalide");
+        assertThat(response.getContentAsString()).contains("Atelier sélectionné invalide");
         verify(filterChain, never()).doFilter(any(), any());
     }
 
