@@ -1,0 +1,480 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DeviceService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">device-manager</a> &gt; <a href="index.source.html" class="el_package">com.devicemanager.service</a> &gt; <span class="el_source">DeviceService.java</span></div><h1>DeviceService.java</h1><pre class="source lang-java linenums">package com.devicemanager.service;
+
+import com.devicemanager.dto.DevicePhotoResponse;
+import com.devicemanager.dto.DeviceRequest;
+import com.devicemanager.dto.DeviceResponse;
+import com.devicemanager.entity.Device;
+import com.devicemanager.entity.DevicePhoto;
+import com.devicemanager.entity.MarqueMas;
+import com.devicemanager.entity.Mas;
+import com.devicemanager.entity.Sfm;
+import com.devicemanager.repository.DeviceRepository;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.hibernate.Hibernate;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.server.ResponseStatusException;
+
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+/**
+ * Service métier du catalogue de pièces détachées (devices).
+ * &lt;p&gt;
+ * CRUD, recherche multi-termes, photos et liens MAS/SFM, scopé strictement
+ * à l'atelier courant ({@code X-Atelier-Id}).
+ */
+@Service
+@RequiredArgsConstructor
+@Transactional
+<span class="fc" id="L38">@Slf4j</span>
+public class DeviceService {
+
+    public static final int MAX_PHOTOS = 5;
+
+    private final DeviceRepository deviceRepository;
+    private final SfmService sfmService;
+    private final MasService masService;
+    private final StorageService storageService;
+    private final ImageOptimizationService imageOptimizationService;
+    private final AtelierService atelierService;
+
+    /**
+     * Liste ou recherche les pièces de l'atelier courant.
+     *
+     * @param q termes de recherche optionnels (tous les mots doivent correspondre)
+     * @return fiches pièces avec photos
+     * @throws org.springframework.web.server.ResponseStatusException {@code 400} si atelier non sélectionné
+     */
+    @Transactional(readOnly = true)
+    public List&lt;DeviceResponse&gt; findAll(String q) {
+<span class="fc" id="L59">        Long atelierId = atelierService.requireCurrentAtelier().getId();</span>
+        List&lt;Device&gt; list;
+<span class="pc bpc" id="L61" title="1 of 4 branches missed.">        if (q == null || q.isBlank()) {</span>
+<span class="fc" id="L62">            list = deviceRepository.findAllWithRelations(atelierId);</span>
+        } else {
+<span class="fc" id="L64">            String[] tokens = java.util.Arrays.stream(q.trim().split(&quot;\\s+&quot;))</span>
+<span class="fc" id="L65">                    .map(String::trim)</span>
+<span class="pc bpc" id="L66" title="1 of 2 branches missed.">                    .filter(t -&gt; !t.isEmpty())</span>
+<span class="fc" id="L67">                    .toArray(String[]::new);</span>
+<span class="fc" id="L68">            list = deviceRepository.search(atelierId, tokens[0]);</span>
+<span class="fc bfc" id="L69" title="All 2 branches covered.">            if (tokens.length &gt; 1) {</span>
+<span class="fc" id="L70">                list = list.stream()</span>
+<span class="fc" id="L71">                        .filter(d -&gt; matchesAllSearchTokens(d, tokens))</span>
+<span class="fc" id="L72">                        .toList();</span>
+            }
+        }
+<span class="fc" id="L75">        list.forEach(d -&gt; Hibernate.initialize(d.getPhotos()));</span>
+<span class="fc" id="L76">        return list.stream().map(this::toResponse).toList();</span>
+    }
+
+    /** Chaque mot doit apparaître dans nom / référence / usage / SFM / MAS / marque. */
+    private boolean matchesAllSearchTokens(Device d, String[] tokens) {
+<span class="fc" id="L81">        String haystack = String.join(&quot; &quot;,</span>
+<span class="fc" id="L82">                nullToEmpty(d.getNom()),</span>
+<span class="fc" id="L83">                nullToEmpty(d.getReference()),</span>
+<span class="fc" id="L84">                nullToEmpty(d.getUsage()),</span>
+<span class="pc bpc" id="L85" title="1 of 2 branches missed.">                d.getSfm() != null ? nullToEmpty(d.getSfm().getNom()) : &quot;&quot;,</span>
+<span class="pc bpc" id="L86" title="1 of 2 branches missed.">                d.getMas() != null ? nullToEmpty(d.getMas().getNumero()) : &quot;&quot;,</span>
+<span class="pc bpc" id="L87" title="1 of 2 branches missed.">                d.getMarque() != null ? nullToEmpty(d.getMarque().getLabel()) : &quot;&quot;,</span>
+<span class="pc bpc" id="L88" title="1 of 2 branches missed.">                d.getMarque() != null ? nullToEmpty(d.getMarque().getCode()) : &quot;&quot;,</span>
+<span class="pc bpc" id="L89" title="2 of 4 branches missed.">                d.getMas() != null &amp;&amp; d.getMas().getMarque() != null</span>
+<span class="pc" id="L90">                        ? nullToEmpty(d.getMas().getMarque().getLabel()) : &quot;&quot;,</span>
+<span class="pc bpc" id="L91" title="2 of 4 branches missed.">                d.getMas() != null &amp;&amp; d.getMas().getMarque() != null</span>
+<span class="pc" id="L92">                        ? nullToEmpty(d.getMas().getMarque().getCode()) : &quot;&quot;</span>
+<span class="fc" id="L93">        ).toLowerCase();</span>
+<span class="fc bfc" id="L94" title="All 2 branches covered.">        for (String token : tokens) {</span>
+<span class="fc bfc" id="L95" title="All 2 branches covered.">            if (!haystack.contains(token.toLowerCase())) {</span>
+<span class="fc" id="L96">                return false;</span>
+            }
+        }
+<span class="fc" id="L99">        return true;</span>
+    }
+
+    private static String nullToEmpty(String value) {
+<span class="pc bpc" id="L103" title="1 of 2 branches missed.">        return value == null ? &quot;&quot; : value;</span>
+    }
+
+    /**
+     * Retourne une pièce par identifiant dans l'atelier courant.
+     *
+     * @param id identifiant de la pièce
+     * @return fiche complète
+     * @throws org.springframework.web.server.ResponseStatusException {@code 404} si introuvable
+     */
+    @Transactional(readOnly = true)
+    public DeviceResponse findById(Long id) {
+<span class="fc" id="L115">        return toResponse(getEntity(id));</span>
+    }
+
+    /**
+     * Crée une pièce avec photos dans l'atelier courant.
+     *
+     * @param request métadonnées (nom, usage, MAS/SFM, etc.)
+     * @param photos images (1 à {@link #MAX_PHOTOS})
+     * @return pièce persistée
+     * @throws org.springframework.web.server.ResponseStatusException {@code 400} si validation échoue ;
+     *         {@code 409} en cas de doublon nom/référence
+     */
+    public DeviceResponse create(DeviceRequest request, List&lt;MultipartFile&gt; photos) {
+<span class="fc" id="L128">        List&lt;MultipartFile&gt; files = normalizeFiles(photos);</span>
+<span class="fc" id="L129">        ensurePhotoCount(files.size(), true);</span>
+<span class="fc" id="L130">        files.forEach(this::validateImageFile);</span>
+
+<span class="fc" id="L132">        var atelier = atelierService.requireCurrentAtelier();</span>
+<span class="fc" id="L133">        String nom = request.getNom().trim();</span>
+<span class="fc" id="L134">        String reference = normalizeOptionalText(request.getReference());</span>
+<span class="fc" id="L135">        ensureUniqueNom(nom, atelier.getId(), null);</span>
+<span class="fc" id="L136">        ensureUniqueReference(reference, atelier.getId(), null);</span>
+<span class="fc" id="L137">        Sfm sfm = resolveOptionalSfm(request.getSfmId());</span>
+<span class="fc" id="L138">        Mas mas = resolveOptionalMas(request.getMasId());</span>
+<span class="pc bpc" id="L139" title="1 of 4 branches missed.">        if (sfm != null &amp;&amp; mas != null) {</span>
+<span class="fc" id="L140">            ensureSfmCoversMas(sfm, mas);</span>
+        }
+<span class="fc bfc" id="L142" title="All 2 branches covered.">        MarqueMas marque = mas != null ? inheritMarqueFromMas(mas) : null;</span>
+
+<span class="fc" id="L144">        Device entity = Device.builder()</span>
+<span class="fc" id="L145">                .nom(nom)</span>
+<span class="fc" id="L146">                .reference(reference)</span>
+<span class="fc" id="L147">                .usage(request.getUsage().trim())</span>
+<span class="fc" id="L148">                .dateAcquisition(request.getDateAcquisition())</span>
+<span class="fc" id="L149">                .obsolete(Boolean.TRUE.equals(request.getObsolete()))</span>
+<span class="fc" id="L150">                .stock(normalizeStock(request.getStock()))</span>
+<span class="fc" id="L151">                .photos(new ArrayList&lt;&gt;())</span>
+<span class="fc" id="L152">                .sfm(sfm)</span>
+<span class="fc" id="L153">                .mas(mas)</span>
+<span class="fc" id="L154">                .marque(marque)</span>
+<span class="fc" id="L155">                .atelier(atelier)</span>
+<span class="fc" id="L156">                .build();</span>
+
+<span class="fc" id="L158">        addNewPhotos(entity, files);</span>
+<span class="fc" id="L159">        syncPrimaryPhoto(entity);</span>
+
+<span class="fc" id="L161">        Device saved = deviceRepository.save(entity);</span>
+<span class="fc" id="L162">        log.info(&quot;Création en base — Pièce id={} nom={} référence={} photos={} atelier={}&quot;,</span>
+<span class="fc" id="L163">                saved.getId(), saved.getNom(), saved.getReference(), saved.getPhotos().size(), atelier.getId());</span>
+<span class="fc" id="L164">        return toResponse(saved);</span>
+    }
+
+    /**
+     * Met à jour uniquement la quantité en stock d'une pièce.
+     *
+     * @param id identifiant de la pièce
+     * @param stock quantité (≥ 0)
+     * @return pièce mise à jour
+     * @throws org.springframework.web.server.ResponseStatusException {@code 404} si introuvable
+     */
+    public DeviceResponse updateStock(Long id, Integer stock) {
+<span class="nc" id="L176">        Device entity = getEntity(id);</span>
+<span class="nc" id="L177">        entity.setStock(normalizeStock(stock));</span>
+<span class="nc" id="L178">        Device saved = deviceRepository.save(entity);</span>
+<span class="nc" id="L179">        log.info(&quot;Mise à jour stock — Pièce id={} stock={}&quot;, saved.getId(), saved.getStock());</span>
+<span class="nc" id="L180">        return toResponse(saved);</span>
+    }
+
+    /**
+     * Met à jour une pièce et remplace éventuellement ses photos.
+     *
+     * @param id identifiant de la pièce
+     * @param request métadonnées mises à jour (incluant {@code keepPhotoIds})
+     * @param photos nouvelles images à ajouter
+     * @return pièce modifiée
+     * @throws org.springframework.web.server.ResponseStatusException {@code 404} si introuvable ;
+     *         {@code 409} en cas de conflit nom/référence
+     */
+    public DeviceResponse update(Long id, DeviceRequest request, List&lt;MultipartFile&gt; photos) {
+<span class="nc" id="L194">        Device entity = getEntity(id);</span>
+<span class="nc" id="L195">        String nom = request.getNom().trim();</span>
+<span class="nc" id="L196">        String reference = normalizeOptionalText(request.getReference());</span>
+<span class="nc" id="L197">        ensureUniqueNom(nom, entity.getAtelier().getId(), entity.getId());</span>
+<span class="nc" id="L198">        ensureUniqueReference(reference, entity.getAtelier().getId(), entity.getId());</span>
+<span class="nc" id="L199">        entity.setNom(nom);</span>
+<span class="nc" id="L200">        entity.setReference(reference);</span>
+<span class="nc" id="L201">        entity.setUsage(request.getUsage().trim());</span>
+<span class="nc" id="L202">        entity.setDateAcquisition(request.getDateAcquisition());</span>
+<span class="nc" id="L203">        entity.setObsolete(Boolean.TRUE.equals(request.getObsolete()));</span>
+<span class="nc" id="L204">        entity.setStock(normalizeStock(request.getStock()));</span>
+<span class="nc" id="L205">        Sfm sfm = resolveOptionalSfm(request.getSfmId());</span>
+<span class="nc" id="L206">        Mas mas = resolveOptionalMas(request.getMasId());</span>
+<span class="nc bnc" id="L207" title="All 4 branches missed.">        if (sfm != null &amp;&amp; mas != null) {</span>
+<span class="nc" id="L208">            ensureSfmCoversMas(sfm, mas);</span>
+        }
+<span class="nc" id="L210">        entity.setSfm(sfm);</span>
+<span class="nc" id="L211">        entity.setMas(mas);</span>
+<span class="nc bnc" id="L212" title="All 2 branches missed.">        entity.setMarque(mas != null ? inheritMarqueFromMas(mas) : null);</span>
+
+<span class="nc" id="L214">        List&lt;MultipartFile&gt; newFiles = normalizeFiles(photos);</span>
+<span class="nc" id="L215">        newFiles.forEach(this::validateImageFile);</span>
+
+<span class="nc bnc" id="L217" title="All 2 branches missed.">        List&lt;Long&gt; keepOrder = request.getKeepPhotoIds() == null</span>
+<span class="nc" id="L218">                ? List.of()</span>
+<span class="nc" id="L219">                : request.getKeepPhotoIds().stream().filter(Objects::nonNull).toList();</span>
+<span class="nc" id="L220">        Set&lt;Long&gt; keepIds = new HashSet&lt;&gt;(keepOrder);</span>
+
+<span class="nc" id="L222">        Map&lt;Long, DevicePhoto&gt; byId = entity.getPhotos().stream()</span>
+<span class="nc bnc" id="L223" title="All 2 branches missed.">                .filter(p -&gt; p.getId() != null)</span>
+<span class="nc" id="L224">                .collect(Collectors.toMap(DevicePhoto::getId, p -&gt; p, (a, b) -&gt; a));</span>
+
+<span class="nc" id="L226">        List&lt;DevicePhoto&gt; kept = new ArrayList&lt;&gt;();</span>
+<span class="nc bnc" id="L227" title="All 2 branches missed.">        for (Long keepId : keepOrder) {</span>
+<span class="nc" id="L228">            DevicePhoto photo = byId.get(keepId);</span>
+<span class="nc bnc" id="L229" title="All 2 branches missed.">            if (photo != null) {</span>
+<span class="nc" id="L230">                kept.add(photo);</span>
+            }
+<span class="nc" id="L232">        }</span>
+
+<span class="nc" id="L234">        int total = kept.size() + newFiles.size();</span>
+<span class="nc" id="L235">        ensurePhotoCount(total, true);</span>
+
+<span class="nc bnc" id="L237" title="All 2 branches missed.">        for (DevicePhoto photo : List.copyOf(entity.getPhotos())) {</span>
+<span class="nc bnc" id="L238" title="All 2 branches missed.">            if (!keepIds.contains(photo.getId())) {</span>
+<span class="nc bnc" id="L239" title="All 2 branches missed.">                if (photo.getPhotoKey() != null) {</span>
+<span class="nc" id="L240">                    storageService.delete(photo.getPhotoKey());</span>
+                }
+<span class="nc" id="L242">                entity.getPhotos().remove(photo);</span>
+            }
+<span class="nc" id="L244">        }</span>
+
+<span class="nc" id="L246">        entity.getPhotos().clear();</span>
+<span class="nc" id="L247">        int position = 0;</span>
+<span class="nc bnc" id="L248" title="All 2 branches missed.">        for (DevicePhoto photo : kept) {</span>
+<span class="nc" id="L249">            photo.setPosition(position++);</span>
+<span class="nc" id="L250">            photo.setDevice(entity);</span>
+<span class="nc" id="L251">            entity.getPhotos().add(photo);</span>
+<span class="nc" id="L252">        }</span>
+<span class="nc" id="L253">        addNewPhotos(entity, newFiles);</span>
+<span class="nc" id="L254">        syncPrimaryPhoto(entity);</span>
+
+<span class="nc" id="L256">        Device saved = deviceRepository.save(entity);</span>
+<span class="nc" id="L257">        log.info(&quot;Modification en base — Pièce id={} nom={} référence={} photos={} atelier={}&quot;,</span>
+<span class="nc" id="L258">                saved.getId(),</span>
+<span class="nc" id="L259">                saved.getNom(),</span>
+<span class="nc" id="L260">                saved.getReference(),</span>
+<span class="nc" id="L261">                saved.getPhotos().size(),</span>
+<span class="nc bnc" id="L262" title="All 2 branches missed.">                saved.getAtelier() != null ? saved.getAtelier().getId() : null);</span>
+<span class="nc" id="L263">        return toResponse(saved);</span>
+    }
+
+    /**
+     * Supprime une pièce et les fichiers stockés associés.
+     *
+     * @param id identifiant de la pièce
+     * @throws org.springframework.web.server.ResponseStatusException {@code 404} si introuvable
+     */
+    public void delete(Long id) {
+<span class="fc" id="L273">        Device entity = getEntity(id);</span>
+<span class="pc bpc" id="L274" title="1 of 2 branches missed.">        Long atelierId = entity.getAtelier() != null ? entity.getAtelier().getId() : null;</span>
+<span class="fc" id="L275">        String nom = entity.getNom();</span>
+<span class="fc" id="L276">        String reference = entity.getReference();</span>
+<span class="fc bfc" id="L277" title="All 2 branches covered.">        for (DevicePhoto photo : entity.getPhotos()) {</span>
+<span class="pc bpc" id="L278" title="1 of 2 branches missed.">            if (photo.getPhotoKey() != null) {</span>
+<span class="fc" id="L279">                storageService.delete(photo.getPhotoKey());</span>
+            }
+<span class="fc" id="L281">        }</span>
+<span class="pc bpc" id="L282" title="1 of 2 branches missed.">        if (entity.getPhotoKey() != null</span>
+<span class="pc bpc" id="L283" title="1 of 2 branches missed.">                &amp;&amp; entity.getPhotos().stream().noneMatch(p -&gt; Objects.equals(p.getPhotoKey(), entity.getPhotoKey()))) {</span>
+<span class="nc" id="L284">            storageService.delete(entity.getPhotoKey());</span>
+        }
+<span class="fc" id="L286">        deviceRepository.delete(entity);</span>
+<span class="fc" id="L287">        log.info(&quot;Suppression en base — Pièce id={} nom={} référence={} atelier={}&quot;,</span>
+                id, nom, reference, atelierId);
+<span class="fc" id="L289">    }</span>
+
+    private void addNewPhotos(Device entity, List&lt;MultipartFile&gt; files) {
+<span class="fc" id="L292">        int position = entity.getPhotos().size();</span>
+<span class="fc bfc" id="L293" title="All 2 branches covered.">        for (MultipartFile file : files) {</span>
+<span class="fc" id="L294">            MultipartFile optimized = imageOptimizationService.optimize(file);</span>
+<span class="fc" id="L295">            StorageService.StoredObject stored = storageService.store(optimized);</span>
+<span class="fc" id="L296">            DevicePhoto photo = DevicePhoto.builder()</span>
+<span class="fc" id="L297">                    .device(entity)</span>
+<span class="fc" id="L298">                    .photoKey(stored.key())</span>
+<span class="fc" id="L299">                    .photoUrl(stored.url())</span>
+<span class="fc" id="L300">                    .contentType(stored.contentType())</span>
+<span class="fc" id="L301">                    .fileSize(stored.size())</span>
+<span class="fc" id="L302">                    .position(position++)</span>
+<span class="fc" id="L303">                    .build();</span>
+<span class="fc" id="L304">            entity.getPhotos().add(photo);</span>
+<span class="fc" id="L305">        }</span>
+<span class="fc" id="L306">    }</span>
+
+    private void syncPrimaryPhoto(Device entity) {
+<span class="pc bpc" id="L309" title="2 of 4 branches missed.">        if (entity.getPhotos() == null || entity.getPhotos().isEmpty()) {</span>
+<span class="nc" id="L310">            entity.setPhotoKey(null);</span>
+<span class="nc" id="L311">            entity.setPhotoUrl(null);</span>
+<span class="nc" id="L312">            entity.setContentType(null);</span>
+<span class="nc" id="L313">            entity.setFileSize(null);</span>
+<span class="nc" id="L314">            return;</span>
+        }
+<span class="fc" id="L316">        DevicePhoto first = entity.getPhotos().getFirst();</span>
+<span class="fc" id="L317">        entity.setPhotoKey(first.getPhotoKey());</span>
+<span class="fc" id="L318">        entity.setPhotoUrl(first.getPhotoUrl());</span>
+<span class="fc" id="L319">        entity.setContentType(first.getContentType());</span>
+<span class="fc" id="L320">        entity.setFileSize(first.getFileSize());</span>
+<span class="fc" id="L321">    }</span>
+
+    private List&lt;MultipartFile&gt; normalizeFiles(List&lt;MultipartFile&gt; photos) {
+<span class="pc bpc" id="L324" title="1 of 2 branches missed.">        if (photos == null) {</span>
+<span class="nc" id="L325">            return List.of();</span>
+        }
+<span class="fc" id="L327">        return photos.stream()</span>
+<span class="fc" id="L328">                .filter(Objects::nonNull)</span>
+<span class="pc bpc" id="L329" title="1 of 2 branches missed.">                .filter(f -&gt; !f.isEmpty())</span>
+<span class="fc" id="L330">                .toList();</span>
+    }
+
+    private void ensurePhotoCount(int count, boolean requireAtLeastOne) {
+<span class="pc bpc" id="L334" title="1 of 4 branches missed.">        if (requireAtLeastOne &amp;&amp; count &lt; 1) {</span>
+<span class="fc" id="L335">            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, &quot;Ajoutez au moins une photo de la pièce&quot;);</span>
+        }
+<span class="fc bfc" id="L337" title="All 2 branches covered.">        if (count &gt; MAX_PHOTOS) {</span>
+<span class="fc" id="L338">            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,</span>
+                    &quot;Maximum &quot; + MAX_PHOTOS + &quot; photos par pièce détachée&quot;);
+        }
+<span class="fc" id="L341">    }</span>
+
+    private void validateImageFile(MultipartFile photo) {
+<span class="fc" id="L344">        String contentType = photo.getContentType();</span>
+<span class="pc bpc" id="L345" title="1 of 4 branches missed.">        if (contentType == null || !contentType.startsWith(&quot;image/&quot;)) {</span>
+<span class="fc" id="L346">            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, &quot;Le fichier doit être une photo (JPEG, PNG…)&quot;);</span>
+        }
+<span class="fc" id="L348">    }</span>
+
+    private Device getEntity(Long id) {
+<span class="fc" id="L351">        Long atelierId = atelierService.requireCurrentAtelier().getId();</span>
+<span class="fc" id="L352">        Device entity = deviceRepository.findByIdWithRelations(id, atelierId)</span>
+<span class="fc" id="L353">                .orElseThrow(() -&gt; new ResponseStatusException(HttpStatus.NOT_FOUND, &quot;Pièce détachée introuvable&quot;));</span>
+<span class="fc" id="L354">        Hibernate.initialize(entity.getPhotos());</span>
+<span class="fc" id="L355">        return entity;</span>
+    }
+
+    private void ensureUniqueNom(String nom, Long atelierId, Long excludeId) {
+<span class="pc bpc" id="L359" title="1 of 2 branches missed.">        boolean exists = excludeId == null</span>
+<span class="fc" id="L360">                ? deviceRepository.existsByNomIgnoreCaseAndAtelierId(nom, atelierId)</span>
+<span class="pc" id="L361">                : deviceRepository.existsByNomIgnoreCaseAndAtelierIdAndIdNot(nom, atelierId, excludeId);</span>
+<span class="fc bfc" id="L362" title="All 2 branches covered.">        if (exists) {</span>
+<span class="fc" id="L363">            throw new ResponseStatusException(HttpStatus.CONFLICT, &quot;Nom de pièce déjà utilisé dans cet atelier&quot;);</span>
+        }
+<span class="fc" id="L365">    }</span>
+
+    private void ensureUniqueReference(String reference, Long atelierId, Long excludeId) {
+<span class="pc bpc" id="L368" title="1 of 4 branches missed.">        if (reference == null || reference.isBlank()) {</span>
+<span class="fc" id="L369">            return;</span>
+        }
+<span class="pc bpc" id="L371" title="1 of 2 branches missed.">        boolean exists = excludeId == null</span>
+<span class="fc" id="L372">                ? deviceRepository.existsByReferenceIgnoreCaseAndAtelierId(reference, atelierId)</span>
+<span class="pc" id="L373">                : deviceRepository.existsByReferenceIgnoreCaseAndAtelierIdAndIdNot(reference, atelierId, excludeId);</span>
+<span class="fc bfc" id="L374" title="All 2 branches covered.">        if (exists) {</span>
+<span class="fc" id="L375">            throw new ResponseStatusException(HttpStatus.CONFLICT, &quot;Référence déjà utilisée dans cet atelier&quot;);</span>
+        }
+<span class="fc" id="L377">    }</span>
+
+    private String normalizeOptionalText(String value) {
+<span class="fc bfc" id="L380" title="All 2 branches covered.">        if (value == null) {</span>
+<span class="fc" id="L381">            return null;</span>
+        }
+<span class="fc" id="L383">        String trimmed = value.trim();</span>
+<span class="pc bpc" id="L384" title="1 of 2 branches missed.">        return trimmed.isEmpty() ? null : trimmed;</span>
+    }
+
+    private Sfm resolveOptionalSfm(Long sfmId) {
+<span class="fc bfc" id="L388" title="All 2 branches covered.">        if (sfmId == null) {</span>
+<span class="fc" id="L389">            return null;</span>
+        }
+<span class="fc" id="L391">        return sfmService.getEntity(sfmId);</span>
+    }
+
+    private Mas resolveOptionalMas(Long masId) {
+<span class="fc bfc" id="L395" title="All 2 branches covered.">        if (masId == null) {</span>
+<span class="fc" id="L396">            return null;</span>
+        }
+<span class="fc" id="L398">        return masService.getEntity(masId);</span>
+    }
+
+    private MarqueMas inheritMarqueFromMas(Mas mas) {
+<span class="pc bpc" id="L402" title="1 of 2 branches missed.">        if (mas.getMarque() == null) {</span>
+<span class="nc" id="L403">            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, &quot;La MAS sélectionnée n'a pas de marque&quot;);</span>
+        }
+<span class="fc" id="L405">        return mas.getMarque();</span>
+    }
+
+    private void ensureSfmCoversMas(Sfm sfm, Mas mas) {
+<span class="pc bpc" id="L409" title="1 of 2 branches missed.">        if (mas.getMarque() == null) {</span>
+<span class="nc" id="L410">            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, &quot;La MAS sélectionnée n'a pas de marque&quot;);</span>
+        }
+<span class="pc bpc" id="L412" title="2 of 4 branches missed.">        if (sfm.getMarques() == null || sfm.getMarques().isEmpty()) {</span>
+<span class="nc" id="L413">            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,</span>
+                    &quot;Le SFM n'a aucune marque associée&quot;);
+        }
+<span class="fc" id="L416">        Long marqueId = mas.getMarque().getId();</span>
+<span class="fc" id="L417">        boolean covered = sfm.getMarques().stream()</span>
+<span class="fc" id="L418">                .anyMatch(m -&gt; m.getId().equals(marqueId));</span>
+<span class="pc bpc" id="L419" title="1 of 2 branches missed.">        if (!covered) {</span>
+<span class="nc" id="L420">            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,</span>
+                    &quot;La MAS n'appartient pas aux marques couvertes par ce SFM&quot;);
+        }
+<span class="fc" id="L423">    }</span>
+
+    private static int normalizeStock(Integer stock) {
+<span class="pc bpc" id="L426" title="1 of 2 branches missed.">        if (stock == null) {</span>
+<span class="fc" id="L427">            return 0;</span>
+        }
+<span class="nc" id="L429">        return Math.max(0, stock);</span>
+    }
+
+    private DeviceResponse toResponse(Device entity) {
+<span class="fc" id="L433">        Mas mas = entity.getMas();</span>
+<span class="fc" id="L434">        MarqueMas marque = entity.getMarque();</span>
+<span class="pc bpc" id="L435" title="1 of 4 branches missed.">        if (marque == null &amp;&amp; mas != null) {</span>
+<span class="nc" id="L436">            marque = mas.getMarque();</span>
+        }
+<span class="fc bfc" id="L438" title="All 2 branches covered.">        String marqueLabel = marque != null ? marque.getLabel() : null;</span>
+
+<span class="pc bpc" id="L440" title="1 of 2 branches missed.">        List&lt;DevicePhotoResponse&gt; photos = entity.getPhotos() == null</span>
+<span class="nc" id="L441">                ? List.of()</span>
+<span class="fc" id="L442">                : entity.getPhotos().stream()</span>
+<span class="fc" id="L443">                .map(p -&gt; DevicePhotoResponse.builder()</span>
+<span class="fc" id="L444">                        .id(p.getId())</span>
+<span class="fc" id="L445">                        .photoUrl(p.getPhotoUrl())</span>
+<span class="fc" id="L446">                        .contentType(p.getContentType())</span>
+<span class="fc" id="L447">                        .fileSize(p.getFileSize())</span>
+<span class="fc" id="L448">                        .position(p.getPosition())</span>
+<span class="fc" id="L449">                        .build())</span>
+<span class="fc" id="L450">                .toList();</span>
+
+<span class="fc" id="L452">        String primaryUrl = entity.getPhotoUrl();</span>
+<span class="pc bpc" id="L453" title="4 of 6 branches missed.">        if ((primaryUrl == null || primaryUrl.isBlank()) &amp;&amp; !photos.isEmpty()) {</span>
+<span class="nc" id="L454">            primaryUrl = photos.getFirst().getPhotoUrl();</span>
+        }
+
+<span class="fc" id="L457">        return DeviceResponse.builder()</span>
+<span class="fc" id="L458">                .id(entity.getId())</span>
+<span class="fc" id="L459">                .nom(entity.getNom())</span>
+<span class="fc" id="L460">                .reference(entity.getReference())</span>
+<span class="fc" id="L461">                .usage(entity.getUsage())</span>
+<span class="fc" id="L462">                .dateAcquisition(entity.getDateAcquisition())</span>
+<span class="fc" id="L463">                .obsolete(entity.isObsolete())</span>
+<span class="fc" id="L464">                .stock(entity.getStock())</span>
+<span class="fc" id="L465">                .photoUrl(primaryUrl)</span>
+<span class="fc" id="L466">                .contentType(entity.getContentType())</span>
+<span class="fc" id="L467">                .fileSize(entity.getFileSize())</span>
+<span class="fc" id="L468">                .photos(photos)</span>
+<span class="fc bfc" id="L469" title="All 2 branches covered.">                .sfmId(entity.getSfm() != null ? entity.getSfm().getId() : null)</span>
+<span class="fc bfc" id="L470" title="All 2 branches covered.">                .sfmNom(entity.getSfm() != null ? entity.getSfm().getNom() : null)</span>
+<span class="fc bfc" id="L471" title="All 2 branches covered.">                .masId(mas != null ? mas.getId() : null)</span>
+<span class="fc bfc" id="L472" title="All 2 branches covered.">                .masNumero(mas != null ? mas.getNumero() : null)</span>
+<span class="pc bpc" id="L473" title="1 of 4 branches missed.">                .masMarque(mas != null &amp;&amp; mas.getMarque() != null ? mas.getMarque().getLabel() : marqueLabel)</span>
+<span class="fc bfc" id="L474" title="All 2 branches covered.">                .marqueId(marque != null ? marque.getId() : null)</span>
+<span class="fc bfc" id="L475" title="All 2 branches covered.">                .marque(marque != null ? marque.getCode() : null)</span>
+<span class="fc" id="L476">                .marqueLabel(marqueLabel)</span>
+<span class="fc" id="L477">                .build();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

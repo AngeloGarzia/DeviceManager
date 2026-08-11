@@ -1,0 +1,200 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>InterventionService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">device-manager</a> &gt; <a href="index.source.html" class="el_package">com.devicemanager.service</a> &gt; <span class="el_source">InterventionService.java</span></div><h1>InterventionService.java</h1><pre class="source lang-java linenums">package com.devicemanager.service;
+
+import com.devicemanager.dto.InterventionLineResponse;
+import com.devicemanager.dto.InterventionRequest;
+import com.devicemanager.dto.InterventionResponse;
+import com.devicemanager.entity.Atelier;
+import com.devicemanager.entity.Device;
+import com.devicemanager.entity.Intervention;
+import com.devicemanager.entity.InterventionLigne;
+import com.devicemanager.entity.User;
+import com.devicemanager.repository.DeviceRepository;
+import com.devicemanager.repository.InterventionRepository;
+import com.devicemanager.repository.UserRepository;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.hibernate.Hibernate;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
+
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * Création et consultation des bons d'intervention (consommation de pièces détachées).
+ */
+@Service
+@RequiredArgsConstructor
+@Transactional
+<span class="fc" id="L34">@Slf4j</span>
+public class InterventionService {
+
+    private final InterventionRepository interventionRepository;
+    private final DeviceRepository deviceRepository;
+    private final UserRepository userRepository;
+    private final AtelierService atelierService;
+
+    /**
+     * Archive un bon d'intervention et décrémente le stock des pièces consommées.
+     */
+    public InterventionResponse create(InterventionRequest request, String username) {
+<span class="fc" id="L46">        User actor = userRepository.findByUsername(username)</span>
+<span class="pc" id="L47">                .orElseThrow(() -&gt; new ResponseStatusException(HttpStatus.UNAUTHORIZED, &quot;Utilisateur introuvable&quot;));</span>
+<span class="fc" id="L48">        Atelier atelier = atelierService.requireCurrentAtelier();</span>
+<span class="fc" id="L49">        Long atelierId = atelier.getId();</span>
+
+<span class="fc" id="L51">        Map&lt;Long, Integer&gt; quantities = mergeQuantities(request.getLignes());</span>
+<span class="pc bpc" id="L52" title="1 of 2 branches missed.">        if (quantities.isEmpty()) {</span>
+<span class="nc" id="L53">            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,</span>
+                    &quot;Ajoutez au moins une pièce détachée consommée&quot;);
+        }
+
+<span class="fc" id="L57">        Intervention intervention = Intervention.builder()</span>
+<span class="fc" id="L58">                .numero(nextNumero(atelierId, request.getDateIntervention()))</span>
+<span class="fc" id="L59">                .dateIntervention(request.getDateIntervention())</span>
+<span class="fc" id="L60">                .technicien(actor)</span>
+<span class="fc" id="L61">                .technicienNom(displayName(actor))</span>
+<span class="fc" id="L62">                .atelier(atelier)</span>
+<span class="fc" id="L63">                .emplacement(trimToNull(request.getEmplacement()))</span>
+<span class="fc" id="L64">                .machineMas(trimToNull(request.getMachineMas()))</span>
+<span class="fc" id="L65">                .motif(request.getMotif().trim())</span>
+<span class="fc" id="L66">                .diagnostic(trimToNull(request.getDiagnostic()))</span>
+<span class="fc" id="L67">                .travaux(request.getTravaux().trim())</span>
+<span class="fc" id="L68">                .observations(trimToNull(request.getObservations()))</span>
+<span class="fc" id="L69">                .lignes(new ArrayList&lt;&gt;())</span>
+<span class="fc" id="L70">                .build();</span>
+
+<span class="fc bfc" id="L72" title="All 2 branches covered.">        for (Map.Entry&lt;Long, Integer&gt; entry : quantities.entrySet()) {</span>
+<span class="fc" id="L73">            Device device = deviceRepository.findByIdWithRelations(entry.getKey(), atelierId)</span>
+<span class="pc" id="L74">                    .orElseThrow(() -&gt; new ResponseStatusException(HttpStatus.BAD_REQUEST,</span>
+                            &quot;Pièce détachée introuvable dans cet atelier.&quot;));
+<span class="fc" id="L76">            int qty = entry.getValue();</span>
+<span class="fc" id="L77">            int stockAvant = Math.max(0, device.getStock());</span>
+<span class="fc bfc" id="L78" title="All 2 branches covered.">            if (qty &gt; stockAvant) {</span>
+<span class="fc" id="L79">                throw new ResponseStatusException(HttpStatus.CONFLICT,</span>
+<span class="fc" id="L80">                        &quot;Stock insuffisant pour « &quot; + device.getNom() + &quot; » (disponible : &quot;</span>
+                                + stockAvant + &quot;, demandé : &quot; + qty + &quot;).&quot;);
+            }
+<span class="fc" id="L83">            int stockApres = stockAvant - qty;</span>
+<span class="fc" id="L84">            device.setStock(stockApres);</span>
+<span class="fc" id="L85">            deviceRepository.save(device);</span>
+
+<span class="fc" id="L87">            InterventionLigne ligne = InterventionLigne.builder()</span>
+<span class="fc" id="L88">                    .device(device)</span>
+<span class="fc" id="L89">                    .pieceNom(device.getNom())</span>
+<span class="fc" id="L90">                    .pieceReference(device.getReference())</span>
+<span class="fc" id="L91">                    .quantite(qty)</span>
+<span class="fc" id="L92">                    .stockAvant(stockAvant)</span>
+<span class="fc" id="L93">                    .stockApres(stockApres)</span>
+<span class="fc" id="L94">                    .build();</span>
+<span class="fc" id="L95">            intervention.addLigne(ligne);</span>
+<span class="fc" id="L96">            log.info(&quot;Stock consommé — Pièce id={} -{} → stock={} (bon {})&quot;,</span>
+<span class="fc" id="L97">                    device.getId(), qty, stockApres, intervention.getNumero());</span>
+<span class="fc" id="L98">        }</span>
+
+<span class="fc" id="L100">        Intervention saved = interventionRepository.saveAndFlush(intervention);</span>
+<span class="fc" id="L101">        log.info(&quot;Archivage en base — Bon intervention id={} numero={} par={} pièces={} atelier={}&quot;,</span>
+<span class="fc" id="L102">                saved.getId(), saved.getNumero(), username, saved.getLignes().size(), atelierId);</span>
+<span class="fc" id="L103">        return toResponse(saved);</span>
+    }
+
+    @Transactional(readOnly = true)
+    public List&lt;InterventionResponse&gt; findAll() {
+<span class="nc" id="L108">        Long atelierId = atelierService.requireCurrentAtelier().getId();</span>
+<span class="nc" id="L109">        return interventionRepository.findAllWithRelationsByAtelierId(atelierId).stream()</span>
+<span class="nc" id="L110">                .map(this::toResponse)</span>
+<span class="nc" id="L111">                .toList();</span>
+    }
+
+    @Transactional(readOnly = true)
+    public InterventionResponse findById(Long id) {
+<span class="nc" id="L116">        Long atelierId = atelierService.requireCurrentAtelier().getId();</span>
+<span class="nc" id="L117">        Intervention intervention = interventionRepository.findByIdWithRelations(id, atelierId)</span>
+<span class="nc" id="L118">                .orElseThrow(() -&gt; new ResponseStatusException(HttpStatus.NOT_FOUND,</span>
+                        &quot;Bon d'intervention introuvable&quot;));
+<span class="nc" id="L120">        return toResponse(intervention);</span>
+    }
+
+    private Map&lt;Long, Integer&gt; mergeQuantities(List&lt;InterventionRequest.InterventionLineDto&gt; lignes) {
+<span class="fc" id="L124">        Map&lt;Long, Integer&gt; quantities = new LinkedHashMap&lt;&gt;();</span>
+<span class="pc bpc" id="L125" title="1 of 2 branches missed.">        if (lignes == null) {</span>
+<span class="nc" id="L126">            return quantities;</span>
+        }
+<span class="fc bfc" id="L128" title="All 2 branches covered.">        for (InterventionRequest.InterventionLineDto line : lignes) {</span>
+<span class="pc bpc" id="L129" title="3 of 6 branches missed.">            if (line == null || line.getDeviceId() == null || line.getQuantite() == null) {</span>
+<span class="nc" id="L130">                continue;</span>
+            }
+<span class="fc" id="L132">            int qty = Math.max(0, line.getQuantite());</span>
+<span class="pc bpc" id="L133" title="1 of 2 branches missed.">            if (qty &lt; 1) {</span>
+<span class="nc" id="L134">                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,</span>
+                        &quot;La quantité doit être au moins 1&quot;);
+            }
+<span class="fc" id="L137">            quantities.merge(line.getDeviceId(), qty, Integer::sum);</span>
+<span class="fc" id="L138">        }</span>
+<span class="fc" id="L139">        return quantities;</span>
+    }
+
+    private String nextNumero(Long atelierId, LocalDateTime date) {
+<span class="pc bpc" id="L143" title="1 of 2 branches missed.">        int year = date != null ? date.getYear() : LocalDateTime.now().getYear();</span>
+<span class="fc" id="L144">        long seq = interventionRepository.countByAtelierIdAndYear(atelierId, year) + 1;</span>
+<span class="fc" id="L145">        return String.format(&quot;BI-%d-%d-%05d&quot;, atelierId, year, seq);</span>
+    }
+
+    private static String displayName(User user) {
+<span class="pc bpc" id="L149" title="1 of 2 branches missed.">        String full = ((user.getPrenom() == null ? &quot;&quot; : user.getPrenom().trim()) + &quot; &quot;</span>
+<span class="pc bpc" id="L150" title="1 of 2 branches missed.">                + (user.getNom() == null ? &quot;&quot; : user.getNom().trim())).trim();</span>
+<span class="pc bpc" id="L151" title="1 of 2 branches missed.">        return full.isBlank() ? user.getUsername() : full;</span>
+    }
+
+    private static String trimToNull(String value) {
+<span class="pc bpc" id="L155" title="1 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="fc" id="L156">            return null;</span>
+        }
+<span class="fc" id="L158">        return value.trim();</span>
+    }
+
+    private InterventionResponse toResponse(Intervention intervention) {
+<span class="fc" id="L162">        Hibernate.initialize(intervention.getLignes());</span>
+<span class="fc" id="L163">        List&lt;InterventionLineResponse&gt; lines = intervention.getLignes().stream()</span>
+<span class="fc" id="L164">                .map(l -&gt; {</span>
+<span class="fc" id="L165">                    Device d = l.getDevice();</span>
+<span class="pc bpc" id="L166" title="1 of 2 branches missed.">                    if (d != null) {</span>
+<span class="fc" id="L167">                        Hibernate.initialize(d.getPhotos());</span>
+                    }
+<span class="fc" id="L169">                    return InterventionLineResponse.builder()</span>
+<span class="fc" id="L170">                            .id(l.getId())</span>
+<span class="pc bpc" id="L171" title="1 of 2 branches missed.">                            .deviceId(d != null ? d.getId() : null)</span>
+<span class="fc" id="L172">                            .pieceNom(l.getPieceNom())</span>
+<span class="fc" id="L173">                            .pieceReference(l.getPieceReference())</span>
+<span class="fc" id="L174">                            .quantite(l.getQuantite())</span>
+<span class="fc" id="L175">                            .stockAvant(l.getStockAvant())</span>
+<span class="fc" id="L176">                            .stockApres(l.getStockApres())</span>
+<span class="pc bpc" id="L177" title="1 of 2 branches missed.">                            .photoUrl(d != null ? d.getPhotoUrl() : null)</span>
+<span class="fc" id="L178">                            .build();</span>
+                })
+<span class="fc" id="L180">                .toList();</span>
+<span class="pc bpc" id="L181" title="1 of 2 branches missed.">        int totalQty = lines.stream().mapToInt(l -&gt; l.getQuantite() == null ? 0 : l.getQuantite()).sum();</span>
+<span class="fc" id="L182">        return InterventionResponse.builder()</span>
+<span class="fc" id="L183">                .id(intervention.getId())</span>
+<span class="fc" id="L184">                .numero(intervention.getNumero())</span>
+<span class="fc" id="L185">                .dateIntervention(intervention.getDateIntervention())</span>
+<span class="fc" id="L186">                .technicienNom(intervention.getTechnicienNom())</span>
+<span class="fc" id="L187">                .emplacement(intervention.getEmplacement())</span>
+<span class="fc" id="L188">                .machineMas(intervention.getMachineMas())</span>
+<span class="fc" id="L189">                .motif(intervention.getMotif())</span>
+<span class="fc" id="L190">                .diagnostic(intervention.getDiagnostic())</span>
+<span class="fc" id="L191">                .travaux(intervention.getTravaux())</span>
+<span class="fc" id="L192">                .observations(intervention.getObservations())</span>
+<span class="fc" id="L193">                .createdAt(intervention.getCreatedAt())</span>
+<span class="fc" id="L194">                .totalPieces(lines.size())</span>
+<span class="fc" id="L195">                .totalQuantite(totalQty)</span>
+<span class="fc" id="L196">                .lignes(lines)</span>
+<span class="fc" id="L197">                .build();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

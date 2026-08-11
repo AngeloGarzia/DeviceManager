@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>JwtAuthenticationFilter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">device-manager</a> &gt; <a href="index.source.html" class="el_package">com.devicemanager.security</a> &gt; <span class="el_source">JwtAuthenticationFilter.java</span></div><h1>JwtAuthenticationFilter.java</h1><pre class="source lang-java linenums">package com.devicemanager.security;
+
+import com.devicemanager.repository.UserRepository;
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpHeaders;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
+import org.springframework.stereotype.Component;
+import org.springframework.web.filter.OncePerRequestFilter;
+
+import java.io.IOException;
+import java.util.List;
+
+/**
+ * Filtre d'authentification JWT exécuté avant la chaîne Spring Security.
+ * &lt;p&gt;
+ * Lit l'en-tête {@code Authorization: Bearer &amp;lt;token&amp;gt;}, valide le JWT via {@link JwtService},
+ * charge l'utilisateur en base et peuple le {@link SecurityContextHolder} avec son rôle
+ * ({@code ROLE_ADMIN} ou {@code ROLE_TECHNICIEN}).
+ * &lt;p&gt;
+ * Un token absent, invalide ou expiré laisse la requête non authentifiée : les endpoints protégés
+ * seront refusés par {@link com.devicemanager.config.SecurityConfig}. Ce filtre s'exécute
+ * &lt;em&gt;avant&lt;/em&gt; {@link com.devicemanager.tenancy.AtelierContextFilter}, qui dépend d'un
+ * utilisateur déjà authentifié pour résoudre le contexte d'atelier.
+ */
+@Component
+@RequiredArgsConstructor
+<span class="fc" id="L35">@Slf4j</span>
+public class JwtAuthenticationFilter extends OncePerRequestFilter {
+
+    private final JwtService jwtService;
+    private final UserRepository userRepository;
+
+    @Override
+    protected void doFilterInternal(
+            HttpServletRequest request,
+            HttpServletResponse response,
+            FilterChain filterChain) throws ServletException, IOException {
+
+<span class="fc" id="L47">        String header = request.getHeader(HttpHeaders.AUTHORIZATION);</span>
+<span class="pc bpc" id="L48" title="1 of 4 branches missed.">        if (header == null || !header.startsWith(&quot;Bearer &quot;)) {</span>
+<span class="fc" id="L49">            filterChain.doFilter(request, response);</span>
+<span class="fc" id="L50">            return;</span>
+        }
+
+<span class="fc" id="L53">        String token = header.substring(7);</span>
+        try {
+<span class="fc" id="L55">            String username = jwtService.extractUsername(token);</span>
+<span class="pc bpc" id="L56" title="2 of 4 branches missed.">            if (username != null &amp;&amp; SecurityContextHolder.getContext().getAuthentication() == null) {</span>
+<span class="fc" id="L57">                userRepository.findByUsername(username).ifPresent(user -&gt; {</span>
+<span class="pc bpc" id="L58" title="1 of 2 branches missed.">                    if (jwtService.isTokenValid(token, user.getUsername())) {</span>
+<span class="fc" id="L59">                        var auth = new UsernamePasswordAuthenticationToken(</span>
+<span class="fc" id="L60">                                user.getUsername(),</span>
+                                null,
+<span class="fc" id="L62">                                List.of(new SimpleGrantedAuthority(&quot;ROLE_&quot; + user.getRole())));</span>
+<span class="fc" id="L63">                        auth.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));</span>
+<span class="fc" id="L64">                        SecurityContextHolder.getContext().setAuthentication(auth);</span>
+                    }
+<span class="fc" id="L66">                });</span>
+            }
+<span class="fc" id="L68">        } catch (Exception ex) {</span>
+            // Token invalide : laisser Spring Security refuser l'accès
+<span class="fc" id="L70">            log.debug(&quot;JWT ignoré (invalide ou expiré)&quot;, ex);</span>
+<span class="fc" id="L71">        }</span>
+
+<span class="fc" id="L73">        filterChain.doFilter(request, response);</span>
+<span class="fc" id="L74">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

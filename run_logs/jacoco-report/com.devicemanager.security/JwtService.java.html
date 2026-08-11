@@ -1,0 +1,163 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>JwtService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">device-manager</a> &gt; <a href="index.source.html" class="el_package">com.devicemanager.security</a> &gt; <span class="el_source">JwtService.java</span></div><h1>JwtService.java</h1><pre class="source lang-java linenums">package com.devicemanager.security;
+
+import com.devicemanager.service.AppSettingsService;
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.security.Keys;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Lazy;
+import org.springframework.stereotype.Component;
+
+import javax.crypto.SecretKey;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.Date;
+import java.util.HexFormat;
+import java.util.UUID;
+
+/**
+ * Service de création et validation des jetons JWT (HS256) et des refresh tokens opaques.
+ * &lt;p&gt;
+ * La clé secrète provient de {@code app.jwt.secret} ({@code APP_JWT_SECRET}, minimum 32 octets).
+ * La durée d'accès peut être surchargée via les paramètres applicatifs en base
+ * ({@link AppSettingsService#JWT_EXPIRATION_MS}).
+ */
+@Component
+public final class JwtService {
+
+    private final SecretKey key;
+    private final long defaultAccessExpirationMs;
+    private final long refreshExpirationMs;
+    private final AppSettingsService appSettingsService;
+
+    /**
+     * Initialise le service avec la clé secrète et les durées d'expiration.
+     *
+     * @param secret                 clé HMAC (au moins 32 caractères)
+     * @param accessExpirationMs     durée de validité du jeton d'accès (ms)
+     * @param refreshExpirationMs    durée de validité du refresh token (ms)
+     * @param appSettingsService     service de paramètres (injection paresseuse pour éviter les cycles)
+     * @throws IllegalStateException si la clé est absente ou trop courte
+     */
+    public JwtService(
+            @Value(&quot;${app.jwt.secret:}&quot;) String secret,
+            @Value(&quot;${app.jwt.access-expiration-ms:900000}&quot;) long accessExpirationMs,
+            @Value(&quot;${app.jwt.refresh-expiration-ms:604800000}&quot;) long refreshExpirationMs,
+<span class="fc" id="L47">            @Lazy AppSettingsService appSettingsService) {</span>
+<span class="pc bpc" id="L48" title="2 of 4 branches missed.">        if (secret == null || secret.isBlank()) {</span>
+<span class="nc" id="L49">            throw new IllegalStateException(</span>
+                    &quot;APP_JWT_SECRET manquant. Définis une clé d'au moins 32 caractères dans les variables d'environnement.&quot;);
+        }
+<span class="fc" id="L52">        byte[] bytes = secret.getBytes(StandardCharsets.UTF_8);</span>
+<span class="pc bpc" id="L53" title="1 of 2 branches missed.">        if (bytes.length &lt; 32) {</span>
+<span class="nc" id="L54">            throw new IllegalStateException(</span>
+                    &quot;APP_JWT_SECRET trop court (&quot; + bytes.length + &quot; octets). Minimum 32 caractères.&quot;);
+        }
+<span class="fc" id="L57">        this.key = Keys.hmacShaKeyFor(bytes);</span>
+<span class="fc" id="L58">        this.defaultAccessExpirationMs = accessExpirationMs;</span>
+<span class="fc" id="L59">        this.refreshExpirationMs = refreshExpirationMs;</span>
+<span class="fc" id="L60">        this.appSettingsService = appSettingsService;</span>
+<span class="fc" id="L61">    }</span>
+
+    /**
+     * Alias de {@link #generateAccessToken(String, String)} (compatibilité tests / anciens appels).
+     */
+    public String generateToken(String username, String role) {
+<span class="fc" id="L67">        return generateAccessToken(username, role);</span>
+    }
+
+    /**
+     * Génère un JWT d'accès signé (durée courte).
+     *
+     * @param username nom d'utilisateur (subject du token)
+     * @param role     rôle applicatif (claim {@code role})
+     * @return token JWT compact
+     */
+    public String generateAccessToken(String username, String role) {
+<span class="fc" id="L78">        Date now = new Date();</span>
+<span class="fc" id="L79">        long expirationMs = appSettingsService.getLong(AppSettingsService.JWT_EXPIRATION_MS, defaultAccessExpirationMs);</span>
+<span class="fc" id="L80">        Date expiry = new Date(now.getTime() + expirationMs);</span>
+<span class="fc" id="L81">        return Jwts.builder()</span>
+<span class="fc" id="L82">                .subject(username)</span>
+<span class="fc" id="L83">                .claim(&quot;role&quot;, role)</span>
+<span class="fc" id="L84">                .issuedAt(now)</span>
+<span class="fc" id="L85">                .expiration(expiry)</span>
+<span class="fc" id="L86">                .signWith(key)</span>
+<span class="fc" id="L87">                .compact();</span>
+    }
+
+    /**
+     * Génère une valeur opaque de refresh token (UUID aléatoire).
+     *
+     * @return valeur brute à envoyer au client (cookie) — ne pas stocker en clair
+     */
+    public String generateRefreshTokenValue() {
+<span class="fc" id="L96">        return UUID.randomUUID().toString();</span>
+    }
+
+    /**
+     * Hash SHA-256 hexadécimal d'un jeton opaque pour stockage en base.
+     *
+     * @param rawToken valeur brute
+     * @return hash hex (64 caractères)
+     */
+    public String hashToken(String rawToken) {
+        try {
+<span class="fc" id="L107">            MessageDigest digest = MessageDigest.getInstance(&quot;SHA-256&quot;);</span>
+<span class="fc" id="L108">            byte[] hashed = digest.digest(rawToken.getBytes(StandardCharsets.UTF_8));</span>
+<span class="fc" id="L109">            return HexFormat.of().formatHex(hashed);</span>
+<span class="nc" id="L110">        } catch (NoSuchAlgorithmException ex) {</span>
+<span class="nc" id="L111">            throw new IllegalStateException(&quot;SHA-256 non disponible&quot;, ex);</span>
+        }
+    }
+
+    /**
+     * Extrait le nom d'utilisateur (subject) d'un token.
+     *
+     * @param token JWT à parser
+     * @return subject du token
+     */
+    public String extractUsername(String token) {
+<span class="fc" id="L122">        return parseClaims(token).getSubject();</span>
+    }
+
+    /**
+     * Vérifie que le token correspond à l'utilisateur et n'est pas expiré.
+     *
+     * @param token    JWT à valider
+     * @param username nom d'utilisateur attendu
+     * @return {@code true} si le token est valide pour cet utilisateur
+     */
+    public boolean isTokenValid(String token, String username) {
+<span class="fc" id="L133">        Claims claims = parseClaims(token);</span>
+<span class="pc bpc" id="L134" title="1 of 4 branches missed.">        return claims.getSubject().equals(username) &amp;&amp; claims.getExpiration().after(new Date());</span>
+    }
+
+    /**
+     * Durée de validité effective des jetons d'accès (paramètre applicatif ou valeur par défaut).
+     *
+     * @return durée en millisecondes
+     */
+    public long getExpirationMs() {
+<span class="fc" id="L143">        return appSettingsService.getLong(AppSettingsService.JWT_EXPIRATION_MS, defaultAccessExpirationMs);</span>
+    }
+
+    /**
+     * Durée de validité des refresh tokens.
+     *
+     * @return durée en millisecondes
+     */
+    public long getRefreshExpirationMs() {
+<span class="nc" id="L152">        return refreshExpirationMs;</span>
+    }
+
+    private Claims parseClaims(String token) {
+<span class="fc" id="L156">        return Jwts.parser()</span>
+<span class="fc" id="L157">                .verifyWith(key)</span>
+<span class="fc" id="L158">                .build()</span>
+<span class="fc" id="L159">                .parseSignedClaims(token)</span>
+<span class="fc" id="L160">                .getPayload();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

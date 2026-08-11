@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AtelierContextFilter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">device-manager</a> &gt; <a href="index.source.html" class="el_package">com.devicemanager.tenancy</a> &gt; <span class="el_source">AtelierContextFilter.java</span></div><h1>AtelierContextFilter.java</h1><pre class="source lang-java linenums">package com.devicemanager.tenancy;
+
+import com.devicemanager.entity.Atelier;
+import com.devicemanager.entity.User;
+import com.devicemanager.repository.AtelierRepository;
+import com.devicemanager.repository.UserRepository;
+import com.devicemanager.security.Roles;
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.stereotype.Component;
+import org.springframework.web.filter.OncePerRequestFilter;
+import org.springframework.web.server.ResponseStatusException;
+
+import java.io.IOException;
+
+/**
+ * Filtre de multi-location (tenancy) par atelier, exécuté après l'authentification JWT.
+ * &lt;p&gt;
+ * Le frontend envoie l'atelier actif via l'en-tête HTTP {@value #HEADER}. Lorsque cet en-tête
+ * est présent et que l'utilisateur est authentifié :
+ * &lt;ul&gt;
+ *   &lt;li&gt;l'atelier est chargé et vérifié (existence, appartenance au même groupe que l'utilisateur) ;&lt;/li&gt;
+ *   &lt;li&gt;les techniciens ne peuvent sélectionner que leur atelier préféré ({@code preferredAtelier}) ;&lt;/li&gt;
+ *   &lt;li&gt;l'identifiant est exposé aux services via {@link AtelierContext} pour la durée de la requête.&lt;/li&gt;
+ * &lt;/ul&gt;
+ * Sans en-tête, la requête continue sans contexte d'atelier (certains endpoints peuvent exiger
+ * {@link AtelierContext#require()} en aval).
+ * &lt;p&gt;
+ * Ignoré pour {@code /api/auth/**} et {@code /uploads/**}. En fin de requête, le contexte
+ * thread-local est toujours nettoyé dans un bloc {@code finally}.
+ */
+@Component
+@RequiredArgsConstructor
+public class AtelierContextFilter extends OncePerRequestFilter {
+
+    /** Nom de l'en-tête HTTP portant l'identifiant numérique de l'atelier sélectionné. */
+    public static final String HEADER = &quot;X-Atelier-Id&quot;;
+
+    private final AtelierRepository atelierRepository;
+    private final UserRepository userRepository;
+
+    @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+<span class="fc" id="L50">        String path = request.getRequestURI();</span>
+<span class="pc bpc" id="L51" title="1 of 4 branches missed.">        return path.startsWith(&quot;/api/auth/&quot;) || path.startsWith(&quot;/uploads/&quot;);</span>
+    }
+
+    @Override
+    protected void doFilterInternal(
+            HttpServletRequest request,
+            HttpServletResponse response,
+            FilterChain filterChain) throws ServletException, IOException {
+        try {
+<span class="fc" id="L60">            Authentication auth = SecurityContextHolder.getContext().getAuthentication();</span>
+<span class="pc bpc" id="L61" title="3 of 6 branches missed.">            if (auth != null &amp;&amp; auth.isAuthenticated() &amp;&amp; auth.getPrincipal() instanceof String username) {</span>
+<span class="fc" id="L62">                String raw = request.getHeader(HEADER);</span>
+<span class="pc bpc" id="L63" title="1 of 4 branches missed.">                if (raw != null &amp;&amp; !raw.isBlank()) {</span>
+<span class="fc" id="L64">                    Long atelierId = Long.parseLong(raw.trim());</span>
+<span class="fc" id="L65">                    User user = userRepository.findByUsername(username)</span>
+<span class="pc" id="L66">                            .orElseThrow(() -&gt; new ResponseStatusException(HttpStatus.UNAUTHORIZED,</span>
+                                    &quot;Authentification requise.&quot;));
+<span class="fc" id="L68">                    Atelier atelier = atelierRepository.findByIdWithCasino(atelierId)</span>
+<span class="pc" id="L69">                            .orElseThrow(() -&gt; new ResponseStatusException(HttpStatus.BAD_REQUEST, &quot;Atelier introuvable&quot;));</span>
+<span class="pc bpc" id="L70" title="1 of 2 branches missed.">                    if (user.getGroupe() == null</span>
+<span class="pc bpc" id="L71" title="1 of 2 branches missed.">                            || atelier.getCasino() == null</span>
+<span class="pc bpc" id="L72" title="1 of 2 branches missed.">                            || atelier.getCasino().getGroupe() == null</span>
+<span class="fc bfc" id="L73" title="All 2 branches covered.">                            || !user.getGroupe().getId().equals(atelier.getCasino().getGroupe().getId())) {</span>
+<span class="fc" id="L74">                        throw new ResponseStatusException(HttpStatus.FORBIDDEN, &quot;Atelier non autorisé pour ce compte&quot;);</span>
+                    }
+<span class="fc bfc" id="L76" title="All 2 branches covered.">                    if (isTechnicien(user.getRole())) {</span>
+<span class="fc" id="L77">                        Atelier preferred = user.getPreferredAtelier();</span>
+<span class="pc bpc" id="L78" title="1 of 4 branches missed.">                        if (preferred == null || !preferred.getId().equals(atelierId)) {</span>
+<span class="fc" id="L79">                            throw new ResponseStatusException(HttpStatus.FORBIDDEN,</span>
+                                    &quot;Les techniciens sont limités à leur atelier préféré&quot;);
+                        }
+                    }
+<span class="fc" id="L83">                    AtelierContext.set(atelierId);</span>
+                }
+            }
+<span class="fc" id="L86">            filterChain.doFilter(request, response);</span>
+<span class="fc" id="L87">        } catch (ResponseStatusException ex) {</span>
+<span class="fc" id="L88">            response.setStatus(ex.getStatusCode().value());</span>
+<span class="fc" id="L89">            response.setContentType(&quot;application/json&quot;);</span>
+<span class="pc bpc" id="L90" title="1 of 2 branches missed.">            String reason = ex.getReason() == null ? &quot;Impossible d'accéder à cet atelier.&quot; : ex.getReason();</span>
+<span class="fc" id="L91">            response.getWriter().write(&quot;{\&quot;message\&quot;:\&quot;&quot; + reason.replace(&quot;\&quot;&quot;, &quot;\\\&quot;&quot;) + &quot;\&quot;}&quot;);</span>
+<span class="fc" id="L92">        } catch (NumberFormatException ex) {</span>
+<span class="fc" id="L93">            response.setStatus(HttpStatus.BAD_REQUEST.value());</span>
+<span class="fc" id="L94">            response.setContentType(&quot;application/json&quot;);</span>
+<span class="fc" id="L95">            response.getWriter().write(&quot;{\&quot;message\&quot;:\&quot;Atelier sélectionné invalide. Resélectionnez un atelier.\&quot;}&quot;);</span>
+        } finally {
+<span class="fc" id="L97">            AtelierContext.clear();</span>
+        }
+<span class="fc" id="L99">    }</span>
+
+    private static boolean isTechnicien(String role) {
+<span class="pc bpc" id="L102" title="1 of 4 branches missed.">        return Roles.TECHNICIEN.equals(role) || &quot;TECH&quot;.equals(role);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FileMagicBytesValidator.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">device-manager</a> &gt; <a href="index.source.html" class="el_package">com.devicemanager.security</a> &gt; <span class="el_source">FileMagicBytesValidator.java</span></div><h1>FileMagicBytesValidator.java</h1><pre class="source lang-java linenums">package com.devicemanager.security;
+
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
+
+/**
+ * Contrôle basique du contenu binaire d'une image (magic bytes).
+ */
+public final class FileMagicBytesValidator {
+
+    private FileMagicBytesValidator() {
+    }
+
+    /**
+     * Vérifie que les octets correspondent à un format image supporté (JPEG, PNG, GIF, WebP).
+     *
+     * @param data contenu du fichier
+     */
+    public static void validateImageMagicBytes(byte[] data) {
+<span class="pc bpc" id="L20" title="2 of 4 branches missed.">        if (data == null || data.length &lt; 12) {</span>
+<span class="nc" id="L21">            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,</span>
+                    &quot;Photo illisible ou format non pris en charge&quot;);
+        }
+<span class="pc bpc" id="L24" title="6 of 8 branches missed.">        if (isJpeg(data) || isPng(data) || isGif(data) || isWebp(data)) {</span>
+<span class="fc" id="L25">            return;</span>
+        }
+<span class="nc" id="L27">        throw new ResponseStatusException(HttpStatus.BAD_REQUEST,</span>
+                &quot;Photo illisible ou format non pris en charge&quot;);
+    }
+
+    private static boolean isJpeg(byte[] d) {
+<span class="pc bpc" id="L32" title="5 of 6 branches missed.">        return d[0] == (byte) 0xFF &amp;&amp; d[1] == (byte) 0xD8 &amp;&amp; d[2] == (byte) 0xFF;</span>
+    }
+
+    private static boolean isPng(byte[] d) {
+<span class="pc bpc" id="L36" title="4 of 8 branches missed.">        return d[0] == (byte) 0x89 &amp;&amp; d[1] == 0x50 &amp;&amp; d[2] == 0x4E &amp;&amp; d[3] == 0x47;</span>
+    }
+
+    private static boolean isGif(byte[] d) {
+<span class="nc bnc" id="L40" title="All 6 branches missed.">        return d[0] == 'G' &amp;&amp; d[1] == 'I' &amp;&amp; d[2] == 'F';</span>
+    }
+
+    private static boolean isWebp(byte[] d) {
+<span class="nc bnc" id="L44" title="All 16 branches missed.">        return d[0] == 'R' &amp;&amp; d[1] == 'I' &amp;&amp; d[2] == 'F' &amp;&amp; d[3] == 'F'</span>
+                &amp;&amp; d[8] == 'W' &amp;&amp; d[9] == 'E' &amp;&amp; d[10] == 'B' &amp;&amp; d[11] == 'P';
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

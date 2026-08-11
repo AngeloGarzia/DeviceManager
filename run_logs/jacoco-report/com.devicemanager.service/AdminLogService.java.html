@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AdminLogService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">device-manager</a> &gt; <a href="index.source.html" class="el_package">com.devicemanager.service</a> &gt; <span class="el_source">AdminLogService.java</span></div><h1>AdminLogService.java</h1><pre class="source lang-java linenums">package com.devicemanager.service;
+
+import com.devicemanager.dto.AdminLogEntryResponse;
+import com.devicemanager.dto.AdminLogListResponse;
+import com.devicemanager.entity.AppLog;
+import com.devicemanager.logging.AppLogDbWriter;
+import com.devicemanager.repository.AppLogRepository;
+import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
+
+/**
+ * Consultation et purge des logs SLF4J persistés en base (admins uniquement).
+ */
+@Service
+@RequiredArgsConstructor
+public class AdminLogService {
+
+<span class="nc" id="L27">    private static final Logger log = LoggerFactory.getLogger(AdminLogService.class);</span>
+
+    private final AppLogRepository appLogRepository;
+    private final AppLogDbWriter appLogDbWriter;
+
+    @Value(&quot;${app.logs.retention-max:5000}&quot;)
+    private int retentionMax;
+
+    /**
+     * Liste les événements persistés, filtrés et limités.
+     *
+     * @param level  niveau minimum (optionnel)
+     * @param logger filtre logger (optionnel)
+     * @param query  recherche texte (optionnel)
+     * @param limit  plafond (défaut 200)
+     * @return snapshot pour l'API admin
+     */
+    @Transactional(readOnly = true)
+    public AdminLogListResponse list(String level, String logger, String query, Integer limit) {
+<span class="nc" id="L46">        appLogDbWriter.flush();</span>
+<span class="nc bnc" id="L47" title="All 2 branches missed.">        int capped = limit == null ? 200 : Math.min(Math.max(limit, 1), 1000);</span>
+<span class="nc" id="L48">        String loggerFilter = blankToNull(logger);</span>
+<span class="nc" id="L49">        String queryFilter = blankToNull(query);</span>
+<span class="nc" id="L50">        List&lt;String&gt; levels = levelsAtLeast(level);</span>
+<span class="nc" id="L51">        boolean levelsEmpty = levels.isEmpty();</span>
+
+<span class="nc" id="L53">        List&lt;AppLog&gt; rows = appLogRepository.search(</span>
+                levelsEmpty,
+<span class="nc bnc" id="L55" title="All 4 branches missed.">                levelsEmpty ? List.of(&quot;_&quot;) : levels,</span>
+                loggerFilter == null,
+<span class="nc bnc" id="L57" title="All 4 branches missed.">                loggerFilter == null ? &quot;&quot; : loggerFilter,</span>
+                queryFilter == null,
+<span class="nc bnc" id="L59" title="All 2 branches missed.">                queryFilter == null ? &quot;&quot; : queryFilter,</span>
+<span class="nc" id="L60">                PageRequest.of(0, capped)</span>
+        );
+
+<span class="nc" id="L63">        List&lt;AdminLogEntryResponse&gt; items = rows.stream()</span>
+<span class="nc" id="L64">                .map(e -&gt; new AdminLogEntryResponse(</span>
+<span class="nc" id="L65">                        e.getId(),</span>
+<span class="nc" id="L66">                        e.getCreatedAt(),</span>
+<span class="nc" id="L67">                        e.getLevel(),</span>
+<span class="nc" id="L68">                        e.getLoggerName(),</span>
+<span class="nc" id="L69">                        e.getThreadName(),</span>
+<span class="nc" id="L70">                        e.getMessage(),</span>
+<span class="nc" id="L71">                        e.getThrowable()))</span>
+<span class="nc" id="L72">                .toList();</span>
+<span class="nc" id="L73">        long total = appLogRepository.count();</span>
+<span class="nc" id="L74">        return new AdminLogListResponse((int) Math.min(total, Integer.MAX_VALUE), retentionMax, items.size(), items);</span>
+    }
+
+    /** Supprime tous les logs en base. */
+    @Transactional
+    public void clear() {
+<span class="nc" id="L80">        appLogDbWriter.flush();</span>
+<span class="nc" id="L81">        appLogRepository.deleteAllInBatch();</span>
+<span class="nc" id="L82">        log.info(&quot;Journal applicatif (app_log) vidé par un administrateur&quot;);</span>
+<span class="nc" id="L83">    }</span>
+
+    private static String blankToNull(String value) {
+<span class="nc bnc" id="L86" title="All 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L87">            return null;</span>
+        }
+<span class="nc" id="L89">        return value.trim();</span>
+    }
+
+    private static List&lt;String&gt; levelsAtLeast(String minLevel) {
+<span class="nc bnc" id="L93" title="All 4 branches missed.">        if (minLevel == null || minLevel.isBlank()) {</span>
+<span class="nc" id="L94">            return List.of();</span>
+        }
+<span class="nc" id="L96">        String key = minLevel.trim().toUpperCase(Locale.ROOT);</span>
+<span class="nc bnc" id="L97" title="All 2 branches missed.">        if (&quot;WARNING&quot;.equals(key)) {</span>
+<span class="nc" id="L98">            key = &quot;WARN&quot;;</span>
+        }
+<span class="nc" id="L100">        List&lt;String&gt; all = List.of(&quot;TRACE&quot;, &quot;DEBUG&quot;, &quot;INFO&quot;, &quot;WARN&quot;, &quot;ERROR&quot;);</span>
+<span class="nc" id="L101">        int idx = all.indexOf(key);</span>
+<span class="nc bnc" id="L102" title="All 2 branches missed.">        if (idx &lt; 0) {</span>
+<span class="nc" id="L103">            return List.of();</span>
+        }
+<span class="nc" id="L105">        return new ArrayList&lt;&gt;(all.subList(idx, all.size()));</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

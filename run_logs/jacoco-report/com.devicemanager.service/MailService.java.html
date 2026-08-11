@@ -1,0 +1,181 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MailService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">device-manager</a> &gt; <a href="index.source.html" class="el_package">com.devicemanager.service</a> &gt; <span class="el_source">MailService.java</span></div><h1>MailService.java</h1><pre class="source lang-java linenums">package com.devicemanager.service;
+
+import com.devicemanager.dto.MailTestResponse;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
+import org.springframework.mail.SimpleMailMessage;
+import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.mail.javamail.JavaMailSenderImpl;
+import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
+
+import java.util.Properties;
+
+/**
+ * Service d'envoi d'e-mails pour DeviceManager.
+ * &lt;p&gt;
+ * Notifications admin (demandes de commande), e-mails SFM et test SMTP.
+ * Configuration lue depuis Setup ; simulation en log si {@code MAIL_ENABLED=false}.
+ */
+@Service
+@RequiredArgsConstructor
+<span class="fc" id="L24">@Slf4j</span>
+public class MailService {
+
+    private final JavaMailSender mailSender;
+    private final AppSettingsService appSettingsService;
+
+    @Value(&quot;${app.mail.enabled:false}&quot;)
+    private boolean mailEnabledDefault;
+
+    @Value(&quot;${app.mail.from:noreply@devicemanager.local}&quot;)
+    private String fromDefault;
+
+    @Value(&quot;${app.mail.admin-email:admin@casino.local}&quot;)
+    private String adminEmailDefault;
+
+    /**
+     * Envoie une notification de nouvelle demande de commande à l'administrateur.
+     *
+     * @param subject sujet du message
+     * @param body corps texte
+     */
+    public void sendOrderRequestToAdmin(String subject, String body) {
+<span class="fc" id="L46">        send(getAdminEmail(), subject, body);</span>
+<span class="fc" id="L47">    }</span>
+
+    /**
+     * Envoie un e-mail de test SMTP vers l'adresse administrateur configurée.
+     *
+     * @return résultat avec destinataire et message de succès
+     * @throws org.springframework.web.server.ResponseStatusException {@code 400} si destinataire non configuré ;
+     *         {@code 502} en cas d'échec SMTP
+     */
+    public MailTestResponse sendTestEmail() {
+<span class="fc" id="L57">        String to = getAdminEmail();</span>
+<span class="pc bpc" id="L58" title="2 of 4 branches missed.">        if (to == null || to.isBlank()) {</span>
+<span class="fc" id="L59">            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,</span>
+                    &quot;Indiquez l'e-mail administrateur dans Paramètres avant d'envoyer un test.&quot;);
+        }
+        try {
+<span class="nc" id="L63">            send(to, &quot;DeviceManager — test SMTP&quot;, &quot;&quot;&quot;</span>
+                    Bonjour,
+
+                    Ceci est un e-mail de test envoyé depuis DeviceManager.
+                    Si vous le recevez, la messagerie est correctement configurée.
+
+                    — DeviceManager
+                    &quot;&quot;&quot;);
+<span class="nc" id="L71">            return MailTestResponse.builder()</span>
+<span class="nc" id="L72">                    .success(true)</span>
+<span class="nc" id="L73">                    .to(to)</span>
+<span class="nc" id="L74">                    .message(&quot;E-mail de test envoyé à &quot; + to)</span>
+<span class="nc" id="L75">                    .build();</span>
+<span class="nc" id="L76">        } catch (ResponseStatusException ex) {</span>
+<span class="nc" id="L77">            throw ex;</span>
+<span class="nc" id="L78">        } catch (Exception ex) {</span>
+<span class="nc" id="L79">            log.error(&quot;Échec e-mail de test: {}&quot;, ex.getMessage(), ex);</span>
+<span class="nc" id="L80">            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,</span>
+                    &quot;Échec d'envoi de l'e-mail. Vérifiez la configuration messagerie dans Paramètres.&quot;);
+        }
+    }
+
+    /**
+     * Envoie un e-mail texte simple (ou le simule si la messagerie est désactivée).
+     *
+     * @param to adresse destinataire
+     * @param subject sujet
+     * @param body corps texte
+     * @throws org.springframework.web.server.ResponseStatusException {@code 400} si configuration SMTP invalide
+     */
+    public void send(String to, String subject, String body) {
+<span class="fc" id="L94">        boolean mailEnabled = appSettingsService.getBoolean(AppSettingsService.MAIL_ENABLED, mailEnabledDefault);</span>
+<span class="fc" id="L95">        String from = appSettingsService.get(AppSettingsService.MAIL_FROM, fromDefault);</span>
+
+<span class="pc bpc" id="L97" title="1 of 2 branches missed.">        if (!mailEnabled) {</span>
+<span class="fc" id="L98">            log.info(&quot;&quot;&quot;</span>
+                    ===== EMAIL SIMULÉ (MAIL_ENABLED=false) =====
+                    To: {}
+                    From: {}
+                    Subject: {}
+                    {}
+                    ==============================================
+                    &quot;&quot;&quot;, to, from, subject, body);
+<span class="fc" id="L106">            return;</span>
+        }
+
+<span class="nc" id="L109">        validateSmtpConfig(from, to);</span>
+
+<span class="nc" id="L111">        SimpleMailMessage message = new SimpleMailMessage();</span>
+<span class="nc" id="L112">        message.setFrom(from);</span>
+<span class="nc" id="L113">        message.setTo(to);</span>
+<span class="nc" id="L114">        message.setSubject(subject);</span>
+<span class="nc" id="L115">        message.setText(body);</span>
+
+<span class="nc" id="L117">        JavaMailSender sender = resolveSender();</span>
+<span class="nc" id="L118">        sender.send(message);</span>
+<span class="nc" id="L119">        log.info(&quot;Email envoyé à {} (sujet={})&quot;, to, subject);</span>
+<span class="nc" id="L120">    }</span>
+
+    /**
+     * Retourne l'adresse e-mail administrateur effective (Setup ou défaut application).
+     *
+     * @return e-mail admin configuré
+     */
+    public String getAdminEmail() {
+<span class="fc" id="L128">        return appSettingsService.get(AppSettingsService.MAIL_ADMIN_EMAIL, adminEmailDefault);</span>
+    }
+
+    private void validateSmtpConfig(String from, String to) {
+<span class="pc bpc" id="L132" title="3 of 6 branches missed.">        if (from == null || from.isBlank() || !from.contains(&quot;@&quot;)) {</span>
+<span class="nc" id="L133">            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,</span>
+                    &quot;Adresse d'expéditeur invalide. Saisissez un e-mail valide dans Paramètres.&quot;);
+        }
+<span class="pc bpc" id="L136" title="3 of 6 branches missed.">        if (to == null || to.isBlank() || !to.contains(&quot;@&quot;)) {</span>
+<span class="nc" id="L137">            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,</span>
+                    &quot;E-mail administrateur invalide. Vérifiez le destinataire dans Paramètres.&quot;);
+        }
+<span class="fc" id="L140">        String host = appSettingsService.get(AppSettingsService.MAIL_HOST, &quot;&quot;);</span>
+<span class="pc bpc" id="L141" title="1 of 4 branches missed.">        if (host == null || host.isBlank()) {</span>
+<span class="fc" id="L142">            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,</span>
+                    &quot;Serveur de messagerie manquant. Renseignez l'hôte SMTP dans Paramètres.&quot;);
+        }
+<span class="fc" id="L145">        String username = appSettingsService.get(AppSettingsService.MAIL_USERNAME, &quot;&quot;);</span>
+<span class="fc" id="L146">        String password = appSettingsService.get(AppSettingsService.MAIL_PASSWORD, &quot;&quot;);</span>
+<span class="pc bpc" id="L147" title="6 of 8 branches missed.">        if (username == null || username.isBlank() || password == null || password.isBlank()) {</span>
+<span class="fc" id="L148">            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,</span>
+                    &quot;Identifiants messagerie incomplets. Renseignez l'utilisateur et le mot de passe SMTP dans Paramètres.&quot;);
+        }
+<span class="nc" id="L151">    }</span>
+
+    private JavaMailSender resolveSender() {
+<span class="nc" id="L154">        String host = appSettingsService.get(AppSettingsService.MAIL_HOST, &quot;&quot;);</span>
+<span class="nc bnc" id="L155" title="All 4 branches missed.">        if (host == null || host.isBlank()) {</span>
+<span class="nc" id="L156">            return mailSender;</span>
+        }
+<span class="nc" id="L158">        int port = (int) appSettingsService.getLong(AppSettingsService.MAIL_PORT, 587);</span>
+<span class="nc" id="L159">        JavaMailSenderImpl dynamic = new JavaMailSenderImpl();</span>
+<span class="nc" id="L160">        dynamic.setHost(host);</span>
+<span class="nc" id="L161">        dynamic.setPort(port);</span>
+<span class="nc" id="L162">        dynamic.setUsername(appSettingsService.get(AppSettingsService.MAIL_USERNAME, &quot;&quot;));</span>
+<span class="nc" id="L163">        dynamic.setPassword(appSettingsService.get(AppSettingsService.MAIL_PASSWORD, &quot;&quot;));</span>
+
+<span class="nc" id="L165">        Properties props = dynamic.getJavaMailProperties();</span>
+<span class="nc" id="L166">        props.put(&quot;mail.transport.protocol&quot;, &quot;smtp&quot;);</span>
+<span class="nc" id="L167">        props.put(&quot;mail.smtp.auth&quot;, &quot;true&quot;);</span>
+<span class="nc" id="L168">        props.put(&quot;mail.smtp.connectiontimeout&quot;, &quot;15000&quot;);</span>
+<span class="nc" id="L169">        props.put(&quot;mail.smtp.timeout&quot;, &quot;15000&quot;);</span>
+<span class="nc" id="L170">        props.put(&quot;mail.smtp.writetimeout&quot;, &quot;15000&quot;);</span>
+<span class="nc bnc" id="L171" title="All 2 branches missed.">        if (port == 465) {</span>
+<span class="nc" id="L172">            props.put(&quot;mail.smtp.ssl.enable&quot;, &quot;true&quot;);</span>
+<span class="nc" id="L173">            props.put(&quot;mail.smtp.starttls.enable&quot;, &quot;false&quot;);</span>
+        } else {
+<span class="nc" id="L175">            props.put(&quot;mail.smtp.starttls.enable&quot;, &quot;true&quot;);</span>
+<span class="nc" id="L176">            props.put(&quot;mail.smtp.starttls.required&quot;, &quot;true&quot;);</span>
+        }
+<span class="nc" id="L178">        return dynamic;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

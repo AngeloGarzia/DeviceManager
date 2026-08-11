@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LoginRateLimitFilter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">device-manager</a> &gt; <a href="index.source.html" class="el_package">com.devicemanager.security</a> &gt; <span class="el_source">LoginRateLimitFilter.java</span></div><h1>LoginRateLimitFilter.java</h1><pre class="source lang-java linenums">package com.devicemanager.security;
+
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.stereotype.Component;
+import org.springframework.web.filter.OncePerRequestFilter;
+
+import java.io.IOException;
+import java.time.Instant;
+import java.util.ArrayDeque;
+import java.util.Deque;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
+/**
+ * Limite le débit des tentatives {@code POST /api/auth/login} par adresse IP (fenêtre glissante 1 min).
+ */
+@Component
+public class LoginRateLimitFilter extends OncePerRequestFilter {
+
+    private static final String LOGIN_PATH = &quot;/api/auth/login&quot;;
+    private static final long WINDOW_MS = 60_000L;
+
+    private final int limitPerMinute;
+<span class="nc" id="L30">    private final Map&lt;String, Deque&lt;Long&gt;&gt; attemptsByIp = new ConcurrentHashMap&lt;&gt;();</span>
+
+    public LoginRateLimitFilter(
+<span class="nc" id="L33">            @Value(&quot;${app.security.login-rate-limit-per-minute:20}&quot;) int limitPerMinute) {</span>
+<span class="nc" id="L34">        this.limitPerMinute = Math.max(1, limitPerMinute);</span>
+<span class="nc" id="L35">    }</span>
+
+    @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+<span class="nc bnc" id="L39" title="All 4 branches missed.">        return !(LOGIN_PATH.equals(request.getRequestURI()) &amp;&amp; &quot;POST&quot;.equalsIgnoreCase(request.getMethod()));</span>
+    }
+
+    @Override
+    protected void doFilterInternal(
+            HttpServletRequest request,
+            HttpServletResponse response,
+            FilterChain filterChain) throws ServletException, IOException {
+<span class="nc" id="L47">        String ip = clientIp(request);</span>
+<span class="nc" id="L48">        long now = Instant.now().toEpochMilli();</span>
+<span class="nc" id="L49">        Deque&lt;Long&gt; timestamps = attemptsByIp.computeIfAbsent(ip, key -&gt; new ArrayDeque&lt;&gt;());</span>
+<span class="nc" id="L50">        synchronized (timestamps) {</span>
+<span class="nc bnc" id="L51" title="All 4 branches missed.">            while (!timestamps.isEmpty() &amp;&amp; now - timestamps.peekFirst() &gt; WINDOW_MS) {</span>
+<span class="nc" id="L52">                timestamps.pollFirst();</span>
+            }
+<span class="nc bnc" id="L54" title="All 2 branches missed.">            if (timestamps.size() &gt;= limitPerMinute) {</span>
+<span class="nc" id="L55">                response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());</span>
+<span class="nc" id="L56">                response.setContentType(MediaType.APPLICATION_JSON_VALUE);</span>
+<span class="nc" id="L57">                response.getWriter().write(&quot;{\&quot;message\&quot;:\&quot;Trop de tentatives de connexion. Réessayez plus tard.\&quot;}&quot;);</span>
+<span class="nc" id="L58">                return;</span>
+            }
+<span class="nc" id="L60">            timestamps.addLast(now);</span>
+<span class="nc" id="L61">        }</span>
+<span class="nc" id="L62">        filterChain.doFilter(request, response);</span>
+<span class="nc" id="L63">    }</span>
+
+    private static String clientIp(HttpServletRequest request) {
+<span class="nc" id="L66">        String forwarded = request.getHeader(&quot;X-Forwarded-For&quot;);</span>
+<span class="nc bnc" id="L67" title="All 4 branches missed.">        if (forwarded != null &amp;&amp; !forwarded.isBlank()) {</span>
+<span class="nc" id="L68">            int comma = forwarded.indexOf(',');</span>
+<span class="nc bnc" id="L69" title="All 2 branches missed.">            return (comma &gt; 0 ? forwarded.substring(0, comma) : forwarded).trim();</span>
+        }
+<span class="nc bnc" id="L71" title="All 2 branches missed.">        return request.getRemoteAddr() != null ? request.getRemoteAddr() : &quot;unknown&quot;;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

@@ -1,0 +1,196 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AuthService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">device-manager</a> &gt; <a href="index.source.html" class="el_package">com.devicemanager.service</a> &gt; <span class="el_source">AuthService.java</span></div><h1>AuthService.java</h1><pre class="source lang-java linenums">package com.devicemanager.service;
+
+import com.devicemanager.dto.AtelierSummary;
+import com.devicemanager.dto.AuthResponse;
+import com.devicemanager.dto.ChangePasswordRequest;
+import com.devicemanager.dto.LoginRequest;
+import com.devicemanager.entity.RefreshToken;
+import com.devicemanager.entity.User;
+import com.devicemanager.repository.RefreshTokenRepository;
+import com.devicemanager.repository.UserRepository;
+import com.devicemanager.security.JwtService;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
+
+import java.time.Instant;
+import java.util.List;
+
+/**
+ * Service d'authentification JWT pour DeviceManager.
+ * &lt;p&gt;
+ * Valide les identifiants, émet un jeton d'accès et un refresh token, et renvoie le profil
+ * utilisateur avec la liste des ateliers casino accessibles et l'atelier actif initial pour
+ * le contexte multi-tenant ({@code X-Atelier-Id}).
+ */
+@Service
+@RequiredArgsConstructor
+<span class="fc" id="L32">@Slf4j</span>
+public class AuthService {
+
+    private final UserRepository userRepository;
+    private final RefreshTokenRepository refreshTokenRepository;
+    private final PasswordEncoder passwordEncoder;
+    private final JwtService jwtService;
+    private final AtelierService atelierService;
+
+    /**
+     * Résultat de login / refresh : corps API + valeur brute du refresh token (cookie).
+     */
+<span class="fc" id="L44">    public record AuthSession(AuthResponse response, String refreshToken) {</span>
+    }
+
+    /**
+     * Authentifie un utilisateur et construit la session (access + refresh).
+     *
+     * @param request identifiants (nom d'utilisateur et mot de passe)
+     * @return jeton JWT, refresh brut, profil, groupe et ateliers disponibles
+     * @throws org.springframework.web.server.ResponseStatusException {@code 401} si identifiants invalides
+     */
+    @Transactional
+    public AuthSession login(LoginRequest request) {
+<span class="pc bpc" id="L56" title="1 of 2 branches missed.">        String attemptedUsername = request.getUsername() == null ? &quot;&quot; : request.getUsername().trim();</span>
+<span class="fc" id="L57">        User user = userRepository.findByUsername(attemptedUsername).orElse(null);</span>
+<span class="fc bfc" id="L58" title="All 2 branches covered.">        if (user == null) {</span>
+<span class="fc" id="L59">            log.warn(&quot;Connexion refusée (utilisateur inconnu) username={}&quot;, attemptedUsername);</span>
+<span class="fc" id="L60">            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, &quot;Identifiants invalides&quot;);</span>
+        }
+
+<span class="fc bfc" id="L63" title="All 2 branches covered.">        if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {</span>
+<span class="fc" id="L64">            log.warn(&quot;Connexion refusée (mot de passe invalide) utilisateur={} rôle={}&quot;,</span>
+<span class="fc" id="L65">                    user.getUsername(), user.getRole());</span>
+<span class="fc" id="L66">            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, &quot;Identifiants invalides&quot;);</span>
+        }
+
+<span class="fc" id="L69">        AuthSession session = issueSession(user);</span>
+<span class="fc" id="L70">        log.info(&quot;Connexion réussie utilisateur={} rôle={} atelier={} groupe={}&quot;,</span>
+<span class="fc" id="L71">                user.getUsername(),</span>
+<span class="fc" id="L72">                user.getRole(),</span>
+<span class="fc" id="L73">                session.response().getAtelierId(),</span>
+<span class="pc bpc" id="L74" title="1 of 2 branches missed.">                user.getGroupe() != null ? user.getGroupe().getNom() : null);</span>
+<span class="fc" id="L75">        return session;</span>
+    }
+
+    /**
+     * Rotation du refresh token : révoque l'ancien, émet un nouvel access + refresh.
+     *
+     * @param rawRefreshToken valeur brute du cookie {@code dm_refresh}
+     * @return nouvelle session
+     */
+    @Transactional
+    public AuthSession refresh(String rawRefreshToken) {
+<span class="nc" id="L86">        RefreshToken existing = requireActiveRefreshToken(rawRefreshToken);</span>
+<span class="nc" id="L87">        existing.setRevoked(true);</span>
+<span class="nc" id="L88">        refreshTokenRepository.save(existing);</span>
+<span class="nc" id="L89">        return issueSession(existing.getUser());</span>
+    }
+
+    /**
+     * Révoque le refresh token présenté (logout).
+     *
+     * @param rawRefreshToken valeur brute du cookie, ou {@code null}
+     */
+    @Transactional
+    public void logout(String rawRefreshToken) {
+<span class="nc bnc" id="L99" title="All 4 branches missed.">        if (rawRefreshToken == null || rawRefreshToken.isBlank()) {</span>
+<span class="nc" id="L100">            return;</span>
+        }
+<span class="nc" id="L102">        String hash = jwtService.hashToken(rawRefreshToken);</span>
+<span class="nc" id="L103">        refreshTokenRepository.findActiveByTokenHash(hash).ifPresent(token -&gt; {</span>
+<span class="nc" id="L104">            token.setRevoked(true);</span>
+<span class="nc" id="L105">            refreshTokenRepository.save(token);</span>
+<span class="nc" id="L106">        });</span>
+<span class="nc" id="L107">    }</span>
+
+    /**
+     * Change le mot de passe de l'utilisateur authentifié et lève {@code mustChangePassword}.
+     *
+     * @param username nom d'utilisateur authentifié
+     * @param request  mot de passe actuel et nouveau
+     */
+    @Transactional
+    public void changePassword(String username, ChangePasswordRequest request) {
+<span class="nc" id="L117">        User user = userRepository.findByUsername(username)</span>
+<span class="nc" id="L118">                .orElseThrow(() -&gt; new ResponseStatusException(HttpStatus.UNAUTHORIZED,</span>
+                        &quot;Session expirée. Veuillez vous reconnecter.&quot;));
+<span class="nc bnc" id="L120" title="All 2 branches missed.">        if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPassword())) {</span>
+<span class="nc" id="L121">            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, &quot;Mot de passe actuel incorrect&quot;);</span>
+        }
+<span class="nc bnc" id="L123" title="All 2 branches missed.">        if (passwordEncoder.matches(request.getNewPassword(), user.getPassword())) {</span>
+<span class="nc" id="L124">            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, &quot;Le nouveau mot de passe doit être différent&quot;);</span>
+        }
+<span class="nc" id="L126">        user.setPassword(passwordEncoder.encode(request.getNewPassword()));</span>
+<span class="nc" id="L127">        user.setMustChangePassword(false);</span>
+<span class="nc" id="L128">        userRepository.save(user);</span>
+<span class="nc" id="L129">        log.info(&quot;Mot de passe changé pour utilisateur={}&quot;, username);</span>
+<span class="nc" id="L130">    }</span>
+
+    private AuthSession issueSession(User user) {
+<span class="fc" id="L133">        List&lt;AtelierSummary&gt; ateliers = atelierService.listForUser(user.getUsername());</span>
+<span class="fc" id="L134">        Long atelierId = resolveLoginAtelierId(user, ateliers);</span>
+
+<span class="fc" id="L136">        String accessToken = jwtService.generateAccessToken(user.getUsername(), user.getRole());</span>
+<span class="fc" id="L137">        String refreshRaw = jwtService.generateRefreshTokenValue();</span>
+<span class="fc" id="L138">        RefreshToken refreshToken = RefreshToken.builder()</span>
+<span class="fc" id="L139">                .user(user)</span>
+<span class="fc" id="L140">                .tokenHash(jwtService.hashToken(refreshRaw))</span>
+<span class="fc" id="L141">                .expiresAt(Instant.now().plusMillis(jwtService.getRefreshExpirationMs()))</span>
+<span class="fc" id="L142">                .revoked(false)</span>
+<span class="fc" id="L143">                .build();</span>
+<span class="fc" id="L144">        refreshTokenRepository.save(refreshToken);</span>
+
+<span class="fc" id="L146">        AuthResponse response = AuthResponse.builder()</span>
+<span class="fc" id="L147">                .token(accessToken)</span>
+<span class="fc" id="L148">                .tokenType(&quot;Bearer&quot;)</span>
+<span class="fc" id="L149">                .expiresInMs(jwtService.getExpirationMs())</span>
+<span class="fc" id="L150">                .username(user.getUsername())</span>
+<span class="fc" id="L151">                .nom(user.getNom())</span>
+<span class="fc" id="L152">                .prenom(user.getPrenom())</span>
+<span class="fc" id="L153">                .role(user.getRole())</span>
+<span class="pc bpc" id="L154" title="1 of 2 branches missed.">                .groupeId(user.getGroupe() != null ? user.getGroupe().getId() : null)</span>
+<span class="pc bpc" id="L155" title="1 of 2 branches missed.">                .groupeNom(user.getGroupe() != null ? user.getGroupe().getNom() : null)</span>
+<span class="fc" id="L156">                .atelierId(atelierId)</span>
+<span class="fc" id="L157">                .ateliers(ateliers)</span>
+<span class="fc" id="L158">                .mustChangePassword(user.isMustChangePassword())</span>
+<span class="fc" id="L159">                .build();</span>
+<span class="fc" id="L160">        return new AuthSession(response, refreshRaw);</span>
+    }
+
+    private RefreshToken requireActiveRefreshToken(String rawRefreshToken) {
+<span class="nc bnc" id="L164" title="All 4 branches missed.">        if (rawRefreshToken == null || rawRefreshToken.isBlank()) {</span>
+<span class="nc" id="L165">            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED,</span>
+                    &quot;Session expirée. Veuillez vous reconnecter.&quot;);
+        }
+<span class="nc" id="L168">        String hash = jwtService.hashToken(rawRefreshToken);</span>
+<span class="nc" id="L169">        RefreshToken token = refreshTokenRepository.findActiveByTokenHash(hash)</span>
+<span class="nc" id="L170">                .orElseThrow(() -&gt; new ResponseStatusException(HttpStatus.UNAUTHORIZED,</span>
+                        &quot;Session invalide. Veuillez vous reconnecter.&quot;));
+<span class="nc bnc" id="L172" title="All 2 branches missed.">        if (token.getExpiresAt().isBefore(Instant.now())) {</span>
+<span class="nc" id="L173">            token.setRevoked(true);</span>
+<span class="nc" id="L174">            refreshTokenRepository.save(token);</span>
+<span class="nc" id="L175">            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED,</span>
+                    &quot;Session expirée. Veuillez vous reconnecter.&quot;);
+        }
+<span class="nc" id="L178">        return token;</span>
+    }
+
+    /**
+     * Préfère l'atelier mémorisé s'il est encore autorisé pour le groupe ; sinon le premier de la liste.
+     */
+    private Long resolveLoginAtelierId(User user, List&lt;AtelierSummary&gt; ateliers) {
+<span class="pc bpc" id="L185" title="1 of 2 branches missed.">        if (ateliers.isEmpty()) {</span>
+<span class="nc" id="L186">            return null;</span>
+        }
+<span class="fc bfc" id="L188" title="All 2 branches covered.">        Long preferredId = user.getPreferredAtelier() != null ? user.getPreferredAtelier().getId() : null;</span>
+<span class="fc bfc" id="L189" title="All 2 branches covered.">        if (preferredId != null</span>
+<span class="fc bfc" id="L190" title="All 2 branches covered.">                &amp;&amp; ateliers.stream().anyMatch(a -&gt; preferredId.equals(a.getId()))) {</span>
+<span class="fc" id="L191">            return preferredId;</span>
+        }
+<span class="fc" id="L193">        return ateliers.get(0).getId();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

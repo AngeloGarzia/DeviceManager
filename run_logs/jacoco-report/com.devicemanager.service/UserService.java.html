@@ -1,0 +1,293 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>UserService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">device-manager</a> &gt; <a href="index.source.html" class="el_package">com.devicemanager.service</a> &gt; <span class="el_source">UserService.java</span></div><h1>UserService.java</h1><pre class="source lang-java linenums">package com.devicemanager.service;
+
+import com.devicemanager.dto.UserRequest;
+import com.devicemanager.dto.UserResponse;
+import com.devicemanager.entity.Atelier;
+import com.devicemanager.entity.Groupe;
+import com.devicemanager.entity.User;
+import com.devicemanager.repository.UserRepository;
+import com.devicemanager.security.Roles;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
+
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+
+/**
+ * Service de gestion des comptes utilisateurs DeviceManager.
+ * &lt;p&gt;
+ * Administration des administrateurs et techniciens d'un groupe casino ;
+ * toutes les opérations sont scopées au groupe de l'administrateur connecté.
+ * Les créations héritent du groupe de l'atelier courant ({@code X-Atelier-Id}).
+ */
+@Service
+@RequiredArgsConstructor
+@Transactional
+<span class="fc" id="L34">@Slf4j</span>
+public class UserService {
+
+<span class="fc" id="L37">    private static final Set&lt;String&gt; ALLOWED_ROLES = Set.of(Roles.ADMIN, Roles.TECHNICIEN);</span>
+
+    private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
+    private final AtelierService atelierService;
+
+    /**
+     * Liste les utilisateurs du groupe de l'administrateur connecté.
+     *
+     * @return comptes du groupe, triés par nom d'utilisateur
+     */
+    @Transactional(readOnly = true)
+    public List&lt;UserResponse&gt; findAll() {
+<span class="fc" id="L50">        Long groupeId = requireActorGroupeId();</span>
+<span class="fc" id="L51">        return userRepository.findAllByGroupeId(groupeId).stream()</span>
+<span class="fc" id="L52">                .sorted((a, b) -&gt; a.getUsername().compareToIgnoreCase(b.getUsername()))</span>
+<span class="fc" id="L53">                .map(this::toResponse)</span>
+<span class="fc" id="L54">                .toList();</span>
+    }
+
+    /**
+     * Retourne un utilisateur du groupe courant par identifiant.
+     *
+     * @param id identifiant du compte
+     * @return profil utilisateur
+     * @throws org.springframework.web.server.ResponseStatusException {@code 404} si introuvable ou hors groupe
+     */
+    @Transactional(readOnly = true)
+    public UserResponse findById(Long id) {
+<span class="nc" id="L66">        return toResponse(getInActorGroupe(id));</span>
+    }
+
+    /**
+     * Crée un utilisateur rattaché au groupe de l'atelier courant.
+     *
+     * @param request identité, rôle, mot de passe et atelier préféré
+     * @return compte créé
+     * @throws org.springframework.web.server.ResponseStatusException {@code 409} si identifiant ou e-mail en doublon ;
+     *         {@code 400} si mot de passe ou atelier technicien manquant
+     */
+    public UserResponse create(UserRequest request) {
+<span class="fc" id="L78">        String username = request.getUsername().trim();</span>
+<span class="fc" id="L79">        String email = requireEmail(request.getEmail());</span>
+<span class="fc bfc" id="L80" title="All 2 branches covered.">        if (userRepository.existsByUsername(username)) {</span>
+<span class="fc" id="L81">            throw new ResponseStatusException(HttpStatus.CONFLICT, &quot;Nom d'utilisateur déjà utilisé&quot;);</span>
+        }
+<span class="fc bfc" id="L83" title="All 2 branches covered.">        if (userRepository.existsByEmailIgnoreCase(email)) {</span>
+<span class="fc" id="L84">            throw new ResponseStatusException(HttpStatus.CONFLICT, &quot;E-mail déjà utilisé&quot;);</span>
+        }
+<span class="pc bpc" id="L86" title="1 of 4 branches missed.">        if (request.getPassword() == null || request.getPassword().isBlank()) {</span>
+<span class="fc" id="L87">            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, &quot;Mot de passe obligatoire&quot;);</span>
+        }
+<span class="fc" id="L89">        String role = normalizeRole(request.getRole());</span>
+<span class="fc" id="L90">        User actor = requireActor();</span>
+<span class="fc" id="L91">        Groupe groupe = atelierService.requireCurrentAtelier().getCasino().getGroupe();</span>
+<span class="fc" id="L92">        ensureActorOwnsGroupe(actor, groupe.getId());</span>
+<span class="fc" id="L93">        Atelier preferred = resolvePreferredAtelier(actor, role, request.getPreferredAtelierId());</span>
+<span class="fc" id="L94">        User saved = userRepository.save(User.builder()</span>
+<span class="fc" id="L95">                .username(username)</span>
+<span class="fc" id="L96">                .nom(requireName(request.getNom(), &quot;Nom&quot;))</span>
+<span class="fc" id="L97">                .prenom(requireName(request.getPrenom(), &quot;Prénom&quot;))</span>
+<span class="fc" id="L98">                .email(email)</span>
+<span class="fc" id="L99">                .password(passwordEncoder.encode(request.getPassword()))</span>
+<span class="fc" id="L100">                .role(role)</span>
+<span class="fc" id="L101">                .groupe(groupe)</span>
+<span class="fc" id="L102">                .preferredAtelier(preferred)</span>
+<span class="fc" id="L103">                .build());</span>
+<span class="fc" id="L104">        log.info(&quot;Création en base — Utilisateur id={} username={} {} {} &lt;{}&gt; rôle={} atelierPréféré={} groupe={}&quot;,</span>
+<span class="fc" id="L105">                saved.getId(),</span>
+<span class="fc" id="L106">                saved.getUsername(),</span>
+<span class="fc" id="L107">                saved.getPrenom(),</span>
+<span class="fc" id="L108">                saved.getNom(),</span>
+<span class="fc" id="L109">                saved.getEmail(),</span>
+<span class="fc" id="L110">                saved.getRole(),</span>
+<span class="pc bpc" id="L111" title="1 of 2 branches missed.">                preferred != null ? preferred.getId() : null,</span>
+<span class="fc" id="L112">                groupe.getId());</span>
+<span class="fc" id="L113">        return toResponse(saved);</span>
+    }
+
+    /**
+     * Met à jour un utilisateur du groupe de l'administrateur connecté.
+     *
+     * @param id identifiant du compte
+     * @param request données mises à jour (mot de passe optionnel)
+     * @return compte modifié
+     * @throws org.springframework.web.server.ResponseStatusException {@code 400} si dernier admin retiré ;
+     *         {@code 409} en cas de conflit identifiant/e-mail ;
+     *         {@code 404} si hors groupe
+     */
+    public UserResponse update(Long id, UserRequest request) {
+<span class="nc" id="L127">        User user = getInActorGroupe(id);</span>
+<span class="nc" id="L128">        String username = request.getUsername().trim();</span>
+<span class="nc" id="L129">        String email = requireEmail(request.getEmail());</span>
+<span class="nc bnc" id="L130" title="All 4 branches missed.">        if (!user.getUsername().equals(username) &amp;&amp; userRepository.existsByUsername(username)) {</span>
+<span class="nc" id="L131">            throw new ResponseStatusException(HttpStatus.CONFLICT, &quot;Nom d'utilisateur déjà utilisé&quot;);</span>
+        }
+<span class="nc bnc" id="L133" title="All 2 branches missed.">        if (userRepository.existsByEmailIgnoreCaseAndIdNot(email, id)) {</span>
+<span class="nc" id="L134">            throw new ResponseStatusException(HttpStatus.CONFLICT, &quot;E-mail déjà utilisé&quot;);</span>
+        }
+
+<span class="nc" id="L137">        String newRole = normalizeRole(request.getRole());</span>
+<span class="nc" id="L138">        Long groupeId = requireGroupeId(user);</span>
+<span class="nc bnc" id="L139" title="All 6 branches missed.">        if (Roles.ADMIN.equals(user.getRole()) &amp;&amp; !Roles.ADMIN.equals(newRole) &amp;&amp; countAdminsInGroupe(groupeId) &lt;= 1) {</span>
+<span class="nc" id="L140">            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, &quot;Impossible de retirer le dernier administrateur&quot;);</span>
+        }
+
+<span class="nc" id="L143">        User actor = requireActor();</span>
+<span class="nc" id="L144">        Atelier preferred = resolvePreferredAtelier(actor, newRole, request.getPreferredAtelierId());</span>
+
+<span class="nc" id="L146">        user.setUsername(username);</span>
+<span class="nc" id="L147">        user.setNom(requireName(request.getNom(), &quot;Nom&quot;));</span>
+<span class="nc" id="L148">        user.setPrenom(requireName(request.getPrenom(), &quot;Prénom&quot;));</span>
+<span class="nc" id="L149">        user.setEmail(email);</span>
+<span class="nc" id="L150">        user.setRole(newRole);</span>
+<span class="nc" id="L151">        user.setPreferredAtelier(preferred);</span>
+<span class="nc bnc" id="L152" title="All 4 branches missed.">        if (request.getPassword() != null &amp;&amp; !request.getPassword().isBlank()) {</span>
+<span class="nc" id="L153">            user.setPassword(passwordEncoder.encode(request.getPassword()));</span>
+        }
+<span class="nc" id="L155">        User saved = userRepository.saveAndFlush(user);</span>
+<span class="nc" id="L156">        log.info(&quot;Modification en base — Utilisateur id={} username={} {} {} &lt;{}&gt; rôle={} atelierPréféré={}&quot;,</span>
+<span class="nc" id="L157">                saved.getId(),</span>
+<span class="nc" id="L158">                saved.getUsername(),</span>
+<span class="nc" id="L159">                saved.getPrenom(),</span>
+<span class="nc" id="L160">                saved.getNom(),</span>
+<span class="nc" id="L161">                saved.getEmail(),</span>
+<span class="nc" id="L162">                saved.getRole(),</span>
+<span class="nc bnc" id="L163" title="All 2 branches missed.">                preferred != null ? preferred.getId() : null);</span>
+<span class="nc" id="L164">        return toResponse(saved);</span>
+    }
+
+    /**
+     * Supprime un utilisateur du groupe (interdit sur soi-même et sur le dernier administrateur du groupe).
+     *
+     * @param id identifiant du compte
+     * @param currentUsername utilisateur connecté
+     * @throws org.springframework.web.server.ResponseStatusException {@code 400} si auto-suppression ou dernier admin ;
+     *         {@code 404} si hors groupe
+     */
+    public void delete(Long id, String currentUsername) {
+<span class="fc" id="L176">        User user = getInActorGroupe(id);</span>
+<span class="fc bfc" id="L177" title="All 2 branches covered.">        if (user.getUsername().equals(currentUsername)) {</span>
+<span class="fc" id="L178">            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, &quot;Vous ne pouvez pas supprimer votre propre compte&quot;);</span>
+        }
+<span class="fc" id="L180">        Long groupeId = requireGroupeId(user);</span>
+<span class="pc bpc" id="L181" title="2 of 4 branches missed.">        if (Roles.ADMIN.equals(user.getRole()) &amp;&amp; countAdminsInGroupe(groupeId) &lt;= 1) {</span>
+<span class="fc" id="L182">            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, &quot;Impossible de supprimer le dernier administrateur&quot;);</span>
+        }
+<span class="nc" id="L184">        String username = user.getUsername();</span>
+<span class="nc" id="L185">        String role = user.getRole();</span>
+<span class="nc" id="L186">        userRepository.delete(user);</span>
+<span class="nc" id="L187">        log.info(&quot;Suppression en base — Utilisateur id={} username={} rôle={} par={} groupe={}&quot;,</span>
+                id, username, role, currentUsername, groupeId);
+<span class="nc" id="L189">    }</span>
+
+    private User requireActor() {
+<span class="fc" id="L192">        Authentication auth = SecurityContextHolder.getContext().getAuthentication();</span>
+<span class="pc bpc" id="L193" title="3 of 6 branches missed.">        if (auth == null || auth.getName() == null || auth.getName().isBlank()) {</span>
+<span class="nc" id="L194">            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, &quot;Authentification requise.&quot;);</span>
+        }
+<span class="fc" id="L196">        return userRepository.findByUsername(auth.getName())</span>
+<span class="pc" id="L197">                .orElseThrow(() -&gt; new ResponseStatusException(HttpStatus.UNAUTHORIZED, &quot;Authentification requise.&quot;));</span>
+    }
+
+    private Long requireActorGroupeId() {
+<span class="fc" id="L201">        return requireGroupeId(requireActor());</span>
+    }
+
+    private Long requireGroupeId(User user) {
+<span class="pc bpc" id="L205" title="2 of 4 branches missed.">        if (user.getGroupe() == null || user.getGroupe().getId() == null) {</span>
+<span class="nc" id="L206">            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,</span>
+                    &quot;Votre compte n'est rattaché à aucun groupe. Contactez un administrateur.&quot;);
+        }
+<span class="fc" id="L209">        return user.getGroupe().getId();</span>
+    }
+
+    private void ensureActorOwnsGroupe(User actor, Long groupeId) {
+<span class="fc" id="L213">        Long actorGroupeId = requireGroupeId(actor);</span>
+<span class="pc bpc" id="L214" title="1 of 2 branches missed.">        if (!Objects.equals(actorGroupeId, groupeId)) {</span>
+<span class="nc" id="L215">            throw new ResponseStatusException(HttpStatus.FORBIDDEN, &quot;Groupe non autorisé pour ce compte&quot;);</span>
+        }
+<span class="fc" id="L217">    }</span>
+
+    private User getInActorGroupe(Long id) {
+<span class="fc" id="L220">        User actor = requireActor();</span>
+<span class="fc" id="L221">        Long actorGroupeId = requireGroupeId(actor);</span>
+<span class="fc" id="L222">        User user = userRepository.findById(id)</span>
+<span class="pc" id="L223">                .orElseThrow(() -&gt; new ResponseStatusException(HttpStatus.NOT_FOUND, &quot;Utilisateur introuvable&quot;));</span>
+<span class="pc bpc" id="L224" title="1 of 2 branches missed.">        Long targetGroupeId = user.getGroupe() != null ? user.getGroupe().getId() : null;</span>
+<span class="fc bfc" id="L225" title="All 2 branches covered.">        if (!Objects.equals(actorGroupeId, targetGroupeId)) {</span>
+            // 404 volontaire : ne pas révéler l'existence d'un compte hors groupe.
+<span class="fc" id="L227">            throw new ResponseStatusException(HttpStatus.NOT_FOUND, &quot;Utilisateur introuvable&quot;);</span>
+        }
+<span class="fc" id="L229">        return user;</span>
+    }
+
+    private Atelier resolvePreferredAtelier(User actor, String role, Long preferredAtelierId) {
+<span class="pc bpc" id="L233" title="1 of 2 branches missed.">        if (Roles.TECHNICIEN.equals(role)) {</span>
+<span class="fc bfc" id="L234" title="All 2 branches covered.">            if (preferredAtelierId == null) {</span>
+<span class="fc" id="L235">                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,</span>
+                        &quot;Atelier préféré obligatoire pour un technicien&quot;);
+            }
+<span class="fc" id="L238">            return atelierService.requireAtelierForUserGroupe(actor, preferredAtelierId);</span>
+        }
+<span class="nc bnc" id="L240" title="All 2 branches missed.">        if (preferredAtelierId == null) {</span>
+<span class="nc" id="L241">            return null;</span>
+        }
+<span class="nc" id="L243">        return atelierService.requireAtelierForUserGroupe(actor, preferredAtelierId);</span>
+    }
+
+    private long countAdminsInGroupe(Long groupeId) {
+<span class="fc" id="L247">        return userRepository.findAllByGroupeId(groupeId).stream()</span>
+<span class="fc" id="L248">                .filter(u -&gt; Roles.ADMIN.equals(u.getRole()))</span>
+<span class="fc" id="L249">                .count();</span>
+    }
+
+    private String requireName(String value, String label) {
+<span class="pc bpc" id="L253" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L254">            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, label + &quot; obligatoire&quot;);</span>
+        }
+<span class="fc" id="L256">        return value.trim();</span>
+    }
+
+    private String requireEmail(String value) {
+<span class="pc bpc" id="L260" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L261">            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, &quot;E-mail obligatoire&quot;);</span>
+        }
+<span class="fc" id="L263">        return value.trim().toLowerCase();</span>
+    }
+
+    private String normalizeRole(String role) {
+<span class="pc bpc" id="L267" title="1 of 2 branches missed.">        String normalized = role == null ? &quot;&quot; : role.trim().toUpperCase();</span>
+<span class="fc bfc" id="L268" title="All 2 branches covered.">        if (&quot;TECH&quot;.equals(normalized)) {</span>
+<span class="fc" id="L269">            normalized = Roles.TECHNICIEN;</span>
+        }
+<span class="fc bfc" id="L271" title="All 2 branches covered.">        if (!ALLOWED_ROLES.contains(normalized)) {</span>
+<span class="fc" id="L272">            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,</span>
+                    &quot;Rôle invalide. Choisissez Administrateur ou Technicien.&quot;);
+        }
+<span class="fc" id="L275">        return normalized;</span>
+    }
+
+    private UserResponse toResponse(User user) {
+<span class="fc" id="L279">        Atelier preferred = user.getPreferredAtelier();</span>
+<span class="fc" id="L280">        return UserResponse.builder()</span>
+<span class="fc" id="L281">                .id(user.getId())</span>
+<span class="fc" id="L282">                .username(user.getUsername())</span>
+<span class="fc" id="L283">                .nom(user.getNom())</span>
+<span class="fc" id="L284">                .prenom(user.getPrenom())</span>
+<span class="fc" id="L285">                .email(user.getEmail())</span>
+<span class="fc" id="L286">                .role(user.getRole())</span>
+<span class="fc bfc" id="L287" title="All 2 branches covered.">                .preferredAtelierId(preferred != null ? preferred.getId() : null)</span>
+<span class="fc bfc" id="L288" title="All 2 branches covered.">                .preferredAtelierNom(preferred != null ? preferred.getNom() : null)</span>
+<span class="fc" id="L289">                .createdAt(user.getCreatedAt())</span>
+<span class="fc" id="L290">                .build();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

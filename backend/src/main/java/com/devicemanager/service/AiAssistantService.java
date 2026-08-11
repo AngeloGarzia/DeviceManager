@@ -279,7 +279,8 @@ public class AiAssistantService {
         String apiKey = resolveApiKey(provider);
         if (apiKey.isBlank()) {
             throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
-                    "Clé IA manquante pour ce fournisseur. Contactez un administrateur ou choisissez un autre fournisseur dans Paramètres.");
+                    "Clé IA manquante pour ce fournisseur. "
+                    + "Contactez un administrateur ou choisissez un autre fournisseur dans Paramètres.");
         }
         return apiKey;
     }

@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Commande.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">device-manager</a> &gt; <a href="index.source.html" class="el_package">com.devicemanager.entity</a> &gt; <span class="el_source">Commande.java</span></div><h1>Commande.java</h1><pre class="source lang-java linenums">package com.devicemanager.entity;
+
+import jakarta.persistence.*;
+import lombok.*;
+
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * Demande de commande de pièces déposée par un technicien pour un atelier.
+ * Contient un message libre et une ou plusieurs lignes (pièce + quantité).
+ */
+@Entity
+@Table(name = &quot;commande&quot;)
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class Commande {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    /** Technicien ayant soumis la demande. */
+    @ManyToOne(optional = false, fetch = FetchType.LAZY)
+    @JoinColumn(name = &quot;technicien_id&quot;, nullable = false,
+            foreignKey = @ForeignKey(name = &quot;fk_commande_technicien&quot;))
+    private User technicien;
+
+    /** Nom du technicien dénormalisé pour l'historique et les e-mails. */
+    @Column(name = &quot;technicien_nom&quot;, nullable = false, length = 120)
+    private String technicienNom;
+
+    @Column(nullable = false, length = 1000)
+    private String message;
+
+    @Column(name = &quot;date_demande&quot;, nullable = false)
+    private LocalDateTime dateDemande;
+
+    /** Statut du cycle de vie (ex. {@code PENDING}, {@code VALIDATED}, {@code RECEIVED}). */
+    @Column(nullable = false, length = 30)
+    private String status;
+
+    @OneToMany(mappedBy = &quot;commande&quot;, cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List&lt;CommandeLigne&gt; lignes = new ArrayList&lt;&gt;();
+
+    /** Atelier concerné — périmètre multi-tenant de la commande. */
+    @ManyToOne(optional = false, fetch = FetchType.LAZY)
+    @JoinColumn(name = &quot;atelier_id&quot;, foreignKey = @ForeignKey(name = &quot;fk_commande_atelier&quot;))
+    private Atelier atelier;
+
+    public void addLigne(CommandeLigne ligne) {
+<span class="fc" id="L57">        lignes.add(ligne);</span>
+<span class="fc" id="L58">        ligne.setCommande(this);</span>
+<span class="fc" id="L59">    }</span>
+
+    @PrePersist
+    void onCreate() {
+<span class="nc bnc" id="L63" title="All 2 branches missed.">        if (dateDemande == null) {</span>
+<span class="nc" id="L64">            dateDemande = LocalDateTime.now();</span>
+        }
+<span class="nc bnc" id="L66" title="All 2 branches missed.">        if (status == null) {</span>
+<span class="nc" id="L67">            status = &quot;PENDING&quot;;</span>
+        }
+<span class="nc" id="L69">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

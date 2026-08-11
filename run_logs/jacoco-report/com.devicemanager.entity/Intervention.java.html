@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Intervention.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">device-manager</a> &gt; <a href="index.source.html" class="el_package">com.devicemanager.entity</a> &gt; <span class="el_source">Intervention.java</span></div><h1>Intervention.java</h1><pre class="source lang-java linenums">package com.devicemanager.entity;
+
+import jakarta.persistence.*;
+import lombok.*;
+
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * Bon d'intervention archivé : consommation de pièces détachées sur un atelier.
+ */
+@Entity
+@Table(name = &quot;intervention&quot;)
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class Intervention {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    /** Numéro métier unique (ex. BI-2026-00042). */
+    @Column(nullable = false, length = 40, unique = true)
+    private String numero;
+
+    @Column(name = &quot;date_intervention&quot;, nullable = false)
+    private LocalDateTime dateIntervention;
+
+    @ManyToOne(optional = false, fetch = FetchType.LAZY)
+    @JoinColumn(name = &quot;technicien_id&quot;, nullable = false,
+            foreignKey = @ForeignKey(name = &quot;fk_intervention_technicien&quot;))
+    private User technicien;
+
+    @Column(name = &quot;technicien_nom&quot;, nullable = false, length = 120)
+    private String technicienNom;
+
+    @ManyToOne(optional = false, fetch = FetchType.LAZY)
+    @JoinColumn(name = &quot;atelier_id&quot;, nullable = false,
+            foreignKey = @ForeignKey(name = &quot;fk_intervention_atelier&quot;))
+    private Atelier atelier;
+
+    /** Lieu / zone d'intervention (ex. salle machines). */
+    @Column(length = 200)
+    private String emplacement;
+
+    /** Machine ou numéro MAS concerné. */
+    @Column(name = &quot;machine_mas&quot;, length = 120)
+    private String machineMas;
+
+    @Column(nullable = false, length = 500)
+    private String motif;
+
+    @Column(length = 2000)
+    private String diagnostic;
+
+    /** Travaux effectués (obligatoire pour un bon complet). */
+    @Column(nullable = false, length = 2000)
+    private String travaux;
+
+    @Column(length = 2000)
+    private String observations;
+
+    @Column(name = &quot;created_at&quot;, nullable = false)
+    private LocalDateTime createdAt;
+
+    @OneToMany(mappedBy = &quot;intervention&quot;, cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List&lt;InterventionLigne&gt; lignes = new ArrayList&lt;&gt;();
+
+    public void addLigne(InterventionLigne ligne) {
+<span class="fc" id="L75">        lignes.add(ligne);</span>
+<span class="fc" id="L76">        ligne.setIntervention(this);</span>
+<span class="fc" id="L77">    }</span>
+
+    @PrePersist
+    void onCreate() {
+<span class="nc bnc" id="L81" title="All 2 branches missed.">        if (createdAt == null) {</span>
+<span class="nc" id="L82">            createdAt = LocalDateTime.now();</span>
+        }
+<span class="nc bnc" id="L84" title="All 2 branches missed.">        if (dateIntervention == null) {</span>
+<span class="nc" id="L85">            dateIntervention = LocalDateTime.now();</span>
+        }
+<span class="nc" id="L87">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

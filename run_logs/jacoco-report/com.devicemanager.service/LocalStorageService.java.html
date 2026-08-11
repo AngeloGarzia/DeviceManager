@@ -1,0 +1,228 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LocalStorageService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">device-manager</a> &gt; <a href="index.source.html" class="el_package">com.devicemanager.service</a> &gt; <span class="el_source">LocalStorageService.java</span></div><h1>LocalStorageService.java</h1><pre class="source lang-java linenums">package com.devicemanager.service;
+
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.dao.EmptyResultDataAccessException;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.Arrays;
+import java.util.Optional;
+import java.util.UUID;
+
+/**
+ * Stockage local des photos de pièces détachées avec copie durable en MySQL.
+ * &lt;p&gt;
+ * Active lorsque S3 est désactivé ; survit au disque éphémère Render via
+ * la table {@code upload_blob}. Lecture/écriture blob via JDBC.
+ */
+@Service
+@ConditionalOnProperty(name = &quot;app.s3.enabled&quot;, havingValue = &quot;false&quot;, matchIfMissing = true)
+<span class="fc" id="L28">@Slf4j</span>
+public class LocalStorageService implements StorageService {
+
+    private final Path root;
+    private final JdbcTemplate jdbcTemplate;
+
+    /**
+     * Constructeur : résout un dossier d'uploads accessible en écriture.
+     *
+     * @param dir chemin préféré (configuration {@code app.s3.local-fallback-dir})
+     * @param jdbcTemplate accès JDBC pour la persistance blob
+     * @throws IllegalStateException si aucun dossier n'est accessible en écriture
+     */
+    public LocalStorageService(
+            @Value(&quot;${app.s3.local-fallback-dir:uploads}&quot;) String dir,
+<span class="fc" id="L43">            JdbcTemplate jdbcTemplate) {</span>
+<span class="fc" id="L44">        this.root = resolveWritableRoot(dir);</span>
+<span class="fc" id="L45">        this.jdbcTemplate = jdbcTemplate;</span>
+<span class="fc" id="L46">        log.info(&quot;Uploads locaux: dossier={}&quot;, root.toAbsolutePath());</span>
+<span class="fc" id="L47">    }</span>
+
+    /**
+     * Retourne le répertoire racine des uploads locaux.
+     *
+     * @return chemin absolu du dossier de stockage
+     */
+    public Path getRoot() {
+<span class="nc" id="L55">        return root;</span>
+    }
+
+    private static Path resolveWritableRoot(String dir) {
+<span class="fc" id="L59">        Path[] candidates = new Path[] {</span>
+<span class="fc" id="L60">                Paths.get(dir),</span>
+<span class="fc" id="L61">                Paths.get(&quot;/app/uploads&quot;),</span>
+<span class="fc" id="L62">                Paths.get(System.getProperty(&quot;java.io.tmpdir&quot;), &quot;device-manager-uploads&quot;),</span>
+<span class="fc" id="L63">                Paths.get(&quot;/tmp&quot;, &quot;device-manager-uploads&quot;)</span>
+        };
+<span class="fc" id="L65">        IOException last = null;</span>
+<span class="pc bpc" id="L66" title="1 of 2 branches missed.">        for (Path candidate : candidates) {</span>
+            try {
+<span class="fc" id="L68">                Path absolute = candidate.toAbsolutePath().normalize();</span>
+<span class="fc" id="L69">                Files.createDirectories(absolute);</span>
+<span class="fc" id="L70">                Path probe = absolute.resolve(&quot;.write-test&quot;);</span>
+<span class="fc" id="L71">                Files.writeString(probe, &quot;ok&quot;);</span>
+<span class="fc" id="L72">                Files.deleteIfExists(probe);</span>
+<span class="fc" id="L73">                return absolute;</span>
+<span class="nc" id="L74">            } catch (IOException ex) {</span>
+<span class="nc" id="L75">                last = ex;</span>
+            }
+        }
+<span class="nc" id="L78">        throw new IllegalStateException(</span>
+                &quot;Stockage des photos indisponible. Contactez un administrateur.&quot;,
+                last);
+    }
+
+    /**
+     * Enregistre un fichier sur disque et en base MySQL.
+     *
+     * @param file fichier à stocker
+     * @return clé, URL relative et métadonnées
+     */
+    @Override
+    @Transactional
+    public StoredObject store(MultipartFile file) {
+<span class="fc" id="L92">        String filename = UUID.randomUUID() + &quot;-&quot; + sanitize(file.getOriginalFilename());</span>
+        try {
+<span class="fc" id="L94">            byte[] bytes = file.getBytes();</span>
+<span class="fc" id="L95">            Path target = root.resolve(filename);</span>
+<span class="fc" id="L96">            Files.write(target, bytes);</span>
+<span class="fc" id="L97">            persistBlob(filename, bytes, file.getContentType(), (long) bytes.length);</span>
+<span class="fc" id="L98">            log.info(&quot;Upload stocké: key={} bytes={} (disque + MySQL)&quot;, filename, bytes.length);</span>
+<span class="fc" id="L99">            return new StoredObject(filename, &quot;/uploads/&quot; + filename, file.getContentType(), (long) bytes.length);</span>
+<span class="nc" id="L100">        } catch (IOException e) {</span>
+<span class="nc" id="L101">            throw new IllegalStateException(&quot;Échec d'enregistrement de la photo. Réessayez.&quot;, e);</span>
+        }
+    }
+
+    /**
+     * Supprime un fichier du disque et de la table {@code upload_blob}.
+     *
+     * @param key clé du fichier (ignorée si invalide)
+     */
+    @Override
+    @Transactional
+    public void delete(String key) {
+<span class="pc bpc" id="L113" title="1 of 2 branches missed.">        if (!isSafeKey(key)) {</span>
+<span class="nc" id="L114">            return;</span>
+        }
+        try {
+<span class="fc" id="L117">            Files.deleteIfExists(root.resolve(key));</span>
+<span class="nc" id="L118">        } catch (IOException e) {</span>
+<span class="nc" id="L119">            throw new IllegalStateException(&quot;Impossible de supprimer la photo.&quot;, e);</span>
+<span class="fc" id="L120">        }</span>
+<span class="fc" id="L121">        jdbcTemplate.update(&quot;DELETE FROM upload_blob WHERE object_key = ?&quot;, key);</span>
+<span class="fc" id="L122">    }</span>
+
+    /**
+     * Charge un fichier depuis le disque, avec repli et réhydratation depuis MySQL.
+     *
+     * @param key clé du fichier
+     * @return octets et type MIME, ou vide si introuvable ou clé non sûre
+     */
+    @Transactional(readOnly = true)
+    public Optional&lt;StoredObjectBytes&gt; load(String key) {
+<span class="fc bfc" id="L132" title="All 2 branches covered.">        if (!isSafeKey(key)) {</span>
+<span class="fc" id="L133">            return Optional.empty();</span>
+        }
+<span class="fc" id="L135">        Path file = root.resolve(key).normalize();</span>
+<span class="pc bpc" id="L136" title="1 of 2 branches missed.">        if (!file.startsWith(root)) {</span>
+<span class="nc" id="L137">            return Optional.empty();</span>
+        }
+        try {
+<span class="fc bfc" id="L140" title="All 2 branches covered.">            if (Files.isRegularFile(file)) {</span>
+<span class="fc" id="L141">                String contentType = Files.probeContentType(file);</span>
+<span class="fc" id="L142">                return Optional.of(new StoredObjectBytes(Files.readAllBytes(file), contentType, Files.size(file)));</span>
+            }
+<span class="nc" id="L144">        } catch (IOException ignored) {</span>
+            // fallback MySQL
+<span class="fc" id="L146">        }</span>
+
+<span class="fc" id="L148">        Optional&lt;StoredObjectBytes&gt; fromDb = loadFromDatabase(key);</span>
+<span class="fc" id="L149">        fromDb.ifPresent(obj -&gt; rehydrateDisk(key, obj.data()));</span>
+<span class="fc bfc" id="L150" title="All 2 branches covered.">        if (fromDb.isEmpty()) {</span>
+<span class="fc" id="L151">            log.warn(&quot;Upload introuvable (disque + MySQL): {}&quot;, key);</span>
+        }
+<span class="fc" id="L153">        return fromDb;</span>
+    }
+
+    private void persistBlob(String key, byte[] data, String contentType, long size) {
+<span class="fc" id="L157">        jdbcTemplate.update(&quot;&quot;&quot;</span>
+                INSERT INTO upload_blob (object_key, data, content_type, file_size)
+                VALUES (?, ?, ?, ?)
+                ON DUPLICATE KEY UPDATE
+                  data = VALUES(data),
+                  content_type = VALUES(content_type),
+                  file_size = VALUES(file_size)
+                &quot;&quot;&quot;,
+<span class="fc" id="L165">                key, data, contentType, size);</span>
+<span class="fc" id="L166">    }</span>
+
+    private Optional&lt;StoredObjectBytes&gt; loadFromDatabase(String key) {
+        try {
+<span class="fc" id="L170">            return Optional.ofNullable(jdbcTemplate.queryForObject(</span>
+                    &quot;SELECT data, content_type, file_size FROM upload_blob WHERE object_key = ?&quot;,
+                    (rs, rowNum) -&gt; {
+<span class="nc" id="L173">                        byte[] data = rs.getBytes(&quot;data&quot;);</span>
+<span class="nc bnc" id="L174" title="All 4 branches missed.">                        if (data == null || data.length == 0) {</span>
+<span class="nc" id="L175">                            return null;</span>
+                        }
+<span class="nc bnc" id="L177" title="All 2 branches missed.">                        Long size = rs.getObject(&quot;file_size&quot;) == null ? (long) data.length : rs.getLong(&quot;file_size&quot;);</span>
+<span class="nc" id="L178">                        return new StoredObjectBytes(data, rs.getString(&quot;content_type&quot;), size);</span>
+                    },
+                    key));
+<span class="fc" id="L181">        } catch (EmptyResultDataAccessException ex) {</span>
+<span class="fc" id="L182">            return Optional.empty();</span>
+        }
+    }
+
+    private void rehydrateDisk(String key, byte[] data) {
+        try {
+<span class="fc" id="L188">            Files.write(root.resolve(key), data);</span>
+<span class="fc" id="L189">            log.info(&quot;Upload rehydraté sur disque depuis MySQL: {}&quot;, key);</span>
+<span class="nc" id="L190">        } catch (IOException ex) {</span>
+<span class="nc" id="L191">            log.warn(&quot;Impossible de rehydrater {} sur disque: {}&quot;, key, ex.getMessage());</span>
+<span class="fc" id="L192">        }</span>
+<span class="fc" id="L193">    }</span>
+
+    private static boolean isSafeKey(String key) {
+<span class="pc bpc" id="L196" title="1 of 2 branches missed.">        return key != null</span>
+<span class="pc bpc" id="L197" title="1 of 2 branches missed.">                &amp;&amp; !key.isBlank()</span>
+<span class="fc bfc" id="L198" title="All 2 branches covered.">                &amp;&amp; !key.contains(&quot;..&quot;)</span>
+<span class="fc bfc" id="L199" title="All 2 branches covered.">                &amp;&amp; !key.contains(&quot;/&quot;)</span>
+<span class="pc bpc" id="L200" title="1 of 2 branches missed.">                &amp;&amp; !key.contains(&quot;\\&quot;);</span>
+    }
+
+    private String sanitize(String name) {
+<span class="pc bpc" id="L204" title="1 of 4 branches missed.">        if (name == null || name.isBlank()) {</span>
+<span class="fc" id="L205">            return &quot;photo.jpg&quot;;</span>
+        }
+<span class="fc" id="L207">        return name.replaceAll(&quot;[^a-zA-Z0-9._-]&quot;, &quot;_&quot;);</span>
+    }
+
+    /**
+     * Contenu binaire d'un fichier chargé depuis le stockage local.
+     *
+     * @param data octets du fichier
+     * @param contentType type MIME
+     * @param fileSize taille en octets
+     */
+    public record StoredObjectBytes(byte[] data, String contentType, Long fileSize) {
+<span class="fc" id="L218">        public StoredObjectBytes {</span>
+<span class="pc bpc" id="L219" title="1 of 2 branches missed.">            data = data == null ? null : Arrays.copyOf(data, data.length);</span>
+<span class="fc" id="L220">        }</span>
+
+        @Override
+        public byte[] data() {
+<span class="pc bpc" id="L224" title="1 of 2 branches missed.">            return data == null ? null : Arrays.copyOf(data, data.length);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

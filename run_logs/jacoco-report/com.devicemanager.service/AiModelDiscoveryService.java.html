@@ -1,0 +1,341 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AiModelDiscoveryService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">device-manager</a> &gt; <a href="index.source.html" class="el_package">com.devicemanager.service</a> &gt; <span class="el_source">AiModelDiscoveryService.java</span></div><h1>AiModelDiscoveryService.java</h1><pre class="source lang-java linenums">package com.devicemanager.service;
+
+import com.devicemanager.ai.AiApiKeyBattery;
+import com.devicemanager.ai.AiProviders;
+import com.devicemanager.dto.AiModelOption;
+import com.devicemanager.dto.AiModelsResponse;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientResponseException;
+
+import java.time.Duration;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
+/**
+ * Découvre en ligne les modèles chat disponibles chez chaque fournisseur IA
+ * (pas de catalogue de modèles en dur).
+ */
+@Service
+@RequiredArgsConstructor
+@Slf4j
+public class AiModelDiscoveryService {
+
+    private static final Duration CACHE_TTL = Duration.ofMinutes(10);
+
+    private final AiApiKeyBattery aiApiKeyBattery;
+    private final ObjectMapper objectMapper;
+
+    private final Map&lt;String, CacheEntry&gt; cache = new ConcurrentHashMap&lt;&gt;();
+
+    /**
+     * Liste les modèles online pour un fournisseur (cache court).
+     */
+    public AiModelsResponse listModels(String providerId) {
+        String id = AiProviders.normalizeProvider(providerId);
+        AiProviders.Provider provider = AiProviders.require(id);
+        String apiKey = aiApiKeyBattery.keyFor(id);
+        if (apiKey == null || apiKey.isBlank()) {
+            return AiModelsResponse.builder()
+                    .providerId(id)
+                    .providerLabel(provider.label())
+                    .hasApiKey(false)
+                    .message(&quot;Clé absente pour ce fournisseur — modèles indisponibles.&quot;)
+                    .models(List.of())
+                    .build();
+        }
+
+        CacheEntry cached = cache.get(id);
+        if (cached != null &amp;&amp; cached.expiresAt().isAfter(Instant.now())) {
+            return cached.response();
+        }
+
+        try {
+            List&lt;AiModelOption&gt; models = &quot;gemini&quot;.equals(id)
+                    ? fetchGeminiModels(apiKey)
+                    : fetchOpenAiCompatibleModels(provider, apiKey);
+            models = sortModels(models);
+            AiModelsResponse response = AiModelsResponse.builder()
+                    .providerId(id)
+                    .providerLabel(provider.label())
+                    .hasApiKey(true)
+                    .message(models.isEmpty()
+                            ? &quot;Aucun modèle chat renvoyé par le fournisseur.&quot;
+                            : models.size() + &quot; modèle(s) disponible(s).&quot;)
+                    .models(models)
+                    .build();
+            cache.put(id, new CacheEntry(Instant.now().plus(CACHE_TTL), response));
+            return response;
+        } catch (RestClientResponseException ex) {
+            log.warn(&quot;Découverte modèles IA échouée ({}): {} {}&quot;, id, ex.getStatusCode().value(), ex.getResponseBodyAsString());
+            String msg = friendlyFetchError(id, ex);
+            return AiModelsResponse.builder()
+                    .providerId(id)
+                    .providerLabel(provider.label())
+                    .hasApiKey(true)
+                    .message(msg)
+                    .models(List.of())
+                    .build();
+        } catch (Exception ex) {
+            log.warn(&quot;Découverte modèles IA échouée ({}): {}&quot;, id, ex.getMessage());
+            return AiModelsResponse.builder()
+                    .providerId(id)
+                    .providerLabel(provider.label())
+                    .hasApiKey(true)
+                    .message(&quot;Impossible de charger les modèles. Réessayez ou changez de fournisseur.&quot;)
+                    .models(List.of())
+                    .build();
+        }
+    }
+
+    /** Premier modèle vision découvert en ligne, ou vide. */
+    public String firstVisionModelId(String providerId) {
+        return listModels(providerId).getModels().stream()
+                .filter(AiModelOption::isVision)
+                .map(AiModelOption::getId)
+                .findFirst()
+                .orElse(null);
+    }
+
+    /** Premier modèle chat découvert, ou vide. */
+    public String firstModelId(String providerId) {
+        return listModels(providerId).getModels().stream()
+                .map(AiModelOption::getId)
+                .findFirst()
+                .orElse(null);
+    }
+
+    private List&lt;AiModelOption&gt; fetchGeminiModels(String apiKey) throws Exception {
+        List&lt;AiModelOption&gt; out = new ArrayList&lt;&gt;();
+        String pageToken = null;
+        do {
+            String uri = &quot;https://generativelanguage.googleapis.com/v1beta/models?pageSize=100&quot;;
+            if (pageToken != null &amp;&amp; !pageToken.isBlank()) {
+                uri += &quot;&amp;pageToken=&quot; + java.net.URLEncoder.encode(pageToken, java.nio.charset.StandardCharsets.UTF_8);
+            }
+            String body = RestClient.create()
+                    .get()
+                    .uri(uri)
+                    .header(&quot;x-goog-api-key&quot;, apiKey)
+                    .accept(MediaType.APPLICATION_JSON)
+                    .retrieve()
+                    .body(String.class);
+            JsonNode root = objectMapper.readTree(body == null ? &quot;{}&quot; : body);
+            JsonNode models = root.path(&quot;models&quot;);
+            if (models.isArray()) {
+                for (JsonNode node : models) {
+                    String name = text(node, &quot;name&quot;);
+                    if (name == null) {
+                        continue;
+                    }
+                    String id = name.startsWith(&quot;models/&quot;) ? name.substring(&quot;models/&quot;.length()) : name;
+                    // Alias versionnés (-001) : on garde le nom stable sans suffixe.
+                    if (id.matches(&quot;.*-\\d{3}$&quot;)) {
+                        continue;
+                    }
+                    if (!supportsGenerateContent(node) || isNonChatGemini(id)) {
+                        continue;
+                    }
+                    boolean vision = AiProviders.supportsVision(&quot;gemini&quot;, id);
+                    out.add(AiModelOption.builder()
+                            .id(id)
+                            .label(id + (vision ? &quot; (vision)&quot; : &quot;&quot;))
+                            .vision(vision)
+                            .build());
+                }
+            }
+            pageToken = text(root, &quot;nextPageToken&quot;);
+        } while (pageToken != null &amp;&amp; !pageToken.isBlank());
+        return out;
+    }
+
+    private List&lt;AiModelOption&gt; fetchOpenAiCompatibleModels(AiProviders.Provider provider, String apiKey)
+            throws Exception {
+        String url = provider.baseUrl().replaceAll(&quot;/+$&quot;, &quot;&quot;) + &quot;/v1/models&quot;;
+        RestClient.RequestHeadersSpec&lt;?&gt; req = RestClient.create()
+                .get()
+                .uri(url)
+                .header(HttpHeaders.AUTHORIZATION, &quot;Bearer &quot; + apiKey)
+                .accept(MediaType.APPLICATION_JSON);
+        if (&quot;openrouter&quot;.equals(provider.id())) {
+            req = req.header(&quot;HTTP-Referer&quot;, &quot;https://devicemanager.local&quot;)
+                    .header(&quot;X-Title&quot;, &quot;DeviceManager&quot;);
+        }
+        String body = req.retrieve().body(String.class);
+        JsonNode root = objectMapper.readTree(body == null ? &quot;{}&quot; : body);
+        List&lt;AiModelOption&gt; out = new ArrayList&lt;&gt;();
+        JsonNode data = root.path(&quot;data&quot;);
+        if (!data.isArray()) {
+            // Certains fournisseurs renvoient { &quot;models&quot;: [...] }
+            data = root.path(&quot;models&quot;);
+        }
+        if (!data.isArray()) {
+            return out;
+        }
+        for (JsonNode node : data) {
+            String id = text(node, &quot;id&quot;);
+            if (id == null) {
+                id = text(node, &quot;name&quot;);
+            }
+            if (id == null || !isLikelyChatModel(provider.id(), id, node)) {
+                continue;
+            }
+            String display = text(node, &quot;name&quot;);
+            if (display == null || display.isBlank() || display.equals(id)) {
+                display = id;
+            }
+            boolean vision = detectVision(provider.id(), id, node);
+            out.add(AiModelOption.builder()
+                    .id(id)
+                    .label(display + (vision ? &quot; (vision)&quot; : &quot;&quot;))
+                    .vision(vision)
+                    .build());
+        }
+        return out;
+    }
+
+    private static boolean supportsGenerateContent(JsonNode node) {
+        JsonNode methods = node.path(&quot;supportedGenerationMethods&quot;);
+        if (!methods.isArray() || methods.isEmpty()) {
+            return true;
+        }
+        for (JsonNode m : methods) {
+            if (&quot;generateContent&quot;.equalsIgnoreCase(m.asText())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean isNonChatGemini(String id) {
+        String m = id.toLowerCase(Locale.ROOT);
+        return m.contains(&quot;embedding&quot;)
+                || m.contains(&quot;aqa&quot;)
+                || m.contains(&quot;imagen&quot;)
+                || m.contains(&quot;tts&quot;)
+                || m.contains(&quot;gecko&quot;)
+                || m.endsWith(&quot;-latest-001&quot;) &amp;&amp; m.contains(&quot;embedding&quot;);
+    }
+
+    private static boolean isLikelyChatModel(String providerId, String id, JsonNode node) {
+        String m = id.toLowerCase(Locale.ROOT);
+        if (m.contains(&quot;embedding&quot;)
+                || m.contains(&quot;whisper&quot;)
+                || m.contains(&quot;tts&quot;)
+                || m.contains(&quot;dall-e&quot;)
+                || m.contains(&quot;moderation&quot;)
+                || m.contains(&quot;realtime&quot;)
+                || m.contains(&quot;audio&quot;)
+                || m.contains(&quot;transcribe&quot;)
+                || m.contains(&quot;tts-1&quot;)) {
+            return false;
+        }
+        // OpenRouter expose architecture.modality
+        JsonNode modality = node.path(&quot;architecture&quot;).path(&quot;modality&quot;);
+        if (modality.isTextual()) {
+            String mod = modality.asText(&quot;&quot;).toLowerCase(Locale.ROOT);
+            if (mod.contains(&quot;text&quot;) || mod.contains(&quot;image&quot;)) {
+                return true;
+            }
+        }
+        if (&quot;openai&quot;.equals(providerId)) {
+            return m.startsWith(&quot;gpt-&quot;)
+                    || m.startsWith(&quot;o1&quot;)
+                    || m.startsWith(&quot;o3&quot;)
+                    || m.startsWith(&quot;o4&quot;)
+                    || m.startsWith(&quot;chatgpt&quot;);
+        }
+        if (&quot;deepseek&quot;.equals(providerId)) {
+            return m.contains(&quot;chat&quot;) || m.contains(&quot;reasoner&quot;);
+        }
+        return true;
+    }
+
+    private static boolean detectVision(String providerId, String id, JsonNode node) {
+        JsonNode modality = node.path(&quot;architecture&quot;).path(&quot;modality&quot;);
+        if (modality.isTextual() &amp;&amp; modality.asText(&quot;&quot;).toLowerCase(Locale.ROOT).contains(&quot;image&quot;)) {
+            return true;
+        }
+        JsonNode inputModalities = node.path(&quot;architecture&quot;).path(&quot;input_modalities&quot;);
+        if (inputModalities.isArray()) {
+            for (JsonNode mod : inputModalities) {
+                if (&quot;image&quot;.equalsIgnoreCase(mod.asText())) {
+                    return true;
+                }
+            }
+        }
+        return AiProviders.supportsVision(providerId, id);
+    }
+
+    private static List&lt;AiModelOption&gt; sortModels(List&lt;AiModelOption&gt; models) {
+        return models.stream()
+                .sorted(Comparator
+                        .comparingInt((AiModelOption m) -&gt; modelSortRank(m.getId()))
+                        .thenComparing(AiModelOption::isVision).reversed()
+                        .thenComparing(m -&gt; m.getId().toLowerCase(Locale.ROOT)))
+                .toList();
+    }
+
+    /** Priorise les modèles Gemini / Flash-Lite courants en tête de liste. */
+    private static int modelSortRank(String id) {
+        String m = id == null ? &quot;&quot; : id.toLowerCase(Locale.ROOT);
+        if (m.equals(&quot;gemini-3.1-flash-lite&quot;) || m.equals(&quot;google/gemini-3.1-flash-lite&quot;)) {
+            return 0;
+        }
+        if (m.contains(&quot;3.1-flash-lite&quot;)) {
+            return 1;
+        }
+        if (m.contains(&quot;flash-lite&quot;) &amp;&amp; !m.contains(&quot;preview&quot;)) {
+            return 2;
+        }
+        if (m.contains(&quot;flash&quot;) &amp;&amp; !m.contains(&quot;preview&quot;) &amp;&amp; !m.contains(&quot;image&quot;)) {
+            return 3;
+        }
+        if (m.startsWith(&quot;gemini-&quot;) &amp;&amp; !m.contains(&quot;preview&quot;)) {
+            return 4;
+        }
+        if (m.contains(&quot;preview&quot;)) {
+            return 8;
+        }
+        return 5;
+    }
+
+    private static String friendlyFetchError(String providerId, RestClientResponseException ex) {
+        int code = ex.getStatusCode().value();
+        String body = ex.getResponseBodyAsString();
+        if (code == 401 || code == 403
+                || body.contains(&quot;ACCESS_TOKEN_TYPE_UNSUPPORTED&quot;)
+                || body.contains(&quot;UNAUTHENTICATED&quot;)
+                || body.contains(&quot;invalid authentication&quot;)) {
+            if (&quot;gemini&quot;.equals(providerId)) {
+                return &quot;Clé Gemini refusée. Essayez OpenRouter ou une autre clé dans la configuration.&quot;;
+            }
+            return &quot;Authentification refusée par le fournisseur (clé invalide ou expirée).&quot;;
+        }
+        return &quot;Impossible de charger les modèles pour ce fournisseur. Réessayez plus tard.&quot;;
+    }
+
+    private static String text(JsonNode node, String field) {
+        JsonNode v = node.path(field);
+        if (v.isMissingNode() || v.isNull()) {
+            return null;
+        }
+        String s = v.asText(null);
+        return s == null || s.isBlank() ? null : s.trim();
+    }
+
+<span class="nc" id="L338">    private record CacheEntry(Instant expiresAt, AiModelsResponse response) {</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

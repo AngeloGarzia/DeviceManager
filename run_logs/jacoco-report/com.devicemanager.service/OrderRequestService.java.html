@@ -1,0 +1,664 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>OrderRequestService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">device-manager</a> &gt; <a href="index.source.html" class="el_package">com.devicemanager.service</a> &gt; <span class="el_source">OrderRequestService.java</span></div><h1>OrderRequestService.java</h1><pre class="source lang-java linenums">package com.devicemanager.service;
+
+import com.devicemanager.dto.MailPreviewItem;
+import com.devicemanager.dto.OrderRequestDto;
+import com.devicemanager.dto.OrderRequestLineResponse;
+import com.devicemanager.dto.OrderRequestResponse;
+import com.devicemanager.entity.Atelier;
+import com.devicemanager.entity.Commande;
+import com.devicemanager.entity.CommandeLigne;
+import com.devicemanager.entity.Device;
+import com.devicemanager.entity.Sfm;
+import com.devicemanager.entity.SfmContact;
+import com.devicemanager.entity.User;
+import com.devicemanager.repository.CommandeRepository;
+import com.devicemanager.repository.DeviceRepository;
+import com.devicemanager.repository.UserRepository;
+import com.devicemanager.security.OrderStatuses;
+import com.devicemanager.security.Roles;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.hibernate.Hibernate;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
+
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+/**
+ * Service métier des demandes de commande de pièces détachées.
+ * &lt;p&gt;
+ * Flux : création ({@code PENDING}) → validation admin + e-mails SFM ({@code VALIDATED})
+ * → vérification/ajustement des quantités → réception ({@code RECEIVED}) avec mise à jour
+ * du stock des pièces. Scopé à l'atelier courant ({@code X-Atelier-Id}).
+ */
+@Service
+@RequiredArgsConstructor
+@Transactional
+<span class="fc" id="L46">@Slf4j</span>
+public class OrderRequestService {
+
+    private final CommandeRepository commandeRepository;
+    private final DeviceRepository deviceRepository;
+    private final UserRepository userRepository;
+    private final MailService mailService;
+    private final AtelierService atelierService;
+
+    /**
+     * Crée une demande {@code PENDING} et notifie l'administrateur par e-mail.
+     *
+     * @param request lignes de pièces et message
+     * @param username demandeur authentifié
+     * @return demande enregistrée
+     * @throws org.springframework.web.server.ResponseStatusException {@code 400} si lignes vides ou pièce introuvable
+     */
+    public OrderRequestResponse create(OrderRequestDto request, String username) {
+<span class="fc" id="L64">        User technicien = userRepository.findByUsername(username)</span>
+<span class="pc" id="L65">                .orElseThrow(() -&gt; new ResponseStatusException(HttpStatus.UNAUTHORIZED, &quot;Utilisateur introuvable&quot;));</span>
+<span class="fc" id="L66">        Atelier atelier = atelierService.requireCurrentAtelier();</span>
+<span class="fc" id="L67">        Long atelierId = atelier.getId();</span>
+
+<span class="pc bpc" id="L69" title="1 of 4 branches missed.">        if (request.getLignes() == null || request.getLignes().isEmpty()) {</span>
+<span class="fc" id="L70">            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, &quot;Ajoutez au moins une pièce à la demande&quot;);</span>
+        }
+
+<span class="fc" id="L73">        Map&lt;Long, Integer&gt; quantities = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L74" title="All 2 branches covered.">        for (OrderRequestDto.OrderRequestLineDto line : request.getLignes()) {</span>
+<span class="fc" id="L75">            quantities.merge(line.getDeviceId(), line.getQuantite(), Integer::sum);</span>
+<span class="fc" id="L76">        }</span>
+
+<span class="fc" id="L78">        LocalDateTime dateDemande = LocalDateTime.now();</span>
+<span class="fc" id="L79">        Commande commande = Commande.builder()</span>
+<span class="fc" id="L80">                .technicien(technicien)</span>
+<span class="fc" id="L81">                .technicienNom(displayUserName(technicien))</span>
+<span class="fc" id="L82">                .message(request.getMessage().trim())</span>
+<span class="fc" id="L83">                .dateDemande(dateDemande)</span>
+<span class="fc" id="L84">                .status(OrderStatuses.PENDING)</span>
+<span class="fc" id="L85">                .lignes(new ArrayList&lt;&gt;())</span>
+<span class="fc" id="L86">                .atelier(atelier)</span>
+<span class="fc" id="L87">                .build();</span>
+
+<span class="fc" id="L89">        List&lt;Device&gt; devices = new ArrayList&lt;&gt;();</span>
+<span class="fc bfc" id="L90" title="All 2 branches covered.">        for (Map.Entry&lt;Long, Integer&gt; entry : quantities.entrySet()) {</span>
+<span class="fc" id="L91">            Device device = deviceRepository.findByIdWithRelations(entry.getKey(), atelierId)</span>
+<span class="fc" id="L92">                    .orElseThrow(() -&gt; new ResponseStatusException(</span>
+                            HttpStatus.BAD_REQUEST, &quot;Pièce détachée introuvable dans cet atelier.&quot;));
+<span class="fc" id="L94">            CommandeLigne ligne = CommandeLigne.builder()</span>
+<span class="fc" id="L95">                    .device(device)</span>
+<span class="fc" id="L96">                    .quantite(entry.getValue())</span>
+<span class="fc" id="L97">                    .build();</span>
+<span class="fc" id="L98">            commande.addLigne(ligne);</span>
+<span class="fc" id="L99">            devices.add(device);</span>
+<span class="fc" id="L100">        }</span>
+
+<span class="fc" id="L102">        Commande saved = commandeRepository.save(commande);</span>
+
+        try {
+<span class="fc" id="L105">            mailService.sendOrderRequestToAdmin(</span>
+<span class="fc" id="L106">                    &quot;Demande de commande #&quot; + saved.getId() + &quot; — &quot; + quantities.size() + &quot; pièce(s)&quot;,</span>
+<span class="fc" id="L107">                    buildAdminNotificationBody(saved, atelier, quantities, devices));</span>
+<span class="nc" id="L108">        } catch (Exception ex) {</span>
+<span class="nc" id="L109">            log.error(&quot;Demande #{} enregistrée mais e-mail admin non envoyé: {}&quot;, saved.getId(), ex.getMessage());</span>
+<span class="fc" id="L110">        }</span>
+<span class="fc" id="L111">        log.info(&quot;Création en base — Demande commande id={} par={} pièces={} atelier={}&quot;,</span>
+<span class="fc" id="L112">                saved.getId(), technicien.getUsername(), quantities.size(), atelier.getId());</span>
+<span class="fc" id="L113">        return toResponse(saved);</span>
+    }
+
+    /**
+     * Validation admin : passe la demande en {@code VALIDATED} et envoie un e-mail par SFM concerné.
+     *
+     * @param id identifiant de la demande
+     * @param adminUsername administrateur validant
+     * @return demande validée
+     * @throws org.springframework.web.server.ResponseStatusException {@code 404} si introuvable ;
+     *         {@code 409} si déjà validée
+     */
+    public OrderRequestResponse validate(Long id, String adminUsername) {
+<span class="fc" id="L126">        Long atelierId = atelierService.requireCurrentAtelier().getId();</span>
+<span class="fc" id="L127">        Commande commande = commandeRepository.findByIdWithRelations(id, atelierId)</span>
+<span class="pc" id="L128">                .orElseThrow(() -&gt; new ResponseStatusException(HttpStatus.NOT_FOUND, &quot;Demande de commande introuvable&quot;));</span>
+
+<span class="pc bpc" id="L130" title="1 of 2 branches missed.">        if (OrderStatuses.isReceived(commande.getStatus())) {</span>
+<span class="nc" id="L131">            throw new ResponseStatusException(HttpStatus.CONFLICT,</span>
+                    &quot;Cette demande est déjà réceptionnée&quot;);
+        }
+<span class="fc bfc" id="L134" title="All 2 branches covered.">        if (!OrderStatuses.isPending(commande.getStatus())) {</span>
+<span class="fc" id="L135">            throw new ResponseStatusException(HttpStatus.CONFLICT,</span>
+                    &quot;Cette demande est déjà validée.&quot;);
+        }
+
+<span class="fc" id="L139">        User admin = userRepository.findByUsername(adminUsername)</span>
+<span class="pc" id="L140">                .orElseThrow(() -&gt; new ResponseStatusException(HttpStatus.UNAUTHORIZED, &quot;Administrateur introuvable&quot;));</span>
+
+<span class="fc" id="L142">        Map&lt;Long, List&lt;CommandeLigne&gt;&gt; bySfm = groupLinesBySfm(commande);</span>
+<span class="fc" id="L143">        int mailsSent = 0;</span>
+<span class="fc" id="L144">        List&lt;String&gt; warnings = new ArrayList&lt;&gt;();</span>
+
+<span class="fc bfc" id="L146" title="All 2 branches covered.">        for (Map.Entry&lt;Long, List&lt;CommandeLigne&gt;&gt; entry : bySfm.entrySet()) {</span>
+<span class="pc bpc" id="L147" title="1 of 2 branches missed.">            if (entry.getKey() == null) {</span>
+<span class="nc" id="L148">                warnings.add(entry.getValue().size() + &quot; pièce(s) sans SFM — aucun e-mail fournisseur&quot;);</span>
+<span class="nc" id="L149">                continue;</span>
+            }
+<span class="fc" id="L151">            Sfm sfm = entry.getValue().getFirst().getDevice().getSfm();</span>
+<span class="fc" id="L152">            Hibernate.initialize(sfm.getContacts());</span>
+<span class="fc" id="L153">            Set&lt;String&gt; recipients = resolveSfmRecipients(sfm);</span>
+<span class="pc bpc" id="L154" title="1 of 2 branches missed.">            if (recipients.isEmpty()) {</span>
+<span class="nc" id="L155">                warnings.add(&quot;SFM « &quot; + sfm.getNom() + &quot; » sans e-mail — non notifié&quot;);</span>
+<span class="nc" id="L156">                continue;</span>
+            }
+<span class="fc" id="L158">            String subject = buildSfmOrderMailSubject(commande);</span>
+<span class="fc" id="L159">            String body = buildSfmOrderMailBody(commande, entry.getValue(), admin);</span>
+<span class="fc bfc" id="L160" title="All 2 branches covered.">            for (String to : recipients) {</span>
+                try {
+<span class="fc" id="L162">                    mailService.send(to, subject, body);</span>
+<span class="fc" id="L163">                    mailsSent++;</span>
+<span class="nc" id="L164">                } catch (Exception ex) {</span>
+<span class="nc" id="L165">                    log.error(&quot;Échec e-mail SFM {} ({}): {}&quot;, sfm.getNom(), to, ex.getMessage());</span>
+<span class="nc" id="L166">                    warnings.add(&quot;Échec envoi à &quot; + to + &quot; (&quot; + sfm.getNom() + &quot;)&quot;);</span>
+<span class="fc" id="L167">                }</span>
+<span class="fc" id="L168">            }</span>
+<span class="fc" id="L169">        }</span>
+
+<span class="fc" id="L171">        commande.setStatus(OrderStatuses.VALIDATED);</span>
+<span class="fc" id="L172">        Commande saved = commandeRepository.save(commande);</span>
+<span class="fc" id="L173">        log.info(&quot;Modification en base — Demande commande id={} validée par={} emailsSfm={}&quot;,</span>
+<span class="fc" id="L174">                id, adminUsername, mailsSent);</span>
+<span class="pc bpc" id="L175" title="1 of 2 branches missed.">        if (!warnings.isEmpty()) {</span>
+<span class="nc" id="L176">            log.warn(&quot;Demande #{} validation — alertes: {}&quot;, id, String.join(&quot; ; &quot;, warnings));</span>
+        }
+<span class="fc" id="L178">        return toResponse(saved);</span>
+    }
+
+    /**
+     * Ajuste les lignes (et éventuellement le message) d'une demande non encore réceptionnée.
+     * Permet à l'admin de corriger les quantités réellement reçues avant confirmation.
+     *
+     * @param id identifiant de la demande
+     * @param request nouvelles lignes (fusionnées par pièce) et message
+     * @param adminUsername administrateur
+     * @return demande mise à jour
+     */
+    public OrderRequestResponse update(Long id, OrderRequestDto request, String adminUsername) {
+<span class="fc" id="L191">        Long atelierId = atelierService.requireCurrentAtelier().getId();</span>
+<span class="fc" id="L192">        Commande commande = commandeRepository.findByIdWithRelations(id, atelierId)</span>
+<span class="pc" id="L193">                .orElseThrow(() -&gt; new ResponseStatusException(HttpStatus.NOT_FOUND, &quot;Demande de commande introuvable&quot;));</span>
+
+<span class="pc bpc" id="L195" title="1 of 2 branches missed.">        if (!OrderStatuses.canEditLines(commande.getStatus())) {</span>
+<span class="nc" id="L196">            throw new ResponseStatusException(HttpStatus.CONFLICT,</span>
+                    &quot;Impossible de modifier une demande déjà réceptionnée&quot;);
+        }
+
+<span class="fc" id="L200">        replaceLines(commande, request, atelierId);</span>
+<span class="pc bpc" id="L201" title="2 of 4 branches missed.">        if (request.getMessage() != null &amp;&amp; !request.getMessage().isBlank()) {</span>
+<span class="fc" id="L202">            commande.setMessage(request.getMessage().trim());</span>
+        }
+
+<span class="fc" id="L205">        Commande saved = commandeRepository.save(commande);</span>
+<span class="fc" id="L206">        log.info(&quot;Modification en base — Demande commande id={} lignes ajustées par={}&quot;, id, adminUsername);</span>
+<span class="fc" id="L207">        return toResponse(saved);</span>
+    }
+
+    /**
+     * Confirme la réception physique : statut {@code RECEIVED} et incrément du stock
+     * pour chaque ligne (quantités éventuellement ajustées dans le corps de requête).
+     *
+     * @param id identifiant de la demande
+     * @param request lignes finales optionnelles ; si présentes, remplacent les lignes avant réception
+     * @param adminUsername administrateur confirmant
+     * @return demande réceptionnée
+     */
+    public OrderRequestResponse receive(Long id, OrderRequestDto request, String adminUsername) {
+<span class="fc" id="L220">        Long atelierId = atelierService.requireCurrentAtelier().getId();</span>
+<span class="fc" id="L221">        Commande commande = commandeRepository.findByIdWithRelations(id, atelierId)</span>
+<span class="pc" id="L222">                .orElseThrow(() -&gt; new ResponseStatusException(HttpStatus.NOT_FOUND, &quot;Demande de commande introuvable&quot;));</span>
+
+<span class="pc bpc" id="L224" title="1 of 2 branches missed.">        if (OrderStatuses.isReceived(commande.getStatus())) {</span>
+<span class="nc" id="L225">            throw new ResponseStatusException(HttpStatus.CONFLICT,</span>
+                    &quot;Cette demande est déjà réceptionnée&quot;);
+        }
+<span class="fc bfc" id="L228" title="All 2 branches covered.">        if (!OrderStatuses.isValidated(commande.getStatus())) {</span>
+<span class="fc" id="L229">            throw new ResponseStatusException(HttpStatus.CONFLICT,</span>
+                    &quot;Réceptionnez uniquement une demande déjà validée.&quot;);
+        }
+
+<span class="pc bpc" id="L233" title="5 of 6 branches missed.">        if (request != null &amp;&amp; request.getLignes() != null &amp;&amp; !request.getLignes().isEmpty()) {</span>
+<span class="nc" id="L234">            replaceLines(commande, request, atelierId);</span>
+<span class="nc bnc" id="L235" title="All 4 branches missed.">            if (request.getMessage() != null &amp;&amp; !request.getMessage().isBlank()) {</span>
+<span class="nc" id="L236">                commande.setMessage(request.getMessage().trim());</span>
+            }
+<span class="nc" id="L238">            commandeRepository.saveAndFlush(commande);</span>
+        }
+
+<span class="pc bpc" id="L241" title="2 of 4 branches missed.">        if (commande.getLignes() == null || commande.getLignes().isEmpty()) {</span>
+<span class="nc" id="L242">            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,</span>
+                    &quot;Ajoutez au moins une pièce avant de confirmer la réception.&quot;);
+        }
+
+<span class="fc" id="L246">        int claimed = commandeRepository.claimStatus(</span>
+                id, atelierId, OrderStatuses.VALIDATED, OrderStatuses.RECEIVED);
+<span class="pc bpc" id="L248" title="1 of 2 branches missed.">        if (claimed == 0) {</span>
+<span class="nc" id="L249">            throw new ResponseStatusException(HttpStatus.CONFLICT,</span>
+                    &quot;Cette demande est déjà réceptionnée ou n'est plus validée.&quot;);
+        }
+
+<span class="fc" id="L253">        Commande toStock = commandeRepository.findByIdWithRelations(id, atelierId)</span>
+<span class="pc" id="L254">                .orElseThrow(() -&gt; new ResponseStatusException(HttpStatus.NOT_FOUND,</span>
+                        &quot;Demande de commande introuvable&quot;));
+<span class="fc bfc" id="L256" title="All 2 branches covered.">        for (CommandeLigne ligne : toStock.getLignes()) {</span>
+<span class="fc" id="L257">            Device device = ligne.getDevice();</span>
+<span class="pc bpc" id="L258" title="1 of 2 branches missed.">            if (device == null) {</span>
+<span class="nc" id="L259">                continue;</span>
+            }
+<span class="pc bpc" id="L261" title="1 of 2 branches missed.">            int qty = ligne.getQuantite() == null ? 0 : Math.max(0, ligne.getQuantite());</span>
+<span class="fc" id="L262">            device.setStock(Math.max(0, device.getStock()) + qty);</span>
+<span class="fc" id="L263">            deviceRepository.save(device);</span>
+<span class="fc" id="L264">            log.info(&quot;Stock mis à jour — Pièce id={} +{} → stock={}&quot;, device.getId(), qty, device.getStock());</span>
+<span class="fc" id="L265">        }</span>
+
+<span class="fc" id="L267">        log.info(&quot;Réception en base — Demande commande id={} par={} pièces={}&quot;,</span>
+<span class="fc" id="L268">                id, adminUsername, toStock.getLignes().size());</span>
+<span class="fc" id="L269">        return toResponse(toStock);</span>
+    }
+
+    /**
+     * Supprime une demande de commande de l'atelier courant.
+     *
+     * @param id identifiant de la demande
+     * @param adminUsername administrateur effectuant la suppression
+     * @throws org.springframework.web.server.ResponseStatusException {@code 404} si introuvable
+     */
+    public void delete(Long id, String adminUsername) {
+<span class="fc" id="L280">        Long atelierId = atelierService.requireCurrentAtelier().getId();</span>
+<span class="fc" id="L281">        Commande commande = commandeRepository.findByIdWithRelations(id, atelierId)</span>
+<span class="fc" id="L282">                .orElseThrow(() -&gt; new ResponseStatusException(HttpStatus.NOT_FOUND, &quot;Demande de commande introuvable&quot;));</span>
+<span class="fc bfc" id="L283" title="All 2 branches covered.">        if (OrderStatuses.isReceived(commande.getStatus())) {</span>
+<span class="fc" id="L284">            throw new ResponseStatusException(HttpStatus.CONFLICT,</span>
+                    &quot;Impossible de supprimer une demande déjà réceptionnée (le stock a déjà été mis à jour).&quot;);
+        }
+<span class="fc" id="L287">        commandeRepository.delete(commande);</span>
+<span class="fc" id="L288">        log.info(&quot;Suppression en base — Demande commande id={} par={} atelier={}&quot;,</span>
+                id, adminUsername, atelierId);
+<span class="fc" id="L290">    }</span>
+
+    private void replaceLines(Commande commande, OrderRequestDto request, Long atelierId) {
+<span class="pc bpc" id="L293" title="2 of 4 branches missed.">        if (request.getLignes() == null || request.getLignes().isEmpty()) {</span>
+<span class="nc" id="L294">            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, &quot;Ajoutez au moins une pièce à la demande&quot;);</span>
+        }
+
+<span class="fc" id="L297">        Map&lt;Long, Integer&gt; quantities = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L298" title="All 2 branches covered.">        for (OrderRequestDto.OrderRequestLineDto line : request.getLignes()) {</span>
+<span class="fc" id="L299">            quantities.merge(line.getDeviceId(), line.getQuantite(), Integer::sum);</span>
+<span class="fc" id="L300">        }</span>
+
+<span class="fc" id="L302">        commande.getLignes().clear();</span>
+<span class="fc bfc" id="L303" title="All 2 branches covered.">        for (Map.Entry&lt;Long, Integer&gt; entry : quantities.entrySet()) {</span>
+<span class="fc" id="L304">            Device device = deviceRepository.findByIdWithRelations(entry.getKey(), atelierId)</span>
+<span class="pc" id="L305">                    .orElseThrow(() -&gt; new ResponseStatusException(</span>
+                            HttpStatus.BAD_REQUEST, &quot;Pièce détachée introuvable dans cet atelier.&quot;));
+<span class="fc" id="L307">            commande.addLigne(CommandeLigne.builder()</span>
+<span class="fc" id="L308">                    .device(device)</span>
+<span class="fc" id="L309">                    .quantite(entry.getValue())</span>
+<span class="fc" id="L310">                    .build());</span>
+<span class="fc" id="L311">        }</span>
+<span class="fc" id="L312">    }</span>
+
+    /**
+     * Liste les demandes de l'atelier courant, triées par date décroissante.
+     *
+     * @return demandes avec lignes et statuts
+     */
+    @Transactional(readOnly = true)
+    public List&lt;OrderRequestResponse&gt; findAll() {
+<span class="fc" id="L321">        Long atelierId = atelierService.requireCurrentAtelier().getId();</span>
+<span class="fc" id="L322">        return commandeRepository.findAllWithRelationsOrderByDateDesc(atelierId).stream()</span>
+<span class="fc" id="L323">                .map(this::toResponse)</span>
+<span class="fc" id="L324">                .toList();</span>
+    }
+
+    /**
+     * Compte les demandes en attente ({@code PENDING} ou {@code SENT}) dans l'atelier courant.
+     *
+     * @return nombre de demandes non validées
+     */
+    @Transactional(readOnly = true)
+    public long countPending() {
+<span class="nc" id="L334">        Long atelierId = atelierService.requireCurrentAtelier().getId();</span>
+<span class="nc" id="L335">        return commandeRepository.countByAtelierIdAndStatusIn(</span>
+<span class="nc" id="L336">                atelierId, List.of(OrderStatuses.PENDING, OrderStatuses.SENT));</span>
+    }
+
+    /**
+     * Aperçu de l'e-mail admin qui sera envoyé à la création (sans enregistrer).
+     *
+     * @param request brouillon de demande
+     * @param username utilisateur authentifié
+     * @return aperçus admin et SFM simulés
+     * @throws org.springframework.web.server.ResponseStatusException {@code 400} si lignes invalides
+     */
+    @Transactional(readOnly = true)
+    public List&lt;MailPreviewItem&gt; previewCreateMails(OrderRequestDto request, String username) {
+<span class="nc" id="L349">        User technicien = userRepository.findByUsername(username)</span>
+<span class="nc" id="L350">                .orElseThrow(() -&gt; new ResponseStatusException(HttpStatus.UNAUTHORIZED, &quot;Utilisateur introuvable&quot;));</span>
+<span class="nc" id="L351">        Atelier atelier = atelierService.requireCurrentAtelier();</span>
+<span class="nc" id="L352">        Long atelierId = atelier.getId();</span>
+
+<span class="nc bnc" id="L354" title="All 4 branches missed.">        if (request.getLignes() == null || request.getLignes().isEmpty()) {</span>
+<span class="nc" id="L355">            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, &quot;Ajoutez au moins une pièce à la demande&quot;);</span>
+        }
+
+<span class="nc" id="L358">        Map&lt;Long, Integer&gt; quantities = new LinkedHashMap&lt;&gt;();</span>
+<span class="nc bnc" id="L359" title="All 2 branches missed.">        for (OrderRequestDto.OrderRequestLineDto line : request.getLignes()) {</span>
+<span class="nc" id="L360">            quantities.merge(line.getDeviceId(), line.getQuantite(), Integer::sum);</span>
+<span class="nc" id="L361">        }</span>
+
+<span class="nc" id="L363">        List&lt;Device&gt; devices = new ArrayList&lt;&gt;();</span>
+<span class="nc bnc" id="L364" title="All 2 branches missed.">        for (Long deviceId : quantities.keySet()) {</span>
+<span class="nc" id="L365">            Device device = deviceRepository.findByIdWithRelations(deviceId, atelierId)</span>
+<span class="nc" id="L366">                    .orElseThrow(() -&gt; new ResponseStatusException(</span>
+                            HttpStatus.BAD_REQUEST, &quot;Pièce détachée introuvable dans cet atelier.&quot;));
+<span class="nc" id="L368">            devices.add(device);</span>
+<span class="nc" id="L369">        }</span>
+
+<span class="nc bnc" id="L371" title="All 4 branches missed.">        String message = request.getMessage() == null || request.getMessage().isBlank()</span>
+<span class="nc" id="L372">                ? &quot;(message à compléter)&quot;</span>
+<span class="nc" id="L373">                : request.getMessage().trim();</span>
+<span class="nc" id="L374">        Commande draft = Commande.builder()</span>
+<span class="nc" id="L375">                .technicien(technicien)</span>
+<span class="nc" id="L376">                .technicienNom(displayUserName(technicien))</span>
+<span class="nc" id="L377">                .message(message)</span>
+<span class="nc" id="L378">                .dateDemande(LocalDateTime.now())</span>
+<span class="nc" id="L379">                .status(OrderStatuses.PENDING)</span>
+<span class="nc" id="L380">                .atelier(atelier)</span>
+<span class="nc" id="L381">                .lignes(new ArrayList&lt;&gt;())</span>
+<span class="nc" id="L382">                .build();</span>
+<span class="nc bnc" id="L383" title="All 2 branches missed.">        for (Device device : devices) {</span>
+<span class="nc" id="L384">            draft.addLigne(CommandeLigne.builder()</span>
+<span class="nc" id="L385">                    .device(device)</span>
+<span class="nc" id="L386">                    .quantite(quantities.getOrDefault(device.getId(), 1))</span>
+<span class="nc" id="L387">                    .build());</span>
+<span class="nc" id="L388">        }</span>
+
+<span class="nc" id="L390">        List&lt;MailPreviewItem&gt; previews = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L391">        String adminSubject = &quot;Demande de commande (aperçu) — &quot; + quantities.size() + &quot; pièce(s)&quot;;</span>
+<span class="nc" id="L392">        String adminBody = buildAdminNotificationBody(draft, atelier, quantities, devices)</span>
+<span class="nc" id="L393">                .replace(&quot;Demande n°null&quot;, &quot;Demande n°(sera attribuée à l'envoi)&quot;);</span>
+<span class="nc" id="L394">        previews.add(MailPreviewItem.builder()</span>
+<span class="nc" id="L395">                .kind(&quot;ADMIN&quot;)</span>
+<span class="nc" id="L396">                .to(mailService.getAdminEmail())</span>
+<span class="nc" id="L397">                .subject(adminSubject)</span>
+<span class="nc" id="L398">                .body(adminBody)</span>
+<span class="nc" id="L399">                .sfmNom(null)</span>
+<span class="nc" id="L400">                .build());</span>
+        // Aperçu SFM : si l'auteur est admin, on montre sa signature ; sinon placeholders admin
+<span class="nc bnc" id="L402" title="All 2 branches missed.">        User validatorPreview = Roles.ADMIN.equalsIgnoreCase(technicien.getRole()) ? technicien : null;</span>
+<span class="nc" id="L403">        previews.addAll(buildSfmMailPreviews(draft, validatorPreview));</span>
+<span class="nc" id="L404">        return previews;</span>
+    }
+
+    /**
+     * Aperçu des e-mails SFM qui seront envoyés à la validation.
+     *
+     * @param id identifiant de la demande
+     * @param viewerUsername utilisateur connecté (signature admin dans l'aperçu si rôle admin)
+     * @return aperçus par destinataire SFM ou alertes
+     * @throws org.springframework.web.server.ResponseStatusException {@code 404} si demande introuvable
+     */
+    @Transactional(readOnly = true)
+    public List&lt;MailPreviewItem&gt; previewSfmMails(Long id, String viewerUsername) {
+<span class="nc" id="L417">        Long atelierId = atelierService.requireCurrentAtelier().getId();</span>
+<span class="nc" id="L418">        Commande commande = commandeRepository.findByIdWithRelations(id, atelierId)</span>
+<span class="nc" id="L419">                .orElseThrow(() -&gt; new ResponseStatusException(HttpStatus.NOT_FOUND, &quot;Demande de commande introuvable&quot;));</span>
+<span class="nc" id="L420">        User viewer = userRepository.findByUsername(viewerUsername).orElse(null);</span>
+<span class="nc" id="L421">        return buildSfmMailPreviews(commande, viewer);</span>
+    }
+
+    private List&lt;MailPreviewItem&gt; buildSfmMailPreviews(Commande commande, User validator) {
+<span class="nc" id="L425">        List&lt;MailPreviewItem&gt; previews = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L426">        Map&lt;Long, List&lt;CommandeLigne&gt;&gt; bySfm = groupLinesBySfm(commande);</span>
+<span class="nc bnc" id="L427" title="All 2 branches missed.">        for (Map.Entry&lt;Long, List&lt;CommandeLigne&gt;&gt; entry : bySfm.entrySet()) {</span>
+<span class="nc bnc" id="L428" title="All 2 branches missed.">            if (entry.getKey() == null) {</span>
+<span class="nc" id="L429">                previews.add(MailPreviewItem.builder()</span>
+<span class="nc" id="L430">                        .kind(&quot;WARNING&quot;)</span>
+<span class="nc" id="L431">                        .to(&quot;—&quot;)</span>
+<span class="nc" id="L432">                        .subject(&quot;Pièces sans SFM&quot;)</span>
+<span class="nc" id="L433">                        .body(entry.getValue().size()</span>
+                                + &quot; pièce(s) sans SFM : aucun e-mail fournisseur ne sera envoyé pour ces lignes.&quot;)
+<span class="nc" id="L435">                        .sfmNom(null)</span>
+<span class="nc" id="L436">                        .build());</span>
+<span class="nc" id="L437">                continue;</span>
+            }
+<span class="nc" id="L439">            Sfm sfm = entry.getValue().getFirst().getDevice().getSfm();</span>
+<span class="nc" id="L440">            Hibernate.initialize(sfm.getContacts());</span>
+<span class="nc" id="L441">            Set&lt;String&gt; recipients = resolveSfmRecipients(sfm);</span>
+<span class="nc" id="L442">            String subject = buildSfmOrderMailSubject(commande);</span>
+<span class="nc" id="L443">            String body = buildSfmOrderMailBody(commande, entry.getValue(), validator);</span>
+<span class="nc bnc" id="L444" title="All 2 branches missed.">            if (recipients.isEmpty()) {</span>
+<span class="nc" id="L445">                previews.add(MailPreviewItem.builder()</span>
+<span class="nc" id="L446">                        .kind(&quot;WARNING&quot;)</span>
+<span class="nc" id="L447">                        .to(&quot;—&quot;)</span>
+<span class="nc" id="L448">                        .subject(subject)</span>
+<span class="nc" id="L449">                        .body(&quot;SFM « &quot; + sfm.getNom() + &quot; » sans adresse e-mail — non notifié.\n\n&quot; + body)</span>
+<span class="nc" id="L450">                        .sfmNom(sfm.getNom())</span>
+<span class="nc" id="L451">                        .build());</span>
+<span class="nc" id="L452">                continue;</span>
+            }
+<span class="nc bnc" id="L454" title="All 2 branches missed.">            for (String to : recipients) {</span>
+<span class="nc" id="L455">                previews.add(MailPreviewItem.builder()</span>
+<span class="nc" id="L456">                        .kind(&quot;SFM&quot;)</span>
+<span class="nc" id="L457">                        .to(to)</span>
+<span class="nc" id="L458">                        .subject(subject)</span>
+<span class="nc" id="L459">                        .body(body)</span>
+<span class="nc" id="L460">                        .sfmNom(sfm.getNom())</span>
+<span class="nc" id="L461">                        .build());</span>
+<span class="nc" id="L462">            }</span>
+<span class="nc" id="L463">        }</span>
+<span class="nc" id="L464">        return previews;</span>
+    }
+
+    private String buildAdminNotificationBody(
+            Commande commande,
+            Atelier atelier,
+            Map&lt;Long, Integer&gt; quantities,
+            List&lt;Device&gt; devices) {
+<span class="fc" id="L472">        StringBuilder linesBody = new StringBuilder();</span>
+<span class="fc" id="L473">        Set&lt;String&gt; sfmLabels = new LinkedHashSet&lt;&gt;();</span>
+<span class="fc bfc" id="L474" title="All 2 branches covered.">        for (Device device : devices) {</span>
+<span class="fc" id="L475">            int qty = quantities.getOrDefault(device.getId(), 1);</span>
+<span class="fc" id="L476">            linesBody.append(&quot;- &quot;).append(device.getNom());</span>
+<span class="pc bpc" id="L477" title="2 of 4 branches missed.">            if (device.getReference() != null &amp;&amp; !device.getReference().isBlank()) {</span>
+<span class="fc" id="L478">                linesBody.append(&quot; (réf. &quot;).append(device.getReference()).append(&quot;)&quot;);</span>
+            }
+<span class="fc" id="L480">            linesBody.append(&quot; × &quot;).append(qty);</span>
+<span class="pc bpc" id="L481" title="1 of 2 branches missed.">            if (device.getSfm() != null) {</span>
+<span class="fc" id="L482">                linesBody.append(&quot; — SFM: &quot;).append(device.getSfm().getNom());</span>
+<span class="fc" id="L483">                sfmLabels.add(device.getSfm().getNom() + &quot; &lt;&quot; + nullToEmpty(device.getSfm().getEmail()) + &quot;&gt;&quot;);</span>
+            } else {
+<span class="nc" id="L485">                linesBody.append(&quot; — SFM: (non renseigné)&quot;);</span>
+            }
+<span class="fc" id="L487">            linesBody.append('\n');</span>
+<span class="fc" id="L488">        }</span>
+
+<span class="pc bpc" id="L490" title="1 of 2 branches missed.">        String sfmBlock = sfmLabels.isEmpty()</span>
+<span class="nc" id="L491">                ? &quot;(aucun SFM associé aux pièces)&quot;</span>
+<span class="fc" id="L492">                : sfmLabels.stream().map(s -&gt; &quot;- &quot; + s).collect(Collectors.joining(&quot;\n&quot;));</span>
+
+<span class="fc" id="L494">        return &quot;&quot;&quot;</span>
+                Bonjour Administrateur,
+
+                Une nouvelle demande de commande nécessite votre validation dans DeviceManager.
+
+                Demande n°%s
+                Atelier : %s
+                Technicien : %s
+                Date/heure : %s
+
+                Pièces détachées :
+                %s
+                SFM concernés :
+                %s
+
+                Message du technicien :
+                %s
+
+                Connectez-vous à l'application puis validez la demande pour envoyer la commande aux SFM.
+
+                — DeviceManager
+<span class="fc" id="L515">                &quot;&quot;&quot;.formatted(</span>
+<span class="fc" id="L516">                commande.getId(),</span>
+<span class="fc" id="L517">                atelier.getNom(),</span>
+<span class="fc" id="L518">                commande.getTechnicienNom(),</span>
+<span class="fc" id="L519">                commande.getDateDemande(),</span>
+                linesBody,
+                sfmBlock,
+<span class="fc" id="L522">                commande.getMessage()</span>
+        );
+    }
+
+    private String buildSfmOrderMailSubject(Commande commande) {
+<span class="pc bpc" id="L527" title="1 of 2 branches missed.">        if (commande.getId() == null) {</span>
+<span class="nc" id="L528">            return &quot;Demande de devis #(n° à l'envoi)&quot;;</span>
+        }
+<span class="fc" id="L530">        return &quot;Demande de devis #&quot; + commande.getId();</span>
+    }
+
+    /**
+     * Corps e-mail SFM — signature :
+     * &lt;pre&gt;
+     * Merci, bien à vous.
+     * {Prénom Nom de l'admin validant}
+     * {e-mail admin}
+     * {e-mail demandeur}
+     * &lt;/pre&gt;
+     */
+    private String buildSfmOrderMailBody(Commande commande, List&lt;CommandeLigne&gt; lignes, User validator) {
+<span class="fc" id="L543">        StringBuilder linesBody = new StringBuilder();</span>
+<span class="fc bfc" id="L544" title="All 2 branches covered.">        for (CommandeLigne ligne : lignes) {</span>
+<span class="fc" id="L545">            Device device = ligne.getDevice();</span>
+<span class="fc" id="L546">            linesBody.append(&quot;- &quot;).append(device.getNom());</span>
+<span class="pc bpc" id="L547" title="2 of 4 branches missed.">            if (device.getReference() != null &amp;&amp; !device.getReference().isBlank()) {</span>
+<span class="fc" id="L548">                linesBody.append(&quot; (réf. &quot;).append(device.getReference()).append(&quot;)&quot;);</span>
+            }
+<span class="fc" id="L550">            linesBody.append(&quot; × &quot;).append(ligne.getQuantite()).append('\n');</span>
+<span class="fc" id="L551">        }</span>
+
+<span class="pc bpc" id="L553" title="1 of 2 branches missed.">        String adminName = validator != null</span>
+<span class="fc" id="L554">                ? displayUserName(validator)</span>
+<span class="pc" id="L555">                : &quot;(Prénom Nom de l'administrateur)&quot;;</span>
+<span class="fc" id="L556">        String adminEmail = resolveUserEmail(validator, &quot;(e-mail de l'administrateur)&quot;);</span>
+<span class="fc" id="L557">        String requesterEmail = resolveUserEmail(commande.getTechnicien(), &quot;(e-mail du demandeur)&quot;);</span>
+
+<span class="fc" id="L559">        StringBuilder body = new StringBuilder();</span>
+<span class="fc" id="L560">        body.append(&quot;Bonjour,\n\n&quot;);</span>
+<span class="fc" id="L561">        body.append(&quot;Pouvez-vous nous faire un devis pour les pièces détachées suivantes :\n\n&quot;);</span>
+<span class="fc" id="L562">        body.append(linesBody);</span>
+<span class="fc" id="L563">        body.append('\n');</span>
+<span class="fc" id="L564">        body.append(&quot;Merci, bien à vous.\n&quot;);</span>
+<span class="fc" id="L565">        body.append(adminName).append('\n');</span>
+<span class="fc" id="L566">        body.append(adminEmail).append('\n');</span>
+<span class="fc" id="L567">        body.append(requesterEmail).append('\n');</span>
+<span class="fc" id="L568">        return body.toString();</span>
+    }
+
+    private static String resolveUserEmail(User user, String fallback) {
+<span class="pc bpc" id="L572" title="3 of 6 branches missed.">        if (user == null || user.getEmail() == null || user.getEmail().isBlank()) {</span>
+<span class="nc" id="L573">            return fallback;</span>
+        }
+<span class="fc" id="L575">        return user.getEmail().trim();</span>
+    }
+
+    private Map&lt;Long, List&lt;CommandeLigne&gt;&gt; groupLinesBySfm(Commande commande) {
+<span class="fc" id="L579">        Map&lt;Long, List&lt;CommandeLigne&gt;&gt; map = new LinkedHashMap&lt;&gt;();</span>
+<span class="pc bpc" id="L580" title="1 of 2 branches missed.">        if (commande.getLignes() == null) {</span>
+<span class="nc" id="L581">            return map;</span>
+        }
+<span class="fc bfc" id="L583" title="All 2 branches covered.">        for (CommandeLigne ligne : commande.getLignes()) {</span>
+<span class="fc" id="L584">            Device device = ligne.getDevice();</span>
+<span class="pc bpc" id="L585" title="2 of 4 branches missed.">            Long sfmId = device != null &amp;&amp; device.getSfm() != null ? device.getSfm().getId() : null;</span>
+<span class="fc" id="L586">            map.computeIfAbsent(sfmId, k -&gt; new ArrayList&lt;&gt;()).add(ligne);</span>
+<span class="fc" id="L587">        }</span>
+<span class="fc" id="L588">        return map;</span>
+    }
+
+    private Set&lt;String&gt; resolveSfmRecipients(Sfm sfm) {
+<span class="fc" id="L592">        Set&lt;String&gt; emails = new LinkedHashSet&lt;&gt;();</span>
+<span class="pc bpc" id="L593" title="2 of 4 branches missed.">        if (sfm.getContacts() != null &amp;&amp; !sfm.getContacts().isEmpty()) {</span>
+<span class="nc bnc" id="L594" title="All 2 branches missed.">            for (SfmContact contact : sfm.getContacts()) {</span>
+<span class="nc bnc" id="L595" title="All 2 branches missed.">                if (!contact.isReceiveOrderMails()) {</span>
+<span class="nc" id="L596">                    continue;</span>
+                }
+<span class="nc bnc" id="L598" title="All 4 branches missed.">                if (contact.getEmail() != null &amp;&amp; !contact.getEmail().isBlank()) {</span>
+<span class="nc" id="L599">                    emails.add(contact.getEmail().trim());</span>
+                }
+<span class="nc" id="L601">            }</span>
+<span class="nc" id="L602">            return emails;</span>
+        }
+        // Ancien format : e-mail principal du SFM sans contacts
+<span class="pc bpc" id="L605" title="2 of 4 branches missed.">        if (sfm.getEmail() != null &amp;&amp; !sfm.getEmail().isBlank()) {</span>
+<span class="fc" id="L606">            emails.add(sfm.getEmail().trim());</span>
+        }
+<span class="fc" id="L608">        return emails;</span>
+    }
+
+    private OrderRequestResponse toResponse(Commande entity) {
+<span class="pc bpc" id="L612" title="1 of 2 branches missed.">        List&lt;OrderRequestLineResponse&gt; lignes = entity.getLignes() == null</span>
+<span class="nc" id="L613">                ? List.of()</span>
+<span class="fc" id="L614">                : entity.getLignes().stream().map(this::toLineResponse).toList();</span>
+
+<span class="pc bpc" id="L616" title="1 of 2 branches missed.">        OrderRequestLineResponse first = lignes.isEmpty() ? null : lignes.get(0);</span>
+<span class="fc" id="L617">        int totalQty = lignes.stream().mapToInt(OrderRequestLineResponse::getQuantite).sum();</span>
+
+<span class="fc" id="L619">        return OrderRequestResponse.builder()</span>
+<span class="fc" id="L620">                .id(entity.getId())</span>
+<span class="fc" id="L621">                .requestedBy(entity.getTechnicienNom())</span>
+<span class="fc" id="L622">                .technicienNom(entity.getTechnicienNom())</span>
+<span class="fc" id="L623">                .message(entity.getMessage())</span>
+<span class="fc" id="L624">                .status(entity.getStatus())</span>
+<span class="fc" id="L625">                .dateDemande(entity.getDateDemande())</span>
+<span class="fc" id="L626">                .createdAt(entity.getDateDemande())</span>
+<span class="fc" id="L627">                .totalPieces(lignes.size())</span>
+<span class="fc" id="L628">                .totalQuantite(totalQty)</span>
+<span class="fc" id="L629">                .lignes(lignes)</span>
+<span class="pc bpc" id="L630" title="1 of 2 branches missed.">                .pieceNom(first != null ? first.getPieceNom() : null)</span>
+<span class="pc bpc" id="L631" title="1 of 2 branches missed.">                .reference(first != null ? first.getReference() : null)</span>
+<span class="fc" id="L632">                .quantite(totalQty)</span>
+<span class="pc bpc" id="L633" title="1 of 2 branches missed.">                .deviceId(first != null ? first.getDeviceId() : null)</span>
+<span class="pc bpc" id="L634" title="1 of 2 branches missed.">                .photoUrl(first != null ? first.getPhotoUrl() : null)</span>
+<span class="fc" id="L635">                .build();</span>
+    }
+
+    private OrderRequestLineResponse toLineResponse(CommandeLigne ligne) {
+<span class="fc" id="L639">        Device device = ligne.getDevice();</span>
+<span class="pc bpc" id="L640" title="1 of 2 branches missed.">        Sfm sfm = device != null ? device.getSfm() : null;</span>
+<span class="fc" id="L641">        return OrderRequestLineResponse.builder()</span>
+<span class="fc" id="L642">                .id(ligne.getId())</span>
+<span class="pc bpc" id="L643" title="1 of 2 branches missed.">                .deviceId(device != null ? device.getId() : null)</span>
+<span class="pc bpc" id="L644" title="1 of 2 branches missed.">                .pieceNom(device != null ? device.getNom() : null)</span>
+<span class="pc bpc" id="L645" title="1 of 2 branches missed.">                .reference(device != null ? device.getReference() : null)</span>
+<span class="fc" id="L646">                .quantite(ligne.getQuantite())</span>
+<span class="pc bpc" id="L647" title="1 of 2 branches missed.">                .photoUrl(device != null ? device.getPhotoUrl() : null)</span>
+<span class="pc bpc" id="L648" title="1 of 2 branches missed.">                .sfmId(sfm != null ? sfm.getId() : null)</span>
+<span class="pc bpc" id="L649" title="1 of 2 branches missed.">                .sfmNom(sfm != null ? sfm.getNom() : null)</span>
+<span class="fc" id="L650">                .build();</span>
+    }
+
+    private static String displayUserName(User user) {
+<span class="pc bpc" id="L654" title="1 of 2 branches missed.">        String prenom = user.getPrenom() == null ? &quot;&quot; : user.getPrenom().trim();</span>
+<span class="pc bpc" id="L655" title="1 of 2 branches missed.">        String nom = user.getNom() == null ? &quot;&quot; : user.getNom().trim();</span>
+<span class="fc" id="L656">        String full = (prenom + &quot; &quot; + nom).trim();</span>
+<span class="pc bpc" id="L657" title="1 of 2 branches missed.">        return full.isEmpty() ? user.getUsername() : full;</span>
+    }
+
+    private static String nullToEmpty(String value) {
+<span class="pc bpc" id="L661" title="1 of 2 branches missed.">        return value == null ? &quot;&quot; : value;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AiProviders.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">device-manager</a> &gt; <a href="index.source.html" class="el_package">com.devicemanager.ai</a> &gt; <span class="el_source">AiProviders.java</span></div><h1>AiProviders.java</h1><pre class="source lang-java linenums">package com.devicemanager.ai;
+
+import java.util.Arrays;
+import java.util.List;
+import java.util.Locale;
+import java.util.Optional;
+
+/**
+ * Catalogue des fournisseurs IA (identifiants et URL de base uniquement).
+ * &lt;p&gt;
+ * Les modèles ne sont plus listés en dur : ils sont découverts en ligne
+ * via {@link com.devicemanager.service.AiModelDiscoveryService}.
+ */
+public final class AiProviders {
+
+    /**
+     * Métadonnées d'un fournisseur IA.
+     *
+     * @param id      identifiant normalisé (ex. {@code openai}, {@code gemini})
+     * @param label   libellé affiché à l'utilisateur
+     * @param baseUrl URL de base compatible OpenAI ({@code /v1/models}, {@code /v1/chat/completions})
+     */
+<span class="fc" id="L23">    public record Provider(</span>
+            String id,
+            String label,
+            String baseUrl
+    ) {
+    }
+
+<span class="fc" id="L30">    private static final List&lt;Provider&gt; ALL = List.of(</span>
+            new Provider(&quot;gemini&quot;, &quot;Google Gemini&quot;, &quot;https://generativelanguage.googleapis.com/v1beta/openai&quot;),
+            new Provider(&quot;openai&quot;, &quot;OpenAI&quot;, &quot;https://api.openai.com&quot;),
+            new Provider(&quot;groq&quot;, &quot;Groq&quot;, &quot;https://api.groq.com/openai&quot;),
+            new Provider(&quot;mistral&quot;, &quot;Mistral AI&quot;, &quot;https://api.mistral.ai&quot;),
+            new Provider(&quot;openrouter&quot;, &quot;OpenRouter (multi-IA)&quot;, &quot;https://openrouter.ai/api&quot;),
+            new Provider(&quot;deepseek&quot;, &quot;DeepSeek&quot;, &quot;https://api.deepseek.com&quot;),
+            new Provider(&quot;together&quot;, &quot;Together AI&quot;, &quot;https://api.together.xyz&quot;),
+            new Provider(&quot;fireworks&quot;, &quot;Fireworks AI&quot;, &quot;https://api.fireworks.ai/inference&quot;)
+    );
+
+    private AiProviders() {
+    }
+
+    /** @return liste immuable de tous les fournisseurs configurés */
+    public static List&lt;Provider&gt; all() {
+<span class="fc" id="L46">        return ALL;</span>
+    }
+
+    /**
+     * Recherche un fournisseur par identifiant ; retourne le premier si l'identifiant est vide.
+     */
+    public static Optional&lt;Provider&gt; find(String id) {
+<span class="pc bpc" id="L53" title="2 of 4 branches missed.">        if (id == null || id.isBlank()) {</span>
+<span class="nc" id="L54">            return Optional.of(ALL.getFirst());</span>
+        }
+<span class="fc" id="L56">        String key = id.trim().toLowerCase(Locale.ROOT);</span>
+<span class="fc" id="L57">        return ALL.stream().filter(p -&gt; p.id().equals(key)).findFirst();</span>
+    }
+
+    /** Retourne le fournisseur demandé, ou le premier disponible en secours. */
+    public static Provider require(String id) {
+<span class="fc" id="L62">        return find(id).orElse(ALL.getFirst());</span>
+    }
+
+    /**
+     * Indique si le modèle accepte probablement des entrées image (heuristique sur le nom).
+     */
+    public static boolean supportsVision(String providerId, String modelId) {
+<span class="nc bnc" id="L69" title="All 2 branches missed.">        String m = modelId == null ? &quot;&quot; : modelId.toLowerCase(Locale.ROOT);</span>
+<span class="nc bnc" id="L70" title="All 2 branches missed.">        String p = providerId == null ? &quot;&quot; : providerId.toLowerCase(Locale.ROOT);</span>
+<span class="nc bnc" id="L71" title="All 2 branches missed.">        if (p.equals(&quot;gemini&quot;)) {</span>
+<span class="nc bnc" id="L72" title="All 6 branches missed.">            return !m.contains(&quot;embedding&quot;) &amp;&amp; !m.contains(&quot;tts&quot;) &amp;&amp; !m.contains(&quot;image-generation&quot;);</span>
+        }
+<span class="nc bnc" id="L74" title="All 2 branches missed.">        return m.contains(&quot;vision&quot;)</span>
+<span class="nc bnc" id="L75" title="All 2 branches missed.">                || m.contains(&quot;gpt-4o&quot;)</span>
+<span class="nc bnc" id="L76" title="All 2 branches missed.">                || m.contains(&quot;gpt-4.1&quot;)</span>
+<span class="nc bnc" id="L77" title="All 2 branches missed.">                || m.contains(&quot;gpt-4-turbo&quot;)</span>
+<span class="nc bnc" id="L78" title="All 2 branches missed.">                || m.contains(&quot;pixtral&quot;)</span>
+<span class="nc bnc" id="L79" title="All 2 branches missed.">                || m.contains(&quot;gemini&quot;)</span>
+<span class="nc bnc" id="L80" title="All 2 branches missed.">                || m.contains(&quot;claude&quot;)</span>
+<span class="nc bnc" id="L81" title="All 2 branches missed.">                || m.contains(&quot;llava&quot;)</span>
+<span class="nc bnc" id="L82" title="All 2 branches missed.">                || m.contains(&quot;qwen2-vl&quot;)</span>
+<span class="nc bnc" id="L83" title="All 2 branches missed.">                || m.contains(&quot;qwen2.5-vl&quot;)</span>
+<span class="nc bnc" id="L84" title="All 2 branches missed.">                || m.contains(&quot;llama-4&quot;)</span>
+<span class="nc bnc" id="L85" title="All 2 branches missed.">                || m.contains(&quot;scout&quot;);</span>
+    }
+
+    /**
+     * @param id identifiant du fournisseur
+     * @return {@code true} si le fournisseur figure dans le catalogue
+     */
+    public static boolean isKnownProvider(String id) {
+<span class="nc bnc" id="L93" title="All 4 branches missed.">        if (id == null || id.isBlank()) {</span>
+<span class="nc" id="L94">            return false;</span>
+        }
+<span class="nc" id="L96">        String key = id.trim().toLowerCase(Locale.ROOT);</span>
+<span class="nc" id="L97">        return ALL.stream().anyMatch(p -&gt; p.id().equals(key));</span>
+    }
+
+    /** @return identifiants de tous les fournisseurs du catalogue */
+    public static List&lt;String&gt; providerIds() {
+<span class="nc" id="L102">        return ALL.stream().map(Provider::id).toList();</span>
+    }
+
+    /**
+     * Normalise un identifiant de fournisseur ; retourne {@code openai} si inconnu ou vide.
+     */
+    public static String normalizeProvider(String raw) {
+<span class="pc bpc" id="L109" title="2 of 4 branches missed.">        if (raw == null || raw.isBlank()) {</span>
+<span class="nc" id="L110">            return &quot;openai&quot;;</span>
+        }
+<span class="fc" id="L112">        String id = raw.trim().toLowerCase(Locale.ROOT);</span>
+<span class="fc" id="L113">        if (Arrays.asList(</span>
+                &quot;gemini&quot;, &quot;openai&quot;, &quot;groq&quot;, &quot;mistral&quot;, &quot;openrouter&quot;, &quot;deepseek&quot;, &quot;together&quot;, &quot;fireworks&quot;
+<span class="pc bpc" id="L115" title="1 of 2 branches missed.">        ).contains(id)) {</span>
+<span class="fc" id="L116">            return id;</span>
+        }
+<span class="nc" id="L118">        return &quot;openai&quot;;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

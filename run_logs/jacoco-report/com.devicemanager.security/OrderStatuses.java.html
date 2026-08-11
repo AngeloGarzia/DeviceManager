@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>OrderStatuses.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">device-manager</a> &gt; <a href="index.source.html" class="el_package">com.devicemanager.security</a> &gt; <span class="el_source">OrderStatuses.java</span></div><h1>OrderStatuses.java</h1><pre class="source lang-java linenums">package com.devicemanager.security;
+
+/**
+ * Statuts possibles d'une demande de commande ({@code commande.status}).
+ */
+public final class OrderStatuses {
+
+    /** Demande créée — en attente de validation par un administrateur. */
+    public static final String PENDING = &quot;PENDING&quot;;
+
+    /** Validée par un admin — courriels de notification envoyés aux contacts SFM. */
+    public static final String VALIDATED = &quot;VALIDATED&quot;;
+
+    /** Réception confirmée par un admin — stock des pièces mis à jour. */
+    public static final String RECEIVED = &quot;RECEIVED&quot;;
+
+    /** Ancien statut legacy, équivalent à {@link #PENDING}. */
+    public static final String SENT = &quot;SENT&quot;;
+
+    private OrderStatuses() {
+    }
+
+    /**
+     * Indique si la demande est encore en attente de validation.
+     *
+     * @param status statut brut en base
+     * @return {@code true} pour {@link #PENDING} ou {@link #SENT}
+     */
+    public static boolean isPending(String status) {
+<span class="pc bpc" id="L30" title="1 of 4 branches missed.">        return PENDING.equals(status) || SENT.equals(status);</span>
+    }
+
+    /**
+     * Indique si la demande est validée et en attente de réception physique.
+     */
+    public static boolean isValidated(String status) {
+<span class="fc" id="L37">        return VALIDATED.equals(status);</span>
+    }
+
+    /**
+     * Indique si la réception a déjà été confirmée.
+     */
+    public static boolean isReceived(String status) {
+<span class="fc" id="L44">        return RECEIVED.equals(status);</span>
+    }
+
+    /**
+     * Les lignes peuvent être ajustées tant que la réception n'est pas confirmée.
+     */
+    public static boolean canEditLines(String status) {
+<span class="pc bpc" id="L51" title="2 of 4 branches missed.">        return isPending(status) || isValidated(status);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

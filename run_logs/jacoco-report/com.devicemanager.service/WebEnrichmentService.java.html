@@ -1,0 +1,150 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>WebEnrichmentService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">device-manager</a> &gt; <a href="index.source.html" class="el_package">com.devicemanager.service</a> &gt; <span class="el_source">WebEnrichmentService.java</span></div><h1>WebEnrichmentService.java</h1><pre class="source lang-java linenums">package com.devicemanager.service;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+
+import java.net.URI;
+import java.net.URLEncoder;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
+
+/**
+ * Enrichissement léger via APIs publiques (Wikipedia / DuckDuckGo) — sans clé API.
+ * &lt;p&gt;
+ * Complète le scan IA d'étiquettes de pièces détachées avec du contexte web
+ * pour rédiger le champ « usage » de la fiche pièce.
+ */
+@Service
+@RequiredArgsConstructor
+<span class="fc" id="L29">@Slf4j</span>
+public class WebEnrichmentService {
+
+    private final ObjectMapper objectMapper;
+    private final HttpClient httpClient = HttpClient.newBuilder()
+            .connectTimeout(Duration.ofSeconds(8))
+            .followRedirects(HttpClient.Redirect.NORMAL)
+            .build();
+
+    /**
+     * Agrège des extraits web à partir de termes (marque, nom, référence).
+     *
+     * @param terms termes de recherche (valeurs nulles ou vides ignorées)
+     * @return texte concaténé de snippets, ou chaîne vide si aucun résultat
+     */
+    public String gatherContext(String... terms) {
+<span class="nc" id="L45">        String query = buildQuery(terms);</span>
+<span class="nc bnc" id="L46" title="All 2 branches missed.">        if (query.isBlank()) {</span>
+<span class="nc" id="L47">            return &quot;&quot;;</span>
+        }
+<span class="nc" id="L49">        Set&lt;String&gt; snippets = new LinkedHashSet&lt;&gt;();</span>
+        try {
+<span class="nc" id="L51">            snippets.addAll(searchWikipedia(query));</span>
+<span class="nc" id="L52">        } catch (Exception ex) {</span>
+<span class="nc" id="L53">            log.debug(&quot;Wikipedia enrichissement échoué: {}&quot;, ex.getMessage());</span>
+<span class="nc" id="L54">        }</span>
+        try {
+<span class="nc" id="L56">            snippets.addAll(searchDuckDuckGo(query));</span>
+<span class="nc" id="L57">        } catch (Exception ex) {</span>
+<span class="nc" id="L58">            log.debug(&quot;DuckDuckGo enrichissement échoué: {}&quot;, ex.getMessage());</span>
+<span class="nc" id="L59">        }</span>
+<span class="nc bnc" id="L60" title="All 2 branches missed.">        if (snippets.isEmpty()) {</span>
+<span class="nc" id="L61">            return &quot;&quot;;</span>
+        }
+<span class="nc" id="L63">        StringBuilder sb = new StringBuilder();</span>
+<span class="nc" id="L64">        int i = 0;</span>
+<span class="nc bnc" id="L65" title="All 2 branches missed.">        for (String s : snippets) {</span>
+<span class="nc bnc" id="L66" title="All 2 branches missed.">            if (i++ &gt;= 6) {</span>
+<span class="nc" id="L67">                break;</span>
+            }
+<span class="nc" id="L69">            sb.append(&quot;- &quot;).append(s.trim()).append('\n');</span>
+<span class="nc" id="L70">        }</span>
+<span class="nc" id="L71">        return sb.toString().trim();</span>
+    }
+
+    private static String buildQuery(String... terms) {
+<span class="nc" id="L75">        List&lt;String&gt; parts = new ArrayList&lt;&gt;();</span>
+<span class="nc bnc" id="L76" title="All 2 branches missed.">        if (terms != null) {</span>
+<span class="nc bnc" id="L77" title="All 2 branches missed.">            for (String t : terms) {</span>
+<span class="nc bnc" id="L78" title="All 4 branches missed.">                if (t != null &amp;&amp; !t.isBlank()) {</span>
+<span class="nc" id="L79">                    parts.add(t.trim());</span>
+                }
+            }
+        }
+<span class="nc" id="L83">        return String.join(&quot; &quot;, parts);</span>
+    }
+
+    private List&lt;String&gt; searchWikipedia(String query) throws Exception {
+<span class="nc" id="L87">        String encoded = URLEncoder.encode(query, StandardCharsets.UTF_8);</span>
+<span class="nc" id="L88">        String searchUrl = &quot;https://fr.wikipedia.org/w/api.php?action=opensearch&amp;search=&quot;</span>
+                + encoded + &quot;&amp;limit=3&amp;namespace=0&amp;format=json&quot;;
+<span class="nc" id="L90">        HttpRequest req = HttpRequest.newBuilder(URI.create(searchUrl))</span>
+<span class="nc" id="L91">                .timeout(Duration.ofSeconds(10))</span>
+<span class="nc" id="L92">                .header(&quot;User-Agent&quot;, &quot;DeviceManager/1.0 (label-scan)&quot;)</span>
+<span class="nc" id="L93">                .GET()</span>
+<span class="nc" id="L94">                .build();</span>
+<span class="nc" id="L95">        HttpResponse&lt;String&gt; res = httpClient.send(req, HttpResponse.BodyHandlers.ofString());</span>
+<span class="nc bnc" id="L96" title="All 4 branches missed.">        if (res.statusCode() &lt; 200 || res.statusCode() &gt;= 300) {</span>
+<span class="nc" id="L97">            return List.of();</span>
+        }
+<span class="nc" id="L99">        JsonNode root = objectMapper.readTree(res.body());</span>
+<span class="nc bnc" id="L100" title="All 4 branches missed.">        if (!root.isArray() || root.size() &lt; 4) {</span>
+<span class="nc" id="L101">            return List.of();</span>
+        }
+<span class="nc" id="L103">        JsonNode titles = root.get(1);</span>
+<span class="nc" id="L104">        JsonNode descs = root.get(2);</span>
+<span class="nc" id="L105">        List&lt;String&gt; out = new ArrayList&lt;&gt;();</span>
+<span class="nc bnc" id="L106" title="All 2 branches missed.">        for (int i = 0; i &lt; titles.size(); i++) {</span>
+<span class="nc" id="L107">            String title = titles.get(i).asText(&quot;&quot;);</span>
+<span class="nc bnc" id="L108" title="All 2 branches missed.">            String desc = descs.size() &gt; i ? descs.get(i).asText(&quot;&quot;) : &quot;&quot;;</span>
+<span class="nc bnc" id="L109" title="All 2 branches missed.">            if (!title.isBlank()) {</span>
+<span class="nc bnc" id="L110" title="All 2 branches missed.">                out.add(desc.isBlank() ? title : title + &quot; — &quot; + desc);</span>
+            }
+        }
+<span class="nc" id="L113">        return out;</span>
+    }
+
+    private List&lt;String&gt; searchDuckDuckGo(String query) throws Exception {
+<span class="nc" id="L117">        String encoded = URLEncoder.encode(query, StandardCharsets.UTF_8);</span>
+<span class="nc" id="L118">        String url = &quot;https://api.duckduckgo.com/?q=&quot; + encoded + &quot;&amp;format=json&amp;no_html=1&amp;skip_disambig=1&quot;;</span>
+<span class="nc" id="L119">        HttpRequest req = HttpRequest.newBuilder(URI.create(url))</span>
+<span class="nc" id="L120">                .timeout(Duration.ofSeconds(10))</span>
+<span class="nc" id="L121">                .header(&quot;User-Agent&quot;, &quot;DeviceManager/1.0 (label-scan)&quot;)</span>
+<span class="nc" id="L122">                .GET()</span>
+<span class="nc" id="L123">                .build();</span>
+<span class="nc" id="L124">        HttpResponse&lt;String&gt; res = httpClient.send(req, HttpResponse.BodyHandlers.ofString());</span>
+<span class="nc bnc" id="L125" title="All 8 branches missed.">        if (res.statusCode() &lt; 200 || res.statusCode() &gt;= 300 || res.body() == null || res.body().isBlank()) {</span>
+<span class="nc" id="L126">            return List.of();</span>
+        }
+<span class="nc" id="L128">        JsonNode root = objectMapper.readTree(res.body());</span>
+<span class="nc" id="L129">        List&lt;String&gt; out = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L130">        String abstractText = root.path(&quot;AbstractText&quot;).asText(&quot;&quot;);</span>
+<span class="nc" id="L131">        String heading = root.path(&quot;Heading&quot;).asText(&quot;&quot;);</span>
+<span class="nc bnc" id="L132" title="All 2 branches missed.">        if (!abstractText.isBlank()) {</span>
+<span class="nc bnc" id="L133" title="All 2 branches missed.">            out.add((heading.isBlank() ? &quot;&quot; : heading + &quot; — &quot;) + abstractText);</span>
+        }
+<span class="nc" id="L135">        JsonNode related = root.path(&quot;RelatedTopics&quot;);</span>
+<span class="nc bnc" id="L136" title="All 2 branches missed.">        if (related.isArray()) {</span>
+<span class="nc bnc" id="L137" title="All 2 branches missed.">            for (JsonNode node : related) {</span>
+<span class="nc bnc" id="L138" title="All 2 branches missed.">                if (out.size() &gt;= 4) {</span>
+<span class="nc" id="L139">                    break;</span>
+                }
+<span class="nc" id="L141">                String text = node.path(&quot;Text&quot;).asText(&quot;&quot;);</span>
+<span class="nc bnc" id="L142" title="All 2 branches missed.">                if (!text.isBlank()) {</span>
+<span class="nc" id="L143">                    out.add(text);</span>
+                }
+<span class="nc" id="L145">            }</span>
+        }
+<span class="nc" id="L147">        return out;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

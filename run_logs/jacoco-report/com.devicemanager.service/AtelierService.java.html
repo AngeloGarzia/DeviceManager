@@ -1,0 +1,661 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AtelierService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">device-manager</a> &gt; <a href="index.source.html" class="el_package">com.devicemanager.service</a> &gt; <span class="el_source">AtelierService.java</span></div><h1>AtelierService.java</h1><pre class="source lang-java linenums">package com.devicemanager.service;
+
+import com.devicemanager.dto.AtelierRequest;
+import com.devicemanager.dto.AtelierResponsableDto;
+import com.devicemanager.dto.AtelierSummary;
+import com.devicemanager.dto.CasinoRequest;
+import com.devicemanager.dto.CasinoSummary;
+import com.devicemanager.dto.coordonnees.AdressePostaleDto;
+import com.devicemanager.dto.coordonnees.CoordonneesDto;
+import com.devicemanager.dto.coordonnees.EmailCoordDto;
+import com.devicemanager.dto.coordonnees.ReseauSocialDto;
+import com.devicemanager.dto.coordonnees.TelephoneCoordDto;
+import com.devicemanager.entity.Atelier;
+import com.devicemanager.entity.Casino;
+import com.devicemanager.entity.User;
+import com.devicemanager.entity.coordonnees.AdressePostale;
+import com.devicemanager.entity.coordonnees.Coordonnees;
+import com.devicemanager.entity.coordonnees.EmailCoord;
+import com.devicemanager.entity.coordonnees.ReseauSocial;
+import com.devicemanager.entity.coordonnees.TelephoneCoord;
+import com.devicemanager.entity.coordonnees.TypeReseauSocial;
+import com.devicemanager.repository.AtelierRepository;
+import com.devicemanager.repository.CasinoRepository;
+import com.devicemanager.repository.CommandeRepository;
+import com.devicemanager.repository.DeviceRepository;
+import com.devicemanager.repository.InterventionRepository;
+import com.devicemanager.repository.MasRepository;
+import com.devicemanager.repository.SfmRepository;
+import com.devicemanager.repository.UserRepository;
+import com.devicemanager.security.Roles;
+import com.devicemanager.tenancy.AtelierContext;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.hibernate.Hibernate;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
+
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+/**
+ * Service de gestion des ateliers techniques et du contexte multi-tenant.
+ * &lt;p&gt;
+ * Résout les ateliers par groupe casino, gère l'atelier courant via
+ * {@link com.devicemanager.tenancy.AtelierContext} ({@code X-Atelier-Id})
+ * et administre les coordonnées et responsables d'atelier.
+ */
+@Service
+@RequiredArgsConstructor
+@Transactional(readOnly = true)
+<span class="fc" id="L57">@Slf4j</span>
+public class AtelierService {
+
+    private final AtelierRepository atelierRepository;
+    private final CasinoRepository casinoRepository;
+    private final UserRepository userRepository;
+    private final DeviceRepository deviceRepository;
+    private final MasRepository masRepository;
+    private final SfmRepository sfmRepository;
+    private final CommandeRepository commandeRepository;
+    private final InterventionRepository interventionRepository;
+
+    /**
+     * Liste les ateliers accessibles à un utilisateur selon son rôle et son groupe.
+     *
+     * @param username nom d'utilisateur connecté
+     * @return tous les ateliers du groupe (admin) ou l'atelier préféré seul (technicien)
+     * @throws org.springframework.web.server.ResponseStatusException {@code 401} si utilisateur introuvable
+     */
+    public List&lt;AtelierSummary&gt; listForUser(String username) {
+<span class="fc" id="L77">        User user = requireUser(username);</span>
+<span class="fc bfc" id="L78" title="All 2 branches covered.">        if (user.getGroupe() == null) {</span>
+<span class="fc" id="L79">            return List.of();</span>
+        }
+        // Technicien : uniquement son atelier préféré (pas de bascule libre).
+<span class="fc bfc" id="L82" title="All 2 branches covered.">        if (isTechnicien(user.getRole())) {</span>
+<span class="fc" id="L83">            Atelier preferred = user.getPreferredAtelier();</span>
+<span class="pc bpc" id="L84" title="1 of 2 branches missed.">            if (preferred == null) {</span>
+<span class="nc" id="L85">                return List.of();</span>
+            }
+<span class="fc" id="L87">            return List.of(toSummary(requireAtelierInUserGroupe(user, preferred.getId())));</span>
+        }
+<span class="fc" id="L89">        return atelierRepository.findAllByGroupeId(user.getGroupe().getId()).stream()</span>
+<span class="fc" id="L90">                .map(this::toSummary)</span>
+<span class="fc" id="L91">                .toList();</span>
+    }
+
+    /**
+     * Résout un atelier du groupe de l'utilisateur (création / affectation compte).
+     *
+     * @param user utilisateur authentifié
+     * @param atelierId identifiant de l'atelier
+     * @return entité atelier vérifiée
+     * @throws org.springframework.web.server.ResponseStatusException {@code 403} si hors groupe ;
+     *         {@code 400} si introuvable
+     */
+    public Atelier requireAtelierForUserGroupe(User user, Long atelierId) {
+<span class="nc" id="L104">        return requireAtelierInUserGroupe(user, atelierId);</span>
+    }
+
+    /**
+     * Liste les casinos du groupe de l'utilisateur (chaque casino possède 0..N ateliers).
+     *
+     * @param username nom d'utilisateur connecté
+     * @return casinos triés par nom, avec nombre d'ateliers
+     */
+    public List&lt;CasinoSummary&gt; listCasinosForUser(String username) {
+<span class="nc" id="L114">        User user = requireUser(username);</span>
+<span class="nc bnc" id="L115" title="All 2 branches missed.">        if (user.getGroupe() == null) {</span>
+<span class="nc" id="L116">            return List.of();</span>
+        }
+<span class="nc" id="L118">        return casinoRepository.findByGroupeIdOrderByNomAsc(user.getGroupe().getId()).stream()</span>
+<span class="nc" id="L119">                .map(this::toCasinoSummary)</span>
+<span class="nc" id="L120">                .toList();</span>
+    }
+
+    /**
+     * Crée un casino dans le groupe de l'administrateur.
+     *
+     * @param username administrateur
+     * @param request  nom du casino
+     * @return casino créé
+     */
+    @Transactional
+    public CasinoSummary createCasino(String username, CasinoRequest request) {
+<span class="nc" id="L132">        User user = requireUser(username);</span>
+<span class="nc bnc" id="L133" title="All 2 branches missed.">        if (user.getGroupe() == null) {</span>
+<span class="nc" id="L134">            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,</span>
+                    &quot;Votre compte n'est rattaché à aucun groupe. Contactez un administrateur.&quot;);
+        }
+<span class="nc" id="L137">        String nom = normalizeNom(request.getNom());</span>
+<span class="nc" id="L138">        Long groupeId = user.getGroupe().getId();</span>
+<span class="nc bnc" id="L139" title="All 2 branches missed.">        if (casinoRepository.existsByNomIgnoreCaseAndGroupeId(nom, groupeId)) {</span>
+<span class="nc" id="L140">            throw new ResponseStatusException(HttpStatus.CONFLICT, &quot;Nom de casino déjà utilisé dans ce groupe&quot;);</span>
+        }
+<span class="nc" id="L142">        Casino saved = casinoRepository.saveAndFlush(Casino.builder()</span>
+<span class="nc" id="L143">                .nom(nom)</span>
+<span class="nc" id="L144">                .groupe(user.getGroupe())</span>
+<span class="nc" id="L145">                .build());</span>
+<span class="nc" id="L146">        log.info(&quot;Création en base — Casino id={} nom={} groupe={} par={}&quot;,</span>
+<span class="nc" id="L147">                saved.getId(), saved.getNom(), user.getGroupe().getNom(), username);</span>
+<span class="nc" id="L148">        return toCasinoSummary(saved);</span>
+    }
+
+    /**
+     * Renomme un casino du groupe.
+     *
+     * @param username administrateur
+     * @param id       casino
+     * @param request  nouveau nom
+     * @return casino modifié
+     */
+    @Transactional
+    public CasinoSummary updateCasino(String username, Long id, CasinoRequest request) {
+<span class="nc" id="L161">        User user = requireUser(username);</span>
+<span class="nc" id="L162">        Casino casino = requireCasinoInUserGroupe(user, id);</span>
+<span class="nc" id="L163">        String nom = normalizeNom(request.getNom());</span>
+<span class="nc" id="L164">        Long groupeId = user.getGroupe().getId();</span>
+<span class="nc bnc" id="L165" title="All 2 branches missed.">        if (casinoRepository.existsByNomIgnoreCaseAndGroupeIdAndIdNot(nom, groupeId, id)) {</span>
+<span class="nc" id="L166">            throw new ResponseStatusException(HttpStatus.CONFLICT, &quot;Nom de casino déjà utilisé dans ce groupe&quot;);</span>
+        }
+<span class="nc" id="L168">        casino.setNom(nom);</span>
+<span class="nc" id="L169">        Casino saved = casinoRepository.saveAndFlush(casino);</span>
+<span class="nc" id="L170">        log.info(&quot;Modification en base — Casino id={} nom={} par={}&quot;, saved.getId(), saved.getNom(), username);</span>
+<span class="nc" id="L171">        return toCasinoSummary(saved);</span>
+    }
+
+    /**
+     * Supprime un casino sans atelier rattaché.
+     *
+     * @param username administrateur
+     * @param id       casino
+     */
+    @Transactional
+    public void deleteCasino(String username, Long id) {
+<span class="nc" id="L182">        User user = requireUser(username);</span>
+<span class="nc" id="L183">        Casino casino = requireCasinoInUserGroupe(user, id);</span>
+<span class="nc" id="L184">        long ateliers = atelierRepository.countByCasinoId(id);</span>
+<span class="nc bnc" id="L185" title="All 2 branches missed.">        if (ateliers &gt; 0) {</span>
+<span class="nc" id="L186">            throw new ResponseStatusException(HttpStatus.CONFLICT,</span>
+                    &quot;Impossible de supprimer : ce casino possède encore &quot; + ateliers + &quot; atelier(s).&quot;);
+        }
+<span class="nc" id="L189">        String nom = casino.getNom();</span>
+<span class="nc" id="L190">        casinoRepository.delete(casino);</span>
+<span class="nc" id="L191">        casinoRepository.flush();</span>
+<span class="nc" id="L192">        log.info(&quot;Suppression en base — Casino id={} nom={} par={}&quot;, id, nom, username);</span>
+<span class="nc" id="L193">    }</span>
+
+    /**
+     * Liste les utilisateurs du même groupe (candidats responsables d'atelier).
+     *
+     * @param username administrateur connecté
+     * @return utilisateurs du groupe
+     */
+    public List&lt;AtelierResponsableDto&gt; listUsersForGroupe(String username) {
+<span class="nc" id="L202">        User user = requireUser(username);</span>
+<span class="nc bnc" id="L203" title="All 2 branches missed.">        if (user.getGroupe() == null) {</span>
+<span class="nc" id="L204">            return List.of();</span>
+        }
+<span class="nc" id="L206">        return userRepository.findAllByGroupeId(user.getGroupe().getId()).stream()</span>
+<span class="nc" id="L207">                .map(this::toResponsableDto)</span>
+<span class="nc" id="L208">                .toList();</span>
+    }
+
+    /**
+     * Charge l'atelier courant depuis le contexte thread-local ({@code X-Atelier-Id}).
+     *
+     * @return entité atelier avec casino
+     * @throws org.springframework.web.server.ResponseStatusException {@code 400} si en-tête absent ou atelier introuvable
+     */
+    public Atelier requireCurrentAtelier() {
+<span class="fc" id="L218">        Long id = AtelierContext.get();</span>
+<span class="fc bfc" id="L219" title="All 2 branches covered.">        if (id == null) {</span>
+<span class="fc" id="L220">            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, &quot;Sélectionnez un atelier pour continuer.&quot;);</span>
+        }
+<span class="fc" id="L222">        return atelierRepository.findByIdWithCasino(id)</span>
+<span class="pc" id="L223">                .orElseThrow(() -&gt; new ResponseStatusException(HttpStatus.BAD_REQUEST, &quot;Atelier introuvable&quot;));</span>
+    }
+
+    /**
+     * Enregistre l'atelier préféré d'un administrateur pour les prochaines sessions.
+     *
+     * @param username administrateur connecté
+     * @param atelierId identifiant de l'atelier à mémoriser
+     * @return résumé de l'atelier choisi
+     * @throws org.springframework.web.server.ResponseStatusException {@code 403} si non admin ou hors groupe
+     */
+    @Transactional
+    public AtelierSummary setPreferredAtelier(String username, Long atelierId) {
+<span class="fc" id="L236">        User user = requireUser(username);</span>
+<span class="fc bfc" id="L237" title="All 2 branches covered.">        if (!Roles.ADMIN.equals(user.getRole())) {</span>
+<span class="fc" id="L238">            throw new ResponseStatusException(HttpStatus.FORBIDDEN,</span>
+                    &quot;Seuls les administrateurs peuvent changer d'atelier&quot;);
+        }
+<span class="fc" id="L241">        Atelier atelier = requireAtelierInUserGroupe(user, atelierId);</span>
+<span class="fc" id="L242">        user.setPreferredAtelier(atelier);</span>
+<span class="fc" id="L243">        userRepository.saveAndFlush(user);</span>
+<span class="fc" id="L244">        return toSummary(atelier);</span>
+    }
+
+    /**
+     * Crée un atelier rattaché à un casino du groupe de l'administrateur.
+     *
+     * @param username administrateur connecté
+     * @param request nom, casino, coordonnées et responsables
+     * @return atelier créé
+     * @throws org.springframework.web.server.ResponseStatusException {@code 409} si nom déjà utilisé pour ce casino
+     */
+    @Transactional
+    public AtelierSummary create(String username, AtelierRequest request) {
+<span class="fc" id="L257">        User user = requireUser(username);</span>
+<span class="fc" id="L258">        Casino casino = requireCasinoInUserGroupe(user, request.getCasinoId());</span>
+<span class="fc" id="L259">        String nom = normalizeNom(request.getNom());</span>
+<span class="fc" id="L260">        ensureUniqueNom(nom, casino.getId(), null);</span>
+<span class="fc" id="L261">        Atelier atelier = Atelier.builder()</span>
+<span class="fc" id="L262">                .nom(nom)</span>
+<span class="fc" id="L263">                .casino(casino)</span>
+<span class="fc" id="L264">                .responsables(new HashSet&lt;&gt;())</span>
+<span class="fc" id="L265">                .build();</span>
+<span class="fc" id="L266">        applyCoordonnees(atelier, request);</span>
+<span class="fc" id="L267">        applyResponsables(atelier, user, request.getResponsableIds());</span>
+<span class="fc" id="L268">        Atelier saved = atelierRepository.saveAndFlush(atelier);</span>
+<span class="fc" id="L269">        applyUtilisateursPreferes(saved, user, request.getUtilisateurPrefereIds());</span>
+<span class="fc" id="L270">        log.info(&quot;Création en base — Atelier id={} nom={} casino={} par={}&quot;,</span>
+<span class="fc" id="L271">                saved.getId(), saved.getNom(), casino.getNom(), username);</span>
+<span class="fc" id="L272">        return toSummary(saved);</span>
+    }
+
+    /**
+     * Met à jour un atelier existant du groupe.
+     *
+     * @param username administrateur connecté
+     * @param id identifiant de l'atelier
+     * @param request données mises à jour
+     * @return atelier modifié
+     * @throws org.springframework.web.server.ResponseStatusException {@code 403} si hors groupe ;
+     *         {@code 409} en cas de conflit de nom
+     */
+    @Transactional
+    public AtelierSummary update(String username, Long id, AtelierRequest request) {
+<span class="nc" id="L287">        User user = requireUser(username);</span>
+<span class="nc" id="L288">        Atelier atelier = requireAtelierInUserGroupe(user, id);</span>
+<span class="nc" id="L289">        Casino casino = requireCasinoInUserGroupe(user, request.getCasinoId());</span>
+<span class="nc" id="L290">        String nom = normalizeNom(request.getNom());</span>
+<span class="nc" id="L291">        ensureUniqueNom(nom, casino.getId(), id);</span>
+<span class="nc" id="L292">        atelier.setNom(nom);</span>
+<span class="nc" id="L293">        atelier.setCasino(casino);</span>
+<span class="nc" id="L294">        applyCoordonnees(atelier, request);</span>
+<span class="nc" id="L295">        applyResponsables(atelier, user, request.getResponsableIds());</span>
+<span class="nc" id="L296">        Atelier saved = atelierRepository.saveAndFlush(atelier);</span>
+<span class="nc" id="L297">        applyUtilisateursPreferes(saved, user, request.getUtilisateurPrefereIds());</span>
+<span class="nc" id="L298">        log.info(&quot;Modification en base — Atelier id={} nom={} casino={} par={}&quot;,</span>
+<span class="nc" id="L299">                saved.getId(), saved.getNom(), casino.getNom(), username);</span>
+<span class="nc" id="L300">        return toSummary(saved);</span>
+    }
+
+    /**
+     * Supprime un atelier sans données métier rattachées.
+     *
+     * @param username administrateur connecté
+     * @param id identifiant de l'atelier
+     * @throws org.springframework.web.server.ResponseStatusException {@code 409} si pièces, MAS, SFM ou commandes liées
+     */
+    @Transactional
+    public void delete(String username, Long id) {
+<span class="fc" id="L312">        User user = requireUser(username);</span>
+<span class="fc" id="L313">        Atelier atelier = requireAtelierInUserGroupe(user, id);</span>
+<span class="fc" id="L314">        long devices = deviceRepository.countByAtelierId(id);</span>
+<span class="fc" id="L315">        long masses = masRepository.countByAtelierId(id);</span>
+<span class="fc" id="L316">        long sfms = sfmRepository.countByAtelierId(id);</span>
+<span class="fc" id="L317">        long commandes = commandeRepository.countByAtelierId(id);</span>
+<span class="fc" id="L318">        long interventions = interventionRepository.countByAtelierId(id);</span>
+<span class="fc bfc" id="L319" title="All 2 branches covered.">        if (devices + masses + sfms + commandes + interventions &gt; 0) {</span>
+<span class="fc" id="L320">            throw new ResponseStatusException(HttpStatus.CONFLICT,</span>
+                    &quot;Impossible de supprimer : des pièces, MAS, SFM, demandes ou bons d'intervention sont liés à cet atelier.&quot;);
+        }
+<span class="fc" id="L323">        String nom = atelier.getNom();</span>
+
+        // UPDATE JPQL + clear du contexte : requireUser JOIN FETCH preferredAtelier laisse sinon
+        // une référence gérée vers l'atelier → TransientObjectException au flush delete.
+<span class="fc" id="L327">        userRepository.clearPreferredAtelier(id);</span>
+
+<span class="fc" id="L329">        Atelier toDelete = atelierRepository.findByIdWithCasino(id)</span>
+<span class="pc" id="L330">                .orElseThrow(() -&gt; new ResponseStatusException(HttpStatus.NOT_FOUND, &quot;Atelier introuvable&quot;));</span>
+<span class="fc" id="L331">        Hibernate.initialize(toDelete.getResponsables());</span>
+<span class="pc bpc" id="L332" title="1 of 2 branches missed.">        if (toDelete.getResponsables() != null) {</span>
+<span class="fc" id="L333">            toDelete.getResponsables().clear();</span>
+        }
+<span class="fc" id="L335">        atelierRepository.delete(toDelete);</span>
+<span class="fc" id="L336">        atelierRepository.flush();</span>
+<span class="fc" id="L337">        log.info(&quot;Suppression en base — Atelier id={} nom={} par={}&quot;, id, nom, username);</span>
+<span class="fc" id="L338">    }</span>
+
+    /**
+     * Convertit une entité atelier en DTO résumé pour l'API.
+     *
+     * @param atelier entité persistée
+     * @return résumé avec casino, groupe, coordonnées et responsables
+     */
+    public AtelierSummary toSummary(Atelier atelier) {
+<span class="pc bpc" id="L347" title="1 of 2 branches missed.">        String casinoNom = atelier.getCasino() != null ? atelier.getCasino().getNom() : &quot;&quot;;</span>
+<span class="pc bpc" id="L348" title="2 of 4 branches missed.">        String groupeNom = atelier.getCasino() != null &amp;&amp; atelier.getCasino().getGroupe() != null</span>
+<span class="fc" id="L349">                ? atelier.getCasino().getGroupe().getNom()</span>
+<span class="pc" id="L350">                : &quot;&quot;;</span>
+<span class="fc" id="L351">        return AtelierSummary.builder()</span>
+<span class="fc" id="L352">                .id(atelier.getId())</span>
+<span class="fc" id="L353">                .nom(atelier.getNom())</span>
+<span class="pc bpc" id="L354" title="1 of 2 branches missed.">                .casinoId(atelier.getCasino() != null ? atelier.getCasino().getId() : null)</span>
+<span class="fc" id="L355">                .casinoNom(casinoNom)</span>
+<span class="pc bpc" id="L356" title="2 of 4 branches missed.">                .groupeId(atelier.getCasino() != null &amp;&amp; atelier.getCasino().getGroupe() != null</span>
+<span class="pc" id="L357">                        ? atelier.getCasino().getGroupe().getId() : null)</span>
+<span class="fc" id="L358">                .groupeNom(groupeNom)</span>
+<span class="fc" id="L359">                .label(atelier.getNom() + &quot; — &quot; + casinoNom)</span>
+<span class="fc" id="L360">                .coordonnees(toCoordonneesDto(atelier.getCoordonnees()))</span>
+<span class="pc bpc" id="L361" title="1 of 2 branches missed.">                .responsables(sortedUserDtos(atelier.getResponsables() == null</span>
+<span class="nc" id="L362">                        ? List.of()</span>
+<span class="fc" id="L363">                        : atelier.getResponsables().stream().map(this::toResponsableDto).toList()))</span>
+<span class="pc bpc" id="L364" title="1 of 2 branches missed.">                .utilisateursPreferes(atelier.getId() == null</span>
+<span class="nc" id="L365">                        ? List.of()</span>
+<span class="fc" id="L366">                        : sortedUserDtos(userRepository.findAllByPreferredAtelierId(atelier.getId()).stream()</span>
+<span class="fc" id="L367">                                .map(this::toResponsableDto)</span>
+<span class="fc" id="L368">                                .toList()))</span>
+<span class="fc" id="L369">                .build();</span>
+    }
+
+    private List&lt;AtelierResponsableDto&gt; sortedUserDtos(List&lt;AtelierResponsableDto&gt; users) {
+<span class="fc" id="L373">        return users.stream()</span>
+<span class="fc" id="L374">                .sorted((a, b) -&gt; {</span>
+<span class="nc bnc" id="L375" title="All 2 branches missed.">                    String la = ((a.getNom() == null ? &quot;&quot; : a.getNom())</span>
+<span class="nc bnc" id="L376" title="All 2 branches missed.">                            + &quot; &quot; + (a.getPrenom() == null ? &quot;&quot; : a.getPrenom())).trim();</span>
+<span class="nc bnc" id="L377" title="All 2 branches missed.">                    String lb = ((b.getNom() == null ? &quot;&quot; : b.getNom())</span>
+<span class="nc bnc" id="L378" title="All 2 branches missed.">                            + &quot; &quot; + (b.getPrenom() == null ? &quot;&quot; : b.getPrenom())).trim();</span>
+<span class="nc bnc" id="L379" title="All 2 branches missed.">                    if (la.isBlank()) {</span>
+<span class="nc bnc" id="L380" title="All 2 branches missed.">                        la = a.getUsername() == null ? &quot;&quot; : a.getUsername();</span>
+                    }
+<span class="nc bnc" id="L382" title="All 2 branches missed.">                    if (lb.isBlank()) {</span>
+<span class="nc bnc" id="L383" title="All 2 branches missed.">                        lb = b.getUsername() == null ? &quot;&quot; : b.getUsername();</span>
+                    }
+<span class="nc" id="L385">                    return la.compareToIgnoreCase(lb);</span>
+                })
+<span class="fc" id="L387">                .toList();</span>
+    }
+
+    private CasinoSummary toCasinoSummary(Casino casino) {
+<span class="nc bnc" id="L391" title="All 2 branches missed.">        long atelierCount = casino.getId() == null ? 0L : atelierRepository.countByCasinoId(casino.getId());</span>
+<span class="nc" id="L392">        return CasinoSummary.builder()</span>
+<span class="nc" id="L393">                .id(casino.getId())</span>
+<span class="nc" id="L394">                .nom(casino.getNom())</span>
+<span class="nc bnc" id="L395" title="All 2 branches missed.">                .groupeId(casino.getGroupe() != null ? casino.getGroupe().getId() : null)</span>
+<span class="nc bnc" id="L396" title="All 2 branches missed.">                .groupeNom(casino.getGroupe() != null ? casino.getGroupe().getNom() : &quot;&quot;)</span>
+<span class="nc" id="L397">                .atelierCount(atelierCount)</span>
+<span class="nc" id="L398">                .build();</span>
+    }
+
+    private void applyCoordonnees(Atelier atelier, AtelierRequest request) {
+<span class="fc" id="L402">        Coordonnees coord = atelier.getCoordonnees();</span>
+<span class="pc bpc" id="L403" title="1 of 2 branches missed.">        if (coord == null) {</span>
+<span class="fc" id="L404">            coord = Coordonnees.builder()</span>
+<span class="fc" id="L405">                    .adresse(new AdressePostale())</span>
+<span class="fc" id="L406">                    .emails(new ArrayList&lt;&gt;())</span>
+<span class="fc" id="L407">                    .telephones(new ArrayList&lt;&gt;())</span>
+<span class="fc" id="L408">                    .reseauxSociaux(new ArrayList&lt;&gt;())</span>
+<span class="fc" id="L409">                    .build();</span>
+<span class="fc" id="L410">            atelier.setCoordonnees(coord);</span>
+        }
+
+<span class="fc" id="L413">        AdressePostaleDto adresseDto = request.getAdresse();</span>
+<span class="pc bpc" id="L414" title="1 of 2 branches missed.">        AdressePostale adresse = coord.getAdresse() != null ? coord.getAdresse() : new AdressePostale();</span>
+<span class="fc bfc" id="L415" title="All 2 branches covered.">        if (adresseDto != null) {</span>
+<span class="fc" id="L416">            adresse.setLigne1(trimToNull(adresseDto.getLigne1()));</span>
+<span class="fc" id="L417">            adresse.setLigne2(trimToNull(adresseDto.getLigne2()));</span>
+<span class="fc" id="L418">            adresse.setCodePostal(trimToNull(adresseDto.getCodePostal()));</span>
+<span class="fc" id="L419">            adresse.setVille(trimToNull(adresseDto.getVille()));</span>
+<span class="fc" id="L420">            adresse.setPays(trimToNull(adresseDto.getPays()));</span>
+        }
+<span class="fc" id="L422">        coord.setAdresse(adresse);</span>
+
+<span class="fc" id="L424">        coord.clearEmails();</span>
+<span class="pc bpc" id="L425" title="1 of 2 branches missed.">        List&lt;EmailCoordDto&gt; emails = request.getEmails() == null ? List.of() : request.getEmails();</span>
+<span class="pc bpc" id="L426" title="3 of 6 branches missed.">        boolean anyPrincipalEmail = emails.stream().anyMatch(e -&gt; e != null &amp;&amp; e.isPrincipal() &amp;&amp; hasText(e.getValeur()));</span>
+<span class="fc" id="L427">        int emailIndex = 0;</span>
+<span class="fc bfc" id="L428" title="All 2 branches covered.">        for (EmailCoordDto dto : emails) {</span>
+<span class="pc bpc" id="L429" title="2 of 4 branches missed.">            if (dto == null || !hasText(dto.getValeur())) {</span>
+<span class="nc" id="L430">                continue;</span>
+            }
+<span class="pc bpc" id="L432" title="5 of 6 branches missed.">            boolean principal = dto.isPrincipal() || (!anyPrincipalEmail &amp;&amp; emailIndex == 0);</span>
+<span class="fc" id="L433">            coord.addEmail(EmailCoord.builder()</span>
+<span class="fc" id="L434">                    .valeur(dto.getValeur().trim())</span>
+<span class="fc" id="L435">                    .principal(principal)</span>
+<span class="fc" id="L436">                    .build());</span>
+<span class="fc" id="L437">            emailIndex++;</span>
+<span class="fc" id="L438">        }</span>
+
+<span class="fc" id="L440">        coord.clearTelephones();</span>
+<span class="pc bpc" id="L441" title="1 of 2 branches missed.">        List&lt;TelephoneCoordDto&gt; telephones = request.getTelephones() == null ? List.of() : request.getTelephones();</span>
+<span class="pc bpc" id="L442" title="3 of 6 branches missed.">        boolean anyPrincipalTel = telephones.stream().anyMatch(t -&gt; t != null &amp;&amp; t.isPrincipal() &amp;&amp; hasText(t.getValeur()));</span>
+<span class="fc" id="L443">        int telIndex = 0;</span>
+<span class="fc bfc" id="L444" title="All 2 branches covered.">        for (TelephoneCoordDto dto : telephones) {</span>
+<span class="pc bpc" id="L445" title="2 of 4 branches missed.">            if (dto == null || !hasText(dto.getValeur())) {</span>
+<span class="nc" id="L446">                continue;</span>
+            }
+<span class="pc bpc" id="L448" title="5 of 6 branches missed.">            boolean principal = dto.isPrincipal() || (!anyPrincipalTel &amp;&amp; telIndex == 0);</span>
+<span class="fc" id="L449">            coord.addTelephone(TelephoneCoord.builder()</span>
+<span class="fc" id="L450">                    .valeur(dto.getValeur().trim())</span>
+<span class="fc" id="L451">                    .label(trimToNull(dto.getLabel()))</span>
+<span class="fc" id="L452">                    .principal(principal)</span>
+<span class="fc" id="L453">                    .build());</span>
+<span class="fc" id="L454">            telIndex++;</span>
+<span class="fc" id="L455">        }</span>
+
+<span class="fc" id="L457">        coord.clearReseauxSociaux();</span>
+<span class="pc bpc" id="L458" title="1 of 2 branches missed.">        List&lt;ReseauSocialDto&gt; reseaux = request.getReseauxSociaux() == null ? List.of() : request.getReseauxSociaux();</span>
+<span class="pc bpc" id="L459" title="1 of 2 branches missed.">        for (ReseauSocialDto dto : reseaux) {</span>
+<span class="nc bnc" id="L460" title="All 4 branches missed.">            if (dto == null || !hasText(dto.getUrl())) {</span>
+<span class="nc" id="L461">                continue;</span>
+            }
+<span class="nc bnc" id="L463" title="All 2 branches missed.">            TypeReseauSocial type = dto.getType() != null ? dto.getType() : TypeReseauSocial.AUTRE;</span>
+<span class="nc" id="L464">            coord.addReseauSocial(ReseauSocial.builder()</span>
+<span class="nc" id="L465">                    .type(type)</span>
+<span class="nc" id="L466">                    .url(dto.getUrl().trim())</span>
+<span class="nc" id="L467">                    .build());</span>
+<span class="nc" id="L468">        }</span>
+<span class="fc" id="L469">    }</span>
+
+    private void applyResponsables(Atelier atelier, User actor, List&lt;Long&gt; responsableIds) {
+<span class="fc" id="L472">        Set&lt;User&gt; next = new HashSet&lt;&gt;();</span>
+<span class="pc bpc" id="L473" title="2 of 4 branches missed.">        if (responsableIds != null &amp;&amp; !responsableIds.isEmpty()) {</span>
+<span class="fc" id="L474">            List&lt;Long&gt; ids = responsableIds.stream().filter(Objects::nonNull).distinct().toList();</span>
+<span class="pc bpc" id="L475" title="1 of 2 branches missed.">            if (!ids.isEmpty()) {</span>
+<span class="fc" id="L476">                List&lt;User&gt; users = userRepository.findAllByIdInWithGroupe(ids);</span>
+<span class="pc bpc" id="L477" title="1 of 2 branches missed.">                if (users.size() != ids.size()) {</span>
+<span class="nc" id="L478">                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, &quot;Responsable introuvable&quot;);</span>
+                }
+<span class="fc bfc" id="L480" title="All 2 branches covered.">                for (User candidate : users) {</span>
+<span class="fc" id="L481">                    ensureSameGroupe(actor, candidate, &quot;Responsable hors du groupe de l'atelier&quot;);</span>
+<span class="fc" id="L482">                    next.add(candidate);</span>
+<span class="fc" id="L483">                }</span>
+            }
+        }
+<span class="pc bpc" id="L486" title="1 of 2 branches missed.">        if (atelier.getResponsables() == null) {</span>
+<span class="nc" id="L487">            atelier.setResponsables(next);</span>
+        } else {
+<span class="fc" id="L489">            atelier.getResponsables().clear();</span>
+<span class="fc" id="L490">            atelier.getResponsables().addAll(next);</span>
+        }
+<span class="fc" id="L492">    }</span>
+
+    /**
+     * Définit les utilisateurs ayant cet atelier comme préféré.
+     * Les utilisateurs retirés voient leur atelier préféré remis à null ;
+     * ceux ajoutés pointent vers cet atelier (un seul préféré par compte).
+     */
+    private void applyUtilisateursPreferes(Atelier atelier, User actor, List&lt;Long&gt; utilisateurPrefereIds) {
+<span class="pc bpc" id="L500" title="1 of 2 branches missed.">        if (atelier.getId() == null) {</span>
+<span class="nc" id="L501">            return;</span>
+        }
+<span class="pc bpc" id="L503" title="1 of 2 branches missed.">        List&lt;Long&gt; desiredIds = utilisateurPrefereIds == null</span>
+<span class="nc" id="L504">                ? List.of()</span>
+<span class="fc" id="L505">                : utilisateurPrefereIds.stream().filter(Objects::nonNull).distinct().toList();</span>
+<span class="fc" id="L506">        Set&lt;Long&gt; desired = new HashSet&lt;&gt;(desiredIds);</span>
+
+<span class="fc" id="L508">        List&lt;User&gt; currentlyPreferring = userRepository.findAllByPreferredAtelierId(atelier.getId());</span>
+<span class="fc" id="L509">        List&lt;User&gt; toClear = currentlyPreferring.stream()</span>
+<span class="pc bpc" id="L510" title="1 of 2 branches missed.">                .filter(current -&gt; !desired.contains(current.getId()))</span>
+<span class="pc" id="L511">                .peek(current -&gt; current.setPreferredAtelier(null))</span>
+<span class="fc" id="L512">                .toList();</span>
+<span class="pc bpc" id="L513" title="1 of 2 branches missed.">        if (!toClear.isEmpty()) {</span>
+<span class="nc" id="L514">            userRepository.saveAll(toClear);</span>
+        }
+
+<span class="pc bpc" id="L517" title="1 of 2 branches missed.">        if (desiredIds.isEmpty()) {</span>
+<span class="nc" id="L518">            return;</span>
+        }
+<span class="fc" id="L520">        List&lt;User&gt; candidates = userRepository.findAllByIdInWithGroupe(desiredIds);</span>
+<span class="pc bpc" id="L521" title="1 of 2 branches missed.">        if (candidates.size() != desiredIds.size()) {</span>
+<span class="nc" id="L522">            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, &quot;Utilisateur préféré introuvable&quot;);</span>
+        }
+<span class="fc bfc" id="L524" title="All 2 branches covered.">        for (User candidate : candidates) {</span>
+<span class="fc" id="L525">            ensureSameGroupe(actor, candidate, &quot;Utilisateur préféré hors du groupe de l'atelier&quot;);</span>
+<span class="fc" id="L526">            candidate.setPreferredAtelier(atelier);</span>
+<span class="fc" id="L527">        }</span>
+<span class="fc" id="L528">        userRepository.saveAll(candidates);</span>
+<span class="fc" id="L529">    }</span>
+
+    private void ensureSameGroupe(User actor, User candidate, String forbiddenMessage) {
+<span class="pc bpc" id="L532" title="1 of 2 branches missed.">        if (actor.getGroupe() == null</span>
+<span class="pc bpc" id="L533" title="1 of 2 branches missed.">                || candidate.getGroupe() == null</span>
+<span class="fc bfc" id="L534" title="All 2 branches covered.">                || !actor.getGroupe().getId().equals(candidate.getGroupe().getId())) {</span>
+<span class="fc" id="L535">            throw new ResponseStatusException(HttpStatus.FORBIDDEN, forbiddenMessage);</span>
+        }
+<span class="fc" id="L537">    }</span>
+
+    private CoordonneesDto toCoordonneesDto(Coordonnees coord) {
+<span class="fc bfc" id="L540" title="All 2 branches covered.">        if (coord == null) {</span>
+<span class="fc" id="L541">            return CoordonneesDto.builder()</span>
+<span class="fc" id="L542">                    .adresse(AdressePostaleDto.builder().build())</span>
+<span class="fc" id="L543">                    .emails(List.of())</span>
+<span class="fc" id="L544">                    .telephones(List.of())</span>
+<span class="fc" id="L545">                    .reseauxSociaux(List.of())</span>
+<span class="fc" id="L546">                    .build();</span>
+        }
+<span class="fc" id="L548">        AdressePostale adresse = coord.getAdresse();</span>
+<span class="fc" id="L549">        return CoordonneesDto.builder()</span>
+<span class="fc" id="L550">                .id(coord.getId())</span>
+<span class="fc" id="L551">                .adresse(AdressePostaleDto.builder()</span>
+<span class="pc bpc" id="L552" title="1 of 2 branches missed.">                        .ligne1(adresse != null ? adresse.getLigne1() : null)</span>
+<span class="pc bpc" id="L553" title="1 of 2 branches missed.">                        .ligne2(adresse != null ? adresse.getLigne2() : null)</span>
+<span class="pc bpc" id="L554" title="1 of 2 branches missed.">                        .codePostal(adresse != null ? adresse.getCodePostal() : null)</span>
+<span class="pc bpc" id="L555" title="1 of 2 branches missed.">                        .ville(adresse != null ? adresse.getVille() : null)</span>
+<span class="pc bpc" id="L556" title="1 of 2 branches missed.">                        .pays(adresse != null ? adresse.getPays() : null)</span>
+<span class="fc" id="L557">                        .build())</span>
+<span class="pc bpc" id="L558" title="1 of 2 branches missed.">                .emails(coord.getEmails() == null ? List.of() : coord.getEmails().stream()</span>
+<span class="fc" id="L559">                        .map(e -&gt; {</span>
+<span class="fc" id="L560">                            EmailCoordDto dto = new EmailCoordDto();</span>
+<span class="fc" id="L561">                            dto.setId(e.getId());</span>
+<span class="fc" id="L562">                            dto.setValeur(e.getValeur());</span>
+<span class="fc" id="L563">                            dto.setPrincipal(e.isPrincipal());</span>
+<span class="fc" id="L564">                            return dto;</span>
+                        })
+<span class="fc" id="L566">                        .collect(Collectors.toCollection(ArrayList::new)))</span>
+<span class="pc bpc" id="L567" title="1 of 2 branches missed.">                .telephones(coord.getTelephones() == null ? List.of() : coord.getTelephones().stream()</span>
+<span class="fc" id="L568">                        .map(t -&gt; {</span>
+<span class="fc" id="L569">                            TelephoneCoordDto dto = new TelephoneCoordDto();</span>
+<span class="fc" id="L570">                            dto.setId(t.getId());</span>
+<span class="fc" id="L571">                            dto.setValeur(t.getValeur());</span>
+<span class="fc" id="L572">                            dto.setLabel(t.getLabel());</span>
+<span class="fc" id="L573">                            dto.setPrincipal(t.isPrincipal());</span>
+<span class="fc" id="L574">                            return dto;</span>
+                        })
+<span class="fc" id="L576">                        .collect(Collectors.toCollection(ArrayList::new)))</span>
+<span class="pc bpc" id="L577" title="1 of 2 branches missed.">                .reseauxSociaux(coord.getReseauxSociaux() == null ? List.of() : coord.getReseauxSociaux().stream()</span>
+<span class="fc" id="L578">                        .map(r -&gt; {</span>
+<span class="nc" id="L579">                            ReseauSocialDto dto = new ReseauSocialDto();</span>
+<span class="nc" id="L580">                            dto.setId(r.getId());</span>
+<span class="nc" id="L581">                            dto.setType(r.getType());</span>
+<span class="nc" id="L582">                            dto.setUrl(r.getUrl());</span>
+<span class="nc" id="L583">                            return dto;</span>
+                        })
+<span class="fc" id="L585">                        .collect(Collectors.toCollection(ArrayList::new)))</span>
+<span class="fc" id="L586">                .build();</span>
+    }
+
+    private AtelierResponsableDto toResponsableDto(User user) {
+<span class="fc" id="L590">        return AtelierResponsableDto.builder()</span>
+<span class="fc" id="L591">                .id(user.getId())</span>
+<span class="fc" id="L592">                .username(user.getUsername())</span>
+<span class="fc" id="L593">                .nom(user.getNom())</span>
+<span class="fc" id="L594">                .prenom(user.getPrenom())</span>
+<span class="fc" id="L595">                .email(user.getEmail())</span>
+<span class="fc" id="L596">                .build();</span>
+    }
+
+    private Atelier requireAtelierInUserGroupe(User user, Long atelierId) {
+<span class="fc" id="L600">        Atelier atelier = atelierRepository.findByIdWithCasino(atelierId)</span>
+<span class="fc" id="L601">                .orElseThrow(() -&gt; new ResponseStatusException(HttpStatus.BAD_REQUEST, &quot;Atelier introuvable&quot;));</span>
+<span class="fc" id="L602">        assertSameGroupe(user, atelier.getCasino());</span>
+<span class="fc" id="L603">        return atelier;</span>
+    }
+
+    private Casino requireCasinoInUserGroupe(User user, Long casinoId) {
+<span class="fc" id="L607">        Casino casino = casinoRepository.findByIdWithGroupe(casinoId)</span>
+<span class="pc" id="L608">                .orElseThrow(() -&gt; new ResponseStatusException(HttpStatus.BAD_REQUEST, &quot;Casino introuvable&quot;));</span>
+<span class="fc" id="L609">        assertSameGroupe(user, casino);</span>
+<span class="fc" id="L610">        return casino;</span>
+    }
+
+    private void assertSameGroupe(User user, Casino casino) {
+<span class="pc bpc" id="L614" title="2 of 4 branches missed.">        if (user.getGroupe() == null</span>
+                || casino == null
+<span class="pc bpc" id="L616" title="1 of 2 branches missed.">                || casino.getGroupe() == null</span>
+<span class="fc bfc" id="L617" title="All 2 branches covered.">                || !user.getGroupe().getId().equals(casino.getGroupe().getId())) {</span>
+<span class="fc" id="L618">            throw new ResponseStatusException(HttpStatus.FORBIDDEN, &quot;Atelier non autorisé pour ce compte&quot;);</span>
+        }
+<span class="fc" id="L620">    }</span>
+
+    private void ensureUniqueNom(String nom, Long casinoId, Long excludeId) {
+<span class="pc bpc" id="L623" title="1 of 2 branches missed.">        boolean exists = excludeId == null</span>
+<span class="fc" id="L624">                ? atelierRepository.findByNomIgnoreCaseAndCasinoId(nom, casinoId).isPresent()</span>
+<span class="nc" id="L625">                : atelierRepository.findByNomIgnoreCaseAndCasinoId(nom, casinoId)</span>
+<span class="nc bnc" id="L626" title="All 2 branches missed.">                        .filter(a -&gt; !a.getId().equals(excludeId))</span>
+<span class="pc" id="L627">                        .isPresent();</span>
+<span class="pc bpc" id="L628" title="1 of 2 branches missed.">        if (exists) {</span>
+<span class="nc" id="L629">            throw new ResponseStatusException(HttpStatus.CONFLICT, &quot;Un atelier avec ce nom existe déjà pour ce casino&quot;);</span>
+        }
+<span class="fc" id="L631">    }</span>
+
+    private static String normalizeNom(String nom) {
+<span class="pc bpc" id="L634" title="2 of 4 branches missed.">        if (nom == null || nom.isBlank()) {</span>
+<span class="nc" id="L635">            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, &quot;Le nom de l'atelier est obligatoire&quot;);</span>
+        }
+<span class="fc" id="L637">        return nom.trim();</span>
+    }
+
+    private static boolean hasText(String value) {
+<span class="pc bpc" id="L641" title="2 of 4 branches missed.">        return value != null &amp;&amp; !value.isBlank();</span>
+    }
+
+    private static String trimToNull(String value) {
+<span class="fc bfc" id="L645" title="All 2 branches covered.">        if (value == null) {</span>
+<span class="fc" id="L646">            return null;</span>
+        }
+<span class="fc" id="L648">        String trimmed = value.trim();</span>
+<span class="pc bpc" id="L649" title="1 of 2 branches missed.">        return trimmed.isEmpty() ? null : trimmed;</span>
+    }
+
+    private User requireUser(String username) {
+<span class="fc" id="L653">        return userRepository.findByUsername(username)</span>
+<span class="fc" id="L654">                .orElseThrow(() -&gt; new ResponseStatusException(HttpStatus.UNAUTHORIZED, &quot;Utilisateur introuvable&quot;));</span>
+    }
+
+    private static boolean isTechnicien(String role) {
+<span class="pc bpc" id="L658" title="1 of 4 branches missed.">        return Roles.TECHNICIEN.equals(role) || &quot;TECH&quot;.equals(role);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

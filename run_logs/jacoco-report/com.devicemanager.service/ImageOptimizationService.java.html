@@ -1,0 +1,223 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ImageOptimizationService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">device-manager</a> &gt; <a href="index.source.html" class="el_package">com.devicemanager.service</a> &gt; <span class="el_source">ImageOptimizationService.java</span></div><h1>ImageOptimizationService.java</h1><pre class="source lang-java linenums">package com.devicemanager.service;
+
+import com.devicemanager.security.FileMagicBytesValidator;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.server.ResponseStatusException;
+
+import javax.imageio.IIOImage;
+import javax.imageio.ImageIO;
+import javax.imageio.ImageWriteParam;
+import javax.imageio.ImageWriter;
+import javax.imageio.stream.ImageOutputStream;
+import java.awt.Graphics2D;
+import java.awt.RenderingHints;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.Arrays;
+import java.util.Iterator;
+
+/**
+ * Optimisation des photos de pièces détachées avant stockage.
+ * &lt;p&gt;
+ * Redimensionne (max {@link #MAX_DIMENSION} px) et compresse en JPEG
+ * pour limiter l'espace disque/S3 et accélérer le scan IA d'étiquettes.
+ */
+@Service
+<span class="fc" id="L33">@Slf4j</span>
+<span class="fc" id="L34">public class ImageOptimizationService {</span>
+
+    /** Plus grand côté conservé — compromis stockage / lisibilité étiquette (~900 px). */
+    public static final int MAX_DIMENSION = 900;
+    private static final float JPEG_QUALITY = 0.78f;
+
+    /**
+     * Redimensionne et compresse une image en JPEG optimisé.
+     *
+     * @param file image source
+     * @return fichier multipart en mémoire (JPEG)
+     * @throws org.springframework.web.server.ResponseStatusException {@code 400} si image absente ou illisible
+     */
+    public MultipartFile optimize(MultipartFile file) {
+<span class="pc bpc" id="L48" title="2 of 4 branches missed.">        if (file == null || file.isEmpty()) {</span>
+<span class="nc" id="L49">            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, &quot;La photo est obligatoire&quot;);</span>
+        }
+        try {
+<span class="fc" id="L52">            byte[] rawBytes = file.getBytes();</span>
+<span class="fc" id="L53">            FileMagicBytesValidator.validateImageMagicBytes(rawBytes);</span>
+<span class="fc" id="L54">            BufferedImage source = ImageIO.read(new ByteArrayInputStream(rawBytes));</span>
+<span class="pc bpc" id="L55" title="1 of 2 branches missed.">            if (source == null) {</span>
+<span class="nc" id="L56">                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, &quot;Photo illisible ou format non pris en charge&quot;);</span>
+            }
+<span class="fc" id="L58">            BufferedImage resized = resizeIfNeeded(source);</span>
+<span class="fc" id="L59">            byte[] jpegBytes = encodeJpeg(resized);</span>
+
+<span class="fc" id="L61">            String originalName = file.getOriginalFilename();</span>
+<span class="fc" id="L62">            String filename = toJpegFilename(originalName);</span>
+
+<span class="fc" id="L64">            log.info(</span>
+                    &quot;Image optimisée: {}x{} → {}x{} ({} → {} octets)&quot;,
+<span class="fc" id="L66">                    source.getWidth(),</span>
+<span class="fc" id="L67">                    source.getHeight(),</span>
+<span class="fc" id="L68">                    resized.getWidth(),</span>
+<span class="fc" id="L69">                    resized.getHeight(),</span>
+<span class="fc" id="L70">                    file.getSize(),</span>
+<span class="fc" id="L71">                    jpegBytes.length</span>
+            );
+
+<span class="fc" id="L74">            String partName = file.getName();</span>
+<span class="fc" id="L75">            return new OptimizedMultipartFile(</span>
+<span class="pc bpc" id="L76" title="1 of 2 branches missed.">                    partName.isBlank() ? &quot;photo&quot; : partName,</span>
+                    filename,
+                    MediaType.IMAGE_JPEG_VALUE,
+                    jpegBytes
+            );
+<span class="nc" id="L81">        } catch (ResponseStatusException ex) {</span>
+<span class="nc" id="L82">            throw ex;</span>
+<span class="nc" id="L83">        } catch (IOException ex) {</span>
+<span class="nc" id="L84">            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,</span>
+                    &quot;Impossible de préparer la photo. Réessayez avec une autre image.&quot;, ex);
+        }
+    }
+
+    private BufferedImage toRgb(BufferedImage source) {
+<span class="pc bpc" id="L90" title="1 of 2 branches missed.">        if (source.getType() == BufferedImage.TYPE_INT_RGB) {</span>
+<span class="nc" id="L91">            return source;</span>
+        }
+<span class="fc" id="L93">        BufferedImage rgb = new BufferedImage(source.getWidth(), source.getHeight(), BufferedImage.TYPE_INT_RGB);</span>
+<span class="fc" id="L94">        Graphics2D g = rgb.createGraphics();</span>
+        try {
+<span class="fc" id="L96">            g.setColor(java.awt.Color.WHITE);</span>
+<span class="fc" id="L97">            g.fillRect(0, 0, source.getWidth(), source.getHeight());</span>
+<span class="fc" id="L98">            g.drawImage(source, 0, 0, null);</span>
+        } finally {
+<span class="fc" id="L100">            g.dispose();</span>
+        }
+<span class="fc" id="L102">        return rgb;</span>
+    }
+
+    private BufferedImage resizeIfNeeded(BufferedImage source) {
+<span class="fc" id="L106">        int width = source.getWidth();</span>
+<span class="fc" id="L107">        int height = source.getHeight();</span>
+<span class="pc bpc" id="L108" title="1 of 4 branches missed.">        if (width &lt;= MAX_DIMENSION &amp;&amp; height &lt;= MAX_DIMENSION) {</span>
+<span class="fc" id="L109">            return toRgb(source);</span>
+        }
+
+<span class="fc" id="L112">        double scale = Math.min((double) MAX_DIMENSION / width, (double) MAX_DIMENSION / height);</span>
+<span class="fc" id="L113">        int targetWidth = Math.max(1, (int) Math.round(width * scale));</span>
+<span class="fc" id="L114">        int targetHeight = Math.max(1, (int) Math.round(height * scale));</span>
+
+<span class="fc" id="L116">        BufferedImage target = new BufferedImage(targetWidth, targetHeight, BufferedImage.TYPE_INT_RGB);</span>
+<span class="fc" id="L117">        Graphics2D g = target.createGraphics();</span>
+        try {
+<span class="fc" id="L119">            g.setColor(java.awt.Color.WHITE);</span>
+<span class="fc" id="L120">            g.fillRect(0, 0, targetWidth, targetHeight);</span>
+<span class="fc" id="L121">            g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);</span>
+<span class="fc" id="L122">            g.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);</span>
+<span class="fc" id="L123">            g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);</span>
+<span class="fc" id="L124">            g.drawImage(source, 0, 0, targetWidth, targetHeight, null);</span>
+        } finally {
+<span class="fc" id="L126">            g.dispose();</span>
+        }
+<span class="fc" id="L128">        return target;</span>
+    }
+
+    private byte[] encodeJpeg(BufferedImage image) throws IOException {
+<span class="fc" id="L132">        Iterator&lt;ImageWriter&gt; writers = ImageIO.getImageWritersByFormatName(&quot;jpg&quot;);</span>
+<span class="pc bpc" id="L133" title="1 of 2 branches missed.">        if (!writers.hasNext()) {</span>
+<span class="nc" id="L134">            throw new IOException(&quot;Aucun encodeur JPEG disponible&quot;);</span>
+        }
+<span class="fc" id="L136">        ImageWriter writer = writers.next();</span>
+<span class="fc" id="L137">        ByteArrayOutputStream baos = new ByteArrayOutputStream();</span>
+<span class="fc" id="L138">        try (ImageOutputStream ios = ImageIO.createImageOutputStream(baos)) {</span>
+<span class="fc" id="L139">            writer.setOutput(ios);</span>
+<span class="fc" id="L140">            ImageWriteParam param = writer.getDefaultWriteParam();</span>
+<span class="pc bpc" id="L141" title="1 of 2 branches missed.">            if (param.canWriteCompressed()) {</span>
+<span class="fc" id="L142">                param.setCompressionMode(ImageWriteParam.MODE_EXPLICIT);</span>
+<span class="fc" id="L143">                param.setCompressionQuality(JPEG_QUALITY);</span>
+            }
+<span class="fc" id="L145">            writer.write(null, new IIOImage(image, null, null), param);</span>
+        } finally {
+<span class="fc" id="L147">            writer.dispose();</span>
+        }
+<span class="fc" id="L149">        return baos.toByteArray();</span>
+    }
+
+    private String toJpegFilename(String originalName) {
+<span class="pc bpc" id="L153" title="2 of 4 branches missed.">        if (originalName == null || originalName.isBlank()) {</span>
+<span class="nc" id="L154">            return &quot;photo.jpg&quot;;</span>
+        }
+<span class="fc" id="L156">        int dot = originalName.lastIndexOf('.');</span>
+<span class="pc bpc" id="L157" title="1 of 2 branches missed.">        String base = dot &gt; 0 ? originalName.substring(0, dot) : originalName;</span>
+<span class="fc" id="L158">        String sanitized = base.replaceAll(&quot;[^a-zA-Z0-9._-]&quot;, &quot;_&quot;);</span>
+<span class="pc bpc" id="L159" title="1 of 2 branches missed.">        if (sanitized.isBlank()) {</span>
+<span class="nc" id="L160">            sanitized = &quot;photo&quot;;</span>
+        }
+<span class="fc" id="L162">        return sanitized + &quot;.jpg&quot;;</span>
+    }
+
+    /**
+     * MultipartFile en mémoire après optimisation.
+     */
+    static final class OptimizedMultipartFile implements MultipartFile {
+
+        private final String name;
+        private final String originalFilename;
+        private final String contentType;
+        private final byte[] content;
+
+<span class="fc" id="L175">        OptimizedMultipartFile(String name, String originalFilename, String contentType, byte[] content) {</span>
+<span class="fc" id="L176">            this.name = name;</span>
+<span class="fc" id="L177">            this.originalFilename = originalFilename;</span>
+<span class="fc" id="L178">            this.contentType = contentType;</span>
+<span class="fc" id="L179">            this.content = Arrays.copyOf(content, content.length);</span>
+<span class="fc" id="L180">        }</span>
+
+        @Override
+        public String getName() {
+<span class="nc" id="L184">            return name;</span>
+        }
+
+        @Override
+        public String getOriginalFilename() {
+<span class="fc" id="L189">            return originalFilename;</span>
+        }
+
+        @Override
+        public String getContentType() {
+<span class="fc" id="L194">            return contentType;</span>
+        }
+
+        @Override
+        public boolean isEmpty() {
+<span class="nc bnc" id="L199" title="All 2 branches missed.">            return content.length == 0;</span>
+        }
+
+        @Override
+        public long getSize() {
+<span class="fc" id="L204">            return content.length;</span>
+        }
+
+        @Override
+        public byte[] getBytes() {
+<span class="nc" id="L209">            return Arrays.copyOf(content, content.length);</span>
+        }
+
+        @Override
+        public InputStream getInputStream() {
+<span class="fc" id="L214">            return new ByteArrayInputStream(content);</span>
+        }
+
+        @Override
+        public void transferTo(java.io.File dest) throws IOException {
+<span class="nc" id="L219">            java.nio.file.Files.write(dest.toPath(), content);</span>
+<span class="nc" id="L220">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

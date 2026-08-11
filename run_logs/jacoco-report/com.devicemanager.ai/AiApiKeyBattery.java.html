@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AiApiKeyBattery.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">device-manager</a> &gt; <a href="index.source.html" class="el_package">com.devicemanager.ai</a> &gt; <span class="el_source">AiApiKeyBattery.java</span></div><h1>AiApiKeyBattery.java</h1><pre class="source lang-java linenums">package com.devicemanager.ai;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
+
+/**
+ * Batterie de clés API IA injectées depuis les variables d'environnement
+ * ({@code GEMINI_API_KEY}, {@code OPENAI_API_KEY}, etc.).
+ * &lt;p&gt;
+ * Fournit l'accès aux clés par identifiant de fournisseur et aide au seed initial
+ * de la configuration IA lors du setup.
+ */
+@Component
+<span class="nc" id="L14">public class AiApiKeyBattery {</span>
+
+    @Value(&quot;${GEMINI_API_KEY:}&quot;)
+    private String geminiApiKey;
+
+    @Value(&quot;${OPENAI_API_KEY:}&quot;)
+    private String openaiApiKey;
+
+    @Value(&quot;${GROQ_API_KEY:}&quot;)
+    private String groqApiKey;
+
+    @Value(&quot;${MISTRAL_API_KEY:}&quot;)
+    private String mistralApiKey;
+
+    @Value(&quot;${OPENROUTER_API_KEY:}&quot;)
+    private String openrouterApiKey;
+
+    @Value(&quot;${DEEPSEEK_API_KEY:}&quot;)
+    private String deepseekApiKey;
+
+    @Value(&quot;${TOGETHER_API_KEY:}&quot;)
+    private String togetherApiKey;
+
+    @Value(&quot;${FIREWORKS_API_KEY:}&quot;)
+    private String fireworksApiKey;
+
+    /**
+     * Retourne la clé API associée au fournisseur demandé, ou une chaîne vide si absente.
+     *
+     * @param providerId identifiant brut du fournisseur (normalisé via {@link AiProviders#normalizeProvider})
+     * @return clé API trimée, ou {@code &quot;&quot;} si inconnue ou non configurée
+     */
+    public String keyFor(String providerId) {
+<span class="nc" id="L47">        String id = AiProviders.normalizeProvider(providerId);</span>
+<span class="nc bnc" id="L48" title="All 9 branches missed.">        String key = switch (id) {</span>
+<span class="nc" id="L49">            case &quot;gemini&quot; -&gt; geminiApiKey;</span>
+<span class="nc" id="L50">            case &quot;openai&quot; -&gt; openaiApiKey;</span>
+<span class="nc" id="L51">            case &quot;groq&quot; -&gt; groqApiKey;</span>
+<span class="nc" id="L52">            case &quot;mistral&quot; -&gt; mistralApiKey;</span>
+<span class="nc" id="L53">            case &quot;openrouter&quot; -&gt; openrouterApiKey;</span>
+<span class="nc" id="L54">            case &quot;deepseek&quot; -&gt; deepseekApiKey;</span>
+<span class="nc" id="L55">            case &quot;together&quot; -&gt; togetherApiKey;</span>
+<span class="nc" id="L56">            case &quot;fireworks&quot; -&gt; fireworksApiKey;</span>
+<span class="nc" id="L57">            default -&gt; &quot;&quot;;</span>
+        };
+<span class="nc" id="L59">        return blankToEmpty(key);</span>
+    }
+
+    /**
+     * Nom de la variable d'environnement attendue pour un fournisseur donné.
+     *
+     * @param providerId identifiant du fournisseur
+     * @return nom de variable (ex. {@code OPENAI_API_KEY}), ou {@code OPENAI_API_KEY} par défaut
+     */
+    public static String envVarName(String providerId) {
+<span class="nc bnc" id="L69" title="All 9 branches missed.">        return switch (AiProviders.normalizeProvider(providerId)) {</span>
+<span class="nc" id="L70">            case &quot;gemini&quot; -&gt; &quot;GEMINI_API_KEY&quot;;</span>
+<span class="nc" id="L71">            case &quot;openai&quot; -&gt; &quot;OPENAI_API_KEY&quot;;</span>
+<span class="nc" id="L72">            case &quot;groq&quot; -&gt; &quot;GROQ_API_KEY&quot;;</span>
+<span class="nc" id="L73">            case &quot;mistral&quot; -&gt; &quot;MISTRAL_API_KEY&quot;;</span>
+<span class="nc" id="L74">            case &quot;openrouter&quot; -&gt; &quot;OPENROUTER_API_KEY&quot;;</span>
+<span class="nc" id="L75">            case &quot;deepseek&quot; -&gt; &quot;DEEPSEEK_API_KEY&quot;;</span>
+<span class="nc" id="L76">            case &quot;together&quot; -&gt; &quot;TOGETHER_API_KEY&quot;;</span>
+<span class="nc" id="L77">            case &quot;fireworks&quot; -&gt; &quot;FIREWORKS_API_KEY&quot;;</span>
+<span class="nc" id="L78">            default -&gt; &quot;OPENAI_API_KEY&quot;;</span>
+        };
+    }
+
+    /**
+     * Première clé non vide utile pour le seed du setup : fournisseur préféré d'abord,
+     * puis parcours de tous les fournisseurs connus.
+     *
+     * @param preferredProviderId fournisseur à tenter en priorité
+     * @return clé API non vide, ou {@code &quot;&quot;} si aucune n'est configurée
+     */
+    public String seedKey(String preferredProviderId) {
+<span class="nc" id="L90">        String preferred = keyFor(preferredProviderId);</span>
+<span class="nc bnc" id="L91" title="All 2 branches missed.">        if (!preferred.isBlank()) {</span>
+<span class="nc" id="L92">            return preferred;</span>
+        }
+<span class="nc bnc" id="L94" title="All 2 branches missed.">        for (String id : AiProviders.providerIds()) {</span>
+<span class="nc" id="L95">            String k = keyFor(id);</span>
+<span class="nc bnc" id="L96" title="All 2 branches missed.">            if (!k.isBlank()) {</span>
+<span class="nc" id="L97">                return k;</span>
+            }
+<span class="nc" id="L99">        }</span>
+<span class="nc" id="L100">        return &quot;&quot;;</span>
+    }
+
+    /**
+     * Indique si au moins une clé API IA est configurée dans l'environnement.
+     *
+     * @return {@code true} si une clé exploitable existe
+     */
+    public boolean hasAnyKey() {
+<span class="nc bnc" id="L109" title="All 2 branches missed.">        return !seedKey(&quot;openai&quot;).isBlank();</span>
+    }
+
+    private static String blankToEmpty(String value) {
+<span class="nc bnc" id="L113" title="All 2 branches missed.">        return value == null ? &quot;&quot; : value.trim();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

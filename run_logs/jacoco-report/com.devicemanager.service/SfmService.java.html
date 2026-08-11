@@ -1,0 +1,310 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SfmService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">device-manager</a> &gt; <a href="index.source.html" class="el_package">com.devicemanager.service</a> &gt; <span class="el_source">SfmService.java</span></div><h1>SfmService.java</h1><pre class="source lang-java linenums">package com.devicemanager.service;
+
+import com.devicemanager.dto.MarqueMasResponse;
+import com.devicemanager.dto.SfmContactResponse;
+import com.devicemanager.dto.SfmRequest;
+import com.devicemanager.dto.SfmResponse;
+import com.devicemanager.dto.SfmTechnicienResponse;
+import com.devicemanager.entity.Atelier;
+import com.devicemanager.entity.MarqueMas;
+import com.devicemanager.entity.Sfm;
+import com.devicemanager.entity.SfmContact;
+import com.devicemanager.repository.MarqueMasRepository;
+import com.devicemanager.repository.SfmContactRepository;
+import com.devicemanager.repository.SfmRepository;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.hibernate.Hibernate;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
+
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+/**
+ * Service métier des SFM (fournisseurs de pièces détachées casino).
+ * &lt;p&gt;
+ * CRUD des fournisseurs avec contacts partageables (dont techniciens multi-SFM)
+ * et marques couvertes, filtré par l'atelier courant ({@code X-Atelier-Id}).
+ */
+@Service
+@RequiredArgsConstructor
+@Transactional
+<span class="fc" id="L43">@Slf4j</span>
+public class SfmService {
+
+    private final SfmRepository sfmRepository;
+    private final SfmContactRepository sfmContactRepository;
+    private final MarqueMasRepository marqueMasRepository;
+    private final AtelierService atelierService;
+
+    @Transactional(readOnly = true)
+    public List&lt;SfmResponse&gt; findAll(String q) {
+<span class="fc" id="L53">        Long atelierId = atelierService.requireCurrentAtelier().getId();</span>
+<span class="pc bpc" id="L54" title="2 of 4 branches missed.">        List&lt;Sfm&gt; list = (q == null || q.isBlank())</span>
+<span class="nc" id="L55">                ? sfmRepository.findAllWithContacts(atelierId)</span>
+<span class="fc" id="L56">                : sfmRepository.search(atelierId, q.trim());</span>
+<span class="fc" id="L57">        list.forEach(s -&gt; Hibernate.initialize(s.getMarques()));</span>
+<span class="fc" id="L58">        return list.stream().map(this::toResponse).toList();</span>
+    }
+
+    @Transactional(readOnly = true)
+    public SfmResponse findById(Long id) {
+<span class="nc" id="L63">        return toResponse(getEntity(id));</span>
+    }
+
+    /**
+     * Liste les techniciens SFM déjà utilisés dans l'atelier courant.
+     */
+    @Transactional(readOnly = true)
+    public List&lt;SfmTechnicienResponse&gt; listTechniciens() {
+<span class="nc" id="L71">        Long atelierId = atelierService.requireCurrentAtelier().getId();</span>
+<span class="nc" id="L72">        return sfmContactRepository.findTechniciensByAtelierId(atelierId).stream()</span>
+<span class="nc" id="L73">                .map(this::toTechnicienResponse)</span>
+<span class="nc" id="L74">                .toList();</span>
+    }
+
+    public SfmResponse create(SfmRequest request) {
+<span class="fc" id="L78">        Atelier atelier = atelierService.requireCurrentAtelier();</span>
+<span class="fc" id="L79">        String nom = request.getNom().trim();</span>
+<span class="fc" id="L80">        ensureUniqueNom(nom, atelier.getId(), null);</span>
+<span class="fc" id="L81">        Sfm entity = Sfm.builder()</span>
+<span class="fc" id="L82">                .nom(nom)</span>
+<span class="fc" id="L83">                .responsable(&quot;&quot;)</span>
+<span class="fc" id="L84">                .telephone(&quot;&quot;)</span>
+<span class="fc" id="L85">                .email(&quot;&quot;)</span>
+<span class="fc" id="L86">                .contacts(new ArrayList&lt;&gt;())</span>
+<span class="fc" id="L87">                .marques(new HashSet&lt;&gt;())</span>
+<span class="fc" id="L88">                .atelier(atelier)</span>
+<span class="fc" id="L89">                .build();</span>
+<span class="fc" id="L90">        applyContacts(entity, request.getContacts());</span>
+<span class="fc" id="L91">        applyMarques(entity, request.getMarqueIds());</span>
+<span class="fc" id="L92">        entity.syncPrimaryContactFields();</span>
+<span class="fc" id="L93">        Sfm saved = sfmRepository.save(entity);</span>
+<span class="fc" id="L94">        log.info(&quot;Création en base — SFM id={} nom={} marques={} atelier={}&quot;,</span>
+<span class="fc" id="L95">                saved.getId(), saved.getNom(), saved.getMarques().size(), atelier.getId());</span>
+<span class="fc" id="L96">        return toResponse(saved);</span>
+    }
+
+    public SfmResponse update(Long id, SfmRequest request) {
+<span class="fc" id="L100">        Sfm entity = getEntity(id);</span>
+<span class="fc" id="L101">        String nom = request.getNom().trim();</span>
+<span class="fc" id="L102">        ensureUniqueNom(nom, entity.getAtelier().getId(), entity.getId());</span>
+<span class="fc" id="L103">        entity.setNom(nom);</span>
+<span class="fc" id="L104">        applyContacts(entity, request.getContacts());</span>
+<span class="fc" id="L105">        applyMarques(entity, request.getMarqueIds());</span>
+<span class="fc" id="L106">        entity.syncPrimaryContactFields();</span>
+<span class="fc" id="L107">        Sfm saved = sfmRepository.save(entity);</span>
+<span class="fc" id="L108">        log.info(&quot;Modification en base — SFM id={} nom={} marques={} atelier={}&quot;,</span>
+<span class="fc" id="L109">                saved.getId(),</span>
+<span class="fc" id="L110">                saved.getNom(),</span>
+<span class="fc" id="L111">                saved.getMarques().size(),</span>
+<span class="pc bpc" id="L112" title="1 of 2 branches missed.">                saved.getAtelier() != null ? saved.getAtelier().getId() : null);</span>
+<span class="fc" id="L113">        return toResponse(saved);</span>
+    }
+
+    public void delete(Long id) {
+<span class="nc" id="L117">        Sfm entity = getEntity(id);</span>
+<span class="nc bnc" id="L118" title="All 2 branches missed.">        Long atelierId = entity.getAtelier() != null ? entity.getAtelier().getId() : null;</span>
+<span class="nc" id="L119">        String nom = entity.getNom();</span>
+<span class="nc" id="L120">        List&lt;SfmContact&gt; linked = new ArrayList&lt;&gt;(entity.getContacts());</span>
+<span class="nc" id="L121">        entity.getContacts().clear();</span>
+<span class="nc" id="L122">        sfmRepository.delete(entity);</span>
+<span class="nc bnc" id="L123" title="All 2 branches missed.">        for (SfmContact contact : linked) {</span>
+<span class="nc" id="L124">            deleteContactIfOrphan(contact.getId());</span>
+<span class="nc" id="L125">        }</span>
+<span class="nc" id="L126">        log.info(&quot;Suppression en base — SFM id={} nom={} atelier={}&quot;, id, nom, atelierId);</span>
+<span class="nc" id="L127">    }</span>
+
+    public Sfm getEntity(Long id) {
+<span class="fc" id="L130">        Long atelierId = atelierService.requireCurrentAtelier().getId();</span>
+<span class="fc" id="L131">        Sfm entity = sfmRepository.findByIdWithContacts(id, atelierId)</span>
+<span class="fc" id="L132">                .orElseThrow(() -&gt; new ResponseStatusException(HttpStatus.NOT_FOUND, &quot;SFM introuvable&quot;));</span>
+<span class="fc" id="L133">        Hibernate.initialize(entity.getMarques());</span>
+<span class="fc" id="L134">        return entity;</span>
+    }
+
+    private void ensureUniqueNom(String nom, Long atelierId, Long excludeId) {
+<span class="fc bfc" id="L138" title="All 2 branches covered.">        boolean exists = excludeId == null</span>
+<span class="fc" id="L139">                ? sfmRepository.existsByNomIgnoreCaseAndAtelierId(nom, atelierId)</span>
+<span class="fc" id="L140">                : sfmRepository.existsByNomIgnoreCaseAndAtelierIdAndIdNot(nom, atelierId, excludeId);</span>
+<span class="fc bfc" id="L141" title="All 2 branches covered.">        if (exists) {</span>
+<span class="fc" id="L142">            throw new ResponseStatusException(HttpStatus.CONFLICT, &quot;Nom SFM déjà utilisé dans cet atelier&quot;);</span>
+        }
+<span class="fc" id="L144">    }</span>
+
+    private void applyContacts(Sfm entity, List&lt;SfmRequest.SfmContactRequest&gt; contacts) {
+<span class="pc bpc" id="L147" title="1 of 4 branches missed.">        if (contacts == null || contacts.isEmpty()) {</span>
+<span class="fc" id="L148">            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, &quot;Ajoutez au moins un contact SFM&quot;);</span>
+        }
+
+<span class="fc" id="L151">        Map&lt;Long, SfmContact&gt; previousById = entity.getContacts().stream()</span>
+<span class="pc bpc" id="L152" title="1 of 2 branches missed.">                .filter(c -&gt; c.getId() != null)</span>
+<span class="pc" id="L153">                .collect(Collectors.toMap(SfmContact::getId, c -&gt; c, (a, b) -&gt; a, LinkedHashMap::new));</span>
+
+<span class="fc" id="L155">        List&lt;SfmContact&gt; next = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L156">        Set&lt;Long&gt; keptIds = new HashSet&lt;&gt;();</span>
+
+<span class="fc bfc" id="L158" title="All 2 branches covered.">        for (SfmRequest.SfmContactRequest req : contacts) {</span>
+<span class="fc" id="L159">            SfmContact contact = resolveContact(req);</span>
+<span class="fc" id="L160">            keptIds.add(contact.getId());</span>
+<span class="pc bpc" id="L161" title="1 of 2 branches missed.">            if (!next.contains(contact)) {</span>
+<span class="fc" id="L162">                next.add(contact);</span>
+            }
+<span class="fc" id="L164">        }</span>
+
+<span class="fc" id="L166">        List&lt;SfmContact&gt; removed = previousById.values().stream()</span>
+<span class="pc bpc" id="L167" title="1 of 2 branches missed.">                .filter(c -&gt; !keptIds.contains(c.getId()))</span>
+<span class="fc" id="L168">                .toList();</span>
+
+<span class="fc" id="L170">        entity.getContacts().clear();</span>
+<span class="fc bfc" id="L171" title="All 2 branches covered.">        for (SfmContact contact : next) {</span>
+<span class="fc" id="L172">            entity.addContact(contact);</span>
+<span class="fc" id="L173">        }</span>
+
+<span class="pc bpc" id="L175" title="1 of 2 branches missed.">        for (SfmContact contact : removed) {</span>
+<span class="nc bnc" id="L176" title="All 2 branches missed.">            if (contact.getSfms() != null) {</span>
+<span class="nc" id="L177">                contact.getSfms().remove(entity);</span>
+            }
+<span class="nc" id="L179">            deleteContactIfOrphan(contact.getId());</span>
+<span class="nc" id="L180">        }</span>
+<span class="fc" id="L181">    }</span>
+
+    private SfmContact resolveContact(SfmRequest.SfmContactRequest req) {
+<span class="fc" id="L184">        String nom = req.getNom().trim();</span>
+<span class="fc" id="L185">        String telephone = req.getTelephone().trim();</span>
+<span class="fc" id="L186">        String email = req.getEmail().trim();</span>
+<span class="pc bpc" id="L187" title="1 of 4 branches missed.">        boolean receiveMails = req.getReceiveOrderMails() == null || Boolean.TRUE.equals(req.getReceiveOrderMails());</span>
+<span class="fc" id="L188">        boolean technicien = Boolean.TRUE.equals(req.getTechnicienSfm());</span>
+
+<span class="fc" id="L190">        SfmContact contact = null;</span>
+<span class="fc bfc" id="L191" title="All 2 branches covered.">        if (req.getId() != null) {</span>
+<span class="fc" id="L192">            contact = sfmContactRepository.findById(req.getId())</span>
+<span class="pc" id="L193">                    .orElseThrow(() -&gt; new ResponseStatusException(HttpStatus.BAD_REQUEST, &quot;Contact introuvable&quot;));</span>
+<span class="pc bpc" id="L194" title="1 of 2 branches missed.">        } else if (technicien) {</span>
+<span class="nc" id="L195">            contact = sfmContactRepository.findByEmailIgnoreCase(email).orElse(null);</span>
+<span class="nc bnc" id="L196" title="All 4 branches missed.">            if (contact != null &amp;&amp; !contact.isTechnicienSfm()) {</span>
+                // Même e-mail qu'un contact non-technicien : on upgrade en technicien partageable.
+<span class="nc" id="L198">                contact.setTechnicienSfm(true);</span>
+            }
+        }
+
+<span class="fc bfc" id="L202" title="All 2 branches covered.">        if (contact == null) {</span>
+<span class="fc" id="L203">            contact = SfmContact.builder()</span>
+<span class="fc" id="L204">                    .nom(nom)</span>
+<span class="fc" id="L205">                    .telephone(telephone)</span>
+<span class="fc" id="L206">                    .email(email)</span>
+<span class="fc" id="L207">                    .receiveOrderMails(receiveMails)</span>
+<span class="fc" id="L208">                    .technicienSfm(technicien)</span>
+<span class="fc" id="L209">                    .sfms(new HashSet&lt;&gt;())</span>
+<span class="fc" id="L210">                    .build();</span>
+        } else {
+<span class="fc" id="L212">            contact.setNom(nom);</span>
+<span class="fc" id="L213">            contact.setTelephone(telephone);</span>
+<span class="fc" id="L214">            contact.setEmail(email);</span>
+<span class="fc" id="L215">            contact.setReceiveOrderMails(receiveMails);</span>
+            // Respecter la case à cocher (y compris pour décocher un technicien).
+<span class="fc" id="L217">            contact.setTechnicienSfm(technicien);</span>
+        }
+<span class="fc" id="L219">        return sfmContactRepository.save(contact);</span>
+    }
+
+    private void deleteContactIfOrphan(Long contactId) {
+<span class="nc bnc" id="L223" title="All 2 branches missed.">        if (contactId == null) {</span>
+<span class="nc" id="L224">            return;</span>
+        }
+<span class="nc" id="L226">        long links = sfmContactRepository.countSfmsByContactId(contactId);</span>
+<span class="nc bnc" id="L227" title="All 2 branches missed.">        if (links == 0) {</span>
+<span class="nc" id="L228">            sfmContactRepository.findById(contactId).ifPresent(sfmContactRepository::delete);</span>
+        }
+<span class="nc" id="L230">    }</span>
+
+    private void applyMarques(Sfm entity, List&lt;Long&gt; marqueIds) {
+<span class="pc bpc" id="L233" title="1 of 4 branches missed.">        if (marqueIds == null || marqueIds.isEmpty()) {</span>
+<span class="fc" id="L234">            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, &quot;Sélectionnez au moins une marque&quot;);</span>
+        }
+<span class="fc" id="L236">        Set&lt;Long&gt; uniqueIds = new LinkedHashSet&lt;&gt;(marqueIds);</span>
+<span class="fc" id="L237">        List&lt;MarqueMas&gt; marques = marqueMasRepository.findAllById(uniqueIds);</span>
+<span class="pc bpc" id="L238" title="1 of 2 branches missed.">        if (marques.size() != uniqueIds.size()) {</span>
+<span class="nc" id="L239">            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, &quot;Une ou plusieurs marques sont introuvables&quot;);</span>
+        }
+<span class="fc" id="L241">        entity.getMarques().clear();</span>
+<span class="fc" id="L242">        entity.getMarques().addAll(marques);</span>
+<span class="fc" id="L243">    }</span>
+
+    private SfmTechnicienResponse toTechnicienResponse(SfmContact c) {
+<span class="nc bnc" id="L246" title="All 2 branches missed.">        List&lt;Sfm&gt; sfms = c.getSfms() == null ? List.of() : c.getSfms().stream()</span>
+<span class="nc" id="L247">                .sorted(Comparator.comparing(Sfm::getNom, String.CASE_INSENSITIVE_ORDER))</span>
+<span class="nc" id="L248">                .toList();</span>
+<span class="nc" id="L249">        return SfmTechnicienResponse.builder()</span>
+<span class="nc" id="L250">                .id(c.getId())</span>
+<span class="nc" id="L251">                .nom(c.getNom())</span>
+<span class="nc" id="L252">                .telephone(c.getTelephone())</span>
+<span class="nc" id="L253">                .email(c.getEmail())</span>
+<span class="nc" id="L254">                .receiveOrderMails(c.isReceiveOrderMails())</span>
+<span class="nc" id="L255">                .sfmIds(sfms.stream().map(Sfm::getId).filter(Objects::nonNull).toList())</span>
+<span class="nc" id="L256">                .sfmNoms(sfms.stream().map(Sfm::getNom).toList())</span>
+<span class="nc" id="L257">                .build();</span>
+    }
+
+    private SfmResponse toResponse(Sfm entity) {
+<span class="pc bpc" id="L261" title="1 of 2 branches missed.">        List&lt;SfmContactResponse&gt; contacts = entity.getContacts() == null</span>
+<span class="nc" id="L262">                ? List.of()</span>
+<span class="fc" id="L263">                : entity.getContacts().stream()</span>
+<span class="fc" id="L264">                .map(c -&gt; SfmContactResponse.builder()</span>
+<span class="fc" id="L265">                        .id(c.getId())</span>
+<span class="fc" id="L266">                        .nom(c.getNom())</span>
+<span class="fc" id="L267">                        .telephone(c.getTelephone())</span>
+<span class="fc" id="L268">                        .email(c.getEmail())</span>
+<span class="fc" id="L269">                        .receiveOrderMails(c.isReceiveOrderMails())</span>
+<span class="fc" id="L270">                        .technicienSfm(c.isTechnicienSfm())</span>
+<span class="fc" id="L271">                        .build())</span>
+<span class="fc" id="L272">                .toList();</span>
+
+<span class="fc bfc" id="L274" title="All 2 branches covered.">        if (contacts.isEmpty()</span>
+<span class="pc bpc" id="L275" title="1 of 2 branches missed.">                &amp;&amp; entity.getResponsable() != null</span>
+<span class="pc bpc" id="L276" title="1 of 2 branches missed.">                &amp;&amp; !entity.getResponsable().isBlank()) {</span>
+<span class="fc" id="L277">            contacts = List.of(SfmContactResponse.builder()</span>
+<span class="fc" id="L278">                    .nom(entity.getResponsable())</span>
+<span class="fc" id="L279">                    .telephone(entity.getTelephone())</span>
+<span class="fc" id="L280">                    .email(entity.getEmail())</span>
+<span class="fc" id="L281">                    .receiveOrderMails(true)</span>
+<span class="fc" id="L282">                    .technicienSfm(false)</span>
+<span class="fc" id="L283">                    .build());</span>
+        }
+
+<span class="pc bpc" id="L286" title="1 of 2 branches missed.">        List&lt;MarqueMasResponse&gt; marques = entity.getMarques() == null</span>
+<span class="nc" id="L287">                ? List.of()</span>
+<span class="fc" id="L288">                : entity.getMarques().stream()</span>
+<span class="fc" id="L289">                .sorted(Comparator.comparing(MarqueMas::getLabel, String.CASE_INSENSITIVE_ORDER))</span>
+<span class="fc" id="L290">                .map(m -&gt; MarqueMasResponse.builder()</span>
+<span class="fc" id="L291">                        .id(m.getId())</span>
+<span class="fc" id="L292">                        .code(m.getCode())</span>
+<span class="fc" id="L293">                        .label(m.getLabel())</span>
+<span class="fc" id="L294">                        .value(m.getId())</span>
+<span class="fc" id="L295">                        .build())</span>
+<span class="fc" id="L296">                .toList();</span>
+
+<span class="fc" id="L298">        return SfmResponse.builder()</span>
+<span class="fc" id="L299">                .id(entity.getId())</span>
+<span class="fc" id="L300">                .nom(entity.getNom())</span>
+<span class="fc" id="L301">                .responsable(entity.getResponsable())</span>
+<span class="fc" id="L302">                .telephone(entity.getTelephone())</span>
+<span class="fc" id="L303">                .email(entity.getEmail())</span>
+<span class="fc" id="L304">                .contacts(contacts)</span>
+<span class="fc" id="L305">                .marqueIds(marques.stream().map(MarqueMasResponse::getId).collect(Collectors.toList()))</span>
+<span class="fc" id="L306">                .marques(marques)</span>
+<span class="fc" id="L307">                .build();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

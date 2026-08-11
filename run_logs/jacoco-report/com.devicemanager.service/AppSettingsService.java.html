@@ -1,0 +1,378 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AppSettingsService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">device-manager</a> &gt; <a href="index.source.html" class="el_package">com.devicemanager.service</a> &gt; <span class="el_source">AppSettingsService.java</span></div><h1>AppSettingsService.java</h1><pre class="source lang-java linenums">package com.devicemanager.service;
+
+import com.devicemanager.ai.AiPromptDefaults;
+import com.devicemanager.ai.AiProviders;
+import com.devicemanager.dto.AppSettingResponse;
+import com.devicemanager.dto.AppSettingsUpdateRequest;
+import com.devicemanager.entity.AppSetting;
+import com.devicemanager.repository.AppSettingRepository;
+import jakarta.annotation.PostConstruct;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+
+/**
+ * Service de paramètres applicatifs persistés (Setup DeviceManager).
+ * &lt;p&gt;
+ * Initialise et met en cache messagerie, JWT, CORS, stockage et IA.
+ * Global à l'application — indépendant du contexte atelier ({@code X-Atelier-Id}).
+ */
+@Service
+@RequiredArgsConstructor
+@Transactional
+<span class="fc" id="L31">@Slf4j</span>
+public class AppSettingsService {
+
+    public static final String MAIL_ENABLED = &quot;MAIL_ENABLED&quot;;
+    public static final String MAIL_FROM = &quot;MAIL_FROM&quot;;
+    public static final String MAIL_ADMIN_EMAIL = &quot;MAIL_ADMIN_EMAIL&quot;;
+    public static final String MAIL_HOST = &quot;MAIL_HOST&quot;;
+    public static final String MAIL_PORT = &quot;MAIL_PORT&quot;;
+    public static final String MAIL_USERNAME = &quot;MAIL_USERNAME&quot;;
+    public static final String MAIL_PASSWORD = &quot;MAIL_PASSWORD&quot;;
+    public static final String JWT_EXPIRATION_MS = &quot;JWT_EXPIRATION_MS&quot;;
+    public static final String CORS_ALLOWED_ORIGINS = &quot;CORS_ALLOWED_ORIGINS&quot;;
+    public static final String S3_ENABLED = &quot;S3_ENABLED&quot;;
+    public static final String S3_BUCKET = &quot;S3_BUCKET&quot;;
+    public static final String S3_REGION = &quot;S3_REGION&quot;;
+    public static final String LOCAL_UPLOAD_DIR = &quot;LOCAL_UPLOAD_DIR&quot;;
+    public static final String AI_ENABLED = &quot;AI_ENABLED&quot;;
+    public static final String AI_PROVIDER = &quot;AI_PROVIDER&quot;;
+    public static final String AI_API_KEY = &quot;AI_API_KEY&quot;;
+    public static final String AI_MODEL = &quot;AI_MODEL&quot;;
+    public static final String AI_SYSTEM_PROMPT = &quot;AI_SYSTEM_PROMPT&quot;;
+    public static final String AI_LABEL_EXTRACT_PROMPT = &quot;AI_LABEL_EXTRACT_PROMPT&quot;;
+    public static final String AI_USAGE_PROMPT = &quot;AI_USAGE_PROMPT&quot;;
+
+    /** Catégorie Setup + page publique /confidentialite. */
+    public static final String PRIVACY_CATEGORY = &quot;RGPD / Mentions légales&quot;;
+    public static final String PRIVACY_EDITOR_LEGAL = &quot;PRIVACY_EDITOR_LEGAL&quot;;
+    public static final String PRIVACY_PUBLICATION_DIRECTOR = &quot;PRIVACY_PUBLICATION_DIRECTOR&quot;;
+    public static final String PRIVACY_EDITOR_CONTACT = &quot;PRIVACY_EDITOR_CONTACT&quot;;
+    public static final String PRIVACY_HOSTING = &quot;PRIVACY_HOSTING&quot;;
+    public static final String PRIVACY_CONTROLLER = &quot;PRIVACY_CONTROLLER&quot;;
+    public static final String PRIVACY_PROCESSORS = &quot;PRIVACY_PROCESSORS&quot;;
+    public static final String PRIVACY_TRANSFER = &quot;PRIVACY_TRANSFER&quot;;
+    public static final String PRIVACY_RIGHTS_EMAIL = &quot;PRIVACY_RIGHTS_EMAIL&quot;;
+    public static final String PRIVACY_POSTAL_ADDRESS = &quot;PRIVACY_POSTAL_ADDRESS&quot;;
+    public static final String PRIVACY_LAST_UPDATED = &quot;PRIVACY_LAST_UPDATED&quot;;
+
+<span class="fc" id="L68">    public static final List&lt;String&gt; PRIVACY_PUBLIC_KEYS = List.of(</span>
+            PRIVACY_EDITOR_LEGAL,
+            PRIVACY_PUBLICATION_DIRECTOR,
+            PRIVACY_EDITOR_CONTACT,
+            PRIVACY_HOSTING,
+            PRIVACY_CONTROLLER,
+            PRIVACY_PROCESSORS,
+            PRIVACY_TRANSFER,
+            PRIVACY_RIGHTS_EMAIL,
+            PRIVACY_POSTAL_ADDRESS,
+            PRIVACY_LAST_UPDATED
+    );
+
+    private final AppSettingRepository appSettingRepository;
+    private final Map&lt;String, String&gt; cache = new ConcurrentHashMap&lt;&gt;();
+
+    @Value(&quot;${app.mail.enabled:false}&quot;)
+    private String defaultMailEnabled;
+
+    @Value(&quot;${app.mail.from:}&quot;)
+    private String defaultMailFrom;
+
+    @Value(&quot;${app.mail.admin-email:}&quot;)
+    private String defaultMailAdminEmail;
+
+    @Value(&quot;${spring.mail.host:}&quot;)
+    private String defaultMailHost;
+
+    @Value(&quot;${spring.mail.port:587}&quot;)
+    private String defaultMailPort;
+
+    @Value(&quot;${spring.mail.username:}&quot;)
+    private String defaultMailUsername;
+
+    @Value(&quot;${spring.mail.password:}&quot;)
+    private String defaultMailPassword;
+
+    @Value(&quot;${app.jwt.expiration-ms:86400000}&quot;)
+    private String defaultJwtExpirationMs;
+
+    @Value(&quot;${app.cors.allowed-origins:}&quot;)
+    private String defaultCorsOrigins;
+
+    @Value(&quot;${app.s3.enabled:false}&quot;)
+    private String defaultS3Enabled;
+
+    @Value(&quot;${app.s3.bucket:}&quot;)
+    private String defaultS3Bucket;
+
+    @Value(&quot;${app.s3.region:}&quot;)
+    private String defaultS3Region;
+
+    @Value(&quot;${app.s3.local-fallback-dir:uploads}&quot;)
+    private String defaultLocalUploadDir;
+
+    @Value(&quot;${app.ai.enabled:false}&quot;)
+    private String defaultAiEnabled;
+
+    @Value(&quot;${AI_DEFAULT_PROVIDER:openai}&quot;)
+    private String defaultAiProvider;
+
+    @Value(&quot;${AI_DEFAULT_MODEL:}&quot;)
+    private String defaultAiModel;
+
+    @Value(&quot;${OPENAI_CHAT_MODEL:gpt-4o-mini}&quot;)
+    private String legacyOpenAiChatModel;
+
+    /**
+     * Initialise les paramètres manquants en base et recharge le cache au démarrage.
+     */
+    @PostConstruct
+    public void initDefaults() {
+<span class="nc" id="L140">        ensure(MAIL_ENABLED, defaultMailEnabled, &quot;Activer l'envoi d'emails&quot;, &quot;Messagerie&quot;, false);</span>
+<span class="nc" id="L141">        ensure(MAIL_FROM, defaultMailFrom, &quot;Email expéditeur&quot;, &quot;Messagerie&quot;, false);</span>
+<span class="nc" id="L142">        ensure(MAIL_ADMIN_EMAIL, defaultMailAdminEmail, &quot;Email administrateur (destinataire)&quot;, &quot;Messagerie&quot;, false);</span>
+<span class="nc" id="L143">        ensure(MAIL_HOST, defaultMailHost, &quot;Serveur SMTP (hôte)&quot;, &quot;Messagerie&quot;, false);</span>
+<span class="nc" id="L144">        ensure(MAIL_PORT, defaultMailPort, &quot;Port SMTP&quot;, &quot;Messagerie&quot;, false);</span>
+<span class="nc" id="L145">        ensure(MAIL_USERNAME, defaultMailUsername, &quot;Identifiant SMTP&quot;, &quot;Messagerie&quot;, false);</span>
+<span class="nc" id="L146">        ensure(MAIL_PASSWORD, defaultMailPassword, &quot;Mot de passe SMTP&quot;, &quot;Messagerie&quot;, true);</span>
+<span class="nc" id="L147">        ensure(JWT_EXPIRATION_MS, defaultJwtExpirationMs, &quot;Durée du jeton JWT (ms)&quot;, &quot;Sécurité&quot;, false);</span>
+<span class="nc" id="L148">        ensure(CORS_ALLOWED_ORIGINS, defaultCorsOrigins, &quot;Origines CORS autorisées&quot;, &quot;Sécurité&quot;, false);</span>
+<span class="nc" id="L149">        ensure(S3_ENABLED, defaultS3Enabled, &quot;Activer le stockage S3&quot;, &quot;Stockage&quot;, false);</span>
+<span class="nc" id="L150">        ensure(S3_BUCKET, defaultS3Bucket, &quot;Bucket S3&quot;, &quot;Stockage&quot;, false);</span>
+<span class="nc" id="L151">        ensure(S3_REGION, defaultS3Region, &quot;Région S3&quot;, &quot;Stockage&quot;, false);</span>
+<span class="nc" id="L152">        ensure(LOCAL_UPLOAD_DIR, defaultLocalUploadDir, &quot;Dossier local des uploads&quot;, &quot;Stockage&quot;, false);</span>
+
+<span class="nc" id="L154">        String provider = AiProviders.normalizeProvider(defaultAiProvider);</span>
+        // Pas de catalogue de modèles en dur : seed éventuel via env, sinon vide (choix Setup online).
+<span class="nc" id="L156">        String model = firstNonBlank(defaultAiModel, legacyOpenAiChatModel);</span>
+
+<span class="nc" id="L158">        ensure(AI_ENABLED, defaultAiEnabled, &quot;Activer l'assistant IA&quot;, &quot;Intelligence artificielle&quot;, false);</span>
+<span class="nc" id="L159">        ensure(AI_PROVIDER, provider, &quot;Fournisseur IA&quot;, &quot;Intelligence artificielle&quot;, false);</span>
+<span class="nc" id="L160">        ensure(AI_MODEL, model, &quot;Modèle IA&quot;, &quot;Intelligence artificielle&quot;, false);</span>
+<span class="nc" id="L161">        ensure(AI_SYSTEM_PROMPT, AiPromptDefaults.SYSTEM,</span>
+                &quot;Prompt système (chat)&quot;, &quot;Intelligence artificielle&quot;, false);
+<span class="nc" id="L163">        ensure(AI_LABEL_EXTRACT_PROMPT, AiPromptDefaults.LABEL_EXTRACT,</span>
+                &quot;Prompt scan étiquette (vision)&quot;, &quot;Intelligence artificielle&quot;, false);
+<span class="nc" id="L165">        ensure(AI_USAGE_PROMPT, AiPromptDefaults.USAGE,</span>
+                &quot;Prompt rédaction usage (placeholders {{nom}}, {{reference}}, …)&quot;,
+                &quot;Intelligence artificielle&quot;, false);
+<span class="nc" id="L168">        ensurePrivacyDefaults();</span>
+<span class="nc" id="L169">        migrateLegacyGeminiModel();</span>
+        // Clés API : uniquement batterie .env (GEMINI_API_KEY, OPENAI_API_KEY, …) — pas exposées dans Setup
+<span class="nc" id="L171">        reloadCache();</span>
+<span class="nc" id="L172">    }</span>
+
+    private void ensurePrivacyDefaults() {
+<span class="nc" id="L175">        ensure(PRIVACY_EDITOR_LEGAL, &quot;&quot;,</span>
+                &quot;Éditeur — raison sociale, forme, capital, RCS, siège&quot;, PRIVACY_CATEGORY, false);
+<span class="nc" id="L177">        ensure(PRIVACY_PUBLICATION_DIRECTOR, &quot;&quot;,</span>
+                &quot;Directeur de la publication&quot;, PRIVACY_CATEGORY, false);
+<span class="nc" id="L179">        ensure(PRIVACY_EDITOR_CONTACT, &quot;&quot;,</span>
+                &quot;Contact éditeur (email / téléphone)&quot;, PRIVACY_CATEGORY, false);
+<span class="nc" id="L181">        ensure(PRIVACY_HOSTING, &quot;&quot;,</span>
+                &quot;Hébergeur(s) — nom et adresse&quot;, PRIVACY_CATEGORY, false);
+<span class="nc" id="L183">        ensure(PRIVACY_CONTROLLER, &quot;&quot;,</span>
+                &quot;Responsable du traitement&quot;, PRIVACY_CATEGORY, false);
+<span class="nc" id="L185">        ensure(PRIVACY_PROCESSORS, &quot;&quot;,</span>
+                &quot;Sous-traitants (ex. Render, Aiven, SMTP, fournisseur IA)&quot;, PRIVACY_CATEGORY, false);
+<span class="nc" id="L187">        ensure(PRIVACY_TRANSFER, &quot;&quot;,</span>
+                &quot;Transferts hors UE — localisation et garanties (CCT, etc.)&quot;, PRIVACY_CATEGORY, false);
+<span class="nc" id="L189">        ensure(PRIVACY_RIGHTS_EMAIL, &quot;&quot;,</span>
+                &quot;Email DPO / privacy (exercice des droits)&quot;, PRIVACY_CATEGORY, false);
+<span class="nc" id="L191">        ensure(PRIVACY_POSTAL_ADDRESS, &quot;&quot;,</span>
+                &quot;Adresse postale (contact RGPD)&quot;, PRIVACY_CATEGORY, false);
+<span class="nc" id="L193">        ensure(PRIVACY_LAST_UPDATED, &quot;10 août 2026&quot;,</span>
+                &quot;Date de dernière mise à jour de la politique&quot;, PRIVACY_CATEGORY, false);
+<span class="nc" id="L195">    }</span>
+
+    /**
+     * Valeurs RGPD publiques pour la page /confidentialite (sans authentification).
+     */
+    @Transactional(readOnly = true)
+    public Map&lt;String, String&gt; publicPrivacyValues() {
+<span class="nc" id="L202">        Map&lt;String, String&gt; out = new HashMap&lt;&gt;();</span>
+<span class="nc bnc" id="L203" title="All 2 branches missed.">        for (String key : PRIVACY_PUBLIC_KEYS) {</span>
+<span class="nc" id="L204">            out.put(key, get(key, &quot;&quot;));</span>
+<span class="nc" id="L205">        }</span>
+<span class="nc" id="L206">        return out;</span>
+    }
+
+    /**
+     * Passe les anciens modèles Gemini Flash par défaut vers {@code gemini-3.1-flash-lite}
+     * (ou l'équivalent OpenRouter), sans écraser un choix Pro / custom.
+     */
+    private void migrateLegacyGeminiModel() {
+<span class="nc" id="L214">        AppSetting providerSetting = appSettingRepository.findById(AI_PROVIDER).orElse(null);</span>
+<span class="nc" id="L215">        AppSetting modelSetting = appSettingRepository.findById(AI_MODEL).orElse(null);</span>
+<span class="nc bnc" id="L216" title="All 4 branches missed.">        if (providerSetting == null || modelSetting == null) {</span>
+<span class="nc" id="L217">            return;</span>
+        }
+<span class="nc" id="L219">        String provider = AiProviders.normalizeProvider(providerSetting.getSettingValue());</span>
+<span class="nc bnc" id="L220" title="All 2 branches missed.">        String current = modelSetting.getSettingValue() == null ? &quot;&quot; : modelSetting.getSettingValue().trim();</span>
+<span class="nc bnc" id="L221" title="All 3 branches missed.">        String target = switch (provider) {</span>
+<span class="nc" id="L222">            case &quot;gemini&quot; -&gt; Set.of(</span>
+                    &quot;gemini-2.0-flash&quot;,
+                    &quot;gemini-2.0-flash-lite&quot;,
+                    &quot;gemini-2.5-flash&quot;,
+                    &quot;gemini-1.5-flash&quot;
+<span class="nc bnc" id="L227" title="All 2 branches missed.">            ).contains(current) ? &quot;gemini-3.1-flash-lite&quot; : null;</span>
+<span class="nc" id="L228">            case &quot;openrouter&quot; -&gt; Set.of(</span>
+                    &quot;google/gemini-2.0-flash-001&quot;,
+                    &quot;google/gemini-2.5-flash&quot;,
+                    &quot;google/gemini-2.5-flash-preview&quot;
+<span class="nc bnc" id="L232" title="All 2 branches missed.">            ).contains(current) ? &quot;google/gemini-3.1-flash-lite&quot; : null;</span>
+<span class="nc" id="L233">            default -&gt; null;</span>
+        };
+<span class="nc bnc" id="L235" title="All 4 branches missed.">        if (target == null || target.equals(current)) {</span>
+<span class="nc" id="L236">            return;</span>
+        }
+<span class="nc" id="L238">        modelSetting.setSettingValue(target);</span>
+<span class="nc" id="L239">        appSettingRepository.save(modelSetting);</span>
+<span class="nc" id="L240">        log.info(&quot;Migration IA — AI_MODEL {} → {} (fournisseur {})&quot;, current, target, provider);</span>
+<span class="nc" id="L241">    }</span>
+
+    private static String firstNonBlank(String... values) {
+<span class="nc bnc" id="L244" title="All 2 branches missed.">        if (values == null) {</span>
+<span class="nc" id="L245">            return &quot;&quot;;</span>
+        }
+<span class="nc bnc" id="L247" title="All 2 branches missed.">        for (String v : values) {</span>
+<span class="nc bnc" id="L248" title="All 4 branches missed.">            if (v != null &amp;&amp; !v.isBlank()) {</span>
+<span class="nc" id="L249">                return v.trim();</span>
+            }
+        }
+<span class="nc" id="L252">        return &quot;&quot;;</span>
+    }
+
+    /**
+     * Liste tous les paramètres (clé API IA exclue, secrets masqués).
+     *
+     * @return réglages triés par catégorie et libellé
+     */
+    @Transactional(readOnly = true)
+    public List&lt;AppSettingResponse&gt; list() {
+<span class="fc" id="L262">        return appSettingRepository.findAllByOrderByCategoryAscLabelAsc().stream()</span>
+<span class="pc bpc" id="L263" title="1 of 2 branches missed.">                .filter(s -&gt; !AI_API_KEY.equals(s.getSettingKey()))</span>
+<span class="fc" id="L264">                .map(this::toResponse)</span>
+<span class="fc" id="L265">                .toList();</span>
+    }
+
+    /**
+     * Met à jour les valeurs fournies et retourne la liste actualisée.
+     *
+     * @param request mappe clé → nouvelle valeur
+     * @return paramètres après mise à jour
+     */
+    public List&lt;AppSettingResponse&gt; update(AppSettingsUpdateRequest request) {
+<span class="nc bnc" id="L275" title="All 2 branches missed.">        Map&lt;String, String&gt; values = request.getValues() == null ? Map.of() : request.getValues();</span>
+<span class="nc" id="L276">        int updated = 0;</span>
+<span class="nc bnc" id="L277" title="All 2 branches missed.">        for (Map.Entry&lt;String, String&gt; entry : values.entrySet()) {</span>
+<span class="nc" id="L278">            AppSetting setting = appSettingRepository.findById(entry.getKey()).orElse(null);</span>
+<span class="nc bnc" id="L279" title="All 2 branches missed.">            if (setting == null) {</span>
+<span class="nc" id="L280">                continue;</span>
+            }
+<span class="nc bnc" id="L282" title="All 2 branches missed.">            String value = entry.getValue() == null ? &quot;&quot; : entry.getValue().trim();</span>
+<span class="nc bnc" id="L283" title="All 6 branches missed.">            if (setting.isSecretValue() &amp;&amp; (value.isBlank() || &quot;********&quot;.equals(value))) {</span>
+<span class="nc" id="L284">                continue;</span>
+            }
+<span class="nc" id="L286">            setting.setSettingValue(value);</span>
+<span class="nc" id="L287">            appSettingRepository.save(setting);</span>
+<span class="nc" id="L288">            updated++;</span>
+<span class="nc" id="L289">        }</span>
+<span class="nc" id="L290">        reloadCache();</span>
+<span class="nc bnc" id="L291" title="All 2 branches missed.">        if (updated &gt; 0) {</span>
+<span class="nc" id="L292">            log.info(&quot;Modification en base — Paramètres applicatifs ({} clé(s) mise(s) à jour)&quot;, updated);</span>
+        }
+<span class="nc" id="L294">        return list();</span>
+    }
+
+    /**
+     * Lit une valeur textuelle depuis le cache (avec repli).
+     *
+     * @param key clé du paramètre
+     * @param fallback valeur par défaut si absente ou vide
+     * @return valeur effective
+     */
+    public String get(String key, String fallback) {
+<span class="fc" id="L305">        String value = cache.get(key);</span>
+<span class="pc bpc" id="L306" title="1 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="fc" id="L307">            return fallback;</span>
+        }
+<span class="fc" id="L309">        return value;</span>
+    }
+
+    /**
+     * Lit un booléen depuis le cache ({@code true}, {@code 1}, {@code yes} acceptés).
+     *
+     * @param key clé du paramètre
+     * @param fallback valeur par défaut si absente
+     * @return valeur booléenne interprétée
+     */
+    public boolean getBoolean(String key, boolean fallback) {
+<span class="fc" id="L320">        String value = get(key, null);</span>
+<span class="pc bpc" id="L321" title="2 of 4 branches missed.">        if (value == null || value.isBlank()) {</span>
+<span class="nc" id="L322">            return fallback;</span>
+        }
+<span class="pc bpc" id="L324" title="3 of 6 branches missed.">        return Boolean.parseBoolean(value) || &quot;1&quot;.equals(value) || &quot;yes&quot;.equalsIgnoreCase(value);</span>
+    }
+
+    /**
+     * Lit un entier long depuis le cache.
+     *
+     * @param key clé du paramètre
+     * @param fallback valeur par défaut si absente ou non numérique
+     * @return valeur numérique
+     */
+    public long getLong(String key, long fallback) {
+        try {
+<span class="fc" id="L336">            return Long.parseLong(get(key, String.valueOf(fallback)));</span>
+<span class="nc" id="L337">        } catch (NumberFormatException ex) {</span>
+<span class="nc" id="L338">            return fallback;</span>
+        }
+    }
+
+    private void ensure(String key, String value, String label, String category, boolean secret) {
+<span class="nc bnc" id="L343" title="All 2 branches missed.">        if (appSettingRepository.existsById(key)) {</span>
+<span class="nc" id="L344">            return;</span>
+        }
+<span class="nc" id="L346">        appSettingRepository.save(AppSetting.builder()</span>
+<span class="nc" id="L347">                .settingKey(key)</span>
+<span class="nc bnc" id="L348" title="All 2 branches missed.">                .settingValue(value == null ? &quot;&quot; : value)</span>
+<span class="nc" id="L349">                .label(label)</span>
+<span class="nc" id="L350">                .category(category)</span>
+<span class="nc" id="L351">                .secretValue(secret)</span>
+<span class="nc" id="L352">                .build());</span>
+<span class="nc" id="L353">    }</span>
+
+    private void reloadCache() {
+<span class="fc" id="L356">        Map&lt;String, String&gt; next = new HashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L357" title="All 2 branches covered.">        for (AppSetting setting : appSettingRepository.findAll()) {</span>
+<span class="pc bpc" id="L358" title="1 of 2 branches missed.">            next.put(setting.getSettingKey(), setting.getSettingValue() == null ? &quot;&quot; : setting.getSettingValue());</span>
+<span class="fc" id="L359">        }</span>
+<span class="fc" id="L360">        cache.clear();</span>
+<span class="fc" id="L361">        cache.putAll(next);</span>
+<span class="fc" id="L362">    }</span>
+
+    private AppSettingResponse toResponse(AppSetting setting) {
+<span class="pc bpc" id="L365" title="1 of 2 branches missed.">        String value = setting.getSettingValue() == null ? &quot;&quot; : setting.getSettingValue();</span>
+<span class="pc bpc" id="L366" title="2 of 4 branches missed.">        if (setting.isSecretValue() &amp;&amp; !value.isBlank()) {</span>
+<span class="fc" id="L367">            value = &quot;********&quot;;</span>
+        }
+<span class="fc" id="L369">        return AppSettingResponse.builder()</span>
+<span class="fc" id="L370">                .key(setting.getSettingKey())</span>
+<span class="fc" id="L371">                .value(value)</span>
+<span class="fc" id="L372">                .label(setting.getLabel())</span>
+<span class="fc" id="L373">                .category(setting.getCategory())</span>
+<span class="fc" id="L374">                .secret(setting.isSecretValue())</span>
+<span class="fc" id="L375">                .build();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

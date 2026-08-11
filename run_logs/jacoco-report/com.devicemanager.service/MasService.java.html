@@ -1,0 +1,232 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MasService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">device-manager</a> &gt; <a href="index.source.html" class="el_package">com.devicemanager.service</a> &gt; <span class="el_source">MasService.java</span></div><h1>MasService.java</h1><pre class="source lang-java linenums">package com.devicemanager.service;
+
+import com.devicemanager.dto.MarqueMasRequest;
+import com.devicemanager.dto.MarqueMasResponse;
+import com.devicemanager.dto.MasRequest;
+import com.devicemanager.dto.MasResponse;
+import com.devicemanager.entity.Atelier;
+import com.devicemanager.entity.MarqueMas;
+import com.devicemanager.entity.Mas;
+import com.devicemanager.repository.MarqueMasRepository;
+import com.devicemanager.repository.MasRepository;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
+
+import java.text.Normalizer;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Locale;
+
+/**
+ * Service métier des MAS (Machines À Sous) et marques associées.
+ * &lt;p&gt;
+ * Les MAS sont rattachées à l'atelier courant ({@code X-Atelier-Id}) ;
+ * les marques constituent un référentiel global partagé entre ateliers.
+ */
+@Service
+@RequiredArgsConstructor
+@Transactional
+<span class="fc" id="L33">@Slf4j</span>
+public class MasService {
+
+    private final MasRepository masRepository;
+    private final MarqueMasRepository marqueMasRepository;
+    private final AtelierService atelierService;
+
+    /**
+     * Liste les MAS de l'atelier courant, avec recherche optionnelle.
+     *
+     * @param q filtre textuel
+     * @return MAS de l'atelier actif
+     */
+    @Transactional(readOnly = true)
+    public List&lt;MasResponse&gt; findAll(String q) {
+<span class="fc" id="L48">        Long atelierId = atelierService.requireCurrentAtelier().getId();</span>
+<span class="pc bpc" id="L49" title="3 of 4 branches missed.">        List&lt;Mas&gt; list = (q == null || q.isBlank())</span>
+<span class="fc" id="L50">                ? masRepository.findAllByAtelierId(atelierId)</span>
+<span class="pc" id="L51">                : masRepository.search(atelierId, q.trim());</span>
+<span class="fc" id="L52">        return list.stream().map(this::toResponse).toList();</span>
+    }
+
+    /**
+     * Retourne une MAS par identifiant dans l'atelier courant.
+     *
+     * @param id identifiant de la MAS
+     * @return fiche MAS
+     * @throws org.springframework.web.server.ResponseStatusException {@code 404} si introuvable
+     */
+    @Transactional(readOnly = true)
+    public MasResponse findById(Long id) {
+<span class="nc" id="L64">        return toResponse(getEntity(id));</span>
+    }
+
+    /**
+     * Liste toutes les marques MAS (référentiel global).
+     *
+     * @return marques triées par libellé
+     */
+    @Transactional(readOnly = true)
+    public List&lt;MarqueMasResponse&gt; listMarques() {
+<span class="nc" id="L74">        return marqueMasRepository.findAllByOrderByLabelAsc().stream()</span>
+<span class="nc" id="L75">                .sorted(Comparator.comparing(MarqueMas::getLabel, String.CASE_INSENSITIVE_ORDER))</span>
+<span class="nc" id="L76">                .map(this::toMarqueResponse)</span>
+<span class="nc" id="L77">                .toList();</span>
+    }
+
+    /**
+     * Crée une marque MAS avec code dérivé du libellé.
+     *
+     * @param request libellé de la marque
+     * @return marque créée
+     * @throws org.springframework.web.server.ResponseStatusException {@code 409} si libellé en doublon
+     */
+    public MarqueMasResponse createMarque(MarqueMasRequest request) {
+<span class="fc" id="L88">        String label = request.getLabel().trim();</span>
+<span class="pc bpc" id="L89" title="1 of 2 branches missed.">        if (marqueMasRepository.existsByLabelIgnoreCase(label)) {</span>
+<span class="nc" id="L90">            throw new ResponseStatusException(HttpStatus.CONFLICT, &quot;Nom de marque déjà utilisé&quot;);</span>
+        }
+<span class="fc" id="L92">        String code = toCode(label);</span>
+<span class="fc" id="L93">        String uniqueCode = code;</span>
+<span class="fc" id="L94">        int i = 2;</span>
+<span class="fc bfc" id="L95" title="All 2 branches covered.">        while (marqueMasRepository.existsByCodeIgnoreCase(uniqueCode)) {</span>
+<span class="fc" id="L96">            uniqueCode = code + &quot;_&quot; + i++;</span>
+        }
+<span class="fc" id="L98">        MarqueMas saved = marqueMasRepository.save(MarqueMas.builder()</span>
+<span class="fc" id="L99">                .code(uniqueCode)</span>
+<span class="fc" id="L100">                .label(label)</span>
+<span class="fc" id="L101">                .build());</span>
+<span class="fc" id="L102">        log.info(&quot;Création en base — Marque MAS id={} label={} code={}&quot;,</span>
+<span class="fc" id="L103">                saved.getId(), saved.getLabel(), saved.getCode());</span>
+<span class="fc" id="L104">        return toMarqueResponse(saved);</span>
+    }
+
+    /**
+     * Crée une MAS dans l'atelier courant.
+     *
+     * @param request numéro, marque et statut
+     * @return MAS créée
+     * @throws org.springframework.web.server.ResponseStatusException {@code 409} si numéro en doublon
+     */
+    public MasResponse create(MasRequest request) {
+<span class="fc" id="L115">        Atelier atelier = atelierService.requireCurrentAtelier();</span>
+<span class="fc" id="L116">        String numero = request.getNumero().trim();</span>
+<span class="fc" id="L117">        ensureUniqueNumero(numero, atelier.getId(), null);</span>
+<span class="fc" id="L118">        Mas entity = Mas.builder()</span>
+<span class="fc" id="L119">                .numero(numero)</span>
+<span class="fc" id="L120">                .marque(getMarque(request.getMarqueId()))</span>
+<span class="fc" id="L121">                .utilise(Boolean.TRUE.equals(request.getUtilise()))</span>
+<span class="fc" id="L122">                .atelier(atelier)</span>
+<span class="fc" id="L123">                .build();</span>
+<span class="fc" id="L124">        Mas saved = masRepository.save(entity);</span>
+<span class="fc" id="L125">        log.info(&quot;Création en base — MAS id={} numero={} marque={} atelier={}&quot;,</span>
+<span class="fc" id="L126">                saved.getId(),</span>
+<span class="fc" id="L127">                saved.getNumero(),</span>
+<span class="pc bpc" id="L128" title="1 of 2 branches missed.">                saved.getMarque() != null ? saved.getMarque().getLabel() : null,</span>
+<span class="fc" id="L129">                atelier.getId());</span>
+<span class="fc" id="L130">        return toResponse(saved);</span>
+    }
+
+    /**
+     * Met à jour une MAS de l'atelier courant.
+     *
+     * @param id identifiant de la MAS
+     * @param request données mises à jour
+     * @return MAS modifiée
+     * @throws org.springframework.web.server.ResponseStatusException {@code 404} si introuvable ;
+     *         {@code 409} en cas de conflit de numéro
+     */
+    public MasResponse update(Long id, MasRequest request) {
+<span class="nc" id="L143">        Mas entity = getEntity(id);</span>
+<span class="nc" id="L144">        String numero = request.getNumero().trim();</span>
+<span class="nc" id="L145">        ensureUniqueNumero(numero, entity.getAtelier().getId(), entity.getId());</span>
+<span class="nc" id="L146">        entity.setNumero(numero);</span>
+<span class="nc" id="L147">        entity.setMarque(getMarque(request.getMarqueId()));</span>
+<span class="nc" id="L148">        entity.setUtilise(Boolean.TRUE.equals(request.getUtilise()));</span>
+<span class="nc" id="L149">        Mas saved = masRepository.save(entity);</span>
+<span class="nc" id="L150">        log.info(&quot;Modification en base — MAS id={} numero={} marque={} atelier={}&quot;,</span>
+<span class="nc" id="L151">                saved.getId(),</span>
+<span class="nc" id="L152">                saved.getNumero(),</span>
+<span class="nc bnc" id="L153" title="All 2 branches missed.">                saved.getMarque() != null ? saved.getMarque().getLabel() : null,</span>
+<span class="nc bnc" id="L154" title="All 2 branches missed.">                saved.getAtelier() != null ? saved.getAtelier().getId() : null);</span>
+<span class="nc" id="L155">        return toResponse(saved);</span>
+    }
+
+    /**
+     * Supprime une MAS de l'atelier courant.
+     *
+     * @param id identifiant de la MAS
+     * @throws org.springframework.web.server.ResponseStatusException {@code 404} si introuvable
+     */
+    public void delete(Long id) {
+<span class="fc" id="L165">        Mas entity = getEntity(id);</span>
+<span class="pc bpc" id="L166" title="1 of 2 branches missed.">        Long atelierId = entity.getAtelier() != null ? entity.getAtelier().getId() : null;</span>
+<span class="fc" id="L167">        String numero = entity.getNumero();</span>
+<span class="fc" id="L168">        masRepository.delete(entity);</span>
+<span class="fc" id="L169">        log.info(&quot;Suppression en base — MAS id={} numero={} atelier={}&quot;, id, numero, atelierId);</span>
+<span class="fc" id="L170">    }</span>
+
+    /**
+     * Charge l'entité MAS pour usage interne (ex. liaison pièce détachée).
+     *
+     * @param id identifiant de la MAS
+     * @return entité persistée
+     * @throws org.springframework.web.server.ResponseStatusException {@code 404} si introuvable dans l'atelier
+     */
+    public Mas getEntity(Long id) {
+<span class="fc" id="L180">        Long atelierId = atelierService.requireCurrentAtelier().getId();</span>
+<span class="fc" id="L181">        return masRepository.findByIdAndAtelierId(id, atelierId)</span>
+<span class="fc" id="L182">                .orElseThrow(() -&gt; new ResponseStatusException(HttpStatus.NOT_FOUND, &quot;MAS introuvable&quot;));</span>
+    }
+
+    private MarqueMas getMarque(Long id) {
+<span class="fc" id="L186">        return marqueMasRepository.findById(id)</span>
+<span class="pc" id="L187">                .orElseThrow(() -&gt; new ResponseStatusException(HttpStatus.BAD_REQUEST, &quot;Marque MAS introuvable&quot;));</span>
+    }
+
+    private void ensureUniqueNumero(String numero, Long atelierId, Long excludeId) {
+<span class="pc bpc" id="L191" title="1 of 2 branches missed.">        boolean exists = excludeId == null</span>
+<span class="fc" id="L192">                ? masRepository.existsByNumeroIgnoreCaseAndAtelierId(numero, atelierId)</span>
+<span class="pc" id="L193">                : masRepository.existsByNumeroIgnoreCaseAndAtelierIdAndIdNot(numero, atelierId, excludeId);</span>
+<span class="fc bfc" id="L194" title="All 2 branches covered.">        if (exists) {</span>
+<span class="fc" id="L195">            throw new ResponseStatusException(HttpStatus.CONFLICT, &quot;Numéro MAS déjà utilisé dans cet atelier&quot;);</span>
+        }
+<span class="fc" id="L197">    }</span>
+
+    private MasResponse toResponse(Mas entity) {
+<span class="fc" id="L200">        MarqueMas marque = entity.getMarque();</span>
+<span class="fc" id="L201">        return MasResponse.builder()</span>
+<span class="fc" id="L202">                .id(entity.getId())</span>
+<span class="fc" id="L203">                .numero(entity.getNumero())</span>
+<span class="pc bpc" id="L204" title="1 of 2 branches missed.">                .marqueId(marque != null ? marque.getId() : null)</span>
+<span class="pc bpc" id="L205" title="1 of 2 branches missed.">                .marque(marque != null ? marque.getCode() : null)</span>
+<span class="pc bpc" id="L206" title="1 of 2 branches missed.">                .marqueLabel(marque != null ? marque.getLabel() : null)</span>
+<span class="fc" id="L207">                .utilise(entity.isUtilise())</span>
+<span class="fc" id="L208">                .build();</span>
+    }
+
+    private MarqueMasResponse toMarqueResponse(MarqueMas marque) {
+<span class="fc" id="L212">        return MarqueMasResponse.builder()</span>
+<span class="fc" id="L213">                .id(marque.getId())</span>
+<span class="fc" id="L214">                .code(marque.getCode())</span>
+<span class="fc" id="L215">                .label(marque.getLabel())</span>
+<span class="fc" id="L216">                .value(marque.getId())</span>
+<span class="fc" id="L217">                .build();</span>
+    }
+
+    static String toCode(String label) {
+<span class="fc" id="L221">        String normalized = Normalizer.normalize(label, Normalizer.Form.NFD)</span>
+<span class="fc" id="L222">                .replaceAll(&quot;\\p{M}+&quot;, &quot;&quot;)</span>
+<span class="fc" id="L223">                .replaceAll(&quot;[^A-Za-z0-9]+&quot;, &quot;_&quot;)</span>
+<span class="fc" id="L224">                .replaceAll(&quot;^_|_$&quot;, &quot;&quot;)</span>
+<span class="fc" id="L225">                .toUpperCase(Locale.ROOT);</span>
+<span class="fc bfc" id="L226" title="All 2 branches covered.">        if (normalized.isBlank()) {</span>
+<span class="fc" id="L227">            return &quot;MARQUE&quot;;</span>
+        }
+<span class="pc bpc" id="L229" title="1 of 2 branches missed.">        return normalized.length() &gt; 60 ? normalized.substring(0, 60) : normalized;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

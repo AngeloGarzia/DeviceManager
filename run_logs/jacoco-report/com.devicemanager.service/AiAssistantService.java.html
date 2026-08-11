@@ -1,0 +1,483 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AiAssistantService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">device-manager</a> &gt; <a href="index.source.html" class="el_package">com.devicemanager.service</a> &gt; <span class="el_source">AiAssistantService.java</span></div><h1>AiAssistantService.java</h1><pre class="source lang-java linenums">package com.devicemanager.service;
+
+import com.devicemanager.ai.AiApiKeyBattery;
+import com.devicemanager.ai.AiPromptDefaults;
+import com.devicemanager.ai.AiProviders;
+import com.devicemanager.dto.AiChatResponse;
+import com.devicemanager.dto.AiLabelScanResponse;
+import com.devicemanager.dto.AiProviderAvailability;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import com.google.genai.Client;
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.content.Media;
+import org.springframework.ai.google.genai.GoogleGenAiChatModel;
+import org.springframework.ai.google.genai.GoogleGenAiChatOptions;
+import org.springframework.ai.openai.OpenAiChatModel;
+import org.springframework.ai.openai.OpenAiChatOptions;
+import org.springframework.ai.openai.api.OpenAiApi;
+import org.springframework.core.io.ByteArrayResource;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.util.MimeTypeUtils;
+import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.server.ResponseStatusException;
+
+import java.util.List;
+
+/**
+ * Service de l'assistant IA intégré à DeviceManager.
+ * &lt;p&gt;
+ * Chat métier, statut des fournisseurs et scan d'étiquettes de pièces détachées
+ * casino. La configuration provient des paramètres Setup et des clés API .env ;
+ * indépendant du filtre atelier sauf pour le contexte métier des réponses.
+ */
+@Service
+@RequiredArgsConstructor
+<span class="fc" id="L39">@Slf4j</span>
+public class AiAssistantService {
+
+    private final AppSettingsService appSettingsService;
+    private final AiApiKeyBattery aiApiKeyBattery;
+    private final AiModelDiscoveryService aiModelDiscoveryService;
+    private final ImageOptimizationService imageOptimizationService;
+    private final WebEnrichmentService webEnrichmentService;
+    private final ObjectMapper objectMapper;
+
+    /**
+     * Indique si l'assistant IA est activé et qu'une clé API est disponible pour le fournisseur courant.
+     *
+     * @return {@code true} si l'IA peut être invoquée
+     */
+    public boolean isEnabled() {
+<span class="fc bfc" id="L55" title="All 2 branches covered.">        if (!appSettingsService.getBoolean(AppSettingsService.AI_ENABLED, false)) {</span>
+<span class="fc" id="L56">            return false;</span>
+        }
+<span class="fc" id="L58">        String provider = resolveProviderId();</span>
+<span class="pc bpc" id="L59" title="1 of 2 branches missed.">        return !resolveApiKey(provider).isBlank();</span>
+    }
+
+    /**
+     * Retourne le statut détaillé de l'assistant et la disponibilité de chaque fournisseur IA.
+     *
+     * @return message explicatif, drapeau {@code enabled} et liste des fournisseurs
+     */
+    public AiChatResponse status() {
+<span class="fc" id="L68">        String provider = resolveProviderId();</span>
+<span class="fc" id="L69">        String model = resolveChatModel(provider);</span>
+<span class="fc" id="L70">        String providerLabel = AiProviders.require(provider).label();</span>
+<span class="fc" id="L71">        boolean flagOn = appSettingsService.getBoolean(AppSettingsService.AI_ENABLED, false);</span>
+<span class="fc" id="L72">        String apiKey = resolveApiKey(provider);</span>
+<span class="pc bpc" id="L73" title="3 of 8 branches missed.">        boolean enabled = flagOn &amp;&amp; !apiKey.isBlank() &amp;&amp; model != null &amp;&amp; !model.isBlank();</span>
+
+        String reply;
+<span class="fc bfc" id="L76" title="All 2 branches covered.">        if (enabled) {</span>
+<span class="fc" id="L77">            reply = &quot;Assistant IA prêt.&quot;;</span>
+<span class="pc bpc" id="L78" title="1 of 2 branches missed.">        } else if (!flagOn) {</span>
+<span class="fc" id="L79">            reply = &quot;Assistant IA désactivé dans les paramètres — activez « Activer l'assistant IA ».&quot;;</span>
+<span class="nc bnc" id="L80" title="All 2 branches missed.">        } else if (apiKey.isBlank()) {</span>
+<span class="nc" id="L81">            reply = &quot;Fournisseur « &quot; + providerLabel + &quot; » sélectionné mais la clé est manquante. &quot;</span>
+                    + &quot;Choisissez un autre fournisseur dans Paramètres ou demandez à un administrateur &quot;
+                    + &quot;de configurer la clé.&quot;;
+        } else {
+<span class="nc" id="L85">            reply = &quot;Aucun modèle IA sélectionné — choisissez un modèle dans Paramètres.&quot;;</span>
+        }
+
+<span class="fc" id="L88">        return AiChatResponse.builder()</span>
+<span class="fc" id="L89">                .enabled(enabled)</span>
+<span class="fc" id="L90">                .reply(reply)</span>
+<span class="fc" id="L91">                .providers(listProviderAvailability())</span>
+<span class="fc" id="L92">                .build();</span>
+    }
+
+    private List&lt;AiProviderAvailability&gt; listProviderAvailability() {
+<span class="fc" id="L96">        return AiProviders.all().stream()</span>
+<span class="fc" id="L97">                .map(p -&gt; {</span>
+<span class="fc" id="L98">                    String key = aiApiKeyBattery.keyFor(p.id());</span>
+<span class="fc" id="L99">                    return AiProviderAvailability.builder()</span>
+<span class="fc" id="L100">                            .id(p.id())</span>
+<span class="fc bfc" id="L101" title="All 2 branches covered.">                            .label(p.label())</span>
+<span class="pc bpc" id="L102" title="1 of 2 branches missed.">                            .hasApiKey(key != null &amp;&amp; !key.isBlank())</span>
+<span class="fc" id="L103">                            .build();</span>
+                })
+<span class="fc" id="L105">                .toList();</span>
+    }
+
+    /**
+     * Envoie un message utilisateur au modèle de chat configuré.
+     *
+     * @param message question ou consigne en langage naturel
+     * @return réponse textuelle du modèle
+     * @throws org.springframework.web.server.ResponseStatusException {@code 503} si IA désactivée ou clé absente ;
+     *         {@code 502} en cas d'échec d'appel externe
+     */
+    public AiChatResponse chat(String message) {
+<span class="fc" id="L117">        requireEnabled();</span>
+<span class="fc" id="L118">        String provider = resolveProviderId();</span>
+<span class="nc" id="L119">        String apiKey = requireApiKey(provider);</span>
+<span class="nc" id="L120">        String model = resolveChatModel(provider);</span>
+
+        try {
+<span class="nc" id="L123">            ChatClient chatClient = buildChatClient(apiKey, provider, model, 0.3);</span>
+<span class="nc" id="L124">            String reply = chatClient.prompt()</span>
+<span class="nc" id="L125">                    .system(systemPrompt())</span>
+<span class="nc" id="L126">                    .user(message.trim())</span>
+<span class="nc" id="L127">                    .call()</span>
+<span class="nc" id="L128">                    .content();</span>
+<span class="nc" id="L129">            return AiChatResponse.builder()</span>
+<span class="nc" id="L130">                    .enabled(true)</span>
+<span class="nc bnc" id="L131" title="All 4 branches missed.">                    .reply(reply == null || reply.isBlank() ? &quot;(réponse vide)&quot; : reply.trim())</span>
+<span class="nc" id="L132">                    .build();</span>
+<span class="nc" id="L133">        } catch (ResponseStatusException ex) {</span>
+<span class="nc" id="L134">            throw ex;</span>
+<span class="nc" id="L135">        } catch (Exception ex) {</span>
+<span class="nc" id="L136">            log.error(&quot;Échec appel Spring AI (model={}): {}&quot;, model, ex.getMessage());</span>
+<span class="nc" id="L137">            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, friendlyAiError(provider, ex));</span>
+        }
+    }
+
+    /**
+     * Analyse une photo d'étiquette : OCR vision + enrichissement web + texte d'usage.
+     *
+     * @param image fichier image de l'étiquette
+     * @return champs extraits (nom, référence, marque, usage, notes)
+     * @throws org.springframework.web.server.ResponseStatusException {@code 400} si image absente ou vide ;
+     *         {@code 502} en cas d'échec d'analyse IA
+     */
+    public AiLabelScanResponse scanLabel(MultipartFile image) {
+<span class="nc" id="L150">        requireEnabled();</span>
+<span class="nc bnc" id="L151" title="All 4 branches missed.">        if (image == null || image.isEmpty()) {</span>
+<span class="nc" id="L152">            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, &quot;Photo d'étiquette obligatoire pour le scan&quot;);</span>
+        }
+<span class="nc" id="L154">        VisionEndpoint vision = resolveVisionEndpoint();</span>
+<span class="nc" id="L155">        String provider = vision.providerId();</span>
+<span class="nc" id="L156">        String apiKey = vision.apiKey();</span>
+<span class="nc" id="L157">        String visionModel = vision.model();</span>
+
+<span class="nc" id="L159">        MultipartFile optimized = imageOptimizationService.optimize(image);</span>
+        byte[] bytes;
+        try {
+<span class="nc" id="L162">            bytes = optimized.getBytes();</span>
+<span class="nc" id="L163">        } catch (Exception ex) {</span>
+<span class="nc" id="L164">            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, &quot;Photo illisible ou format non pris en charge&quot;);</span>
+<span class="nc" id="L165">        }</span>
+<span class="nc bnc" id="L166" title="All 2 branches missed.">        if (bytes.length == 0) {</span>
+<span class="nc" id="L167">            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, &quot;La photo est vide&quot;);</span>
+        }
+
+        try {
+<span class="nc" id="L171">            ChatClient visionClient = buildChatClient(apiKey, provider, visionModel, 0.1);</span>
+<span class="nc" id="L172">            String extractRaw = visionClient.prompt()</span>
+<span class="nc" id="L173">                    .user(u -&gt; u.text(labelExtractPrompt())</span>
+<span class="nc" id="L174">                            .media(new Media(MimeTypeUtils.IMAGE_JPEG, new ByteArrayResource(bytes))))</span>
+<span class="nc" id="L175">                    .call()</span>
+<span class="nc" id="L176">                    .content();</span>
+
+<span class="nc" id="L178">            JsonNode extracted = parseJsonObject(extractRaw);</span>
+<span class="nc" id="L179">            String nom = textOrNull(extracted, &quot;nom&quot;);</span>
+<span class="nc" id="L180">            String reference = textOrNull(extracted, &quot;reference&quot;);</span>
+<span class="nc" id="L181">            String marque = textOrNull(extracted, &quot;marque&quot;);</span>
+<span class="nc" id="L182">            String rawText = textOrNull(extracted, &quot;rawText&quot;);</span>
+<span class="nc" id="L183">            String notes = textOrNull(extracted, &quot;notes&quot;);</span>
+
+<span class="nc" id="L185">            String webContext = webEnrichmentService.gatherContext(marque, nom, reference);</span>
+<span class="nc" id="L186">            String usage = generateUsage(apiKey, provider, resolveChatModelForProvider(provider),</span>
+                    nom, reference, marque, rawText, notes, webContext);
+
+<span class="nc" id="L189">            return AiLabelScanResponse.builder()</span>
+<span class="nc" id="L190">                    .enabled(true)</span>
+<span class="nc" id="L191">                    .nom(nom)</span>
+<span class="nc" id="L192">                    .reference(reference)</span>
+<span class="nc" id="L193">                    .marque(marque)</span>
+<span class="nc" id="L194">                    .usage(usage)</span>
+<span class="nc" id="L195">                    .rawText(rawText)</span>
+<span class="nc bnc" id="L196" title="All 2 branches missed.">                    .notes(blankToNull(joinNotes(notes, webContext.isBlank() ? null : &quot;Infos web trouvées pour enrichir l'usage.&quot;)))</span>
+<span class="nc" id="L197">                    .build();</span>
+<span class="nc" id="L198">        } catch (ResponseStatusException ex) {</span>
+<span class="nc" id="L199">            throw ex;</span>
+<span class="nc" id="L200">        } catch (Exception ex) {</span>
+<span class="nc" id="L201">            log.error(&quot;Échec scan étiquette IA: {}&quot;, ex.getMessage(), ex);</span>
+<span class="nc" id="L202">            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,</span>
+                    &quot;Analyse de l'étiquette impossible. Réessayez ou changez de fournisseur dans Paramètres.&quot;);
+        }
+    }
+
+    /** Message utilisateur plus clair (notamment clés Gemini AQ. rejetées par Google). */
+    private String friendlyAiError(String provider, Exception ex) {
+<span class="nc" id="L209">        String chain = exceptionChain(ex);</span>
+<span class="nc bnc" id="L210" title="All 2 branches missed.">        boolean geminiAuth = &quot;gemini&quot;.equalsIgnoreCase(provider)</span>
+<span class="nc bnc" id="L211" title="All 2 branches missed.">                &amp;&amp; (chain.contains(&quot;401&quot;)</span>
+<span class="nc bnc" id="L212" title="All 2 branches missed.">                || chain.contains(&quot;UNAUTHENTICATED&quot;)</span>
+<span class="nc bnc" id="L213" title="All 2 branches missed.">                || chain.contains(&quot;ACCESS_TOKEN_TYPE_UNSUPPORTED&quot;)</span>
+<span class="nc bnc" id="L214" title="All 2 branches missed.">                || chain.contains(&quot;invalid authentication&quot;));</span>
+<span class="nc bnc" id="L215" title="All 2 branches missed.">        if (geminiAuth) {</span>
+<span class="nc" id="L216">            return &quot;Clé Gemini refusée. Dans Paramètres, choisissez OpenRouter avec un modèle vision, &quot;</span>
+                    + &quot;ou OpenAI.&quot;;
+        }
+<span class="nc" id="L219">        return &quot;Échec de l'appel au modèle IA. Réessayez ou changez de fournisseur dans Paramètres.&quot;;</span>
+    }
+
+    private static String exceptionChain(Throwable ex) {
+<span class="nc" id="L223">        StringBuilder sb = new StringBuilder();</span>
+<span class="nc bnc" id="L224" title="All 2 branches missed.">        for (Throwable t = ex; t != null; t = t.getCause()) {</span>
+<span class="nc bnc" id="L225" title="All 2 branches missed.">            if (!sb.isEmpty()) {</span>
+<span class="nc" id="L226">                sb.append(&quot; | &quot;);</span>
+            }
+<span class="nc" id="L228">            sb.append(t.getClass().getSimpleName());</span>
+<span class="nc bnc" id="L229" title="All 2 branches missed.">            if (t.getMessage() != null) {</span>
+<span class="nc" id="L230">                sb.append(&quot;: &quot;).append(t.getMessage());</span>
+            }
+        }
+<span class="nc" id="L233">        return sb.toString();</span>
+    }
+
+    private String generateUsage(
+            String apiKey,
+            String provider,
+            String model,
+            String nom,
+            String reference,
+            String marque,
+            String rawText,
+            String notes,
+            String webContext) {
+<span class="nc" id="L246">        String prompt = applyUsagePlaceholders(</span>
+<span class="nc" id="L247">                usagePromptTemplate(),</span>
+                nom,
+                reference,
+                marque,
+                rawText,
+                notes,
+                webContext);
+
+<span class="nc" id="L255">        ChatClient chatClient = buildChatClient(apiKey, provider, model, 0.4);</span>
+<span class="nc" id="L256">        String reply = chatClient.prompt()</span>
+<span class="nc" id="L257">                .system(systemPrompt())</span>
+<span class="nc" id="L258">                .user(prompt)</span>
+<span class="nc" id="L259">                .call()</span>
+<span class="nc" id="L260">                .content();</span>
+<span class="nc bnc" id="L261" title="All 4 branches missed.">        if (reply == null || reply.isBlank()) {</span>
+<span class="nc" id="L262">            return null;</span>
+        }
+<span class="nc" id="L264">        String cleaned = reply.trim();</span>
+<span class="nc bnc" id="L265" title="All 2 branches missed.">        if (cleaned.length() &gt; 500) {</span>
+<span class="nc" id="L266">            cleaned = cleaned.substring(0, 497) + &quot;...&quot;;</span>
+        }
+<span class="nc" id="L268">        return cleaned;</span>
+    }
+
+    private void requireEnabled() {
+<span class="fc bfc" id="L272" title="All 2 branches covered.">        if (!appSettingsService.getBoolean(AppSettingsService.AI_ENABLED, false)) {</span>
+<span class="fc" id="L273">            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,</span>
+                    &quot;Assistant IA désactivé dans Paramètres.&quot;);
+        }
+<span class="fc" id="L276">    }</span>
+
+    private String requireApiKey(String provider) {
+<span class="fc" id="L279">        String apiKey = resolveApiKey(provider);</span>
+<span class="pc bpc" id="L280" title="1 of 2 branches missed.">        if (apiKey.isBlank()) {</span>
+<span class="fc" id="L281">            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,</span>
+                    &quot;Clé IA manquante pour ce fournisseur. Contactez un administrateur ou choisissez un autre fournisseur dans Paramètres.&quot;);
+        }
+<span class="nc" id="L284">        return apiKey;</span>
+    }
+
+    /** Clé du fournisseur courant depuis la batterie .env uniquement. */
+    private String resolveApiKey(String provider) {
+<span class="fc" id="L289">        return aiApiKeyBattery.keyFor(provider);</span>
+    }
+
+    private String resolveProviderId() {
+<span class="fc" id="L293">        return AiProviders.normalizeProvider(appSettingsService.get(AppSettingsService.AI_PROVIDER, &quot;openai&quot;));</span>
+    }
+
+    private String systemPrompt() {
+<span class="nc" id="L297">        return firstNonBlank(</span>
+<span class="nc" id="L298">                appSettingsService.get(AppSettingsService.AI_SYSTEM_PROMPT, &quot;&quot;),</span>
+                AiPromptDefaults.SYSTEM);
+    }
+
+    private String labelExtractPrompt() {
+<span class="nc" id="L303">        return firstNonBlank(</span>
+<span class="nc" id="L304">                appSettingsService.get(AppSettingsService.AI_LABEL_EXTRACT_PROMPT, &quot;&quot;),</span>
+                AiPromptDefaults.LABEL_EXTRACT);
+    }
+
+    private String usagePromptTemplate() {
+<span class="nc" id="L309">        return firstNonBlank(</span>
+<span class="nc" id="L310">                appSettingsService.get(AppSettingsService.AI_USAGE_PROMPT, &quot;&quot;),</span>
+                AiPromptDefaults.USAGE);
+    }
+
+    private static String applyUsagePlaceholders(
+            String template,
+            String nom,
+            String reference,
+            String marque,
+            String rawText,
+            String notes,
+            String webContext) {
+<span class="nc bnc" id="L322" title="All 4 branches missed.">        String web = webContext == null || webContext.isBlank() ? &quot;(aucun résultat web)&quot; : webContext;</span>
+<span class="nc" id="L323">        return template</span>
+<span class="nc" id="L324">                .replace(&quot;{{nom}}&quot;, nullToDash(nom))</span>
+<span class="nc" id="L325">                .replace(&quot;{{reference}}&quot;, nullToDash(reference))</span>
+<span class="nc" id="L326">                .replace(&quot;{{marque}}&quot;, nullToDash(marque))</span>
+<span class="nc" id="L327">                .replace(&quot;{{rawText}}&quot;, nullToDash(rawText))</span>
+<span class="nc" id="L328">                .replace(&quot;{{notes}}&quot;, nullToDash(notes))</span>
+<span class="nc" id="L329">                .replace(&quot;{{webContext}}&quot;, web);</span>
+    }
+
+    private static String firstNonBlank(String value, String fallback) {
+<span class="nc bnc" id="L333" title="All 4 branches missed.">        if (value != null &amp;&amp; !value.isBlank()) {</span>
+<span class="nc" id="L334">            return value.trim();</span>
+        }
+<span class="nc" id="L336">        return fallback;</span>
+    }
+
+    private String resolveChatModel(String provider) {
+<span class="fc" id="L340">        return resolveChatModelForProvider(provider);</span>
+    }
+
+    private String resolveChatModelForProvider(String provider) {
+        // Pour le fournisseur courant, respecter le modèle Setup ; sinon premier modèle découvert en ligne.
+<span class="pc bpc" id="L345" title="1 of 2 branches missed.">        if (provider.equals(resolveProviderId())) {</span>
+<span class="fc" id="L346">            String model = appSettingsService.get(AppSettingsService.AI_MODEL, &quot;&quot;);</span>
+<span class="pc bpc" id="L347" title="2 of 4 branches missed.">            if (model != null &amp;&amp; !model.isBlank()) {</span>
+<span class="fc" id="L348">                return model.trim();</span>
+            }
+        }
+<span class="nc" id="L351">        String online = aiModelDiscoveryService.firstModelId(provider);</span>
+<span class="nc bnc" id="L352" title="All 2 branches missed.">        return online == null ? &quot;&quot; : online;</span>
+    }
+
+<span class="nc" id="L355">    private record VisionEndpoint(String providerId, String model, String apiKey) {</span>
+    }
+
+    /**
+     * Endpoint vision : fournisseur courant s'il a un modèle vision + clé,
+     * sinon premier autre fournisseur avec clé et modèle vision (ex. Gemini).
+     */
+    private VisionEndpoint resolveVisionEndpoint() {
+<span class="nc" id="L363">        String preferred = resolveProviderId();</span>
+<span class="nc" id="L364">        VisionEndpoint local = tryVisionEndpoint(preferred);</span>
+<span class="nc bnc" id="L365" title="All 2 branches missed.">        if (local != null) {</span>
+<span class="nc" id="L366">            return local;</span>
+        }
+<span class="nc bnc" id="L368" title="All 2 branches missed.">        for (String id : AiProviders.providerIds()) {</span>
+<span class="nc bnc" id="L369" title="All 2 branches missed.">            if (id.equals(preferred)) {</span>
+<span class="nc" id="L370">                continue;</span>
+            }
+<span class="nc" id="L372">            VisionEndpoint alt = tryVisionEndpoint(id);</span>
+<span class="nc bnc" id="L373" title="All 2 branches missed.">            if (alt != null) {</span>
+<span class="nc" id="L374">                log.info(&quot;Scan étiquette : {} sans vision accessible → fallback {}&quot;, preferred, id);</span>
+<span class="nc" id="L375">                return alt;</span>
+            }
+<span class="nc" id="L377">        }</span>
+<span class="nc" id="L378">        throw new ResponseStatusException(HttpStatus.BAD_REQUEST,</span>
+                &quot;Aucun fournisseur capable de lire les photos d'étiquettes. &quot;
+                        + &quot;Dans Paramètres, choisissez Gemini ou OpenRouter avec un modèle vision.&quot;);
+    }
+
+    private VisionEndpoint tryVisionEndpoint(String providerId) {
+<span class="nc" id="L384">        String key = resolveApiKey(providerId);</span>
+<span class="nc bnc" id="L385" title="All 2 branches missed.">        if (key.isBlank()) {</span>
+<span class="nc" id="L386">            return null;</span>
+        }
+<span class="nc" id="L388">        String configured = resolveChatModelForProvider(providerId);</span>
+        String visionModel;
+<span class="nc bnc" id="L390" title="All 6 branches missed.">        if (configured != null &amp;&amp; !configured.isBlank() &amp;&amp; AiProviders.supportsVision(providerId, configured)) {</span>
+<span class="nc" id="L391">            visionModel = configured;</span>
+        } else {
+<span class="nc" id="L393">            visionModel = aiModelDiscoveryService.firstVisionModelId(providerId);</span>
+        }
+<span class="nc bnc" id="L395" title="All 4 branches missed.">        if (visionModel == null || visionModel.isBlank()) {</span>
+<span class="nc" id="L396">            return null;</span>
+        }
+<span class="nc" id="L398">        return new VisionEndpoint(providerId, visionModel, key);</span>
+    }
+
+    private ChatClient buildChatClient(String apiKey, String providerId, String model, double temperature) {
+        // Les clés Gemini récentes (préfixe AQ.) refusent l'endpoint OpenAI-compatible + Bearer.
+        // On passe par l'API native (x-goog-api-key) via le client Google GenAI.
+<span class="nc bnc" id="L404" title="All 2 branches missed.">        if (&quot;gemini&quot;.equalsIgnoreCase(providerId)) {</span>
+<span class="nc" id="L405">            Client genAiClient = Client.builder()</span>
+<span class="nc" id="L406">                    .apiKey(apiKey)</span>
+<span class="nc" id="L407">                    .build();</span>
+<span class="nc" id="L408">            GoogleGenAiChatModel geminiModel = GoogleGenAiChatModel.builder()</span>
+<span class="nc" id="L409">                    .genAiClient(genAiClient)</span>
+<span class="nc" id="L410">                    .defaultOptions(GoogleGenAiChatOptions.builder()</span>
+<span class="nc" id="L411">                            .model(model)</span>
+<span class="nc" id="L412">                            .temperature(temperature)</span>
+<span class="nc" id="L413">                            .build())</span>
+<span class="nc" id="L414">                    .build();</span>
+<span class="nc" id="L415">            return ChatClient.builder(geminiModel).build();</span>
+        }
+
+<span class="nc" id="L418">        AiProviders.Provider provider = AiProviders.require(providerId);</span>
+<span class="nc" id="L419">        OpenAiApi openAiApi = OpenAiApi.builder()</span>
+<span class="nc" id="L420">                .apiKey(apiKey)</span>
+<span class="nc" id="L421">                .baseUrl(provider.baseUrl())</span>
+<span class="nc" id="L422">                .build();</span>
+<span class="nc" id="L423">        OpenAiChatModel chatModel = OpenAiChatModel.builder()</span>
+<span class="nc" id="L424">                .openAiApi(openAiApi)</span>
+<span class="nc" id="L425">                .defaultOptions(OpenAiChatOptions.builder()</span>
+<span class="nc" id="L426">                        .model(model)</span>
+<span class="nc" id="L427">                        .temperature(temperature)</span>
+<span class="nc" id="L428">                        .build())</span>
+<span class="nc" id="L429">                .build();</span>
+<span class="nc" id="L430">        return ChatClient.builder(chatModel).build();</span>
+    }
+
+    private JsonNode parseJsonObject(String raw) throws Exception {
+<span class="nc bnc" id="L434" title="All 4 branches missed.">        if (raw == null || raw.isBlank()) {</span>
+<span class="nc" id="L435">            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,</span>
+                    &quot;L'assistant n'a pas pu générer de réponse. Réessayez.&quot;);
+        }
+<span class="nc" id="L438">        String cleaned = raw.trim();</span>
+<span class="nc bnc" id="L439" title="All 2 branches missed.">        if (cleaned.startsWith(&quot;```&quot;)) {</span>
+<span class="nc" id="L440">            cleaned = cleaned.replaceFirst(&quot;^```(?:json)?\\s*&quot;, &quot;&quot;).replaceFirst(&quot;\\s*```$&quot;, &quot;&quot;);</span>
+        }
+<span class="nc" id="L442">        int start = cleaned.indexOf('{');</span>
+<span class="nc" id="L443">        int end = cleaned.lastIndexOf('}');</span>
+<span class="nc bnc" id="L444" title="All 4 branches missed.">        if (start &gt;= 0 &amp;&amp; end &gt; start) {</span>
+<span class="nc" id="L445">            cleaned = cleaned.substring(start, end + 1);</span>
+        }
+<span class="nc" id="L447">        return objectMapper.readTree(cleaned);</span>
+    }
+
+    private static String textOrNull(JsonNode node, String field) {
+<span class="nc bnc" id="L451" title="All 6 branches missed.">        if (node == null || !node.has(field) || node.get(field).isNull()) {</span>
+<span class="nc" id="L452">            return null;</span>
+        }
+<span class="nc" id="L454">        String v = node.get(field).asText(null);</span>
+<span class="nc" id="L455">        return blankToNull(v);</span>
+    }
+
+    private static String blankToNull(String v) {
+<span class="nc bnc" id="L459" title="All 2 branches missed.">        if (v == null) {</span>
+<span class="nc" id="L460">            return null;</span>
+        }
+<span class="nc" id="L462">        String t = v.trim();</span>
+<span class="nc bnc" id="L463" title="All 4 branches missed.">        if (t.isEmpty() || &quot;null&quot;.equalsIgnoreCase(t)) {</span>
+<span class="nc" id="L464">            return null;</span>
+        }
+<span class="nc" id="L466">        return t;</span>
+    }
+
+    private static String nullToDash(String v) {
+<span class="nc bnc" id="L470" title="All 4 branches missed.">        return v == null || v.isBlank() ? &quot;—&quot; : v;</span>
+    }
+
+    private static String joinNotes(String a, String b) {
+<span class="nc bnc" id="L474" title="All 4 branches missed.">        if (a == null || a.isBlank()) {</span>
+<span class="nc" id="L475">            return b;</span>
+        }
+<span class="nc bnc" id="L477" title="All 4 branches missed.">        if (b == null || b.isBlank()) {</span>
+<span class="nc" id="L478">            return a;</span>
+        }
+<span class="nc" id="L480">        return a + &quot; | &quot; + b;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>

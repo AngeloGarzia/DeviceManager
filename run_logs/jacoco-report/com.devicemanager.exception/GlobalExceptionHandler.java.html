@@ -1,0 +1,181 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>GlobalExceptionHandler.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">device-manager</a> &gt; <a href="index.source.html" class="el_package">com.devicemanager.exception</a> &gt; <span class="el_source">GlobalExceptionHandler.java</span></div><h1>GlobalExceptionHandler.java</h1><pre class="source lang-java linenums">package com.devicemanager.exception;
+
+import com.devicemanager.dto.ApiError;
+import jakarta.servlet.http.HttpServletRequest;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.validation.FieldError;
+import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.server.ResponseStatusException;
+
+import java.time.Instant;
+import java.util.stream.Collectors;
+
+/**
+ * Gestionnaire global des exceptions REST.
+ * Transforme les erreurs applicatives en réponses {@link ApiError} structurées,
+ * avec des messages métier Device Manager (jamais de détail technique brut).
+ */
+<span class="fc" id="L23">@Slf4j</span>
+@RestControllerAdvice
+<span class="fc" id="L25">public class GlobalExceptionHandler {</span>
+
+    private static final String MSG_INTERNAL =
+            &quot;Une erreur interne est survenue dans Device Manager. Réessayez ou contactez un administrateur.&quot;;
+    private static final String MSG_ATELIER_REQUIS =
+            &quot;Sélectionnez un atelier pour continuer.&quot;;
+
+    /**
+     * Convertit une {@link ResponseStatusException} en réponse HTTP avec le statut et le message fournis.
+     *
+     * @param ex      exception avec code HTTP et raison
+     * @param request requête en cours (pour le chemin)
+     * @return réponse d'erreur structurée
+     */
+    @ExceptionHandler(ResponseStatusException.class)
+    public ResponseEntity&lt;ApiError&gt; handleStatus(ResponseStatusException ex, HttpServletRequest request) {
+<span class="fc" id="L41">        String message = ex.getReason();</span>
+<span class="pc bpc" id="L42" title="2 of 4 branches missed.">        if (message == null || message.isBlank()) {</span>
+<span class="nc" id="L43">            message = defaultReason(ex.getStatusCode().value());</span>
+        }
+<span class="fc" id="L45">        return build(ex.getStatusCode().value(), message, request.getRequestURI());</span>
+    }
+
+    /**
+     * Agrège les messages de validation Bean Validation en une seule réponse 400.
+     *
+     * @param ex      exception de validation des arguments du contrôleur
+     * @param request requête en cours (pour le chemin)
+     * @return réponse d'erreur avec les messages de champ concaténés
+     */
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity&lt;ApiError&gt; handleValidation(MethodArgumentNotValidException ex, HttpServletRequest request) {
+<span class="nc" id="L57">        String message = ex.getBindingResult().getFieldErrors().stream()</span>
+<span class="nc" id="L58">                .map(this::fieldErrorMessage)</span>
+<span class="nc" id="L59">                .collect(Collectors.joining(&quot;; &quot;));</span>
+<span class="nc bnc" id="L60" title="All 2 branches missed.">        if (message.isBlank()) {</span>
+<span class="nc" id="L61">            message = &quot;Les informations saisies sont incomplètes ou invalides.&quot;;</span>
+        }
+<span class="nc" id="L63">        return build(HttpStatus.BAD_REQUEST.value(), message, request.getRequestURI());</span>
+    }
+
+    /**
+     * Traduit les violations d'intégrité SQL en messages métier lisibles (unicité, clés étrangères).
+     *
+     * @param ex      exception de contrainte base de données
+     * @param request requête en cours (pour le chemin)
+     * @return réponse 409 avec message contextualisé
+     */
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity&lt;ApiError&gt; handleIntegrity(DataIntegrityViolationException ex, HttpServletRequest request) {
+<span class="fc" id="L75">        String raw = ex.getMostSpecificCause().getMessage();</span>
+<span class="pc bpc" id="L76" title="1 of 2 branches missed.">        String lower = raw == null ? &quot;&quot; : raw.toLowerCase();</span>
+        String message;
+        // FK d'abord : le message MySQL contient &quot;REFERENCES&quot;, qui ne doit pas
+        // être confondu avec l'unicité de la colonne device.reference.
+<span class="fc bfc" id="L80" title="All 2 branches covered.">        if (lower.contains(&quot;foreign key&quot;)</span>
+<span class="pc bpc" id="L81" title="1 of 2 branches missed.">                || lower.contains(&quot;cannot delete or update a parent row&quot;)</span>
+<span class="pc bpc" id="L82" title="1 of 2 branches missed.">                || lower.contains(&quot;a foreign key constraint fails&quot;)) {</span>
+<span class="fc" id="L83">            message = &quot;Suppression impossible : cet élément est encore utilisé &quot;</span>
+                    + &quot;(par ex. une pièce liée à une demande de commande).&quot;;
+<span class="pc bpc" id="L85" title="3 of 4 branches missed.">        } else if (lower.contains(&quot;uk_mas_numero&quot;) || lower.contains(&quot;numero&quot;)) {</span>
+<span class="fc" id="L86">            message = &quot;Numéro MAS déjà utilisé&quot;;</span>
+<span class="nc bnc" id="L87" title="All 6 branches missed.">        } else if (lower.contains(&quot;uk_sfm_nom&quot;) || (lower.contains(&quot;sfm&quot;) &amp;&amp; lower.contains(&quot;nom&quot;))) {</span>
+<span class="nc" id="L88">            message = &quot;Nom SFM déjà utilisé&quot;;</span>
+<span class="nc bnc" id="L89" title="All 6 branches missed.">        } else if (lower.contains(&quot;uk_device_nom&quot;) || (lower.contains(&quot;device&quot;) &amp;&amp; lower.contains(&quot;nom&quot;))) {</span>
+<span class="nc" id="L90">            message = &quot;Nom de pièce déjà utilisé&quot;;</span>
+<span class="nc bnc" id="L91" title="All 2 branches missed.">        } else if (lower.contains(&quot;uk_device_reference&quot;)</span>
+<span class="nc bnc" id="L92" title="All 4 branches missed.">                || (lower.contains(&quot;duplicate&quot;) &amp;&amp; lower.contains(&quot;reference&quot;))) {</span>
+<span class="nc" id="L93">            message = &quot;Référence déjà utilisée&quot;;</span>
+<span class="nc bnc" id="L94" title="All 6 branches missed.">        } else if (lower.contains(&quot;marque&quot;) || lower.contains(&quot;label&quot;) || lower.contains(&quot;code&quot;)) {</span>
+<span class="nc" id="L95">            message = &quot;Nom de marque déjà utilisé&quot;;</span>
+<span class="nc bnc" id="L96" title="All 2 branches missed.">        } else if (lower.contains(&quot;constraint&quot;)) {</span>
+<span class="nc" id="L97">            message = &quot;Suppression impossible : cet élément est encore utilisé ailleurs.&quot;;</span>
+        } else {
+<span class="nc" id="L99">            message = &quot;Cette valeur existe déjà. Vérifiez le nom, la référence ou le numéro saisi.&quot;;</span>
+        }
+<span class="fc" id="L101">        return build(HttpStatus.CONFLICT.value(), message, request.getRequestURI());</span>
+    }
+
+    /**
+     * Atelier non sélectionné (contexte tenancy).
+     */
+    @ExceptionHandler(IllegalStateException.class)
+    public ResponseEntity&lt;ApiError&gt; handleIllegalState(IllegalStateException ex, HttpServletRequest request) {
+<span class="nc bnc" id="L109" title="All 2 branches missed.">        String msg = ex.getMessage() == null ? &quot;&quot; : ex.getMessage();</span>
+<span class="nc bnc" id="L110" title="All 4 branches missed.">        if (msg.toLowerCase().contains(&quot;atelier&quot;) || msg.startsWith(&quot;Sélectionnez&quot;)) {</span>
+<span class="nc" id="L111">            return build(HttpStatus.BAD_REQUEST.value(), MSG_ATELIER_REQUIS, request.getRequestURI());</span>
+        }
+<span class="nc bnc" id="L113" title="All 4 branches missed.">        if (!msg.isBlank() &amp;&amp; !looksTechnical(msg)) {</span>
+<span class="nc" id="L114">            log.warn(&quot;État incohérent sur {}: {}&quot;, request.getRequestURI(), msg);</span>
+<span class="nc" id="L115">            return build(HttpStatus.INTERNAL_SERVER_ERROR.value(), msg, request.getRequestURI());</span>
+        }
+<span class="nc" id="L117">        log.error(&quot;État incohérent sur {}: {}&quot;, request.getRequestURI(), msg, ex);</span>
+<span class="nc" id="L118">        return build(HttpStatus.INTERNAL_SERVER_ERROR.value(), MSG_INTERNAL, request.getRequestURI());</span>
+    }
+
+    /**
+     * Attrape toute exception non gérée et renvoie une erreur 500 métier (sans détail technique).
+     *
+     * @param ex      exception non prévue
+     * @param request requête en cours (pour le chemin)
+     * @return réponse d'erreur interne
+     */
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity&lt;ApiError&gt; handleGeneric(Exception ex, HttpServletRequest request) {
+<span class="nc" id="L130">        log.error(&quot;Erreur non gérée sur {}: {}&quot;, request.getRequestURI(), ex.getMessage(), ex);</span>
+<span class="nc" id="L131">        return build(HttpStatus.INTERNAL_SERVER_ERROR.value(), MSG_INTERNAL, request.getRequestURI());</span>
+    }
+
+    private String fieldErrorMessage(FieldError error) {
+<span class="nc" id="L135">        String msg = error.getDefaultMessage();</span>
+<span class="nc bnc" id="L136" title="All 4 branches missed.">        if (msg == null || msg.isBlank()</span>
+<span class="nc bnc" id="L137" title="All 2 branches missed.">                || msg.startsWith(&quot;must &quot;)</span>
+<span class="nc bnc" id="L138" title="All 2 branches missed.">                || msg.contains(&quot;must not&quot;)</span>
+<span class="nc bnc" id="L139" title="All 2 branches missed.">                || msg.contains(&quot;size must&quot;)) {</span>
+<span class="nc" id="L140">            return &quot;Le champ « &quot; + error.getField() + &quot; » est invalide ou obligatoire.&quot;;</span>
+        }
+<span class="nc" id="L142">        return msg;</span>
+    }
+
+    private static boolean looksTechnical(String message) {
+<span class="nc" id="L146">        String lower = message.toLowerCase();</span>
+<span class="nc bnc" id="L147" title="All 2 branches missed.">        return lower.contains(&quot;exception&quot;)</span>
+<span class="nc bnc" id="L148" title="All 2 branches missed.">                || lower.contains(&quot;nullpointer&quot;)</span>
+<span class="nc bnc" id="L149" title="All 2 branches missed.">                || lower.contains(&quot;hibernate&quot;)</span>
+<span class="nc bnc" id="L150" title="All 2 branches missed.">                || lower.contains(&quot;sql&quot;)</span>
+<span class="nc bnc" id="L151" title="All 2 branches missed.">                || lower.contains(&quot;jdbc&quot;)</span>
+<span class="nc bnc" id="L152" title="All 2 branches missed.">                || lower.contains(&quot;docker&quot;)</span>
+<span class="nc bnc" id="L153" title="All 2 branches missed.">                || lower.contains(&quot;.env&quot;)</span>
+<span class="nc bnc" id="L154" title="All 2 branches missed.">                || lower.contains(&quot;jwt&quot;)</span>
+<span class="nc bnc" id="L155" title="All 2 branches missed.">                || lower.contains(&quot;stack trace&quot;)</span>
+<span class="nc bnc" id="L156" title="All 2 branches missed.">                || lower.contains(&quot;caused by&quot;);</span>
+    }
+
+    private static String defaultReason(int status) {
+<span class="nc bnc" id="L160" title="All 6 branches missed.">        return switch (status) {</span>
+<span class="nc" id="L161">            case 400 -&gt; &quot;Requête invalide.&quot;;</span>
+<span class="nc" id="L162">            case 401 -&gt; &quot;Authentification requise. Veuillez vous reconnecter.&quot;;</span>
+<span class="nc" id="L163">            case 403 -&gt; &quot;Vous n'avez pas les droits pour cette action.&quot;;</span>
+<span class="nc" id="L164">            case 404 -&gt; &quot;Élément introuvable.&quot;;</span>
+<span class="nc" id="L165">            case 409 -&gt; &quot;Cette action entre en conflit avec l'état actuel.&quot;;</span>
+<span class="nc" id="L166">            default -&gt; MSG_INTERNAL;</span>
+        };
+    }
+
+    private ResponseEntity&lt;ApiError&gt; build(int status, String message, String path) {
+<span class="fc" id="L171">        ApiError body = ApiError.builder()</span>
+<span class="fc" id="L172">                .timestamp(Instant.now())</span>
+<span class="fc" id="L173">                .status(status)</span>
+<span class="fc" id="L174">                .error(HttpStatus.valueOf(status).getReasonPhrase())</span>
+<span class="fc" id="L175">                .message(message)</span>
+<span class="fc" id="L176">                .path(path)</span>
+<span class="fc" id="L177">                .build();</span>
+<span class="fc" id="L178">        return ResponseEntity.status(status).body(body);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>
