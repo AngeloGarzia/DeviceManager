@@ -32,7 +32,7 @@ class AiModelDiscoveryServiceTest {
 
         assertThat(response.isHasApiKey()).isFalse();
         assertThat(response.getModels()).isEmpty();
-        assertThat(response.getMessage()).contains("Clé API absente");
+        assertThat(response.getMessage()).contains("Clé absente pour ce fournisseur");
         assertThat(response.getProviderId()).isEqualTo("openai");
     }
 

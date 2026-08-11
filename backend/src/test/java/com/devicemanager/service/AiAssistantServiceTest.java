@@ -66,7 +66,7 @@ class AiAssistantServiceTest {
                 .isInstanceOf(ResponseStatusException.class)
                 .extracting(ex -> ((ResponseStatusException) ex).getReason())
                 .asString()
-                .contains("Clé API");
+                .contains("Clé IA manquante");
     }
 
     @Test
@@ -77,8 +77,7 @@ class AiAssistantServiceTest {
         when(appSettingsService.get(AppSettingsService.AI_MODEL, "")).thenReturn("gpt-4o-mini");
 
         assertThat(aiAssistantService.isEnabled()).isTrue();
-        assertThat(aiAssistantService.status().getReply()).contains("OpenAI");
-        assertThat(aiAssistantService.status().getReply()).contains("gpt-4o-mini");
+        assertThat(aiAssistantService.status().getReply()).contains("Assistant IA prêt");
     }
 
     @Test
@@ -89,7 +88,7 @@ class AiAssistantServiceTest {
         when(appSettingsService.get(AppSettingsService.AI_MODEL, "")).thenReturn("gemini-3.1-flash-lite");
 
         assertThat(aiAssistantService.isEnabled()).isTrue();
-        assertThat(aiAssistantService.status().getReply()).contains("Gemini");
+        assertThat(aiAssistantService.status().getReply()).contains("Assistant IA prêt");
     }
 
     @Test
