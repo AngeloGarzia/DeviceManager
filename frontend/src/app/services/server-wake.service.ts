@@ -33,7 +33,7 @@ export class ServerWakeService {
   private readonly pollIntervalMs = 2500;
   /** Timeout long : un cold start Render peut garder la connexion ouverte ~30–60s. */
   private readonly requestTimeoutMs = 60_000;
-  private readonly maxWaitMs = 180_000;
+  private readonly maxWaitMs = 120_000;
 
   wake(): Observable<ServerWakeState> {
     return new Observable((subscriber: Subscriber<ServerWakeState>) => {
