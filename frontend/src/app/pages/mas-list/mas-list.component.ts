@@ -13,6 +13,7 @@ import { Mas } from '../../models/models';
 import { MasService } from '../../services/mas.service';
 import { AuthService } from '../../services/auth.service';
 import { ConfirmDialogComponent } from '../../shared/confirm-dialog.component';
+import { apiErrorMessage } from '../../shared/api-error';
 
 /**
  * Liste des MAS (modèles d'appareils de substitution) de l'atelier.
@@ -68,7 +69,7 @@ export class MasListComponent implements OnInit {
     this.confirmOpen.set(false);
     this.masService.delete(id).subscribe({
       next: () => { this.pendingDelete = null; this.load(); },
-      error: (err) => { this.error.set(err?.error?.message || 'Suppression impossible.'); this.pendingDelete = null; }
+      error: (err) => { this.error.set(apiErrorMessage(err, 'Suppression impossible.')); this.pendingDelete = null; }
     });
   }
 }

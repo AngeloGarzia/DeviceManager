@@ -37,6 +37,18 @@ export const routes: Routes = [
           import('./pages/device-stock/device-stock.component').then((m) => m.DeviceStockComponent)
       },
       {
+        path: 'devices/utiliser',
+        loadComponent: () =>
+          import('./pages/device-use/device-use.component').then((m) => m.DeviceUseComponent)
+      },
+      {
+        path: 'devices/interventions',
+        loadComponent: () =>
+          import('./pages/intervention-list/intervention-list.component').then(
+            (m) => m.InterventionListComponent
+          )
+      },
+      {
         path: 'devices/new',
         loadComponent: () =>
           import('./pages/device-form/device-form.component').then((m) => m.DeviceFormComponent)

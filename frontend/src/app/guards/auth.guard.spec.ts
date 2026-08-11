@@ -1,5 +1,6 @@
 import { TestBed } from '@angular/core/testing';
-import { provideRouter, Router } from '@angular/router';
+import { provideRouter, Router, UrlTree } from '@angular/router';
+import { of } from 'rxjs';
 import { authGuard } from './auth.guard';
 import { AuthService } from '../services/auth.service';
 
@@ -8,7 +9,13 @@ describe('authGuard', () => {
   let router: Router;
 
   beforeEach(() => {
-    auth = jasmine.createSpyObj('AuthService', ['getToken', 'isTokenExpired', 'isLoggedIn', 'handleSessionExpired']);
+    auth = jasmine.createSpyObj('AuthService', [
+      'getToken',
+      'isTokenExpired',
+      'isLoggedIn',
+      'handleSessionExpired',
+      'tryRestoreSession'
+    ]);
     TestBed.configureTestingModule({
       providers: [{ provide: AuthService, useValue: auth }, provideRouter([])]
     });
@@ -17,18 +24,30 @@ describe('authGuard', () => {
   });
 
   it('allows logged-in users', () => {
-    auth.getToken.and.returnValue('jwt');
-    auth.isTokenExpired.and.returnValue(false);
     auth.isLoggedIn.and.returnValue(true);
     const result = TestBed.runInInjectionContext(() => authGuard({} as never, {} as never));
     expect(result).toBeTrue();
+    expect(auth.tryRestoreSession).not.toHaveBeenCalled();
   });
 
-  it('redirects anonymous users to login', () => {
-    auth.getToken.and.returnValue(null);
+  it('restores session then allows access', (done) => {
     auth.isLoggedIn.and.returnValue(false);
+    auth.tryRestoreSession.and.returnValue(of(true));
     const result = TestBed.runInInjectionContext(() => authGuard({} as never, {} as never));
-    expect(router.createUrlTree).toHaveBeenCalledWith(['/login']);
-    expect(result).toEqual(jasmine.anything());
+    (result as ReturnType<AuthService['tryRestoreSession']>).subscribe((value) => {
+      expect(value).toBeTrue();
+      done();
+    });
+  });
+
+  it('redirects anonymous users to login when restore fails', (done) => {
+    auth.isLoggedIn.and.returnValue(false);
+    auth.tryRestoreSession.and.returnValue(of(false));
+    const result = TestBed.runInInjectionContext(() => authGuard({} as never, {} as never));
+    (result as ReturnType<AuthService['tryRestoreSession']>).subscribe((value) => {
+      expect(router.createUrlTree).toHaveBeenCalledWith(['/login']);
+      expect(value).toEqual(jasmine.any(UrlTree));
+      done();
+    });
   });
 });

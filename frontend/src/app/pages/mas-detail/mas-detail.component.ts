@@ -9,6 +9,7 @@ import { Mas } from '../../models/models';
 import { MasService } from '../../services/mas.service';
 import { AuthService } from '../../services/auth.service';
 import { ConfirmDialogComponent } from '../../shared/confirm-dialog.component';
+import { apiErrorMessage } from '../../shared/api-error';
 
 /**
  * Fiche détaillée d'une MAS.
@@ -47,7 +48,7 @@ export class MasDetailComponent implements OnInit {
     this.confirmOpen.set(false);
     this.masService.delete(current.id).subscribe({
       next: () => this.router.navigate(['/mas']),
-      error: (err) => this.error.set(err?.error?.message || 'Suppression impossible.')
+      error: (err) => this.error.set(apiErrorMessage(err, 'Suppression impossible.'))
     });
   }
 }

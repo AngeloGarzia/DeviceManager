@@ -115,7 +115,8 @@ public class AuthService {
     @Transactional
     public void changePassword(String username, ChangePasswordRequest request) {
         User user = userRepository.findByUsername(username)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Non authentifié"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED,
+                        "Session expirée. Veuillez vous reconnecter."));
         if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPassword())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Mot de passe actuel incorrect");
         }
@@ -161,15 +162,18 @@ public class AuthService {
 
     private RefreshToken requireActiveRefreshToken(String rawRefreshToken) {
         if (rawRefreshToken == null || rawRefreshToken.isBlank()) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Refresh token manquant");
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED,
+                    "Session expirée. Veuillez vous reconnecter.");
         }
         String hash = jwtService.hashToken(rawRefreshToken);
         RefreshToken token = refreshTokenRepository.findActiveByTokenHash(hash)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Refresh token invalide"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED,
+                        "Session invalide. Veuillez vous reconnecter."));
         if (token.getExpiresAt().isBefore(Instant.now())) {
             token.setRevoked(true);
             refreshTokenRepository.save(token);
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Refresh token expiré");
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED,
+                    "Session expirée. Veuillez vous reconnecter.");
         }
         return token;
     }

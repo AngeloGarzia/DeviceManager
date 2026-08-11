@@ -74,16 +74,15 @@ public class AiAssistantService {
 
         String reply;
         if (enabled) {
-            reply = "Assistant IA prêt (" + providerLabel + " / " + model + ").";
+            reply = "Assistant IA prêt.";
         } else if (!flagOn) {
             reply = "Assistant IA désactivé dans les paramètres — activez « Activer l'assistant IA ».";
         } else if (apiKey.isBlank()) {
-            String envVar = AiApiKeyBattery.envVarName(provider);
-            reply = "Fournisseur « " + providerLabel + " » sélectionné mais " + envVar
-                    + " est vide. Choisissez un fournisseur avec clé "
-                    + "ou renseignez " + envVar + " dans le .env / Render.";
+            reply = "Fournisseur « " + providerLabel + " » sélectionné mais la clé est manquante. "
+                    + "Choisissez un autre fournisseur dans Paramètres ou demandez à un administrateur "
+                    + "de configurer la clé.";
         } else {
-            reply = "Aucun modèle IA sélectionné — choisissez un modèle dans Paramètres (liste en ligne).";
+            reply = "Aucun modèle IA sélectionné — choisissez un modèle dans Paramètres.";
         }
 
         return AiChatResponse.builder()
@@ -150,7 +149,7 @@ public class AiAssistantService {
     public AiLabelScanResponse scanLabel(MultipartFile image) {
         requireEnabled();
         if (image == null || image.isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Image obligatoire");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Photo d'étiquette obligatoire pour le scan");
         }
         VisionEndpoint vision = resolveVisionEndpoint();
         String provider = vision.providerId();
@@ -162,10 +161,10 @@ public class AiAssistantService {
         try {
             bytes = optimized.getBytes();
         } catch (Exception ex) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Image illisible");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Photo illisible ou format non pris en charge");
         }
         if (bytes.length == 0) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Image vide");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La photo est vide");
         }
 
         try {
@@ -201,7 +200,7 @@ public class AiAssistantService {
         } catch (Exception ex) {
             log.error("Échec scan étiquette IA: {}", ex.getMessage(), ex);
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
-                    "Échec de l'analyse IA de l'étiquette: " + friendlyAiError(provider, ex));
+                    "Analyse de l'étiquette impossible. Réessayez ou changez de fournisseur dans Paramètres.");
         }
     }
 
@@ -214,15 +213,10 @@ public class AiAssistantService {
                 || chain.contains("ACCESS_TOKEN_TYPE_UNSUPPORTED")
                 || chain.contains("invalid authentication"));
         if (geminiAuth) {
-            return "Clé Gemini refusée par Google (souvent les nouvelles clés « AQ. »). "
-                    + "Dans Paramètres, choisissez OpenRouter + un modèle vision "
-                    + "(ex. google/gemini-3.1-flash-lite), ou OpenAI gpt-4o-mini.";
+            return "Clé Gemini refusée. Dans Paramètres, choisissez OpenRouter avec un modèle vision, "
+                    + "ou OpenAI.";
         }
-        String msg = ex.getMessage();
-        if (msg == null || msg.isBlank()) {
-            return "Échec de l'appel au modèle IA";
-        }
-        return "Échec de l'appel au modèle IA: " + msg;
+        return "Échec de l'appel au modèle IA. Réessayez ou changez de fournisseur dans Paramètres.";
     }
 
     private static String exceptionChain(Throwable ex) {
@@ -277,7 +271,7 @@ public class AiAssistantService {
     private void requireEnabled() {
         if (!appSettingsService.getBoolean(AppSettingsService.AI_ENABLED, false)) {
             throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
-                    "Assistant IA désactivé dans Setup");
+                    "Assistant IA désactivé dans Paramètres.");
         }
     }
 
@@ -285,8 +279,7 @@ public class AiAssistantService {
         String apiKey = resolveApiKey(provider);
         if (apiKey.isBlank()) {
             throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
-                    "Clé API IA manquante pour le fournisseur « " + provider
-                            + " » (variable .env de la batterie IA)");
+                    "Clé IA manquante pour ce fournisseur. Contactez un administrateur ou choisissez un autre fournisseur dans Paramètres.");
         }
         return apiKey;
     }
@@ -383,9 +376,8 @@ public class AiAssistantService {
             }
         }
         throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                "Aucun fournisseur vision disponible. "
-                        + "Groq n’offre souvent pas de modèle vision : choisissez Gemini ou OpenRouter "
-                        + "dans Paramètres, ou renseignez GEMINI_API_KEY / OPENROUTER_API_KEY.");
+                "Aucun fournisseur capable de lire les photos d'étiquettes. "
+                        + "Dans Paramètres, choisissez Gemini ou OpenRouter avec un modèle vision.");
     }
 
     private VisionEndpoint tryVisionEndpoint(String providerId) {
@@ -440,7 +432,8 @@ public class AiAssistantService {
 
     private JsonNode parseJsonObject(String raw) throws Exception {
         if (raw == null || raw.isBlank()) {
-            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Réponse IA vide");
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
+                    "L'assistant n'a pas pu générer de réponse. Réessayez.");
         }
         String cleaned = raw.trim();
         if (cleaned.startsWith("```")) {

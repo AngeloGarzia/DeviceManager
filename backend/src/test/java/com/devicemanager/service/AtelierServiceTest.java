@@ -12,6 +12,7 @@ import com.devicemanager.repository.AtelierRepository;
 import com.devicemanager.repository.CasinoRepository;
 import com.devicemanager.repository.CommandeRepository;
 import com.devicemanager.repository.DeviceRepository;
+import com.devicemanager.repository.InterventionRepository;
 import com.devicemanager.repository.MasRepository;
 import com.devicemanager.repository.SfmRepository;
 import com.devicemanager.repository.UserRepository;
@@ -51,6 +52,7 @@ class AtelierServiceTest {
     @Mock private MasRepository masRepository;
     @Mock private SfmRepository sfmRepository;
     @Mock private CommandeRepository commandeRepository;
+    @Mock private InterventionRepository interventionRepository;
     @InjectMocks private AtelierService atelierService;
 
     @AfterEach
@@ -77,7 +79,7 @@ class AtelierServiceTest {
         assertThatThrownBy(() -> atelierService.requireCurrentAtelier())
                 .isInstanceOf(ResponseStatusException.class)
                 .extracting(ex -> ((ResponseStatusException) ex).getReason())
-                .isEqualTo("Sélectionnez un atelier (en-tête X-Atelier-Id)");
+                .isEqualTo("Sélectionnez un atelier pour continuer.");
     }
 
     @Test
@@ -274,5 +276,27 @@ class AtelierServiceTest {
                 .extracting(ex -> ((ResponseStatusException) ex).getReason())
                 .asString()
                 .contains("Impossible de supprimer");
+    }
+
+    @Test
+    void delete_clearsPreferredAtelierThenDeletes() {
+        var user = TestFixtures.user("admin", Roles.ADMIN);
+        var atelier = TestFixtures.atelier();
+        atelier.setResponsables(new HashSet<>());
+        user.setPreferredAtelier(atelier);
+        when(userRepository.findByUsername("admin")).thenReturn(Optional.of(user));
+        when(atelierRepository.findByIdWithCasino(100L)).thenReturn(Optional.of(atelier));
+        when(deviceRepository.countByAtelierId(100L)).thenReturn(0L);
+        when(masRepository.countByAtelierId(100L)).thenReturn(0L);
+        when(sfmRepository.countByAtelierId(100L)).thenReturn(0L);
+        when(commandeRepository.countByAtelierId(100L)).thenReturn(0L);
+        when(interventionRepository.countByAtelierId(100L)).thenReturn(0L);
+        when(userRepository.clearPreferredAtelier(100L)).thenReturn(1);
+
+        atelierService.delete("admin", 100L);
+
+        verify(userRepository).clearPreferredAtelier(100L);
+        verify(atelierRepository).delete(atelier);
+        verify(atelierRepository).flush();
     }
 }

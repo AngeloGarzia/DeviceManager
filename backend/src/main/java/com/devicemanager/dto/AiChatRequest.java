@@ -10,7 +10,7 @@ import lombok.Data;
 @Data
 public class AiChatRequest {
 
-    @NotBlank
-    @Size(max = 4000)
+    @NotBlank(message = "Le message pour l'assistant IA est obligatoire")
+    @Size(max = 4000, message = "Le message ne doit pas dépasser 4000 caractères")
     private String message;
 }

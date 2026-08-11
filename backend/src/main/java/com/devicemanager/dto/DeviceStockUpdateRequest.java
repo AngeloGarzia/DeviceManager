@@ -10,7 +10,7 @@ import lombok.Data;
 @Data
 public class DeviceStockUpdateRequest {
 
-    @NotNull
-    @Min(0)
+    @NotNull(message = "La quantité en stock est obligatoire")
+    @Min(value = 0, message = "Le stock ne peut pas être négatif")
     private Integer stock;
 }

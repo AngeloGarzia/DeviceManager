@@ -1,12 +1,13 @@
 import { Injectable, computed, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
-import { tap } from 'rxjs/operators';
-import { Observable } from 'rxjs';
+import { Observable, of } from 'rxjs';
+import { catchError, finalize, map, shareReplay, tap } from 'rxjs/operators';
 import { environment } from '../../environments/environment';
 import { AtelierSummary, AuthResponse, LoginRequest } from '../models/models';
 
-const TOKEN_KEY = 'dm_token';
+/** Ancienne clé JWT — purgée (le token d'accès ne vit plus que en mémoire). */
+const LEGACY_TOKEN_KEY = 'dm_token';
 const USER_KEY = 'dm_user';
 const NOM_KEY = 'dm_nom';
 const PRENOM_KEY = 'dm_prenom';
@@ -21,6 +22,9 @@ const LEGACY_REMEMBER_PASS_KEY = 'dm_remember_pass';
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
+  /** Access JWT — mémoire process uniquement (jamais localStorage / sessionStorage). */
+  private accessToken: string | null = null;
+
   readonly username = signal<string | null>(this.readUser());
   readonly nom = signal<string | null>(localStorage.getItem(NOM_KEY));
   readonly prenom = signal<string | null>(localStorage.getItem(PRENOM_KEY));
@@ -77,60 +81,17 @@ export class AuthService {
   });
 
   private sessionExpiredHandled = false;
+  private refreshInFlight: Observable<AuthResponse> | null = null;
 
   constructor(private http: HttpClient, private router: Router) {
+    this.purgeLegacyAccessToken();
     this.purgeLegacyRememberedPasswords();
-    // Nettoie une session déjà expirée au démarrage (token encore en localStorage).
-    if (this.getToken() && this.isTokenExpired()) {
-      this.clearSession();
-    }
   }
 
   login(payload: LoginRequest): Observable<AuthResponse> {
     return this.http
       .post<AuthResponse>(`${environment.apiUrl}/api/auth/login`, payload, { withCredentials: true })
-      .pipe(
-      tap((res) => {
-        this.sessionExpiredHandled = false;
-        localStorage.setItem(TOKEN_KEY, res.token);
-        localStorage.setItem(USER_KEY, res.username);
-        localStorage.setItem(ROLE_KEY, res.role);
-        this.username.set(res.username);
-        this.role.set(res.role);
-        this.setMustChangePassword(!!res.mustChangePassword);
-        const nom = res.nom?.trim() || '';
-        const prenom = res.prenom?.trim() || '';
-        this.nom.set(nom || null);
-        this.prenom.set(prenom || null);
-        if (nom) {
-          localStorage.setItem(NOM_KEY, nom);
-        } else {
-          localStorage.removeItem(NOM_KEY);
-        }
-        if (prenom) {
-          localStorage.setItem(PRENOM_KEY, prenom);
-        } else {
-          localStorage.removeItem(PRENOM_KEY);
-        }
-        this.groupeNom.set(res.groupeNom ?? null);
-        if (res.groupeNom) {
-          localStorage.setItem(GROUPE_KEY, res.groupeNom);
-        }
-        const ateliers = (res.ateliers ?? []).map((a) => ({
-          ...a,
-          id: Number(a.id)
-        }));
-        this.ateliers.set(ateliers);
-        localStorage.setItem(ATELIERS_KEY, JSON.stringify(ateliers));
-        const preferred = this.toAtelierId(res.atelierId);
-        const atelierId =
-          preferred != null && ateliers.some((a) => a.id === preferred)
-            ? preferred
-            : (ateliers[0]?.id ?? null);
-        this.setAtelierId(atelierId);
-        this.atelierRevision.set(0);
-      })
-    );
+      .pipe(tap((res) => this.applyAuthResponse(res, true)));
   }
 
   setAtelierId(id: number | null): void {
@@ -179,16 +140,36 @@ export class AuthService {
     this.router.navigate(['/login']);
   }
 
-  /** Rafraîchit l'access token via le cookie HttpOnly refresh. */
+  /** Rafraîchit l'access token via le cookie HttpOnly refresh (single-flight). */
   refreshAccessToken(): Observable<AuthResponse> {
-    return this.http
-      .post<AuthResponse>(`${environment.apiUrl}/api/auth/refresh`, {}, { withCredentials: true })
-      .pipe(
-        tap((res) => {
-          localStorage.setItem(TOKEN_KEY, res.token);
-          this.setMustChangePassword(!!res.mustChangePassword);
-        })
-      );
+    if (!this.refreshInFlight) {
+      this.refreshInFlight = this.http
+        .post<AuthResponse>(`${environment.apiUrl}/api/auth/refresh`, {}, { withCredentials: true })
+        .pipe(
+          tap((res) => this.applyAuthResponse(res, false)),
+          finalize(() => {
+            this.refreshInFlight = null;
+          }),
+          shareReplay({ bufferSize: 1, refCount: false })
+        );
+    }
+    return this.refreshInFlight;
+  }
+
+  /**
+   * Restaure la session après rechargement de page (access token perdu, cookie refresh présent).
+   */
+  tryRestoreSession(): Observable<boolean> {
+    if (this.isLoggedIn()) {
+      return of(true);
+    }
+    return this.refreshAccessToken().pipe(
+      map(() => true),
+      catchError(() => {
+        this.clearSession();
+        return of(false);
+      })
+    );
   }
 
   changePassword(currentPassword: string, newPassword: string): Observable<void> {
@@ -226,7 +207,7 @@ export class AuthService {
   }
 
   getToken(): string | null {
-    return localStorage.getItem(TOKEN_KEY);
+    return this.accessToken;
   }
 
   getAtelierId(): number | null {
@@ -239,7 +220,7 @@ export class AuthService {
       return false;
     }
     if (this.isTokenExpired(token)) {
-      this.clearSession();
+      this.accessToken = null;
       return false;
     }
     return true;
@@ -252,7 +233,8 @@ export class AuthService {
     }
     const exp = this.readJwtExp(token);
     if (exp == null) {
-      return false;
+      // Token illisible → considéré comme invalide (ne pas laisser passer un jeton planté).
+      return true;
     }
     // Petite marge pour éviter les courses avec l'horloge serveur.
     return Date.now() >= exp * 1000 - 5_000;
@@ -268,8 +250,76 @@ export class AuthService {
     return this.role() || '';
   }
 
+  private applyAuthResponse(res: AuthResponse, resetAtelierRevision: boolean): void {
+    this.sessionExpiredHandled = false;
+    this.accessToken = res.token;
+    localStorage.removeItem(LEGACY_TOKEN_KEY);
+
+    localStorage.setItem(USER_KEY, res.username);
+    localStorage.setItem(ROLE_KEY, res.role);
+    this.username.set(res.username);
+    this.role.set(res.role);
+    this.setMustChangePassword(!!res.mustChangePassword);
+
+    const nom = res.nom?.trim() || '';
+    const prenom = res.prenom?.trim() || '';
+    this.nom.set(nom || null);
+    this.prenom.set(prenom || null);
+    if (nom) {
+      localStorage.setItem(NOM_KEY, nom);
+    } else {
+      localStorage.removeItem(NOM_KEY);
+    }
+    if (prenom) {
+      localStorage.setItem(PRENOM_KEY, prenom);
+    } else {
+      localStorage.removeItem(PRENOM_KEY);
+    }
+
+    this.groupeNom.set(res.groupeNom ?? null);
+    if (res.groupeNom) {
+      localStorage.setItem(GROUPE_KEY, res.groupeNom);
+    } else {
+      localStorage.removeItem(GROUPE_KEY);
+    }
+
+    const ateliers = (res.ateliers ?? []).map((a) => ({
+      ...a,
+      id: Number(a.id)
+    }));
+    this.ateliers.set(ateliers);
+    localStorage.setItem(ATELIERS_KEY, JSON.stringify(ateliers));
+
+    const preferred = this.toAtelierId(res.atelierId);
+    const current = this.atelierId();
+    let atelierId: number | null;
+    if (resetAtelierRevision) {
+      // Login : atelier préféré serveur.
+      atelierId =
+        preferred != null && ateliers.some((a) => a.id === preferred)
+          ? preferred
+          : (ateliers[0]?.id ?? null);
+    } else {
+      // Refresh : conserver l'atelier courant si encore autorisé (évite de réinitialiser le contexte admin).
+      atelierId =
+        current != null && ateliers.some((a) => a.id === current)
+          ? current
+          : preferred != null && ateliers.some((a) => a.id === preferred)
+            ? preferred
+            : (ateliers[0]?.id ?? null);
+    }
+    const atelierChanged = atelierId !== current;
+    this.setAtelierId(atelierId);
+    if (resetAtelierRevision) {
+      this.atelierRevision.set(0);
+    } else if (atelierChanged) {
+      this.atelierRevision.update((v) => v + 1);
+    }
+  }
+
   private clearSession(): void {
-    localStorage.removeItem(TOKEN_KEY);
+    this.accessToken = null;
+    localStorage.removeItem(LEGACY_TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
     localStorage.removeItem(NOM_KEY);
     localStorage.removeItem(PRENOM_KEY);
@@ -288,6 +338,12 @@ export class AuthService {
     this.groupeNom.set(null);
     this.mustChangePassword.set(false);
     this.atelierRevision.set(0);
+    this.refreshInFlight = null;
+  }
+
+  /** Supprime tout ancien JWT d'accès resté en localStorage. */
+  private purgeLegacyAccessToken(): void {
+    localStorage.removeItem(LEGACY_TOKEN_KEY);
   }
 
   /** Supprime tout stockage historique du mot de passe en clair. */

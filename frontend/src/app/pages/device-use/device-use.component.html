@@ -1,0 +1,248 @@
+<section class="order-page grid gap-4">
+  <header class="order-page-header">
+    <div>
+      <h1 class="page-title" data-tour="page-device-use">Utiliser une pièce détachée</h1>
+      <p class="page-subtitle">
+        Consommez une ou plusieurs pièces : un bon d’intervention complet est créé et archivé
+      </p>
+    </div>
+    <a mat-stroked-button class="order-action-btn order-demandes-btn" routerLink="/devices/interventions">
+      <mat-icon>archive</mat-icon>
+      Bons archivés
+    </a>
+  </header>
+
+  <mat-card class="!rounded-xl !border !border-line !shadow-soft">
+    <mat-card-content class="!pt-5">
+      <div class="order-picker-layout" [formGroup]="picker">
+        <mat-form-field appearance="outline" class="search-field order-picker-search w-full min-w-0">
+          <mat-label>Rechercher une pièce</mat-label>
+          <input
+            matInput
+            [formControl]="searchCtrl"
+            [matAutocomplete]="deviceAuto"
+            placeholder="Nom, référence, usage, marque, MAS, SFM…"
+            autocomplete="off"
+          />
+          @if (searching()) {
+            <mat-spinner matSuffix diameter="18"></mat-spinner>
+          } @else if (searchQueryText() || selectedDevice()) {
+            <button
+              matSuffix
+              mat-icon-button
+              type="button"
+              aria-label="Effacer"
+              (click)="clearSearch()"
+            >
+              <mat-icon>close</mat-icon>
+            </button>
+          } @else {
+            <mat-icon matSuffix>search</mat-icon>
+          }
+          <mat-hint>La quantité ne peut pas dépasser le stock disponible</mat-hint>
+        </mat-form-field>
+
+        <mat-autocomplete
+          #deviceAuto="matAutocomplete"
+          [displayWith]="displayDevice"
+          (optionSelected)="onDeviceSelected($event)"
+        >
+          @for (d of suggestions(); track d.id) {
+            <mat-option [value]="d" class="!h-auto !leading-normal !py-2">
+              <div class="suggest-row">
+                @if (photoUrl(d)) {
+                  <img [src]="photoUrl(d)" [alt]="d.nom" class="suggest-thumb" />
+                } @else {
+                  <div class="suggest-thumb fallback"><mat-icon>precision_manufacturing</mat-icon></div>
+                }
+                <div class="min-w-0 flex-1">
+                  <div class="truncate text-sm font-semibold text-ink">{{ d.nom }}</div>
+                  <div class="truncate text-xs text-ink-soft">
+                    {{ d.reference || 'Sans référence' }} · Stock {{ d.stock || 0 }}
+                  </div>
+                </div>
+              </div>
+            </mat-option>
+          }
+          @if (!searching() && searchQueryText() && !selectedDevice() && suggestions().length === 0) {
+            <mat-option disabled>Aucune pièce trouvée</mat-option>
+          }
+        </mat-autocomplete>
+
+        <div class="order-picker-create-spacer" aria-hidden="true"></div>
+
+        <div class="qty-piece-row order-picker-qty">
+          <mat-form-field appearance="outline" class="qty-field-main" subscriptSizing="dynamic">
+            <mat-label>Quantité</mat-label>
+            <input matInput type="number" min="1" formControlName="quantite" />
+          </mat-form-field>
+
+          <div class="piece-thumb" [class.has-piece]="!!selectedDevice()">
+            @if (selectedDevice(); as device) {
+              @if (photoUrl(device)) {
+                <img [src]="photoUrl(device)" [alt]="device.nom" />
+              } @else {
+                <div class="thumb-fallback"><mat-icon>precision_manufacturing</mat-icon></div>
+              }
+              <div class="thumb-meta">
+                <span class="thumb-title">{{ device.nom }}</span>
+                <span class="thumb-ref"
+                  >{{ device.reference || 'Sans référence' }} · Stock {{ device.stock || 0 }}</span
+                >
+              </div>
+            } @else {
+              <div class="thumb-fallback"><mat-icon>image_not_supported</mat-icon></div>
+              <div class="thumb-meta">
+                <span class="thumb-title">Pièce détachée</span>
+                <span class="thumb-ref">Recherchez puis choisissez une suggestion</span>
+              </div>
+            }
+          </div>
+        </div>
+
+        <button
+          mat-flat-button
+          color="primary"
+          type="button"
+          class="order-action-btn order-picker-add"
+          (click)="addLine()"
+        >
+          <mat-icon>add</mat-icon>
+          Ajouter à la liste
+        </button>
+      </div>
+
+      <div class="mt-5">
+        <h2 class="m-0 mb-3 text-base font-semibold text-ink">
+          Pièces consommées ({{ lines().length }})
+        </h2>
+        @if (lines().length === 0) {
+          <p class="m-0 rounded-lg border border-dashed border-line px-3 py-4 text-sm text-ink-soft">
+            Aucune pièce ajoutée. Recherchez une pièce puis cliquez sur « Ajouter à la liste ».
+          </p>
+        } @else {
+          <div class="grid gap-2">
+            @for (line of lines(); track line.deviceId) {
+              <div class="line-row">
+                @if (photoUrl(line)) {
+                  <img [src]="photoUrl(line)" [alt]="line.nom" class="line-thumb" />
+                } @else {
+                  <div class="line-thumb fallback"><mat-icon>precision_manufacturing</mat-icon></div>
+                }
+                <div class="line-meta min-w-0 flex-1">
+                  <div class="truncate text-sm font-semibold text-ink">{{ line.nom }}</div>
+                  <div class="text-xs text-ink-soft">
+                    {{ line.reference || 'Sans référence' }} · Stock {{ line.stock }}
+                  </div>
+                </div>
+                <div class="line-actions">
+                  <mat-form-field appearance="outline" class="qty-field">
+                    <mat-label>Qté</mat-label>
+                    <input
+                      matInput
+                      type="number"
+                      min="1"
+                      [attr.max]="line.stock"
+                      [value]="line.quantite"
+                      (change)="updateQty(line.deviceId, $any($event.target).value)"
+                    />
+                  </mat-form-field>
+                  <button
+                    mat-icon-button
+                    type="button"
+                    color="warn"
+                    (click)="removeLine(line.deviceId)"
+                    aria-label="Retirer"
+                  >
+                    <mat-icon>delete</mat-icon>
+                  </button>
+                </div>
+              </div>
+            }
+          </div>
+        }
+      </div>
+
+      <form class="mt-5 grid gap-3" [formGroup]="form" (ngSubmit)="submit()">
+        <h2 class="m-0 text-base font-semibold text-ink">Bon d’intervention</h2>
+
+        <div class="bon-grid">
+          <mat-form-field appearance="outline">
+            <mat-label>Date et heure</mat-label>
+            <input matInput type="datetime-local" formControlName="dateIntervention" />
+          </mat-form-field>
+          <mat-form-field appearance="outline">
+            <mat-label>Emplacement</mat-label>
+            <input matInput formControlName="emplacement" />
+          </mat-form-field>
+          <mat-form-field appearance="outline">
+            <mat-label>Machine / MAS</mat-label>
+            <mat-select formControlName="machineMas">
+              <mat-option [value]="null">— Aucune —</mat-option>
+              @for (mas of masses(); track mas.id) {
+                <mat-option [value]="masLabel(mas)">
+                  {{ masLabel(mas) }}
+                  @if (!mas.utilise) {
+                    <span class="text-ink-soft"> (non utilisée)</span>
+                  }
+                </mat-option>
+              }
+            </mat-select>
+            <mat-hint>Machines de l’atelier</mat-hint>
+          </mat-form-field>
+        </div>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Motif de l’intervention</mat-label>
+          <input matInput formControlName="motif" />
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Diagnostic</mat-label>
+          <textarea matInput rows="3" formControlName="diagnostic"></textarea>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Travaux effectués</mat-label>
+          <textarea matInput rows="4" formControlName="travaux"></textarea>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Observations</mat-label>
+          <textarea matInput rows="3" formControlName="observations"></textarea>
+        </mat-form-field>
+
+        @if (successNumero()) {
+          <p class="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+            Bon d’intervention <strong>{{ successNumero() }}</strong> archivé. Le stock a été mis à jour.
+            <button
+              mat-button
+              color="primary"
+              type="button"
+              class="!ml-1"
+              (click)="goToArchive()"
+            >
+              Voir l’archive
+            </button>
+          </p>
+        }
+        @if (error()) {
+          <p class="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{{ error() }}</p>
+        }
+
+        <div class="order-actions-footer mt-2">
+          <a mat-stroked-button class="order-action-btn" routerLink="/devices">Retour</a>
+          <button
+            mat-flat-button
+            color="primary"
+            type="submit"
+            class="order-action-btn"
+            [disabled]="saving() || lines().length === 0"
+          >
+            {{ saving() ? 'Enregistrement…' : 'Archiver le bon' }}
+          </button>
+        </div>
+      </form>
+    </mat-card-content>
+  </mat-card>
+</section>

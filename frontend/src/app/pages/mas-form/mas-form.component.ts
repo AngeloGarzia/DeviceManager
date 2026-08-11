@@ -12,6 +12,7 @@ import { MatCardModule } from '@angular/material/card';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MasService } from '../../services/mas.service';
 import { MarqueMasOption, MasForm } from '../../models/models';
+import { apiErrorMessage } from '../../shared/api-error';
 
 /**
  * Formulaire de création ou modification d'une MAS.
@@ -141,7 +142,7 @@ export class MasFormComponent implements OnInit {
       },
       error: (err) => {
         this.savingMarque.set(false);
-        this.marqueError.set(err?.error?.message || 'Création de la marque impossible.');
+        this.marqueError.set(apiErrorMessage(err, 'Création de la marque impossible.'));
       }
     });
   }
@@ -165,7 +166,7 @@ export class MasFormComponent implements OnInit {
       next: (saved) => this.navigateAfterSave(saved.id),
       error: (err) => {
         this.saving.set(false);
-        this.error.set(err?.error?.message || 'Enregistrement impossible.');
+        this.error.set(apiErrorMessage(err, 'Enregistrement impossible.'));
       }
     });
   }

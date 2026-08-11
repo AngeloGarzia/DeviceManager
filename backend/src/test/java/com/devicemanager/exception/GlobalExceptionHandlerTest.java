@@ -59,7 +59,7 @@ class GlobalExceptionHandlerTest {
                 new DataIntegrityViolationException("FK", new RuntimeException("foreign key constraint fails")),
                 request);
 
-        assertThat(response.getBody().getMessage()).contains("référencé");
+        assertThat(response.getBody().getMessage()).contains("encore utilisé");
     }
 
     @Test
@@ -73,7 +73,7 @@ class GlobalExceptionHandlerTest {
                 new DataIntegrityViolationException("FK", new RuntimeException(mysql)),
                 request);
 
-        assertThat(response.getBody().getMessage()).contains("encore référencé");
+        assertThat(response.getBody().getMessage()).contains("encore utilisé");
         assertThat(response.getBody().getMessage()).doesNotContain("Référence déjà utilisée");
     }
 }

@@ -21,6 +21,7 @@ import {
 import { Device, OrderRequestLineForm } from '../../models/models';
 import { DeviceService } from '../../services/device.service';
 import { MailPreviewItem, OrderRequestService } from '../../services/order-request.service';
+import { apiErrorMessage } from '../../shared/api-error';
 
 interface DraftLine {
   deviceId: number;
@@ -291,7 +292,7 @@ export class OrderRequestFormComponent implements OnInit {
         },
         error: (err) => {
           this.previewing.set(false);
-          this.error.set(err?.error?.message || 'Aperçu impossible.');
+          this.error.set(apiErrorMessage(err, 'Aperçu impossible.'));
         }
       });
   }
@@ -336,7 +337,7 @@ export class OrderRequestFormComponent implements OnInit {
         },
         error: (err) => {
           this.saving.set(false);
-          this.error.set(err?.error?.message || 'Envoi impossible.');
+          this.error.set(apiErrorMessage(err, 'Envoi impossible.'));
         }
       });
   }

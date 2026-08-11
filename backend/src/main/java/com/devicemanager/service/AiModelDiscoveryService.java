@@ -51,7 +51,7 @@ public class AiModelDiscoveryService {
                     .providerId(id)
                     .providerLabel(provider.label())
                     .hasApiKey(false)
-                    .message("Clé API absente (" + AiApiKeyBattery.envVarName(id) + ").")
+                    .message("Clé absente pour ce fournisseur — modèles indisponibles.")
                     .models(List.of())
                     .build();
         }
@@ -93,7 +93,7 @@ public class AiModelDiscoveryService {
                     .providerId(id)
                     .providerLabel(provider.label())
                     .hasApiKey(true)
-                    .message("Impossible de récupérer les modèles : " + ex.getMessage())
+                    .message("Impossible de charger les modèles. Réessayez ou changez de fournisseur.")
                     .models(List.of())
                     .build();
         }
@@ -319,12 +319,11 @@ public class AiModelDiscoveryService {
                 || body.contains("UNAUTHENTICATED")
                 || body.contains("invalid authentication")) {
             if ("gemini".equals(providerId)) {
-                return "Clé Gemini refusée par Google (souvent les clés « AQ. »). "
-                        + "Essayez OpenRouter, ou régénérez une clé AI Studio.";
+                return "Clé Gemini refusée. Essayez OpenRouter ou une autre clé dans la configuration.";
             }
             return "Authentification refusée par le fournisseur (clé invalide ou expirée).";
         }
-        return "Échec HTTP " + code + " lors de la récupération des modèles.";
+        return "Impossible de charger les modèles pour ce fournisseur. Réessayez plus tard.";
     }
 
     private static String text(JsonNode node, String field) {

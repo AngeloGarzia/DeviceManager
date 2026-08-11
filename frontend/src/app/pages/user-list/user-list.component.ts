@@ -10,6 +10,7 @@ import { AppUser } from '../../models/models';
 import { UserService } from '../../services/user.service';
 import { AuthService } from '../../services/auth.service';
 import { ConfirmDialogComponent } from '../../shared/confirm-dialog.component';
+import { apiErrorMessage } from '../../shared/api-error';
 
 /**
  * Liste des comptes utilisateurs du groupe (réservée aux administrateurs).
@@ -56,7 +57,7 @@ export class UserListComponent implements OnInit {
       },
       error: (err) => {
         this.loading.set(false);
-        this.error.set(err?.error?.message || 'Chargement impossible.');
+        this.error.set(apiErrorMessage(err, 'Chargement impossible.'));
       }
     });
   }
@@ -91,7 +92,7 @@ export class UserListComponent implements OnInit {
     this.pendingDelete = null;
     this.userService.delete(id).subscribe({
       next: () => this.load(),
-      error: (err) => this.error.set(err?.error?.message || 'Suppression impossible.')
+      error: (err) => this.error.set(apiErrorMessage(err, 'Suppression impossible.'))
     });
   }
 }

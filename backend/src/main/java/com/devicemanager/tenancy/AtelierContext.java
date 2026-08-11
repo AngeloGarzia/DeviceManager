@@ -40,7 +40,7 @@ public final class AtelierContext {
     public static Long require() {
         Long id = CURRENT.get();
         if (id == null) {
-            throw new IllegalStateException("Aucun atelier sélectionné");
+            throw new IllegalStateException("Sélectionnez un atelier pour continuer.");
         }
         return id;
     }

@@ -9,6 +9,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { AuthService } from '../../services/auth.service';
+import { apiErrorMessage } from '../../shared/api-error';
 
 /**
  * Page de connexion à DeviceManager.
@@ -54,7 +55,14 @@ export class LoginComponent {
     }
     if (this.route.snapshot.queryParamMap.get('reason') === 'expired') {
       this.error.set('Session expirée. Veuillez vous reconnecter.');
+      return;
     }
+    // Rechargement de /login avec cookie refresh encore valide → renvoyer vers l'app.
+    this.auth.tryRestoreSession().subscribe((ok) => {
+      if (ok) {
+        void this.router.navigate([this.auth.mustChangePassword() ? '/change-password' : '/devices']);
+      }
+    });
   }
 
   /** Affiche ou masque le mot de passe. */
@@ -78,7 +86,7 @@ export class LoginComponent {
       },
       error: (err) => {
         this.loading.set(false);
-        this.error.set(err?.error?.message || 'Connexion impossible');
+        this.error.set(apiErrorMessage(err, 'Connexion impossible'));
       }
     });
   }

@@ -9,6 +9,7 @@ import { Device } from '../../models/models';
 import { DeviceService } from '../../services/device.service';
 import { AuthService } from '../../services/auth.service';
 import { ConfirmDialogComponent } from '../../shared/confirm-dialog.component';
+import { apiErrorMessage } from '../../shared/api-error';
 
 /**
  * Fiche détaillée d'une pièce détachée.
@@ -90,7 +91,7 @@ export class DeviceDetailComponent implements OnInit {
     this.confirmOpen.set(false);
     this.deviceService.delete(current.id).subscribe({
       next: () => this.router.navigate(['/devices']),
-      error: (err) => this.error.set(err?.error?.message || 'Suppression impossible.')
+      error: (err) => this.error.set(apiErrorMessage(err, 'Suppression impossible.'))
     });
   }
 }

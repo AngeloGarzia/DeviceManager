@@ -147,7 +147,7 @@ public class OrderRequestController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<OrderRequestResponse> receive(
             @PathVariable Long id,
-            @RequestBody(required = false) OrderRequestDto request,
+            @Valid @RequestBody(required = false) OrderRequestDto request,
             Authentication authentication) {
         return ResponseEntity.ok(orderRequestService.receive(id, request, authentication.getName()));
     }

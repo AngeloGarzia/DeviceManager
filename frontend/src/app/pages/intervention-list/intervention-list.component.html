@@ -1,0 +1,125 @@
+<section class="grid gap-4">
+  <header class="flex flex-wrap items-start justify-between gap-3">
+    <div>
+      <h1 class="page-title" data-tour="page-interventions">Bons d’intervention</h1>
+      <p class="page-subtitle">Archive des consommations de pièces détachées de l’atelier</p>
+    </div>
+    <div class="flex flex-wrap gap-2">
+      <a mat-flat-button color="primary" routerLink="/devices/utiliser">
+        <mat-icon>handyman</mat-icon>
+        Utiliser une pièce
+      </a>
+      <button mat-stroked-button type="button" (click)="load()">Actualiser</button>
+    </div>
+  </header>
+
+  @if (error()) {
+    <p class="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{{ error() }}</p>
+  }
+  @if (loading()) {
+    <div class="flex justify-center py-10"><mat-spinner diameter="36"></mat-spinner></div>
+  } @else if (items().length === 0) {
+    <div class="panel">
+      <h2 class="m-0 text-lg font-semibold">Aucun bon archivé</h2>
+      <p class="mt-2 text-sm text-ink-soft">
+        Les bons créés depuis « Utiliser une pièce détachée » apparaîtront ici.
+      </p>
+    </div>
+  } @else {
+    <div class="grid gap-3">
+      @for (item of items(); track item.id) {
+        <mat-card class="!rounded-xl !border !border-line !shadow-soft">
+          <mat-card-content class="!pt-4">
+            <div class="flex flex-wrap items-start justify-between gap-2">
+              <div>
+                <h2 class="m-0 text-base font-semibold">
+                  {{ item.numero }} · {{ item.totalPieces || item.lignes?.length || 0 }} pièce(s) · Qté
+                  {{ item.totalQuantite || 0 }}
+                </h2>
+                <p class="mt-1 text-sm text-ink-soft">
+                  {{ item.technicienNom }} ·
+                  {{ item.dateIntervention | date: 'dd/MM/yyyy HH:mm' }}
+                  @if (item.machineMas) {
+                    · {{ item.machineMas }}
+                  }
+                  @if (item.emplacement) {
+                    · {{ item.emplacement }}
+                  }
+                </p>
+              </div>
+              <button mat-stroked-button type="button" (click)="toggle(item.id)">
+                {{ expandedId() === item.id ? 'Masquer' : 'Détail' }}
+              </button>
+            </div>
+
+            <p class="mt-3 text-sm text-ink">
+              <span class="font-medium">Motif :</span> {{ item.motif }}
+            </p>
+
+            @if (expandedId() === item.id) {
+              <div class="mt-3 grid gap-3 border-t border-line pt-3">
+                @if (item.diagnostic) {
+                  <div>
+                    <div class="text-xs font-semibold uppercase tracking-wide text-ink-soft">Diagnostic</div>
+                    <p class="mt-1 whitespace-pre-wrap text-sm text-ink">{{ item.diagnostic }}</p>
+                  </div>
+                }
+                <div>
+                  <div class="text-xs font-semibold uppercase tracking-wide text-ink-soft">
+                    Travaux effectués
+                  </div>
+                  <p class="mt-1 whitespace-pre-wrap text-sm text-ink">{{ item.travaux }}</p>
+                </div>
+                @if (item.observations) {
+                  <div>
+                    <div class="text-xs font-semibold uppercase tracking-wide text-ink-soft">
+                      Observations
+                    </div>
+                    <p class="mt-1 whitespace-pre-wrap text-sm text-ink">{{ item.observations }}</p>
+                  </div>
+                }
+
+                <div class="grid gap-2">
+                  <div class="text-xs font-semibold uppercase tracking-wide text-ink-soft">
+                    Pièces consommées
+                  </div>
+                  @for (line of item.lignes || []; track line.deviceId) {
+                    <div
+                      class="flex flex-wrap items-center gap-3 rounded-lg border border-line bg-slate-50 px-3 py-2"
+                    >
+                      @if (photoUrl(line.photoUrl)) {
+                        <img
+                          [src]="photoUrl(line.photoUrl)"
+                          [alt]="line.pieceNom"
+                          class="line-thumb"
+                        />
+                      } @else {
+                        <div class="line-thumb fallback">
+                          <mat-icon>precision_manufacturing</mat-icon>
+                        </div>
+                      }
+                      <div class="min-w-0 flex-1">
+                        <div class="truncate text-sm font-medium text-ink">{{ line.pieceNom }}</div>
+                        <div class="text-xs text-ink-soft">
+                          {{ line.pieceReference || 'Sans référence' }}
+                          @if (line.stockAvant != null && line.stockApres != null) {
+                            · Stock {{ line.stockAvant }} → {{ line.stockApres }}
+                          }
+                        </div>
+                      </div>
+                      <span class="text-sm font-semibold text-ink">× {{ line.quantite }}</span>
+                    </div>
+                  }
+                </div>
+
+                <p class="m-0 text-xs text-ink-faint">
+                  Archivé le {{ item.createdAt | date: 'dd/MM/yyyy HH:mm' }}
+                </p>
+              </div>
+            }
+          </mat-card-content>
+        </mat-card>
+      }
+    </div>
+  }
+</section>

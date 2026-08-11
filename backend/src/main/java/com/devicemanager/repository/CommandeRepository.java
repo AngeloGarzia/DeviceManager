@@ -2,6 +2,7 @@ package com.devicemanager.repository;
 
 import com.devicemanager.entity.Commande;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -73,4 +74,23 @@ public interface CommandeRepository extends JpaRepository<Commande, Long> {
      * @return nombre de commandes
      */
     long countByAtelierId(Long atelierId);
+
+    /**
+     * Passe atomiquement une commande d'un statut attendu à un nouveau statut (anti double-réception).
+     *
+     * @return 1 si la transition a été appliquée, 0 sinon
+     */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+            update Commande c
+            set c.status = :newStatus
+            where c.id = :id
+              and c.atelier.id = :atelierId
+              and c.status = :expectedStatus
+            """)
+    int claimStatus(
+            @Param("id") Long id,
+            @Param("atelierId") Long atelierId,
+            @Param("expectedStatus") String expectedStatus,
+            @Param("newStatus") String newStatus);
 }

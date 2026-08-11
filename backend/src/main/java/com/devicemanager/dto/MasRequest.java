@@ -11,15 +11,15 @@ import lombok.Data;
 @Data
 public class MasRequest {
 
-    @NotBlank
-    @Size(max = 80)
+    @NotBlank(message = "Le numéro MAS est obligatoire")
+    @Size(max = 80, message = "Le numéro MAS ne doit pas dépasser 80 caractères")
     private String numero;
 
     /** Identifiant de la marque du catalogue. */
-    @NotNull
+    @NotNull(message = "La marque MAS est obligatoire")
     private Long marqueId;
 
     /** Indique si la référence est encore utilisée en exploitation. */
-    @NotNull
+    @NotNull(message = "Indiquez si la MAS est utilisée")
     private Boolean utilise;
 }

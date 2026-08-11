@@ -53,9 +53,8 @@ public class ImageOptimizationService {
             FileMagicBytesValidator.validateImageMagicBytes(rawBytes);
             BufferedImage source = ImageIO.read(new ByteArrayInputStream(rawBytes));
             if (source == null) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Image illisible ou format non supporté");
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Photo illisible ou format non pris en charge");
             }
-
             BufferedImage resized = resizeIfNeeded(source);
             byte[] jpegBytes = encodeJpeg(resized);
 
@@ -82,7 +81,8 @@ public class ImageOptimizationService {
         } catch (ResponseStatusException ex) {
             throw ex;
         } catch (IOException ex) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Impossible d'optimiser l'image", ex);
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Impossible de préparer la photo. Réessayez avec une autre image.", ex);
         }
     }
 

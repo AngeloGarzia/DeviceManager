@@ -12,6 +12,6 @@ import java.util.Map;
 public class AppSettingsUpdateRequest {
 
     /** Map clé → nouvelle valeur pour chaque paramètre à modifier. */
-    @NotNull
+    @NotNull(message = "Les valeurs des paramètres sont obligatoires")
     private Map<String, String> values;
 }

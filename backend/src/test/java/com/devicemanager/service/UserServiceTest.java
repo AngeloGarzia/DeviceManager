@@ -173,7 +173,7 @@ class UserServiceTest {
     void delete_rejectsLastAdmin() {
         User admin = TestFixtures.user("admin", Roles.ADMIN);
         when(userRepository.findById(50L)).thenReturn(Optional.of(admin));
-        when(userRepository.findAll()).thenReturn(List.of(admin));
+        when(userRepository.findAllByGroupeId(1L)).thenReturn(List.of(admin));
 
         assertThatThrownBy(() -> userService.delete(50L, "other"))
                 .isInstanceOf(ResponseStatusException.class)
@@ -182,6 +182,34 @@ class UserServiceTest {
                     assertThat(rse.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
                     assertThat(rse.getReason()).isEqualTo("Impossible de supprimer le dernier administrateur");
                 });
+    }
+
+    @Test
+    void findById_rejectsUserOutsideGroupe() {
+        User outsider = TestFixtures.user("other", Roles.ADMIN);
+        outsider.setId(99L);
+        outsider.setGroupe(com.devicemanager.entity.Groupe.builder().id(2L).nom("Autre").build());
+        when(userRepository.findById(99L)).thenReturn(Optional.of(outsider));
+
+        assertThatThrownBy(() -> userService.findById(99L))
+                .isInstanceOf(ResponseStatusException.class)
+                .satisfies(ex -> {
+                    ResponseStatusException rse = (ResponseStatusException) ex;
+                    assertThat(rse.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+                    assertThat(rse.getReason()).isEqualTo("Utilisateur introuvable");
+                });
+    }
+
+    @Test
+    void findAll_scopesToActorGroupe() {
+        when(userRepository.findAllByGroupeId(1L)).thenReturn(List.of(
+                TestFixtures.user("admin", Roles.ADMIN),
+                TestFixtures.user("tech", Roles.TECHNICIEN)
+        ));
+
+        assertThat(userService.findAll()).hasSize(2);
+        verify(userRepository).findAllByGroupeId(1L);
+        verify(userRepository, never()).findAll();
     }
 
     @Test
@@ -199,6 +227,6 @@ class UserServiceTest {
         assertThatThrownBy(() -> userService.create(request))
                 .isInstanceOf(ResponseStatusException.class)
                 .extracting(ex -> ((ResponseStatusException) ex).getReason())
-                .isEqualTo("Rôle invalide (ADMIN ou TECHNICIEN)");
+                .isEqualTo("Rôle invalide. Choisissez Administrateur ou Technicien.");
     }
 }

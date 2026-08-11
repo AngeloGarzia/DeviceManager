@@ -103,22 +103,26 @@ public class AuthController {
     }
 
     private ResponseCookie refreshCookie(String rawToken, HttpServletRequest request) {
+        boolean secure = isSecureRequest(request);
+        // Prod front/API cross-origin : SameSite=None + Secure pour que le cookie refresh parte en XHR.
+        // Dev same-origin (proxy) : Lax suffit sur HTTP local.
         return ResponseCookie.from(REFRESH_COOKIE, rawToken)
                 .httpOnly(true)
-                .secure(isSecureRequest(request))
+                .secure(secure)
                 .path("/api/auth")
                 .maxAge(Duration.ofMillis(jwtService.getRefreshExpirationMs()))
-                .sameSite("Lax")
+                .sameSite(secure ? "None" : "Lax")
                 .build();
     }
 
     private ResponseCookie clearRefreshCookie(HttpServletRequest request) {
+        boolean secure = isSecureRequest(request);
         return ResponseCookie.from(REFRESH_COOKIE, "")
                 .httpOnly(true)
-                .secure(isSecureRequest(request))
+                .secure(secure)
                 .path("/api/auth")
                 .maxAge(0)
-                .sameSite("Lax")
+                .sameSite(secure ? "None" : "Lax")
                 .build();
     }
 

@@ -16,12 +16,12 @@ import java.util.List;
 @Data
 public class OrderRequestDto {
 
-    @NotEmpty
+    @NotEmpty(message = "Ajoutez au moins une pièce à la demande")
     @Valid
     private List<OrderRequestLineDto> lignes;
 
-    @NotBlank
-    @Size(max = 1000)
+    @NotBlank(message = "Le message de la demande est obligatoire")
+    @Size(max = 1000, message = "Le message ne doit pas dépasser 1000 caractères")
     private String message;
 
     /**
@@ -30,11 +30,11 @@ public class OrderRequestDto {
     @Data
     public static class OrderRequestLineDto {
         /** Identifiant de la pièce commandée. */
-        @NotNull
+        @NotNull(message = "La pièce est obligatoire sur chaque ligne")
         private Long deviceId;
 
-        @NotNull
-        @Min(1)
+        @NotNull(message = "La quantité est obligatoire")
+        @Min(value = 1, message = "La quantité doit être au moins 1")
         private Integer quantite;
     }
 }

@@ -10,6 +10,7 @@ import { OrderRequest, OrderRequestForm, OrderRequestLine } from '../../models/m
 import { MailPreviewItem, OrderRequestService } from '../../services/order-request.service';
 import { AuthService } from '../../services/auth.service';
 import { ConfirmDialogComponent } from '../../shared/confirm-dialog.component';
+import { apiErrorMessage } from '../../shared/api-error';
 
 /**
  * Liste des demandes de commande de pièces détachées.
@@ -152,7 +153,7 @@ export class OrderRequestListComponent implements OnInit {
       },
       error: (err) => {
         this.previewLoadingId.set(null);
-        this.error.set(err?.error?.message || 'Aperçu impossible.');
+        this.error.set(apiErrorMessage(err, 'Aperçu impossible.'));
       }
     });
   }
@@ -180,7 +181,7 @@ export class OrderRequestListComponent implements OnInit {
       },
       error: (err) => {
         this.validatingId.set(null);
-        this.error.set(err?.error?.message || 'Validation impossible.');
+        this.error.set(apiErrorMessage(err, 'Validation impossible.'));
       }
     });
   }
@@ -205,7 +206,7 @@ export class OrderRequestListComponent implements OnInit {
       },
       error: (err) => {
         this.savingId.set(null);
-        this.error.set(err?.error?.message || 'Enregistrement impossible.');
+        this.error.set(apiErrorMessage(err, 'Enregistrement impossible.'));
       }
     });
   }
@@ -289,7 +290,7 @@ export class OrderRequestListComponent implements OnInit {
         this.deletingId.set(null);
         this.pendingDelete = null;
         this.confirmStep.set(1);
-        this.error.set(err?.error?.message || 'Suppression impossible.');
+        this.error.set(apiErrorMessage(err, 'Suppression impossible.'));
       }
     });
   }
@@ -330,6 +331,9 @@ export class OrderRequestListComponent implements OnInit {
   }
 
   private confirmReceive(): void {
+    if (this.receivingId() != null) {
+      return;
+    }
     const item = this.pendingReceive;
     if (!item) {
       this.cancelConfirm();
@@ -356,7 +360,7 @@ export class OrderRequestListComponent implements OnInit {
       error: (err) => {
         this.receivingId.set(null);
         this.pendingReceive = null;
-        this.error.set(err?.error?.message || 'Réception impossible.');
+        this.error.set(apiErrorMessage(err, 'Réception impossible.'));
       }
     });
   }

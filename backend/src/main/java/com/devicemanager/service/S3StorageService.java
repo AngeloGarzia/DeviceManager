@@ -60,7 +60,7 @@ public class S3StorageService implements StorageService {
             String url = "https://" + bucket + ".s3." + region + ".amazonaws.com/" + key;
             return new StoredObject(key, url, file.getContentType(), file.getSize());
         } catch (IOException e) {
-            throw new IllegalStateException("Échec upload S3", e);
+            throw new IllegalStateException("Échec d'enregistrement de la photo. Réessayez.", e);
         }
     }
 

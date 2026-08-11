@@ -10,6 +10,6 @@ import lombok.Data;
 public class PreferredAtelierRequest {
 
     /** Identifiant de l'atelier à activer ou mémoriser. */
-    @NotNull
+    @NotNull(message = "Sélectionnez un atelier")
     private Long atelierId;
 }

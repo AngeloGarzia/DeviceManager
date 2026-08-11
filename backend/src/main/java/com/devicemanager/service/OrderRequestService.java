@@ -90,7 +90,7 @@ public class OrderRequestService {
         for (Map.Entry<Long, Integer> entry : quantities.entrySet()) {
             Device device = deviceRepository.findByIdWithRelations(entry.getKey(), atelierId)
                     .orElseThrow(() -> new ResponseStatusException(
-                            HttpStatus.BAD_REQUEST, "Pièce détachée introuvable: " + entry.getKey()));
+                            HttpStatus.BAD_REQUEST, "Pièce détachée introuvable dans cet atelier."));
             CommandeLigne ligne = CommandeLigne.builder()
                     .device(device)
                     .quantite(entry.getValue())
@@ -125,7 +125,7 @@ public class OrderRequestService {
     public OrderRequestResponse validate(Long id, String adminUsername) {
         Long atelierId = atelierService.requireCurrentAtelier().getId();
         Commande commande = commandeRepository.findByIdWithRelations(id, atelierId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Demande introuvable"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Demande de commande introuvable"));
 
         if (OrderStatuses.isReceived(commande.getStatus())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
@@ -133,7 +133,7 @@ public class OrderRequestService {
         }
         if (!OrderStatuses.isPending(commande.getStatus())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
-                    "Cette demande est déjà validée (statut=" + commande.getStatus() + ")");
+                    "Cette demande est déjà validée.");
         }
 
         User admin = userRepository.findByUsername(adminUsername)
@@ -190,7 +190,7 @@ public class OrderRequestService {
     public OrderRequestResponse update(Long id, OrderRequestDto request, String adminUsername) {
         Long atelierId = atelierService.requireCurrentAtelier().getId();
         Commande commande = commandeRepository.findByIdWithRelations(id, atelierId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Demande introuvable"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Demande de commande introuvable"));
 
         if (!OrderStatuses.canEditLines(commande.getStatus())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
@@ -219,7 +219,7 @@ public class OrderRequestService {
     public OrderRequestResponse receive(Long id, OrderRequestDto request, String adminUsername) {
         Long atelierId = atelierService.requireCurrentAtelier().getId();
         Commande commande = commandeRepository.findByIdWithRelations(id, atelierId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Demande introuvable"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Demande de commande introuvable"));
 
         if (OrderStatuses.isReceived(commande.getStatus())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
@@ -227,7 +227,7 @@ public class OrderRequestService {
         }
         if (!OrderStatuses.isValidated(commande.getStatus())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
-                    "Seule une demande validée peut être réceptionnée (statut=" + commande.getStatus() + ")");
+                    "Réceptionnez uniquement une demande déjà validée.");
         }
 
         if (request != null && request.getLignes() != null && !request.getLignes().isEmpty()) {
@@ -235,14 +235,25 @@ public class OrderRequestService {
             if (request.getMessage() != null && !request.getMessage().isBlank()) {
                 commande.setMessage(request.getMessage().trim());
             }
+            commandeRepository.saveAndFlush(commande);
         }
 
         if (commande.getLignes() == null || commande.getLignes().isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "Impossible de réceptionner une demande sans ligne");
+                    "Ajoutez au moins une pièce avant de confirmer la réception.");
         }
 
-        for (CommandeLigne ligne : commande.getLignes()) {
+        int claimed = commandeRepository.claimStatus(
+                id, atelierId, OrderStatuses.VALIDATED, OrderStatuses.RECEIVED);
+        if (claimed == 0) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Cette demande est déjà réceptionnée ou n'est plus validée.");
+        }
+
+        Commande toStock = commandeRepository.findByIdWithRelations(id, atelierId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "Demande de commande introuvable"));
+        for (CommandeLigne ligne : toStock.getLignes()) {
             Device device = ligne.getDevice();
             if (device == null) {
                 continue;
@@ -253,11 +264,9 @@ public class OrderRequestService {
             log.info("Stock mis à jour — Pièce id={} +{} → stock={}", device.getId(), qty, device.getStock());
         }
 
-        commande.setStatus(OrderStatuses.RECEIVED);
-        Commande saved = commandeRepository.save(commande);
         log.info("Réception en base — Demande commande id={} par={} pièces={}",
-                id, adminUsername, saved.getLignes().size());
-        return toResponse(saved);
+                id, adminUsername, toStock.getLignes().size());
+        return toResponse(toStock);
     }
 
     /**
@@ -270,10 +279,10 @@ public class OrderRequestService {
     public void delete(Long id, String adminUsername) {
         Long atelierId = atelierService.requireCurrentAtelier().getId();
         Commande commande = commandeRepository.findByIdWithRelations(id, atelierId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Demande introuvable"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Demande de commande introuvable"));
         if (OrderStatuses.isReceived(commande.getStatus())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
-                    "Impossible de supprimer une demande déjà réceptionnée (stock déjà mis à jour)");
+                    "Impossible de supprimer une demande déjà réceptionnée (le stock a déjà été mis à jour).");
         }
         commandeRepository.delete(commande);
         log.info("Suppression en base — Demande commande id={} par={} atelier={}",
@@ -294,7 +303,7 @@ public class OrderRequestService {
         for (Map.Entry<Long, Integer> entry : quantities.entrySet()) {
             Device device = deviceRepository.findByIdWithRelations(entry.getKey(), atelierId)
                     .orElseThrow(() -> new ResponseStatusException(
-                            HttpStatus.BAD_REQUEST, "Pièce détachée introuvable: " + entry.getKey()));
+                            HttpStatus.BAD_REQUEST, "Pièce détachée introuvable dans cet atelier."));
             commande.addLigne(CommandeLigne.builder()
                     .device(device)
                     .quantite(entry.getValue())
@@ -355,7 +364,7 @@ public class OrderRequestService {
         for (Long deviceId : quantities.keySet()) {
             Device device = deviceRepository.findByIdWithRelations(deviceId, atelierId)
                     .orElseThrow(() -> new ResponseStatusException(
-                            HttpStatus.BAD_REQUEST, "Pièce détachée introuvable: " + deviceId));
+                            HttpStatus.BAD_REQUEST, "Pièce détachée introuvable dans cet atelier."));
             devices.add(device);
         }
 
@@ -407,7 +416,7 @@ public class OrderRequestService {
     public List<MailPreviewItem> previewSfmMails(Long id, String viewerUsername) {
         Long atelierId = atelierService.requireCurrentAtelier().getId();
         Commande commande = commandeRepository.findByIdWithRelations(id, atelierId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Demande introuvable"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Demande de commande introuvable"));
         User viewer = userRepository.findByUsername(viewerUsername).orElse(null);
         return buildSfmMailPreviews(commande, viewer);
     }

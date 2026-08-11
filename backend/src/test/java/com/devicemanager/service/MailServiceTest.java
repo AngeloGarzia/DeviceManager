@@ -55,7 +55,7 @@ class MailServiceTest {
                 .satisfies(ex -> {
                     ResponseStatusException rse = (ResponseStatusException) ex;
                     assertThat(rse.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-                    assertThat(rse.getReason()).contains("MAIL_HOST");
+                    assertThat(rse.getReason()).contains("Serveur de messagerie");
                 });
     }
 
@@ -71,7 +71,7 @@ class MailServiceTest {
                 .isInstanceOf(ResponseStatusException.class)
                 .extracting(ex -> ((ResponseStatusException) ex).getReason())
                 .asString()
-                .contains("MAIL_USERNAME");
+                .contains("Identifiants messagerie");
     }
 
     @Test
@@ -82,6 +82,6 @@ class MailServiceTest {
                 .isInstanceOf(ResponseStatusException.class)
                 .extracting(ex -> ((ResponseStatusException) ex).getReason())
                 .asString()
-                .contains("MAIL_ADMIN_EMAIL");
+                .contains("e-mail administrateur");
     }
 }

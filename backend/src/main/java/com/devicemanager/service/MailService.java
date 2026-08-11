@@ -57,7 +57,7 @@ public class MailService {
         String to = getAdminEmail();
         if (to == null || to.isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "Configurez MAIL_ADMIN_EMAIL (destinataire) avant le test");
+                    "Indiquez l'e-mail administrateur dans Paramètres avant d'envoyer un test.");
         }
         try {
             send(to, "DeviceManager — test SMTP", """
@@ -78,7 +78,7 @@ public class MailService {
         } catch (Exception ex) {
             log.error("Échec e-mail de test: {}", ex.getMessage(), ex);
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
-                    "Échec SMTP: " + rootMessage(ex));
+                    "Échec d'envoi de l'e-mail. Vérifiez la configuration messagerie dans Paramètres.");
         }
     }
 
@@ -131,22 +131,22 @@ public class MailService {
     private void validateSmtpConfig(String from, String to) {
         if (from == null || from.isBlank() || !from.contains("@")) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "MAIL_FROM invalide — utilisez une adresse e-mail réelle");
+                    "Adresse d'expéditeur invalide. Saisissez un e-mail valide dans Paramètres.");
         }
         if (to == null || to.isBlank() || !to.contains("@")) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "MAIL_ADMIN_EMAIL invalide");
+                    "E-mail administrateur invalide. Vérifiez le destinataire dans Paramètres.");
         }
         String host = appSettingsService.get(AppSettingsService.MAIL_HOST, "");
         if (host == null || host.isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "MAIL_HOST manquant (ex. smtp-relay.brevo.com ou smtp.gmail.com)");
+                    "Serveur de messagerie manquant. Renseignez l'hôte SMTP dans Paramètres.");
         }
         String username = appSettingsService.get(AppSettingsService.MAIL_USERNAME, "");
         String password = appSettingsService.get(AppSettingsService.MAIL_PASSWORD, "");
         if (username == null || username.isBlank() || password == null || password.isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "MAIL_USERNAME / MAIL_PASSWORD requis pour l'envoi SMTP");
+                    "Identifiants messagerie incomplets. Renseignez l'utilisateur et le mot de passe SMTP dans Paramètres.");
         }
     }
 
@@ -176,14 +176,5 @@ public class MailService {
             props.put("mail.smtp.starttls.required", "true");
         }
         return dynamic;
-    }
-
-    private static String rootMessage(Throwable ex) {
-        Throwable current = ex;
-        while (current.getCause() != null && current.getCause() != current) {
-            current = current.getCause();
-        }
-        String msg = current.getMessage();
-        return msg == null || msg.isBlank() ? ex.getClass().getSimpleName() : msg;
     }
 }

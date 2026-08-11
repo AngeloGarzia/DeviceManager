@@ -63,7 +63,8 @@ public class AtelierContextFilter extends OncePerRequestFilter {
                 if (raw != null && !raw.isBlank()) {
                     Long atelierId = Long.parseLong(raw.trim());
                     User user = userRepository.findByUsername(username)
-                            .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
+                            .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED,
+                                    "Authentification requise."));
                     Atelier atelier = atelierRepository.findByIdWithCasino(atelierId)
                             .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Atelier introuvable"));
                     if (user.getGroupe() == null
@@ -86,11 +87,12 @@ public class AtelierContextFilter extends OncePerRequestFilter {
         } catch (ResponseStatusException ex) {
             response.setStatus(ex.getStatusCode().value());
             response.setContentType("application/json");
-            response.getWriter().write("{\"message\":\"" + (ex.getReason() == null ? "Erreur atelier" : ex.getReason()) + "\"}");
+            String reason = ex.getReason() == null ? "Impossible d'accéder à cet atelier." : ex.getReason();
+            response.getWriter().write("{\"message\":\"" + reason.replace("\"", "\\\"") + "\"}");
         } catch (NumberFormatException ex) {
             response.setStatus(HttpStatus.BAD_REQUEST.value());
             response.setContentType("application/json");
-            response.getWriter().write("{\"message\":\"Identifiant atelier invalide\"}");
+            response.getWriter().write("{\"message\":\"Atelier sélectionné invalide. Resélectionnez un atelier.\"}");
         } finally {
             AtelierContext.clear();
         }

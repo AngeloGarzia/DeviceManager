@@ -31,6 +31,7 @@ import { AiService } from '../../services/ai.service';
 import { DeviceForm, DevicePhoto, Mas, Sfm } from '../../models/models';
 import { ConfirmDialogComponent } from '../../shared/confirm-dialog.component';
 import { ImageEditorDialogComponent } from '../../shared/image-editor-dialog.component';
+import { apiErrorMessage } from '../../shared/api-error';
 
 interface NewPhotoItem {
   file: File;
@@ -441,8 +442,7 @@ export class DeviceFormComponent implements OnInit, AfterViewInit, OnDestroy {
       error: (err) => {
         this.scanningLabel.set(false);
         this.error.set(
-          err?.error?.message ||
-            'Scan IA impossible. Vérifiez que l’IA est activée dans les paramètres et qu’une clé .env existe pour le fournisseur choisi.'
+          apiErrorMessage(err, 'Scan IA impossible. Vérifiez que l’assistant est activé dans Paramètres.')
         );
       }
     });
@@ -592,10 +592,9 @@ export class DeviceFormComponent implements OnInit, AfterViewInit, OnDestroy {
     this.saveDevice();
   }
 
-  /** L'utilisateur confirme l'enregistrement malgré le décalage de marques. */
+  /** L'utilisateur a pris connaissance de l'incompatibilité — corriger le choix SFM/MAS. */
   confirmMarqueMismatch(): void {
     this.marqueMismatchOpen.set(false);
-    this.saveDevice();
   }
 
   /** Ferme l'avertissement sans enregistrer. */
@@ -616,7 +615,7 @@ export class DeviceFormComponent implements OnInit, AfterViewInit, OnDestroy {
     return (
       `La marque de la MAS « ${mas?.numero || '—'} » (${masMarque}) ` +
       `ne fait pas partie des marques du SFM « ${sfm?.nom || '—'} » (${sfmMarques}). ` +
-      `Vous pouvez tout de même enregistrer la pièce détachée.`
+      `Corrigez le SFM ou la MAS avant d'enregistrer.`
     );
   }
 
@@ -670,7 +669,7 @@ export class DeviceFormComponent implements OnInit, AfterViewInit, OnDestroy {
       },
       error: (err) => {
         this.saving.set(false);
-        this.error.set(err?.error?.message || 'Enregistrement impossible.');
+        this.error.set(apiErrorMessage(err, 'Enregistrement impossible.'));
       }
     });
   }

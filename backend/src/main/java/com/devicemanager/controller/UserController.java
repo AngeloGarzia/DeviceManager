@@ -26,9 +26,9 @@ public class UserController {
     private final UserService userService;
 
     /**
-     * Liste tous les utilisateurs de l'application.
+     * Liste les utilisateurs du groupe de l'administrateur connecté.
      *
-     * @return comptes triés par nom d'utilisateur
+     * @return comptes du groupe, triés par nom d'utilisateur
      */
     @GetMapping
     public ResponseEntity<List<UserResponse>> list() {
@@ -36,11 +36,11 @@ public class UserController {
     }
 
     /**
-     * Retourne un utilisateur par identifiant.
+     * Retourne un utilisateur du groupe courant par identifiant.
      *
      * @param id identifiant du compte
      * @return profil utilisateur
-     * @throws org.springframework.web.server.ResponseStatusException {@code 404} si introuvable
+     * @throws org.springframework.web.server.ResponseStatusException {@code 404} si introuvable ou hors groupe
      */
     @GetMapping("/{id}")
     public ResponseEntity<UserResponse> get(@PathVariable Long id) {

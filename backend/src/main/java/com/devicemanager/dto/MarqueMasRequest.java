@@ -10,7 +10,7 @@ import lombok.Data;
 @Data
 public class MarqueMasRequest {
 
-    @NotBlank
-    @Size(max = 120)
+    @NotBlank(message = "Le nom de la marque est obligatoire")
+    @Size(max = 120, message = "Le nom de la marque ne doit pas dépasser 120 caractères")
     private String label;
 }

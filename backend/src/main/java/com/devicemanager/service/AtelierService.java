@@ -23,6 +23,7 @@ import com.devicemanager.repository.AtelierRepository;
 import com.devicemanager.repository.CasinoRepository;
 import com.devicemanager.repository.CommandeRepository;
 import com.devicemanager.repository.DeviceRepository;
+import com.devicemanager.repository.InterventionRepository;
 import com.devicemanager.repository.MasRepository;
 import com.devicemanager.repository.SfmRepository;
 import com.devicemanager.repository.UserRepository;
@@ -30,6 +31,7 @@ import com.devicemanager.security.Roles;
 import com.devicemanager.tenancy.AtelierContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.hibernate.Hibernate;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -62,6 +64,7 @@ public class AtelierService {
     private final MasRepository masRepository;
     private final SfmRepository sfmRepository;
     private final CommandeRepository commandeRepository;
+    private final InterventionRepository interventionRepository;
 
     /**
      * Liste les ateliers accessibles à un utilisateur selon son rôle et son groupe.
@@ -128,7 +131,8 @@ public class AtelierService {
     public CasinoSummary createCasino(String username, CasinoRequest request) {
         User user = requireUser(username);
         if (user.getGroupe() == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Groupe utilisateur manquant");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Votre compte n'est rattaché à aucun groupe. Contactez un administrateur.");
         }
         String nom = normalizeNom(request.getNom());
         Long groupeId = user.getGroupe().getId();
@@ -213,7 +217,7 @@ public class AtelierService {
     public Atelier requireCurrentAtelier() {
         Long id = AtelierContext.get();
         if (id == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Sélectionnez un atelier (en-tête X-Atelier-Id)");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Sélectionnez un atelier pour continuer.");
         }
         return atelierRepository.findByIdWithCasino(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Atelier introuvable"));
@@ -311,16 +315,24 @@ public class AtelierService {
         long masses = masRepository.countByAtelierId(id);
         long sfms = sfmRepository.countByAtelierId(id);
         long commandes = commandeRepository.countByAtelierId(id);
-        if (devices + masses + sfms + commandes > 0) {
+        long interventions = interventionRepository.countByAtelierId(id);
+        if (devices + masses + sfms + commandes + interventions > 0) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
-                    "Impossible de supprimer : des pièces, MAS, SFM ou demandes sont liées à cet atelier.");
+                    "Impossible de supprimer : des pièces, MAS, SFM, demandes ou bons d'intervention sont liés à cet atelier.");
         }
         String nom = atelier.getNom();
+
+        // UPDATE JPQL + clear du contexte : requireUser JOIN FETCH preferredAtelier laisse sinon
+        // une référence gérée vers l'atelier → TransientObjectException au flush delete.
         userRepository.clearPreferredAtelier(id);
-        if (atelier.getResponsables() != null) {
-            atelier.getResponsables().clear();
+
+        Atelier toDelete = atelierRepository.findByIdWithCasino(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Atelier introuvable"));
+        Hibernate.initialize(toDelete.getResponsables());
+        if (toDelete.getResponsables() != null) {
+            toDelete.getResponsables().clear();
         }
-        atelierRepository.delete(atelier);
+        atelierRepository.delete(toDelete);
         atelierRepository.flush();
         log.info("Suppression en base — Atelier id={} nom={} par={}", id, nom, username);
     }

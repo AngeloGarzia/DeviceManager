@@ -14,6 +14,7 @@ import { Device } from '../../models/models';
 import { DeviceService } from '../../services/device.service';
 import { AuthService } from '../../services/auth.service';
 import { ConfirmDialogComponent } from '../../shared/confirm-dialog.component';
+import { apiErrorMessage } from '../../shared/api-error';
 
 /**
  * Liste des pièces détachées de l'atelier courant.
@@ -120,7 +121,7 @@ export class DeviceListComponent implements OnInit {
         this.load();
       },
       error: (err) => {
-        this.error.set(err?.error?.message || 'Suppression impossible.');
+        this.error.set(apiErrorMessage(err, 'Suppression impossible.'));
         this.pendingDelete = null;
       }
     });

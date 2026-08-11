@@ -3,6 +3,7 @@ package com.devicemanager.service;
 import com.devicemanager.dto.UserRequest;
 import com.devicemanager.dto.UserResponse;
 import com.devicemanager.entity.Atelier;
+import com.devicemanager.entity.Groupe;
 import com.devicemanager.entity.User;
 import com.devicemanager.repository.UserRepository;
 import com.devicemanager.security.Roles;
@@ -17,13 +18,15 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 
 /**
  * Service de gestion des comptes utilisateurs DeviceManager.
  * <p>
  * Administration des administrateurs et techniciens d'un groupe casino ;
- * les créations héritent du groupe de l'atelier courant ({@code X-Atelier-Id}).
+ * toutes les opérations sont scopées au groupe de l'administrateur connecté.
+ * Les créations héritent du groupe de l'atelier courant ({@code X-Atelier-Id}).
  */
 @Service
 @RequiredArgsConstructor
@@ -38,28 +41,29 @@ public class UserService {
     private final AtelierService atelierService;
 
     /**
-     * Liste tous les utilisateurs triés par nom d'utilisateur.
+     * Liste les utilisateurs du groupe de l'administrateur connecté.
      *
-     * @return comptes avec rôle et atelier préféré
+     * @return comptes du groupe, triés par nom d'utilisateur
      */
     @Transactional(readOnly = true)
     public List<UserResponse> findAll() {
-        return userRepository.findAll().stream()
+        Long groupeId = requireActorGroupeId();
+        return userRepository.findAllByGroupeId(groupeId).stream()
                 .sorted((a, b) -> a.getUsername().compareToIgnoreCase(b.getUsername()))
                 .map(this::toResponse)
                 .toList();
     }
 
     /**
-     * Retourne un utilisateur par identifiant.
+     * Retourne un utilisateur du groupe courant par identifiant.
      *
      * @param id identifiant du compte
      * @return profil utilisateur
-     * @throws org.springframework.web.server.ResponseStatusException {@code 404} si introuvable
+     * @throws org.springframework.web.server.ResponseStatusException {@code 404} si introuvable ou hors groupe
      */
     @Transactional(readOnly = true)
     public UserResponse findById(Long id) {
-        return toResponse(get(id));
+        return toResponse(getInActorGroupe(id));
     }
 
     /**
@@ -84,6 +88,8 @@ public class UserService {
         }
         String role = normalizeRole(request.getRole());
         User actor = requireActor();
+        Groupe groupe = atelierService.requireCurrentAtelier().getCasino().getGroupe();
+        ensureActorOwnsGroupe(actor, groupe.getId());
         Atelier preferred = resolvePreferredAtelier(actor, role, request.getPreferredAtelierId());
         User saved = userRepository.save(User.builder()
                 .username(username)
@@ -92,31 +98,33 @@ public class UserService {
                 .email(email)
                 .password(passwordEncoder.encode(request.getPassword()))
                 .role(role)
-                .groupe(atelierService.requireCurrentAtelier().getCasino().getGroupe())
+                .groupe(groupe)
                 .preferredAtelier(preferred)
                 .build());
-        log.info("Création en base — Utilisateur id={} username={} {} {} <{}> rôle={} atelierPréféré={}",
+        log.info("Création en base — Utilisateur id={} username={} {} {} <{}> rôle={} atelierPréféré={} groupe={}",
                 saved.getId(),
                 saved.getUsername(),
                 saved.getPrenom(),
                 saved.getNom(),
                 saved.getEmail(),
                 saved.getRole(),
-                preferred != null ? preferred.getId() : null);
+                preferred != null ? preferred.getId() : null,
+                groupe.getId());
         return toResponse(saved);
     }
 
     /**
-     * Met à jour un utilisateur existant.
+     * Met à jour un utilisateur du groupe de l'administrateur connecté.
      *
      * @param id identifiant du compte
      * @param request données mises à jour (mot de passe optionnel)
      * @return compte modifié
      * @throws org.springframework.web.server.ResponseStatusException {@code 400} si dernier admin retiré ;
-     *         {@code 409} en cas de conflit identifiant/e-mail
+     *         {@code 409} en cas de conflit identifiant/e-mail ;
+     *         {@code 404} si hors groupe
      */
     public UserResponse update(Long id, UserRequest request) {
-        User user = get(id);
+        User user = getInActorGroupe(id);
         String username = request.getUsername().trim();
         String email = requireEmail(request.getEmail());
         if (!user.getUsername().equals(username) && userRepository.existsByUsername(username)) {
@@ -127,7 +135,8 @@ public class UserService {
         }
 
         String newRole = normalizeRole(request.getRole());
-        if (Roles.ADMIN.equals(user.getRole()) && !Roles.ADMIN.equals(newRole) && countAdmins() <= 1) {
+        Long groupeId = requireGroupeId(user);
+        if (Roles.ADMIN.equals(user.getRole()) && !Roles.ADMIN.equals(newRole) && countAdminsInGroupe(groupeId) <= 1) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Impossible de retirer le dernier administrateur");
         }
 
@@ -156,34 +165,68 @@ public class UserService {
     }
 
     /**
-     * Supprime un utilisateur (interdit sur soi-même et sur le dernier administrateur).
+     * Supprime un utilisateur du groupe (interdit sur soi-même et sur le dernier administrateur du groupe).
      *
      * @param id identifiant du compte
      * @param currentUsername utilisateur connecté
-     * @throws org.springframework.web.server.ResponseStatusException {@code 400} si auto-suppression ou dernier admin
+     * @throws org.springframework.web.server.ResponseStatusException {@code 400} si auto-suppression ou dernier admin ;
+     *         {@code 404} si hors groupe
      */
     public void delete(Long id, String currentUsername) {
-        User user = get(id);
+        User user = getInActorGroupe(id);
         if (user.getUsername().equals(currentUsername)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Vous ne pouvez pas supprimer votre propre compte");
         }
-        if (Roles.ADMIN.equals(user.getRole()) && countAdmins() <= 1) {
+        Long groupeId = requireGroupeId(user);
+        if (Roles.ADMIN.equals(user.getRole()) && countAdminsInGroupe(groupeId) <= 1) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Impossible de supprimer le dernier administrateur");
         }
         String username = user.getUsername();
         String role = user.getRole();
         userRepository.delete(user);
-        log.info("Suppression en base — Utilisateur id={} username={} rôle={} par={}",
-                id, username, role, currentUsername);
+        log.info("Suppression en base — Utilisateur id={} username={} rôle={} par={} groupe={}",
+                id, username, role, currentUsername, groupeId);
     }
 
     private User requireActor() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth == null || auth.getName() == null || auth.getName().isBlank()) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authentification requise.");
         }
         return userRepository.findByUsername(auth.getName())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authentification requise."));
+    }
+
+    private Long requireActorGroupeId() {
+        return requireGroupeId(requireActor());
+    }
+
+    private Long requireGroupeId(User user) {
+        if (user.getGroupe() == null || user.getGroupe().getId() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Votre compte n'est rattaché à aucun groupe. Contactez un administrateur.");
+        }
+        return user.getGroupe().getId();
+    }
+
+    private void ensureActorOwnsGroupe(User actor, Long groupeId) {
+        Long actorGroupeId = requireGroupeId(actor);
+        if (!Objects.equals(actorGroupeId, groupeId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Groupe non autorisé pour ce compte");
+        }
+    }
+
+    private User getInActorGroupe(Long id) {
+        User actor = requireActor();
+        Long actorGroupeId = requireGroupeId(actor);
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Utilisateur introuvable"));
+        Long targetGroupeId = user.getGroupe() != null ? user.getGroupe().getId() : null;
+        if (!Objects.equals(actorGroupeId, targetGroupeId)) {
+            // 404 volontaire : ne pas révéler l'existence d'un compte hors groupe.
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Utilisateur introuvable");
+        }
+        return user;
     }
 
     private Atelier resolvePreferredAtelier(User actor, String role, Long preferredAtelierId) {
@@ -200,8 +243,8 @@ public class UserService {
         return atelierService.requireAtelierForUserGroupe(actor, preferredAtelierId);
     }
 
-    private long countAdmins() {
-        return userRepository.findAll().stream()
+    private long countAdminsInGroupe(Long groupeId) {
+        return userRepository.findAllByGroupeId(groupeId).stream()
                 .filter(u -> Roles.ADMIN.equals(u.getRole()))
                 .count();
     }
@@ -226,14 +269,10 @@ public class UserService {
             normalized = Roles.TECHNICIEN;
         }
         if (!ALLOWED_ROLES.contains(normalized)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Rôle invalide (ADMIN ou TECHNICIEN)");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Rôle invalide. Choisissez Administrateur ou Technicien.");
         }
         return normalized;
-    }
-
-    private User get(Long id) {
-        return userRepository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Utilisateur introuvable"));
     }
 
     private UserResponse toResponse(User user) {

@@ -60,7 +60,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
      * @param atelierId identifiant de l'atelier supprimé
      * @return nombre d'utilisateurs mis à jour
      */
-    @Modifying
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("UPDATE User u SET u.preferredAtelier = NULL WHERE u.preferredAtelier.id = :atelierId")
     int clearPreferredAtelier(@Param("atelierId") Long atelierId);
 

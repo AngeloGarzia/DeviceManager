@@ -13,6 +13,7 @@ import { Sfm } from '../../models/models';
 import { SfmService } from '../../services/sfm.service';
 import { AuthService } from '../../services/auth.service';
 import { ConfirmDialogComponent } from '../../shared/confirm-dialog.component';
+import { apiErrorMessage } from '../../shared/api-error';
 
 /**
  * Liste des SFM (fournisseurs de pièces) de l'atelier.
@@ -73,7 +74,7 @@ export class SfmListComponent implements OnInit {
     this.confirmOpen.set(false);
     this.sfmService.delete(id).subscribe({
       next: () => { this.pendingDelete = null; this.load(); },
-      error: (err) => { this.error.set(err?.error?.message || 'Suppression impossible.'); this.pendingDelete = null; }
+      error: (err) => { this.error.set(apiErrorMessage(err, 'Suppression impossible.')); this.pendingDelete = null; }
     });
   }
 }

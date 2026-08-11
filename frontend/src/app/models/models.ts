@@ -252,6 +252,50 @@ export interface OrderRequest {
   lignes?: OrderRequestLine[];
 }
 
+export interface InterventionLineForm {
+  deviceId: number;
+  quantite: number;
+}
+
+export interface InterventionForm {
+  dateIntervention: string;
+  emplacement?: string | null;
+  machineMas?: string | null;
+  motif: string;
+  diagnostic?: string | null;
+  travaux: string;
+  observations?: string | null;
+  lignes: InterventionLineForm[];
+}
+
+export interface InterventionLine {
+  id?: number;
+  deviceId: number;
+  pieceNom?: string;
+  pieceReference?: string | null;
+  quantite: number;
+  stockAvant?: number;
+  stockApres?: number;
+  photoUrl?: string;
+}
+
+export interface Intervention {
+  id: number;
+  numero: string;
+  dateIntervention: string;
+  technicienNom: string;
+  emplacement?: string | null;
+  machineMas?: string | null;
+  motif: string;
+  diagnostic?: string | null;
+  travaux: string;
+  observations?: string | null;
+  createdAt: string;
+  totalPieces?: number;
+  totalQuantite?: number;
+  lignes?: InterventionLine[];
+}
+
 export interface AppUser {
   id: number;
   username: string;

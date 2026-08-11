@@ -19,12 +19,12 @@ import java.util.List;
 @Data
 public class AtelierRequest {
 
-    @NotBlank
-    @Size(max = 160)
+    @NotBlank(message = "Le nom de l'atelier est obligatoire")
+    @Size(max = 160, message = "Le nom de l'atelier ne doit pas dépasser 160 caractères")
     private String nom;
 
     /** Identifiant du casino parent. */
-    @NotNull
+    @NotNull(message = "Le casino est obligatoire")
     private Long casinoId;
 
     @Valid

@@ -12,6 +12,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { AppUserForm, AtelierSummary } from '../../models/models';
 import { UserService } from '../../services/user.service';
 import { AtelierService } from '../../services/atelier.service';
+import { apiErrorMessage } from '../../shared/api-error';
 
 /**
  * Formulaire de création ou modification d'un compte utilisateur.
@@ -140,7 +141,7 @@ export class UserFormComponent implements OnInit {
       next: () => this.router.navigate(['/users']),
       error: (err) => {
         this.saving.set(false);
-        this.error.set(err?.error?.message || 'Enregistrement impossible.');
+        this.error.set(apiErrorMessage(err, 'Enregistrement impossible.'));
       }
     });
   }

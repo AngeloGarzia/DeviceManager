@@ -8,6 +8,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatCardModule } from '@angular/material/card';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { AiService } from '../../services/ai.service';
+import { apiErrorMessage } from '../../shared/api-error';
 
 interface ChatTurn {
   role: 'user' | 'assistant';
@@ -92,7 +93,7 @@ export class AiAssistantComponent implements OnInit {
       },
       error: (err) => {
         this.sending.set(false);
-        this.error.set(err?.error?.message || 'Échec de la réponse IA.');
+        this.error.set(apiErrorMessage(err, 'Échec de la réponse IA.'));
       }
     });
   }

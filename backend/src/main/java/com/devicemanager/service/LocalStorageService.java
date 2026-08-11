@@ -76,7 +76,7 @@ public class LocalStorageService implements StorageService {
             }
         }
         throw new IllegalStateException(
-                "Aucun dossier d'uploads accessible en écriture (vérifier droits Docker / APP_S3_LOCAL_FALLBACK_DIR)",
+                "Stockage des photos indisponible. Contactez un administrateur.",
                 last);
     }
 
@@ -98,7 +98,7 @@ public class LocalStorageService implements StorageService {
             log.info("Upload stocké: key={} bytes={} (disque + MySQL)", filename, bytes.length);
             return new StoredObject(filename, "/uploads/" + filename, file.getContentType(), (long) bytes.length);
         } catch (IOException e) {
-            throw new IllegalStateException("Échec stockage local", e);
+            throw new IllegalStateException("Échec d'enregistrement de la photo. Réessayez.", e);
         }
     }
 
@@ -116,7 +116,7 @@ public class LocalStorageService implements StorageService {
         try {
             Files.deleteIfExists(root.resolve(key));
         } catch (IOException e) {
-            throw new IllegalStateException("Échec suppression locale", e);
+            throw new IllegalStateException("Impossible de supprimer la photo.", e);
         }
         jdbcTemplate.update("DELETE FROM upload_blob WHERE object_key = ?", key);
     }

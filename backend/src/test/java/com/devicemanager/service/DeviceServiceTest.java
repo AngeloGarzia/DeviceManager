@@ -115,7 +115,7 @@ class DeviceServiceTest {
         assertThatThrownBy(() -> deviceService.create(request(), List.of()))
                 .isInstanceOf(ResponseStatusException.class)
                 .extracting(ex -> ((ResponseStatusException) ex).getReason())
-                .isEqualTo("Ajoutez au moins une image");
+                .isEqualTo("Ajoutez au moins une photo de la pièce");
     }
 
     @Test
@@ -129,7 +129,7 @@ class DeviceServiceTest {
         assertThatThrownBy(() -> deviceService.create(request(), List.of(photo, p2, p3, p4, p5, p6)))
                 .isInstanceOf(ResponseStatusException.class)
                 .extracting(ex -> ((ResponseStatusException) ex).getReason())
-                .isEqualTo("Maximum 5 images par pièce détachée");
+                .isEqualTo("Maximum 5 photos par pièce détachée");
     }
 
     @Test
@@ -139,7 +139,7 @@ class DeviceServiceTest {
         assertThatThrownBy(() -> deviceService.create(request(), List.of(bad)))
                 .isInstanceOf(ResponseStatusException.class)
                 .extracting(ex -> ((ResponseStatusException) ex).getReason())
-                .isEqualTo("Le fichier doit être une image");
+                .isEqualTo("Le fichier doit être une photo (JPEG, PNG…)");
     }
 
     @Test

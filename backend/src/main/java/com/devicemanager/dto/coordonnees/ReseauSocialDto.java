@@ -13,6 +13,6 @@ public class ReseauSocialDto {
     private Long id;
     private TypeReseauSocial type;
 
-    @Size(max = 255)
+    @Size(max = 255, message = "L'URL du réseau social ne doit pas dépasser 255 caractères")
     private String url;
 }

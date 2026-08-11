@@ -8,6 +8,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatButtonModule } from '@angular/material/button';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { AuthService } from '../../services/auth.service';
+import { apiErrorMessage } from '../../shared/api-error';
 
 /**
  * Changement de mot de passe obligatoire (comptes démo / premier login).
@@ -59,7 +60,7 @@ export class ChangePasswordComponent {
       },
       error: (err) => {
         this.loading.set(false);
-        this.error.set(err?.error?.message || 'Impossible de changer le mot de passe.');
+        this.error.set(apiErrorMessage(err, 'Impossible de changer le mot de passe.'));
       }
     });
   }

@@ -104,7 +104,7 @@ class OrderRequestServiceTest {
         assertThatThrownBy(() -> orderRequestService.create(request, "tech"))
                 .isInstanceOf(ResponseStatusException.class)
                 .extracting(ex -> ((ResponseStatusException) ex).getReason())
-                .isEqualTo("Pièce détachée introuvable: 999");
+                .isEqualTo("Pièce détachée introuvable dans cet atelier.");
     }
 
     @Test
@@ -203,7 +203,7 @@ class OrderRequestServiceTest {
         assertThatThrownBy(() -> orderRequestService.delete(999L, "admin"))
                 .isInstanceOf(ResponseStatusException.class)
                 .extracting(ex -> ((ResponseStatusException) ex).getReason())
-                .isEqualTo("Demande introuvable");
+                .isEqualTo("Demande de commande introuvable");
     }
 
     @Test
@@ -257,14 +257,19 @@ class OrderRequestServiceTest {
         commande.addLigne(CommandeLigne.builder().id(1L).device(device).quantite(4).build());
 
         when(commandeRepository.findByIdWithRelations(81L, 100L)).thenReturn(Optional.of(commande));
+        when(commandeRepository.claimStatus(81L, 100L, OrderStatuses.VALIDATED, OrderStatuses.RECEIVED))
+                .thenAnswer(inv -> {
+                    commande.setStatus(OrderStatuses.RECEIVED);
+                    return 1;
+                });
         when(deviceRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-        when(commandeRepository.save(any(Commande.class))).thenAnswer(inv -> inv.getArgument(0));
 
         OrderRequestResponse response = orderRequestService.receive(81L, null, "admin");
 
         assertThat(response.getStatus()).isEqualTo(OrderStatuses.RECEIVED);
         assertThat(device.getStock()).isEqualTo(6);
         verify(deviceRepository).save(device);
+        verify(commandeRepository).claimStatus(81L, 100L, OrderStatuses.VALIDATED, OrderStatuses.RECEIVED);
     }
 
     @Test

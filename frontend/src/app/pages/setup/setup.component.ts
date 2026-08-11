@@ -18,7 +18,7 @@ import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatSelectModule } from '@angular/material/select';
 import { MatIconModule } from '@angular/material/icon';
 import { MatCheckboxModule } from '@angular/material/checkbox';
-import { forkJoin } from 'rxjs';
+import { forkJoin, Subscription } from 'rxjs';
 import {
   AppSetting,
   AtelierRequest,
@@ -35,6 +35,7 @@ import { AiModelOption, AiService } from '../../services/ai.service';
 import { AdminLogEntry, AdminLogService } from '../../services/admin-log.service';
 import { AppTourService } from '../../services/app-tour.service';
 import { ConfirmDialogComponent } from '../../shared/confirm-dialog.component';
+import { apiErrorMessage } from '../../shared/api-error';
 
 /**
  * Page d'administration initiale et des paramètres applicatifs.
@@ -203,6 +204,7 @@ export class SetupComponent implements OnInit {
   readonly aiModelsLoading = signal(false);
   readonly aiModelsMessage = signal<string | null>(null);
   readonly aiModelFilter = signal('');
+  private aiProviderSub: Subscription | null = null;
 
   readonly aiModelsForProvider = computed(() => {
     const q = this.aiModelFilter().trim().toLowerCase();
@@ -304,7 +306,7 @@ export class SetupComponent implements OnInit {
           this.logsLoading.set(false);
         },
         error: (err) => {
-          this.logsError.set(err?.error?.message || 'Impossible de charger les logs.');
+          this.logsError.set(apiErrorMessage(err, 'Impossible de charger les logs.'));
           this.logsLoading.set(false);
         }
       });
@@ -318,7 +320,7 @@ export class SetupComponent implements OnInit {
     this.confirmClearLogs.set(false);
     this.adminLogService.clear().subscribe({
       next: () => this.reloadLogs(),
-      error: (err) => this.logsError.set(err?.error?.message || 'Échec du vidage des logs.')
+      error: (err) => this.logsError.set(apiErrorMessage(err, 'Échec du vidage des logs.'))
     });
   }
 
@@ -351,12 +353,13 @@ export class SetupComponent implements OnInit {
         this.form = this.fb.group(group);
         const provider = (group['AI_PROVIDER']?.value || 'openai').toString();
         this.selectedAiProvider.set(provider);
-        this.form.get('AI_PROVIDER')?.valueChanges.subscribe((value) => {
+        this.aiProviderSub?.unsubscribe();
+        this.aiProviderSub = this.form.get('AI_PROVIDER')?.valueChanges.subscribe((value) => {
           const next = (value || 'openai').toString();
           this.selectedAiProvider.set(next);
           this.aiModelFilter.set('');
           this.loadOnlineAiModels(next, true);
-        });
+        }) ?? null;
         // Attendre le statut des clés si pas encore prêt, sinon charger tout de suite.
         if (this.aiService.statusLoaded()) {
           this.loadOnlineAiModels(provider, false);
@@ -365,7 +368,7 @@ export class SetupComponent implements OnInit {
       },
       error: (err) => {
         this.loading.set(false);
-        this.error.set(err?.error?.message || 'Chargement du setup impossible.');
+        this.error.set(apiErrorMessage(err, 'Chargement des paramètres impossible.'));
       }
     });
   }
@@ -394,7 +397,7 @@ export class SetupComponent implements OnInit {
       },
       error: (err) => {
         this.ateliersLoading.set(false);
-        this.atelierError.set(err?.error?.message || 'Chargement casino / atelier impossible.');
+        this.atelierError.set(apiErrorMessage(err, 'Chargement casino / atelier impossible.'));
       }
     });
   }
@@ -463,7 +466,7 @@ export class SetupComponent implements OnInit {
       },
       error: (err) => {
         this.casinoSaving.set(false);
-        this.casinoError.set(err?.error?.message || 'Enregistrement du casino impossible.');
+        this.casinoError.set(apiErrorMessage(err, 'Enregistrement du casino impossible.'));
       }
     });
   }
@@ -499,7 +502,7 @@ export class SetupComponent implements OnInit {
       },
       error: (err) => {
         this.casinoSaving.set(false);
-        this.casinoError.set(err?.error?.message || 'Suppression du casino impossible.');
+        this.casinoError.set(apiErrorMessage(err, 'Suppression du casino impossible.'));
       }
     });
   }
@@ -607,7 +610,7 @@ export class SetupComponent implements OnInit {
         this.onlineAiModels.set([]);
         this.aiModelsLoading.set(false);
         modelCtrl?.enable({ emitEvent: false });
-        this.aiModelsMessage.set(err?.error?.message || 'Impossible de charger les modèles en ligne.');
+        this.aiModelsMessage.set(apiErrorMessage(err, 'Impossible de charger les modèles en ligne.'));
       }
     });
   }
@@ -793,7 +796,7 @@ export class SetupComponent implements OnInit {
       },
       error: (err) => {
         this.atelierSaving.set(false);
-        this.atelierError.set(err?.error?.message || 'Enregistrement de l’atelier impossible.');
+        this.atelierError.set(apiErrorMessage(err, 'Enregistrement de l’atelier impossible.'));
       }
     });
   }
@@ -828,7 +831,7 @@ export class SetupComponent implements OnInit {
       },
       error: (err) => {
         this.atelierSaving.set(false);
-        this.atelierError.set(err?.error?.message || 'Suppression impossible.');
+        this.atelierError.set(apiErrorMessage(err, 'Suppression impossible.'));
       }
     });
   }
@@ -859,7 +862,7 @@ export class SetupComponent implements OnInit {
       },
       error: (err) => {
         this.saving.set(false);
-        this.error.set(err?.error?.message || 'Enregistrement impossible.');
+        this.error.set(apiErrorMessage(err, 'Enregistrement impossible.'));
       }
     });
   }
@@ -884,13 +887,13 @@ export class SetupComponent implements OnInit {
           },
           error: (err) => {
             this.testingMail.set(false);
-            this.error.set(err?.error?.message || 'Échec de l\'envoi de test.');
+            this.error.set(apiErrorMessage(err, 'Échec de l\'envoi de test.'));
           }
         });
       },
       error: (err) => {
         this.testingMail.set(false);
-        this.error.set(err?.error?.message || 'Enregistrement impossible avant le test.');
+        this.error.set(apiErrorMessage(err, 'Enregistrement impossible avant le test.'));
       }
     });
   }

@@ -16,25 +16,25 @@ import java.util.List;
 @Data
 public class DeviceRequest {
 
-    @NotBlank
-    @Size(max = 120)
+    @NotBlank(message = "Le nom de la pièce est obligatoire")
+    @Size(max = 120, message = "Le nom de la pièce ne doit pas dépasser 120 caractères")
     private String nom;
 
-    @Size(max = 80)
+    @Size(max = 80, message = "La référence ne doit pas dépasser 80 caractères")
     private String reference;
 
-    @NotBlank
-    @Size(max = 500)
+    @NotBlank(message = "L'usage de la pièce est obligatoire")
+    @Size(max = 500, message = "L'usage ne doit pas dépasser 500 caractères")
     private String usage;
 
-    @NotNull
+    @NotNull(message = "La date d'acquisition est obligatoire")
     private LocalDate dateAcquisition;
 
-    @NotNull
+    @NotNull(message = "Indiquez si la pièce est obsolète")
     private Boolean obsolete;
 
     /** Quantité en stock (≥ 0). Défaut 0 si absent. */
-    @Min(0)
+    @Min(value = 0, message = "Le stock ne peut pas être négatif")
     private Integer stock;
 
     /** Identifiant SFM associé (optionnel). */

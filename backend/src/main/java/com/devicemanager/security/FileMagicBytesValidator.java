@@ -4,7 +4,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
 /**
- * Validation des magic bytes des formats image acceptés (JPEG, PNG, GIF, WEBP).
+ * Contrôle basique du contenu binaire d'une image (magic bytes).
  */
 public final class FileMagicBytesValidator {
 
@@ -12,37 +12,36 @@ public final class FileMagicBytesValidator {
     }
 
     /**
-     * Vérifie que les octets correspondent à un format image supporté.
+     * Vérifie que les octets correspondent à un format image supporté (JPEG, PNG, GIF, WebP).
      *
-     * @param data contenu du fichier (au moins les premiers octets)
-     * @throws ResponseStatusException {@code 400} si le format n'est pas reconnu
+     * @param data contenu du fichier
      */
     public static void validateImageMagicBytes(byte[] data) {
         if (data == null || data.length < 12) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Image illisible ou format non supporté");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Photo illisible ou format non pris en charge");
         }
         if (isJpeg(data) || isPng(data) || isGif(data) || isWebp(data)) {
             return;
         }
-        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Image illisible ou format non supporté");
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                "Photo illisible ou format non pris en charge");
     }
 
-    private static boolean isJpeg(byte[] data) {
-        return data[0] == (byte) 0xFF && data[1] == (byte) 0xD8 && data[2] == (byte) 0xFF;
+    private static boolean isJpeg(byte[] d) {
+        return d[0] == (byte) 0xFF && d[1] == (byte) 0xD8 && d[2] == (byte) 0xFF;
     }
 
-    private static boolean isPng(byte[] data) {
-        return data[0] == (byte) 0x89 && data[1] == 0x50 && data[2] == 0x4E && data[3] == 0x47
-                && data[4] == 0x0D && data[5] == 0x0A && data[6] == 0x1A && data[7] == 0x0A;
+    private static boolean isPng(byte[] d) {
+        return d[0] == (byte) 0x89 && d[1] == 0x50 && d[2] == 0x4E && d[3] == 0x47;
     }
 
-    private static boolean isGif(byte[] data) {
-        return data[0] == 'G' && data[1] == 'I' && data[2] == 'F'
-                && data[3] == '8' && (data[4] == '7' || data[4] == '9') && data[5] == 'a';
+    private static boolean isGif(byte[] d) {
+        return d[0] == 'G' && d[1] == 'I' && d[2] == 'F';
     }
 
-    private static boolean isWebp(byte[] data) {
-        return data[0] == 'R' && data[1] == 'I' && data[2] == 'F' && data[3] == 'F'
-                && data[8] == 'W' && data[9] == 'E' && data[10] == 'B' && data[11] == 'P';
+    private static boolean isWebp(byte[] d) {
+        return d[0] == 'R' && d[1] == 'I' && d[2] == 'F' && d[3] == 'F'
+                && d[8] == 'W' && d[9] == 'E' && d[10] == 'B' && d[11] == 'P';
     }
 }

@@ -13,6 +13,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { SfmService } from '../../services/sfm.service';
 import { MasService } from '../../services/mas.service';
 import { MarqueMasOption, SfmContact, SfmForm, SfmTechnicien } from '../../models/models';
+import { apiErrorMessage } from '../../shared/api-error';
 
 /**
  * Formulaire de création ou modification d'un SFM (fournisseur de pièces).
@@ -180,7 +181,7 @@ export class SfmFormComponent implements OnInit {
       },
       error: (err) => {
         this.savingMarque.set(false);
-        this.marqueError.set(err?.error?.message || 'Création de la marque impossible.');
+        this.marqueError.set(apiErrorMessage(err, 'Création de la marque impossible.'));
       }
     });
   }
@@ -318,7 +319,7 @@ export class SfmFormComponent implements OnInit {
       },
       error: (err) => {
         this.saving.set(false);
-        this.error.set(err?.error?.message || 'Enregistrement impossible.');
+        this.error.set(apiErrorMessage(err, 'Enregistrement impossible.'));
       }
     });
   }

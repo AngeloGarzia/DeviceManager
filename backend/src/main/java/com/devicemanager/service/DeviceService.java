@@ -332,25 +332,25 @@ public class DeviceService {
 
     private void ensurePhotoCount(int count, boolean requireAtLeastOne) {
         if (requireAtLeastOne && count < 1) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Ajoutez au moins une image");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Ajoutez au moins une photo de la pièce");
         }
         if (count > MAX_PHOTOS) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "Maximum " + MAX_PHOTOS + " images par pièce détachée");
+                    "Maximum " + MAX_PHOTOS + " photos par pièce détachée");
         }
     }
 
     private void validateImageFile(MultipartFile photo) {
         String contentType = photo.getContentType();
         if (contentType == null || !contentType.startsWith("image/")) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Le fichier doit être une image");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Le fichier doit être une photo (JPEG, PNG…)");
         }
     }
 
     private Device getEntity(Long id) {
         Long atelierId = atelierService.requireCurrentAtelier().getId();
         Device entity = deviceRepository.findByIdWithRelations(id, atelierId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Device introuvable"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Pièce détachée introuvable"));
         Hibernate.initialize(entity.getPhotos());
         return entity;
     }
