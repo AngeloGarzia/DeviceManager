@@ -40,6 +40,14 @@ public class Commande {
     @Column(name = "date_demande", nullable = false)
     private LocalDateTime dateDemande;
 
+    /** Horodatage de la validation admin (null pour l'historique ancien). */
+    @Column(name = "date_validation")
+    private LocalDateTime dateValidation;
+
+    /** Horodatage de la réception physique (null pour l'historique ancien). */
+    @Column(name = "date_reception")
+    private LocalDateTime dateReception;
+
     /** Statut du cycle de vie (ex. {@code PENDING}, {@code VALIDATED}, {@code RECEIVED}). */
     @Column(nullable = false, length = 30)
     private String status;

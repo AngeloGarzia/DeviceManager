@@ -4,6 +4,7 @@ import com.devicemanager.dto.DeviceRequest;
 import com.devicemanager.dto.DeviceResponse;
 import com.devicemanager.entity.Device;
 import com.devicemanager.repository.DeviceRepository;
+import com.devicemanager.repository.UserRepository;
 import com.devicemanager.support.TestFixtures;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -25,6 +26,9 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -38,6 +42,8 @@ class DeviceServiceTest {
     @Mock private StorageService storageService;
     @Mock private ImageOptimizationService imageOptimizationService;
     @Mock private AtelierService atelierService;
+    @Mock private StockMouvementService stockMouvementService;
+    @Mock private UserRepository userRepository;
     @InjectMocks private DeviceService deviceService;
 
     private MockMultipartFile photo;
@@ -246,5 +252,40 @@ class DeviceServiceTest {
                 .isInstanceOf(ResponseStatusException.class)
                 .satisfies(ex -> assertThat(((ResponseStatusException) ex).getStatusCode())
                         .isEqualTo(HttpStatus.NOT_FOUND));
+    }
+
+    @Test
+    void updateStock_recordsManualMouvementWhenChanged() {
+        Device device = TestFixtures.device();
+        device.setStock(4);
+        when(deviceRepository.findByIdWithRelations(40L, 100L)).thenReturn(Optional.of(device));
+        when(deviceRepository.save(any(Device.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(userRepository.findByUsername("admin")).thenReturn(Optional.of(TestFixtures.user("admin", "ADMIN")));
+        when(stockMouvementService.record(any(), any(), anyInt(), anyInt(), anyString(), any(), anyString()))
+                .thenAnswer(inv -> null);
+
+        DeviceResponse response = deviceService.updateStock(40L, 7, "admin");
+
+        assertThat(response.getStock()).isEqualTo(7);
+        verify(stockMouvementService).record(
+                any(),
+                eq(device),
+                eq(4),
+                eq(7),
+                eq("MANUAL"),
+                eq(40L),
+                anyString());
+    }
+
+    @Test
+    void updateStock_skipsMouvementWhenUnchanged() {
+        Device device = TestFixtures.device();
+        device.setStock(4);
+        when(deviceRepository.findByIdWithRelations(40L, 100L)).thenReturn(Optional.of(device));
+        when(deviceRepository.save(any(Device.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        deviceService.updateStock(40L, 4, "admin");
+
+        verify(stockMouvementService, never()).record(any(), any(), anyInt(), anyInt(), anyString(), any(), anyString());
     }
 }

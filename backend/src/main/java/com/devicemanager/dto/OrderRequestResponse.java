@@ -19,6 +19,10 @@ public class OrderRequestResponse {
     /** Statut du cycle de vie (ex. {@code PENDING}, {@code VALIDATED}). */
     private String status;
     private LocalDateTime dateDemande;
+    /** Horodatage de la validation admin (null si historique ancien). */
+    private LocalDateTime dateValidation;
+    /** Horodatage de la réception (null si historique ancien). */
+    private LocalDateTime dateReception;
     /** Alias de {@link #dateDemande} pour compatibilité front. */
     private LocalDateTime createdAt;
     private Integer totalPieces;

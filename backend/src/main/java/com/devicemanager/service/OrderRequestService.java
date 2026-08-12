@@ -16,6 +16,7 @@ import com.devicemanager.repository.DeviceRepository;
 import com.devicemanager.repository.UserRepository;
 import com.devicemanager.security.OrderStatuses;
 import com.devicemanager.security.Roles;
+import com.devicemanager.security.StockMouvementSources;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.hibernate.Hibernate;
@@ -51,6 +52,7 @@ public class OrderRequestService {
     private final UserRepository userRepository;
     private final MailService mailService;
     private final AtelierService atelierService;
+    private final StockMouvementService stockMouvementService;
 
     /**
      * Crée une demande {@code PENDING} et notifie l'administrateur par e-mail.
@@ -169,6 +171,7 @@ public class OrderRequestService {
         }
 
         commande.setStatus(OrderStatuses.VALIDATED);
+        commande.setDateValidation(LocalDateTime.now());
         Commande saved = commandeRepository.save(commande);
         log.info("Modification en base — Demande commande id={} validée par={} emailsSfm={}",
                 id, adminUsername, mailsSent);
@@ -253,16 +256,36 @@ public class OrderRequestService {
         Commande toStock = commandeRepository.findByIdWithRelations(id, atelierId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
                         "Demande de commande introuvable"));
+        LocalDateTime dateReception = LocalDateTime.now();
+        toStock.setDateReception(dateReception);
+        String acteurNom = userRepository.findByUsername(adminUsername)
+                .map(OrderRequestService::displayUserName)
+                .orElse(adminUsername);
+        Atelier atelier = toStock.getAtelier();
         for (CommandeLigne ligne : toStock.getLignes()) {
             Device device = ligne.getDevice();
             if (device == null) {
                 continue;
             }
             int qty = ligne.getQuantite() == null ? 0 : Math.max(0, ligne.getQuantite());
-            device.setStock(Math.max(0, device.getStock()) + qty);
+            if (qty == 0) {
+                continue;
+            }
+            int stockAvant = Math.max(0, device.getStock());
+            int stockApres = stockAvant + qty;
+            device.setStock(stockApres);
             deviceRepository.save(device);
+            stockMouvementService.record(
+                    atelier,
+                    device,
+                    stockAvant,
+                    stockApres,
+                    StockMouvementSources.ORDER_RECEIVE,
+                    toStock.getId(),
+                    acteurNom);
             log.info("Stock mis à jour — Pièce id={} +{} → stock={}", device.getId(), qty, device.getStock());
         }
+        commandeRepository.save(toStock);
 
         log.info("Réception en base — Demande commande id={} par={} pièces={}",
                 id, adminUsername, toStock.getLignes().size());
@@ -623,6 +646,8 @@ public class OrderRequestService {
                 .message(entity.getMessage())
                 .status(entity.getStatus())
                 .dateDemande(entity.getDateDemande())
+                .dateValidation(entity.getDateValidation())
+                .dateReception(entity.getDateReception())
                 .createdAt(entity.getDateDemande())
                 .totalPieces(lignes.size())
                 .totalQuantite(totalQty)

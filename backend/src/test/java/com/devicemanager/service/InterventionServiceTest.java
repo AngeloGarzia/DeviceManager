@@ -25,6 +25,8 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -36,6 +38,7 @@ class InterventionServiceTest {
     @Mock private DeviceRepository deviceRepository;
     @Mock private UserRepository userRepository;
     @Mock private AtelierService atelierService;
+    @Mock private StockMouvementService stockMouvementService;
     @InjectMocks private InterventionService interventionService;
 
     @Test
@@ -54,6 +57,8 @@ class InterventionServiceTest {
             i.setId(10L);
             return i;
         });
+        when(stockMouvementService.record(any(), any(), anyInt(), anyInt(), anyString(), any(), anyString()))
+                .thenAnswer(inv -> null);
 
         InterventionRequest.InterventionLineDto line = new InterventionRequest.InterventionLineDto();
         line.setDeviceId(40L);
@@ -79,6 +84,14 @@ class InterventionServiceTest {
         ArgumentCaptor<Intervention> captor = ArgumentCaptor.forClass(Intervention.class);
         verify(interventionRepository).saveAndFlush(captor.capture());
         assertThat(captor.getValue().getLignes()).hasSize(1);
+        verify(stockMouvementService).record(
+                any(),
+                eq(device),
+                eq(5),
+                eq(3),
+                eq("INTERVENTION"),
+                eq(10L),
+                anyString());
     }
 
     @Test

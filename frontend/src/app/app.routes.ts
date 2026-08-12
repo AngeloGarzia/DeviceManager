@@ -78,6 +78,13 @@ export const routes: Routes = [
           )
       },
       {
+        path: 'order-timeline',
+        loadComponent: () =>
+          import('./pages/order-timeline/order-timeline.component').then(
+            (m) => m.OrderTimelineComponent
+          )
+      },
+      {
         path: 'mas',
         loadComponent: () => import('./pages/mas-list/mas-list.component').then((m) => m.MasListComponent)
       },

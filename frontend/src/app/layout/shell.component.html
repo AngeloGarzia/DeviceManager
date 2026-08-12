@@ -163,6 +163,10 @@
             <span class="orders-menu-count">{{ orders.pendingCount() > 99 ? '99+' : orders.pendingCount() }}</span>
           }
         </a>
+        <a mat-menu-item routerLink="/order-timeline" routerLinkActive="orders-menu-active">
+          <mat-icon>timeline</mat-icon>
+          <span>Timeline</span>
+        </a>
       </mat-menu>
 
       <a routerLink="/mas" routerLinkActive="active-nav" [routerLinkActiveOptions]="{ exact: false }" class="nav-link">

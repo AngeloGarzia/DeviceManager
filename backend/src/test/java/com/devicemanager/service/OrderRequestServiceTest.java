@@ -37,6 +37,7 @@ class OrderRequestServiceTest {
     @Mock private UserRepository userRepository;
     @Mock private MailService mailService;
     @Mock private AtelierService atelierService;
+    @Mock private StockMouvementService stockMouvementService;
     @InjectMocks private OrderRequestService orderRequestService;
 
     @BeforeEach
@@ -142,6 +143,7 @@ class OrderRequestServiceTest {
         OrderRequestResponse response = orderRequestService.validate(70L, "admin");
 
         assertThat(response.getStatus()).isEqualTo(OrderStatuses.VALIDATED);
+        assertThat(response.getDateValidation()).isNotNull();
         ArgumentCaptor<String> subjectCaptor = ArgumentCaptor.forClass(String.class);
         ArgumentCaptor<String> bodyCaptor = ArgumentCaptor.forClass(String.class);
         verify(mailService).send(eq("jean@example.com"), subjectCaptor.capture(), bodyCaptor.capture());
@@ -262,14 +264,27 @@ class OrderRequestServiceTest {
                     commande.setStatus(OrderStatuses.RECEIVED);
                     return 1;
                 });
+        when(userRepository.findByUsername("admin")).thenReturn(Optional.of(TestFixtures.user("admin", Roles.ADMIN)));
         when(deviceRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(commandeRepository.save(any(Commande.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(stockMouvementService.record(any(), any(), anyInt(), anyInt(), anyString(), any(), anyString()))
+                .thenAnswer(inv -> null);
 
         OrderRequestResponse response = orderRequestService.receive(81L, null, "admin");
 
         assertThat(response.getStatus()).isEqualTo(OrderStatuses.RECEIVED);
+        assertThat(response.getDateReception()).isNotNull();
         assertThat(device.getStock()).isEqualTo(6);
         verify(deviceRepository).save(device);
         verify(commandeRepository).claimStatus(81L, 100L, OrderStatuses.VALIDATED, OrderStatuses.RECEIVED);
+        verify(stockMouvementService).record(
+                eq(commande.getAtelier()),
+                eq(device),
+                eq(2),
+                eq(6),
+                eq("ORDER_RECEIVE"),
+                eq(81L),
+                anyString());
     }
 
     @Test

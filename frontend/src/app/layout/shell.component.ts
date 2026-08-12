@@ -77,7 +77,8 @@ export class ShellComponent implements OnInit {
 
   /** Indique si la section « Demandes de commande » est active dans la barre de navigation. */
   isOrdersSectionActive(): boolean {
-    return this.router.url.startsWith('/order-request');
+    const url = this.router.url;
+    return url.startsWith('/order-request') || url.startsWith('/order-timeline');
   }
 
   /** Ouvre l'assistant IA si le module est activé. */

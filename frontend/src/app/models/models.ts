@@ -248,8 +248,39 @@ export interface OrderRequest {
   photoUrl?: string;
   status: string;
   dateDemande?: string;
+  dateValidation?: string | null;
+  dateReception?: string | null;
   createdAt: string;
   lignes?: OrderRequestLine[];
+}
+
+export type TimelineEventType =
+  | 'ORDER_REQUEST'
+  | 'ORDER_VALIDATED'
+  | 'ORDER_RECEIVED'
+  | 'INTERVENTION'
+  | 'STOCK_ADJUSTMENT';
+
+export interface TimelineLine {
+  deviceId?: number | null;
+  pieceNom?: string | null;
+  pieceReference?: string | null;
+  quantite?: number | null;
+  stockAvant?: number | null;
+  stockApres?: number | null;
+  delta?: number | null;
+}
+
+export interface TimelineEvent {
+  type: TimelineEventType | string;
+  at: string;
+  title: string;
+  subtitle?: string | null;
+  acteur?: string | null;
+  refType?: string | null;
+  refId?: number | null;
+  deltaStock?: number | null;
+  lignes?: TimelineLine[];
 }
 
 export interface InterventionLineForm {

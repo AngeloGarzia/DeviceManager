@@ -11,6 +11,7 @@ import com.devicemanager.entity.User;
 import com.devicemanager.repository.DeviceRepository;
 import com.devicemanager.repository.InterventionRepository;
 import com.devicemanager.repository.UserRepository;
+import com.devicemanager.security.StockMouvementSources;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.hibernate.Hibernate;
@@ -38,6 +39,7 @@ public class InterventionService {
     private final DeviceRepository deviceRepository;
     private final UserRepository userRepository;
     private final AtelierService atelierService;
+    private final StockMouvementService stockMouvementService;
 
     /**
      * Archive un bon d'intervention et décrémente le stock des pièces consommées.
@@ -98,6 +100,21 @@ public class InterventionService {
         }
 
         Intervention saved = interventionRepository.saveAndFlush(intervention);
+        String acteurNom = displayName(actor);
+        for (InterventionLigne ligne : saved.getLignes()) {
+            Device device = ligne.getDevice();
+            if (device == null) {
+                continue;
+            }
+            stockMouvementService.record(
+                    atelier,
+                    device,
+                    ligne.getStockAvant(),
+                    ligne.getStockApres(),
+                    StockMouvementSources.INTERVENTION,
+                    saved.getId(),
+                    acteurNom);
+        }
         log.info("Archivage en base — Bon intervention id={} numero={} par={} pièces={} atelier={}",
                 saved.getId(), saved.getNumero(), username, saved.getLignes().size(), atelierId);
         return toResponse(saved);

@@ -8,7 +8,10 @@ import com.devicemanager.entity.DevicePhoto;
 import com.devicemanager.entity.MarqueMas;
 import com.devicemanager.entity.Mas;
 import com.devicemanager.entity.Sfm;
+import com.devicemanager.entity.User;
 import com.devicemanager.repository.DeviceRepository;
+import com.devicemanager.repository.UserRepository;
+import com.devicemanager.security.StockMouvementSources;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.hibernate.Hibernate;
@@ -46,6 +49,8 @@ public class DeviceService {
     private final StorageService storageService;
     private final ImageOptimizationService imageOptimizationService;
     private final AtelierService atelierService;
+    private final StockMouvementService stockMouvementService;
+    private final UserRepository userRepository;
 
     /**
      * Liste ou recherche les pièces de l'atelier courant.
@@ -169,15 +174,39 @@ public class DeviceService {
      *
      * @param id identifiant de la pièce
      * @param stock quantité (≥ 0)
+     * @param username acteur authentifié (journal de stock)
      * @return pièce mise à jour
      * @throws org.springframework.web.server.ResponseStatusException {@code 404} si introuvable
      */
-    public DeviceResponse updateStock(Long id, Integer stock) {
+    public DeviceResponse updateStock(Long id, Integer stock, String username) {
         Device entity = getEntity(id);
-        entity.setStock(normalizeStock(stock));
+        int stockAvant = Math.max(0, entity.getStock());
+        int stockApres = normalizeStock(stock);
+        entity.setStock(stockApres);
         Device saved = deviceRepository.save(entity);
-        log.info("Mise à jour stock — Pièce id={} stock={}", saved.getId(), saved.getStock());
+        if (stockApres != stockAvant) {
+            String acteurNom = userRepository.findByUsername(username)
+                    .map(this::displayUserName)
+                    .orElse(username);
+            stockMouvementService.record(
+                    atelierService.requireCurrentAtelier(),
+                    saved,
+                    stockAvant,
+                    stockApres,
+                    StockMouvementSources.MANUAL,
+                    saved.getId(),
+                    acteurNom);
+        }
+        log.info("Mise à jour stock — Pièce id={} stock={} (avant={}) par={}",
+                saved.getId(), saved.getStock(), stockAvant, username);
         return toResponse(saved);
+    }
+
+    private String displayUserName(User user) {
+        String prenom = user.getPrenom() == null ? "" : user.getPrenom().trim();
+        String nom = user.getNom() == null ? "" : user.getNom().trim();
+        String full = (prenom + " " + nom).trim();
+        return full.isEmpty() ? user.getUsername() : full;
     }
 
     /**
