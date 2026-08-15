@@ -2,7 +2,7 @@ import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../environments/environment';
-import { Mas, MasForm, MarqueMasOption } from '../models/models';
+import { DenoOption, Mas, MasForm, MarqueMasOption } from '../models/models';
 
 @Injectable({ providedIn: 'root' })
 export class MasService {
@@ -24,6 +24,17 @@ export class MasService {
 
   createMarque(label: string): Observable<MarqueMasOption> {
     return this.http.post<MarqueMasOption>(`${this.base}/marques`, { label });
+  }
+
+  listDenos(): Observable<DenoOption[]> {
+    return this.http.get<DenoOption[]>(`${this.base}/denos`);
+  }
+
+  createDeno(valeur: number, label?: string): Observable<DenoOption> {
+    return this.http.post<DenoOption>(`${this.base}/denos`, {
+      valeur,
+      label: label?.trim() || null
+    });
   }
 
   get(id: number): Observable<Mas> {

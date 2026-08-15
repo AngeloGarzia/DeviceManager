@@ -28,6 +28,7 @@ public final class TestFixtures {
                 .id(20L)
                 .numero("MAS-001")
                 .marque(marque())
+                .statut(MasStatut.UTILISEE)
                 .utilise(true)
                 .atelier(atelier())
                 .build();

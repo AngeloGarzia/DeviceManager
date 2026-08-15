@@ -7,6 +7,7 @@ import com.devicemanager.entity.Intervention;
 import com.devicemanager.entity.User;
 import com.devicemanager.repository.DeviceRepository;
 import com.devicemanager.repository.InterventionRepository;
+import com.devicemanager.repository.MasRepository;
 import com.devicemanager.repository.UserRepository;
 import com.devicemanager.security.Roles;
 import com.devicemanager.support.TestFixtures;
@@ -36,9 +37,11 @@ class InterventionServiceTest {
 
     @Mock private InterventionRepository interventionRepository;
     @Mock private DeviceRepository deviceRepository;
+    @Mock private MasRepository masRepository;
     @Mock private UserRepository userRepository;
     @Mock private AtelierService atelierService;
     @Mock private StockMouvementService stockMouvementService;
+    @Mock private FitService fitService;
     @InjectMocks private InterventionService interventionService;
 
     @Test

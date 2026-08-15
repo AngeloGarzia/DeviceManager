@@ -11,12 +11,19 @@ import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatCardModule } from '@angular/material/card';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MasService } from '../../services/mas.service';
-import { MarqueMasOption, MasForm } from '../../models/models';
+import { DenoOption, MarqueMasOption, MasForm, MasStatut } from '../../models/models';
 import { apiErrorMessage } from '../../shared/api-error';
+
+const MAS_STATUT_OPTIONS: { value: MasStatut; label: string }[] = [
+  { value: 'UTILISEE', label: 'Machine utilisée' },
+  { value: 'EN_RESERVE', label: 'En réserve' },
+  { value: 'VENDUE', label: 'Vendue' },
+  { value: 'DETRUITE', label: 'Détruite' }
+];
 
 /**
  * Formulaire de création ou modification d'une MAS.
- * Permet aussi la création inline d'une marque et le retour vers le formulaire pièce.
+ * Permet aussi la création inline d'une marque / dénomination.
  */
 @Component({
   selector: 'app-mas-form',
@@ -45,33 +52,60 @@ export class MasFormComponent implements OnInit {
   readonly loading = signal(false);
   readonly saving = signal(false);
   readonly savingMarque = signal(false);
+  readonly savingDeno = signal(false);
   readonly showNewMarque = signal(false);
+  readonly showNewDeno = signal(false);
   readonly error = signal<string | null>(null);
   readonly marqueError = signal<string | null>(null);
+  readonly denoError = signal<string | null>(null);
   readonly marques = signal<MarqueMasOption[]>([]);
+  readonly denos = signal<DenoOption[]>([]);
+  readonly statutOptions = MAS_STATUT_OPTIONS;
   id: number | null = null;
   returnDevice: string | null = null;
   private returnForOrderRequest = false;
 
   readonly form = this.fb.group({
     numero: ['', [Validators.required, Validators.maxLength(80)]],
+    numeroSocle: ['', Validators.maxLength(80)],
+    tauxRedistribution: [null as number | null, [Validators.min(0), Validators.max(100)]],
     marqueId: [null as number | null, Validators.required],
-    utilise: [true]
+    denoId: [null as number | null],
+    statut: ['UTILISEE' as string, Validators.required]
   });
 
   readonly newMarqueForm = this.fb.nonNullable.group({
     label: ['', [Validators.required, Validators.maxLength(120)]]
   });
 
-  /** Indique si le formulaire est en mode édition. */
+  readonly newDenoForm = this.fb.nonNullable.group({
+    valeur: [null as number | null, [Validators.required, Validators.min(0.0001)]]
+  });
+
   get isEdit(): boolean {
     return this.id !== null;
+  }
+
+  isStatutChecked(value: string): boolean {
+    return this.form.controls.statut.value === value;
+  }
+
+  /** Cases à cocher exclusives : un seul statut à la fois. */
+  onStatutToggle(value: MasStatut, checked: boolean): void {
+    if (checked) {
+      this.form.patchValue({ statut: value });
+      return;
+    }
+    if (this.form.controls.statut.value === value) {
+      this.form.patchValue({ statut: 'UTILISEE' });
+    }
   }
 
   ngOnInit(): void {
     this.returnDevice = this.route.snapshot.queryParamMap.get('returnDevice');
     this.returnForOrderRequest = this.route.snapshot.queryParamMap.get('forOrderRequest') === '1';
     this.loadMarques();
+    this.loadDenos();
 
     const rawId = this.route.snapshot.paramMap.get('id');
     if (rawId) {
@@ -81,8 +115,11 @@ export class MasFormComponent implements OnInit {
         next: (mas) => {
           this.form.patchValue({
             numero: mas.numero,
+            numeroSocle: mas.numeroSocle || '',
+            tauxRedistribution: mas.tauxRedistribution ?? null,
             marqueId: mas.marqueId,
-            utilise: mas.utilise
+            denoId: mas.denoId ?? null,
+            statut: mas.statut || (mas.utilise ? 'UTILISEE' : 'EN_RESERVE')
           });
           this.loading.set(false);
         },
@@ -94,7 +131,6 @@ export class MasFormComponent implements OnInit {
     }
   }
 
-  /** Charge la liste des marques disponibles pour la MAS. */
   loadMarques(selectId?: number): void {
     this.masService.listMarques().subscribe({
       next: (data) => {
@@ -106,26 +142,34 @@ export class MasFormComponent implements OnInit {
     });
   }
 
+  loadDenos(selectId?: number): void {
+    this.masService.listDenos().subscribe({
+      next: (data) => {
+        this.denos.set([...data].sort((a, b) => Number(a.valeur) - Number(b.valeur)));
+        if (selectId != null) {
+          this.form.patchValue({ denoId: selectId });
+        }
+      }
+    });
+  }
+
   private sortMarques(data: MarqueMasOption[]): MarqueMasOption[] {
     return [...data].sort((a, b) =>
       (a.label || '').localeCompare(b.label || '', 'fr', { sensitivity: 'base' })
     );
   }
 
-  /** Affiche le sous-formulaire de création d'une nouvelle marque. */
   openNewMarque(): void {
     this.showNewMarque.set(true);
     this.marqueError.set(null);
     this.newMarqueForm.reset({ label: '' });
   }
 
-  /** Ferme le sous-formulaire de création de marque. */
   cancelNewMarque(): void {
     this.showNewMarque.set(false);
     this.marqueError.set(null);
   }
 
-  /** Crée une nouvelle marque et la sélectionne dans le formulaire. */
   createMarque(): void {
     if (this.newMarqueForm.invalid) {
       this.newMarqueForm.markAllAsTouched();
@@ -147,7 +191,53 @@ export class MasFormComponent implements OnInit {
     });
   }
 
-  /** Valide et enregistre la MAS (création ou mise à jour). */
+  openNewDeno(): void {
+    this.showNewDeno.set(true);
+    this.denoError.set(null);
+    this.newDenoForm.reset({ valeur: null });
+  }
+
+  cancelNewDeno(): void {
+    this.showNewDeno.set(false);
+    this.denoError.set(null);
+  }
+
+  createDeno(): void {
+    if (this.newDenoForm.invalid) {
+      this.newDenoForm.markAllAsTouched();
+      return;
+    }
+    this.savingDeno.set(true);
+    this.denoError.set(null);
+    const valeur = Number(this.newDenoForm.controls.valeur.value);
+    if (!Number.isFinite(valeur) || valeur <= 0) {
+      this.denoError.set('Saisissez une valeur strictement positive (ex. 0.50).');
+      this.savingDeno.set(false);
+      return;
+    }
+    this.masService.createDeno(valeur).subscribe({
+      next: (created) => {
+        const id = created.id ?? created.value ?? null;
+        this.savingDeno.set(false);
+        this.showNewDeno.set(false);
+        this.denoError.set(null);
+        if (id != null) {
+          this.denos.update((list) => {
+            const without = list.filter((d) => d.id !== id);
+            return [...without, created].sort((a, b) => Number(a.valeur) - Number(b.valeur));
+          });
+          this.form.patchValue({ denoId: id });
+        } else {
+          this.loadDenos();
+        }
+      },
+      error: (err) => {
+        this.savingDeno.set(false);
+        this.denoError.set(apiErrorMessage(err, 'Création de la dénomination impossible.'));
+      }
+    });
+  }
+
   submit(): void {
     if (this.form.invalid) {
       this.form.markAllAsTouched();
@@ -156,10 +246,19 @@ export class MasFormComponent implements OnInit {
     this.saving.set(true);
     this.error.set(null);
     const raw = this.form.getRawValue();
+    const tauxRaw = raw.tauxRedistribution;
+    const taux =
+      tauxRaw === null || tauxRaw === undefined || String(tauxRaw).trim() === ''
+        ? null
+        : Number(tauxRaw);
     const payload: MasForm = {
       numero: raw.numero!.trim(),
+      numeroSocle: raw.numeroSocle?.trim() || null,
+      tauxRedistribution: Number.isFinite(taux as number) ? (taux as number) : null,
       marqueId: raw.marqueId,
-      utilise: !!raw.utilise
+      denoId: raw.denoId,
+      statut: raw.statut || 'UTILISEE',
+      utilise: (raw.statut || 'UTILISEE') === 'UTILISEE'
     };
     const req$ = this.id ? this.masService.update(this.id, payload) : this.masService.create(payload);
     req$.subscribe({
@@ -171,7 +270,6 @@ export class MasFormComponent implements OnInit {
     });
   }
 
-  /** Annule la saisie et retourne à la fiche ou à la liste. */
   cancel(): void {
     if (this.returnToDeviceForm()) {
       return;

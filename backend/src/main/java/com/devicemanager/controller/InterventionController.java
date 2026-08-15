@@ -40,7 +40,11 @@ public class InterventionController {
      */
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'TECHNICIEN')")
-    public ResponseEntity<List<InterventionResponse>> list() {
+    public ResponseEntity<List<InterventionResponse>> list(
+            @RequestParam(required = false) Long masId) {
+        if (masId != null) {
+            return ResponseEntity.ok(interventionService.findByMasId(masId));
+        }
         return ResponseEntity.ok(interventionService.findAll());
     }
 

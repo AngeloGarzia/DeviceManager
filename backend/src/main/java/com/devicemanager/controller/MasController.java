@@ -1,5 +1,7 @@
 package com.devicemanager.controller;
 
+import com.devicemanager.dto.DenoRequest;
+import com.devicemanager.dto.DenoResponse;
 import com.devicemanager.dto.MarqueMasRequest;
 import com.devicemanager.dto.MarqueMasResponse;
 import com.devicemanager.dto.MasRequest;
@@ -57,6 +59,22 @@ public class MasController {
     @PostMapping("/marques")
     public ResponseEntity<MarqueMasResponse> createMarque(@Valid @RequestBody MarqueMasRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(masService.createMarque(request));
+    }
+
+    /**
+     * Liste les dénominations MAS (référentiel global).
+     */
+    @GetMapping("/denos")
+    public ResponseEntity<List<DenoResponse>> denos() {
+        return ResponseEntity.ok(masService.listDenos());
+    }
+
+    /**
+     * Crée une dénomination MAS.
+     */
+    @PostMapping("/denos")
+    public ResponseEntity<DenoResponse> createDeno(@Valid @RequestBody DenoRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(masService.createDeno(request));
     }
 
     /**

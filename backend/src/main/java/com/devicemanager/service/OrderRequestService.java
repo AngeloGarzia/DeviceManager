@@ -348,6 +348,23 @@ public class OrderRequestService {
     }
 
     /**
+     * Commandes dont au moins une pièce est rattachée à l'une des MAS données.
+     */
+    @Transactional(readOnly = true)
+    public List<OrderRequestResponse> findByMasIds(List<Long> masIds) {
+        Long atelierId = atelierService.requireCurrentAtelier().getId();
+        List<Long> ids = masIds == null
+                ? List.of()
+                : masIds.stream().filter(id -> id != null).distinct().toList();
+        if (ids.isEmpty()) {
+            return List.of();
+        }
+        return commandeRepository.findByAtelierAndDeviceMasIds(atelierId, ids).stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    /**
      * Compte les demandes en attente ({@code PENDING} ou {@code SENT}) dans l'atelier courant.
      *
      * @return nombre de demandes non validées

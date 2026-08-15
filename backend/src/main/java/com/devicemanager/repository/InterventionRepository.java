@@ -33,6 +33,32 @@ public interface InterventionRepository extends JpaRepository<Intervention, Long
             """)
     Optional<Intervention> findByIdWithRelations(@Param("id") Long id, @Param("atelierId") Long atelierId);
 
+    @Query("""
+            select distinct i from Intervention i
+            left join fetch i.lignes l
+            left join fetch l.device d
+            join fetch i.technicien
+            left join fetch i.mas
+            where i.atelier.id = :atelierId
+              and (
+                   (i.mas is not null and i.mas.id = :masId)
+                or (
+                      i.mas is null
+                  and i.machineMas is not null
+                  and (
+                       lower(i.machineMas) = lower(:numero)
+                    or lower(i.machineMas) like lower(concat(:numero, ' — %'))
+                    or lower(i.machineMas) like lower(concat(:numero, ' - %'))
+                  )
+                )
+              )
+            order by i.dateIntervention desc, i.id desc
+            """)
+    List<Intervention> findByAtelierAndMas(
+            @Param("atelierId") Long atelierId,
+            @Param("masId") Long masId,
+            @Param("numero") String numero);
+
     long countByAtelierId(Long atelierId);
 
     @Query("""

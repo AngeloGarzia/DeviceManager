@@ -81,6 +81,11 @@ export class ShellComponent implements OnInit {
     return url.startsWith('/order-request') || url.startsWith('/order-timeline');
   }
 
+  /** Indique si la section MAS est active. */
+  isMasSectionActive(): boolean {
+    return this.router.url.startsWith('/mas');
+  }
+
   /** Ouvre l'assistant IA si le module est activé. */
   openAiAssistant(): void {
     if (!this.ai.enabled()) {

@@ -10,7 +10,12 @@ export class TimelineService {
 
   constructor(private http: HttpClient) {}
 
-  list(opts?: { from?: string; to?: string; types?: string[] }): Observable<TimelineEvent[]> {
+  list(opts?: {
+    from?: string;
+    to?: string;
+    types?: string[];
+    masId?: number;
+  }): Observable<TimelineEvent[]> {
     let params = new HttpParams();
     if (opts?.from) {
       params = params.set('from', opts.from);
@@ -22,6 +27,9 @@ export class TimelineService {
       for (const t of opts.types) {
         params = params.append('types', t);
       }
+    }
+    if (opts?.masId != null) {
+      params = params.set('masId', String(opts.masId));
     }
     return this.http.get<TimelineEvent[]>(this.base, { params });
   }

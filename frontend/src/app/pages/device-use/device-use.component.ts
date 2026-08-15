@@ -8,6 +8,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatAutocompleteModule, MatAutocompleteSelectedEvent } from '@angular/material/autocomplete';
 import { MatSelectModule } from '@angular/material/select';
+import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatCardModule } from '@angular/material/card';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
@@ -19,10 +20,13 @@ import {
   of,
   switchMap
 } from 'rxjs';
-import { Device, Mas } from '../../models/models';
+import { Device, FitSignataire, Mas } from '../../models/models';
+import { AuthService } from '../../services/auth.service';
 import { DeviceService } from '../../services/device.service';
+import { FitService } from '../../services/fit.service';
 import { InterventionService } from '../../services/intervention.service';
 import { MasService } from '../../services/mas.service';
+import { SignaturePadComponent } from '../../shared/signature-pad.component';
 import { apiErrorMessage } from '../../shared/api-error';
 
 interface DraftLine {
@@ -49,9 +53,11 @@ interface DraftLine {
     MatInputModule,
     MatAutocompleteModule,
     MatSelectModule,
+    MatCheckboxModule,
     MatCardModule,
     MatIconModule,
-    MatProgressSpinnerModule
+    MatProgressSpinnerModule,
+    SignaturePadComponent
   ],
   templateUrl: './device-use.component.html',
   styleUrl: './device-use.component.scss'
@@ -63,6 +69,8 @@ export class DeviceUseComponent implements OnInit {
   private readonly deviceService = inject(DeviceService);
   private readonly interventionService = inject(InterventionService);
   private readonly masService = inject(MasService);
+  private readonly fitService = inject(FitService);
+  private readonly auth = inject(AuthService);
   private readonly destroyRef = inject(DestroyRef);
 
   readonly suggestions = signal<Device[]>([]);
@@ -70,6 +78,8 @@ export class DeviceUseComponent implements OnInit {
   readonly selectedDevice = signal<Device | null>(null);
   readonly lines = signal<DraftLine[]>([]);
   readonly masses = signal<Mas[]>([]);
+  readonly admins = signal<FitSignataire[]>([]);
+  readonly techniciens = signal<FitSignataire[]>([]);
   readonly saving = signal(false);
   readonly error = signal<string | null>(null);
   readonly successNumero = signal<string | null>(null);
@@ -84,13 +94,24 @@ export class DeviceUseComponent implements OnInit {
   readonly form = this.fb.group({
     dateIntervention: [this.defaultDateTimeLocal(), [Validators.required]],
     emplacement: ['', Validators.maxLength(200)],
-    /** Libellé MAS archivé sur le bon (numero — marque). */
-    machineMas: [null as string | null],
+    /** Identifiant MAS pour le suivi technique + écriture FIT. */
+    masId: [null as number | null],
+    /** Associer ce bon à une ligne FIT (optionnel, nécessite une MAS). */
+    associerFit: [false],
     motif: ['', [Validators.required, Validators.maxLength(500)]],
     diagnostic: ['', Validators.maxLength(2000)],
     travaux: ['', [Validators.required, Validators.maxLength(2000)]],
-    observations: ['', Validators.maxLength(2000)]
+    observations: ['', Validators.maxLength(2000)],
+    signatureAdmin: [null as string | null],
+    signatureTechnicien: [null as string | null],
+    signataireAdminId: [null as number | null],
+    signataireTechnicienId: [null as number | null]
   });
+
+  /** True si le bon doit être reporté sur la FIT (MAS + case cochée). */
+  requiresFitSignatures(): boolean {
+    return this.form.controls.masId.value != null && !!this.form.controls.associerFit.value;
+  }
 
   constructor() {
     this.searchCtrl.valueChanges
@@ -126,6 +147,8 @@ export class DeviceUseComponent implements OnInit {
 
   ngOnInit(): void {
     this.loadMasses();
+    this.loadSignataires();
+    this.applyQueryPrefill();
     const raw = this.route.snapshot.queryParamMap.get('deviceId');
     if (!raw) {
       return;
@@ -140,6 +163,66 @@ export class DeviceUseComponent implements OnInit {
         this.addLine();
       }
     });
+  }
+
+  private applyQueryPrefill(): void {
+    const q = this.route.snapshot.queryParamMap;
+    const masRaw = q.get('masId');
+    const masId = masRaw ? Number(masRaw) : NaN;
+    const patch: Record<string, string | number | null> = {};
+    if (Number.isFinite(masId)) {
+      patch['masId'] = masId;
+    }
+    for (const key of ['motif', 'travaux', 'diagnostic', 'emplacement', 'observations'] as const) {
+      const val = q.get(key);
+      if (val) {
+        patch[key] = val;
+      }
+    }
+    if (Object.keys(patch).length) {
+      this.form.patchValue(patch);
+    }
+  }
+
+  private loadSignataires(): void {
+    this.fitService.listSignataires().subscribe({
+      next: (signataires) => {
+        this.admins.set(signataires.admins || []);
+        this.techniciens.set(signataires.techniciens || []);
+        this.preselectCurrentUser();
+      },
+      error: () => {
+        this.admins.set([]);
+        this.techniciens.set([]);
+      }
+    });
+  }
+
+  private preselectCurrentUser(): void {
+    const username = this.auth.username();
+    if (!username) {
+      return;
+    }
+    if (this.auth.isAdmin()) {
+      const me = this.admins().find((u) => u.username === username);
+      if (me) {
+        this.form.patchValue({ signataireAdminId: me.id });
+      }
+    }
+    if (this.auth.isTechnicien()) {
+      const me = this.techniciens().find((u) => u.username === username);
+      if (me) {
+        this.form.patchValue({ signataireTechnicienId: me.id });
+      }
+    }
+  }
+
+  private displayNameById(list: FitSignataire[], id: number | null | undefined): string | null {
+    if (id == null) {
+      return null;
+    }
+    const found = list.find((u) => u.id === id);
+    return found?.displayName?.trim() || found?.username || null;
   }
 
   /** Charge les MAS de l'atelier pour le sélecteur Machine. */
@@ -280,16 +363,46 @@ export class DeviceUseComponent implements OnInit {
     }
 
     const v = this.form.getRawValue();
+    const associerFit = v.masId != null && !!v.associerFit;
+    if (associerFit && (!v.signatureAdmin || !v.signatureTechnicien)) {
+      this.error.set(
+        'Pour associer le bon à la FIT, les signatures admin et technicien (dessin) sont obligatoires.'
+      );
+      return;
+    }
+    const adminNom = associerFit
+      ? this.displayNameById(this.admins(), v.signataireAdminId)
+      : null;
+    const techNom = associerFit
+      ? this.displayNameById(this.techniciens(), v.signataireTechnicienId)
+      : null;
+    if (associerFit && (!adminNom || !techNom)) {
+      this.error.set('Sélectionnez un signataire admin et un technicien pour la FIT.');
+      return;
+    }
+
     this.saving.set(true);
     this.interventionService
       .create({
         dateIntervention: this.toIsoLocal(v.dateIntervention || ''),
         emplacement: v.emplacement?.trim() || null,
-        machineMas: (v.machineMas || '').trim() || null,
+        masId: v.masId,
+        associerFit,
+        machineMas: (() => {
+          if (v.masId == null) {
+            return null;
+          }
+          const mas = this.masses().find((m) => m.id === v.masId);
+          return mas ? this.masLabel(mas) : null;
+        })(),
         motif: (v.motif || '').trim(),
         diagnostic: v.diagnostic?.trim() || null,
         travaux: (v.travaux || '').trim(),
         observations: v.observations?.trim() || null,
+        signatureAdmin: associerFit ? v.signatureAdmin : null,
+        signatureTechnicien: associerFit ? v.signatureTechnicien : null,
+        signataireAdminNom: adminNom,
+        signataireTechnicienNom: techNom,
         lignes: this.lines().map((l) => ({ deviceId: l.deviceId, quantite: l.quantite }))
       })
       .subscribe({
@@ -303,9 +416,15 @@ export class DeviceUseComponent implements OnInit {
             travaux: '',
             observations: '',
             emplacement: '',
-            machineMas: null,
+            masId: null,
+            associerFit: false,
+            signatureAdmin: null,
+            signatureTechnicien: null,
+            signataireAdminId: null,
+            signataireTechnicienId: null,
             dateIntervention: this.defaultDateTimeLocal()
           });
+          this.preselectCurrentUser();
         },
         error: (err) => {
           this.saving.set(false);

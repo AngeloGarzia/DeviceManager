@@ -3,7 +3,7 @@
     <div>
       <h1 class="page-title" data-tour="page-order-timeline">Timeline</h1>
       <p class="page-subtitle">
-        Demandes, validations, réceptions, interventions et ajustements de stock
+        Vue en colonnes : commandes, bons d’intervention, interventions techniques, FIT et stock
       </p>
     </div>
     <div class="flex flex-wrap gap-2">
@@ -17,15 +17,15 @@
 
   <div class="filter-row">
     <button mat-stroked-button type="button" class="filter-all" (click)="toggleAll()">Tout</button>
-    @for (f of filters; track f.type) {
+    @for (c of columns; track c.id) {
       <button
         type="button"
         class="filter-chip"
-        [ngClass]="[typeClass(f.type), isActive(f.type) ? 'active' : '']"
-        (click)="toggleType(f.type)"
+        [ngClass]="[columnClass(c.id), isActive(c.id) ? 'active' : '']"
+        (click)="toggleColumn(c.id)"
       >
-        <mat-icon>{{ f.icon }}</mat-icon>
-        {{ f.label }}
+        <mat-icon>{{ c.icon }}</mat-icon>
+        {{ c.label }}
       </button>
     }
   </div>
@@ -39,91 +39,103 @@
     <div class="panel">
       <h2 class="m-0 text-lg font-semibold">Aucun événement</h2>
       <p class="mt-2 text-sm text-ink-soft">
-        Les demandes, interventions et mouvements de stock apparaîtront ici.
+        Les commandes, bons, interventions techniques, FIT et mouvements de stock apparaîtront ici.
       </p>
     </div>
   } @else {
-    <ol class="timeline">
-      @for (event of visibleItems(); track eventKey(event, $index); let i = $index) {
-        @let key = eventKey(event, i);
-        <li class="timeline-item">
-          <div class="timeline-rail" aria-hidden="true">
-            <span class="timeline-dot" [class]="typeClass(event.type)">
-              <mat-icon>{{ typeMeta(event.type).icon }}</mat-icon>
-            </span>
-          </div>
-          <article class="timeline-card">
-            <div class="timeline-card-head">
-              <div class="min-w-0 flex-1">
-                <div class="flex flex-wrap items-center gap-2">
-                  <span class="type-badge" [class]="typeClass(event.type)">
-                    {{ typeMeta(event.type).label }}
-                  </span>
-                  <time class="text-xs text-ink-soft" [attr.datetime]="event.at">
-                    {{ event.at | date: 'dd/MM/yyyy HH:mm' }}
-                  </time>
-                  @if (event.deltaStock !== null) {
-                    <span
-                      class="delta-badge"
-                      [class.plus]="event.deltaStock > 0"
-                      [class.minus]="event.deltaStock < 0"
-                    >
-                      {{ deltaLabel(event.deltaStock) }}
-                    </span>
-                  }
-                </div>
-                <h2 class="m-0 mt-1 text-base font-semibold text-ink">{{ event.title }}</h2>
-                @if (event.subtitle) {
-                  <p class="mt-1 text-sm text-ink-soft">{{ event.subtitle }}</p>
-                }
-                @if (event.acteur) {
-                  <p class="mt-1 text-xs text-ink-faint">Par {{ event.acteur }}</p>
-                }
-              </div>
-              <div class="timeline-actions">
-                @if (linkFor(event); as href) {
-                  <a mat-stroked-button [routerLink]="href">Voir</a>
-                }
-                @if ((event.lignes?.length || 0) > 0) {
-                  <button mat-button type="button" (click)="toggleExpand(key)">
-                    {{ expandedId() === key ? 'Masquer' : 'Détail' }}
-                  </button>
-                }
-              </div>
+    <div class="swim-scroll">
+      <div class="swimlanes" [style.--cols]="gridTemplate()">
+        <div class="swim-header" [style.grid-template-columns]="gridTemplate()">
+          @for (c of visibleColumns(); track c.id) {
+            <div class="swim-col-title" [ngClass]="columnClass(c.id)">
+              <mat-icon>{{ c.icon }}</mat-icon>
+              <span>{{ c.label }}</span>
             </div>
+          }
+        </div>
 
-            @if (expandedId() === key && event.lignes?.length) {
-              <ul class="timeline-lines">
-                @for (line of event.lignes; track $index) {
-                  <li>
-                    <div class="min-w-0 flex-1">
-                      <div class="truncate text-sm font-medium">{{ line.pieceNom }}</div>
-                      <div class="text-xs text-ink-soft">
-                        {{ line.pieceReference || 'Sans référence' }}
-                        @if (line.stockAvant !== null && line.stockApres !== null) {
-                          · Stock {{ line.stockAvant }} → {{ line.stockApres }}
+        <div class="swim-body">
+          @for (event of visibleItems(); track eventKey(event, $index); let i = $index) {
+            @let key = eventKey(event, i);
+            @let col = columnOf(event);
+            <div class="swim-row" [style.grid-template-columns]="gridTemplate()">
+              @for (c of visibleColumns(); track c.id) {
+                <div class="swim-cell" [ngClass]="columnClass(c.id)">
+                  @if (c.id === col) {
+                    <article class="timeline-card" [ngClass]="typeClass(event.type)">
+                      <div class="timeline-card-head">
+                        <div class="min-w-0 flex-1">
+                          <div class="flex flex-wrap items-center gap-2">
+                            <span class="type-badge" [ngClass]="typeClass(event.type)">
+                              {{ typeLabel(event.type) }}
+                            </span>
+                            <time class="text-xs text-ink-soft" [attr.datetime]="event.at">
+                              {{ event.at | date: 'dd/MM/yyyy HH:mm' }}
+                            </time>
+                            @if (event.deltaStock != null) {
+                              <span
+                                class="delta-badge"
+                                [class.plus]="event.deltaStock! > 0"
+                                [class.minus]="event.deltaStock! < 0"
+                              >
+                                {{ deltaLabel(event.deltaStock) }}
+                              </span>
+                            }
+                          </div>
+                          <h2 class="m-0 mt-1 text-sm font-semibold text-ink">{{ event.title }}</h2>
+                          @if (event.subtitle) {
+                            <p class="mt-1 text-xs text-ink-soft line-clamp-3">{{ event.subtitle }}</p>
+                          }
+                          @if (event.masNumero) {
+                            <p class="mt-1 text-xs text-ink-faint">MAS {{ event.masNumero }}</p>
+                          }
+                          @if (event.acteur) {
+                            <p class="mt-0.5 text-xs text-ink-faint">Par {{ event.acteur }}</p>
+                          }
+                        </div>
+                      </div>
+                      <div class="timeline-actions">
+                        @if (linkFor(event); as href) {
+                          <a mat-stroked-button [routerLink]="href">Voir</a>
+                        }
+                        @if ((event.lignes?.length || 0) > 0) {
+                          <button mat-button type="button" (click)="toggleExpand(key)">
+                            {{ expandedId() === key ? 'Masquer' : 'Détail' }}
+                          </button>
                         }
                       </div>
-                    </div>
-                    <span class="text-sm font-semibold">
-                      @if (line.delta !== null) {
-                        {{ deltaLabel(line.delta) }}
-                      } @else {
-                        × {{ line.quantite }}
+                      @if (expandedId() === key && event.lignes?.length) {
+                        <ul class="timeline-lines">
+                          @for (line of event.lignes; track $index) {
+                            <li>
+                              <div class="min-w-0 flex-1">
+                                <div class="truncate text-sm font-medium">{{ line.pieceNom }}</div>
+                                <div class="text-xs text-ink-soft">
+                                  {{ line.pieceReference || 'Sans référence' }}
+                                  @if (line.stockAvant !== null && line.stockApres !== null) {
+                                    · Stock {{ line.stockAvant }} → {{ line.stockApres }}
+                                  }
+                                </div>
+                              </div>
+                              <span class="text-sm font-semibold">
+                                @if (line.delta !== null) {
+                                  {{ deltaLabel(line.delta) }}
+                                } @else {
+                                  × {{ line.quantite }}
+                                }
+                              </span>
+                            </li>
+                          }
+                        </ul>
                       }
-                    </span>
-                    @if (line.deviceId) {
-                      <a class="text-xs text-sky-700 underline" [routerLink]="['/devices', line.deviceId]"
-                        >Pièce</a
-                      >
-                    }
-                  </li>
-                }
-              </ul>
-            }
-          </article>
-        </li>
-      }
-    </ol>
+                    </article>
+                  }
+                </div>
+              }
+            </div>
+          }
+        </div>
+      </div>
+    </div>
   }
 </section>

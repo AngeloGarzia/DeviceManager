@@ -1,0 +1,26 @@
+.form-card {
+  padding: 1rem;
+  border: 1px solid #d7e0ea;
+  border-radius: 0.85rem;
+  background: #fff;
+}
+
+.links-block {
+  padding: 0.85rem 1rem;
+  border: 1px solid #d7e0ea;
+  border-radius: 0.75rem;
+  background: #f8fafc;
+  display: grid;
+  gap: 0.65rem;
+}
+
+.sig-grid {
+  display: grid;
+  gap: 1rem;
+}
+
+@media (min-width: 900px) {
+  .sig-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}

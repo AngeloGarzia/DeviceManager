@@ -20,7 +20,16 @@ describe('MasService', () => {
   it('should list MAS', () => {
     service.list().subscribe((list) => expect(list.length).toBe(1));
     const req = http.expectOne('/api/mas');
-    req.flush([{ id: 1, numero: 'M1', marqueId: 1, marque: 'N', marqueLabel: 'Novomatic', utilise: true }]);
+    req.flush([{
+      id: 1,
+      numero: 'M1',
+      marqueId: 1,
+      marque: 'N',
+      marqueLabel: 'Novomatic',
+      statut: 'UTILISEE',
+      statutLabel: 'Machine utilisée',
+      utilise: true
+    }]);
   });
 
   it('should create marque', () => {
@@ -30,12 +39,26 @@ describe('MasService', () => {
     req.flush({ id: 1, code: 'NOVOMATIC', label: 'Novomatic', value: 1 });
   });
 
+  it('should list denos', () => {
+    service.listDenos().subscribe((list) => expect(list.length).toBe(1));
+    const req = http.expectOne('/api/mas/denos');
+    req.flush([{ id: 1, valeur: 0.5, label: '0,50 €', value: 1 }]);
+  });
+
   it('should create MAS', () => {
-    const payload = { numero: 'M1', marqueId: 1, utilise: true };
+    const payload = {
+      numero: 'M1',
+      marqueId: 1,
+      statut: 'UTILISEE',
+      utilise: true,
+      numeroSocle: 'S-12',
+      tauxRedistribution: 94.5,
+      denoId: 1
+    };
     service.create(payload).subscribe((m) => expect(m.numero).toBe('M1'));
     const req = http.expectOne('/api/mas');
     expect(req.request.method).toBe('POST');
-    req.flush({ id: 1, ...payload, marque: 'N', marqueLabel: 'Novomatic' });
+    req.flush({ id: 1, ...payload, marque: 'N', marqueLabel: 'Novomatic', denoLabel: '0,50 €' });
   });
 
   it('should delete MAS', () => {

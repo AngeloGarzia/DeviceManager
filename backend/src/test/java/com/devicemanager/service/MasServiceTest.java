@@ -5,6 +5,7 @@ import com.devicemanager.dto.MasRequest;
 import com.devicemanager.dto.MasResponse;
 import com.devicemanager.entity.MarqueMas;
 import com.devicemanager.entity.Mas;
+import com.devicemanager.repository.DenoRepository;
 import com.devicemanager.repository.MarqueMasRepository;
 import com.devicemanager.repository.MasRepository;
 import com.devicemanager.support.TestFixtures;
@@ -35,6 +36,7 @@ class MasServiceTest {
 
     @Mock private MasRepository masRepository;
     @Mock private MarqueMasRepository marqueMasRepository;
+    @Mock private DenoRepository denoRepository;
     @Mock private AtelierService atelierService;
     @InjectMocks private MasService masService;
 

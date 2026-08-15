@@ -1,0 +1,169 @@
+<section class="grid gap-4">
+  <header class="flex flex-wrap items-start justify-between gap-3">
+    <div>
+      <h1 class="page-title" data-tour="page-mas-suivi">Suivi MAS</h1>
+      <p class="page-subtitle">
+        Timeline en colonnes : bons d’intervention, interventions techniques et FIT
+      </p>
+    </div>
+    <div class="flex flex-wrap gap-2">
+      <a mat-stroked-button routerLink="/mas">
+        <mat-icon>casino</mat-icon>
+        Liste MAS
+      </a>
+      <button mat-stroked-button type="button" [disabled]="masCtrl.value === null" (click)="reload()">
+        Actualiser
+      </button>
+    </div>
+  </header>
+
+  <mat-form-field appearance="outline" class="w-full max-w-xl">
+    <mat-label>Machine / MAS</mat-label>
+    <mat-select [formControl]="masCtrl">
+      <mat-option [value]="null">— Choisir une MAS —</mat-option>
+      @for (mas of masses(); track mas.id) {
+        <mat-option [value]="mas.id">{{ masOptionLabel(mas) }}</mat-option>
+      }
+    </mat-select>
+    <mat-hint>Sélectionnez une machine pour afficher son historique multi-colonnes</mat-hint>
+  </mat-form-field>
+
+  @if (masCtrl.value !== null) {
+    <div class="filter-row">
+      <button mat-stroked-button type="button" (click)="toggleAll()">Tout</button>
+      @for (c of columns; track c.id) {
+        <button
+          type="button"
+          class="filter-chip"
+          [ngClass]="[columnClass(c.id), isActive(c.id) ? 'active' : '']"
+          (click)="toggleColumn(c.id)"
+        >
+          <mat-icon>{{ c.icon }}</mat-icon>
+          {{ c.label }}
+        </button>
+      }
+    </div>
+  }
+
+  @if (error()) {
+    <p class="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{{ error() }}</p>
+  }
+
+  @if (loadingMas() || loading()) {
+    <div class="flex justify-center py-10"><mat-spinner diameter="36"></mat-spinner></div>
+  } @else if (masCtrl.value === null) {
+    <div class="panel">
+      <h2 class="m-0 text-lg font-semibold">Aucune MAS sélectionnée</h2>
+      <p class="mt-2 text-sm text-ink-soft">
+        Choisissez une machine pour voir la timeline de ses bons, interventions et FIT.
+      </p>
+    </div>
+  } @else if (visibleItems().length === 0) {
+    <div class="panel">
+      <h2 class="m-0 text-lg font-semibold">Aucun événement</h2>
+      <p class="mt-2 text-sm text-ink-soft">
+        Aucun bon, intervention technique ou ligne FIT n’est encore lié à
+        {{ selectedMas()?.numero || 'cette MAS' }}.
+      </p>
+      <div class="mt-3 flex flex-wrap gap-2">
+        <a mat-flat-button color="primary" routerLink="/devices/utiliser">Utiliser une pièce</a>
+        <a mat-stroked-button routerLink="/mas/interventions/new">Nouvelle intervention</a>
+        <a mat-stroked-button routerLink="/mas/fit">Fiches FIT</a>
+      </div>
+    </div>
+  } @else {
+    @if (selectedMas(); as mas) {
+      <div class="mas-summary">
+        <div>
+          <div class="text-xs uppercase tracking-wide text-ink-faint">Machine suivie</div>
+          <div class="mt-1 text-base font-semibold text-ink">{{ masOptionLabel(mas) }}</div>
+        </div>
+        <div class="text-sm text-ink-soft">{{ visibleItems().length }} événement(s)</div>
+      </div>
+    }
+
+    <div class="swim-scroll">
+      <div class="swimlanes">
+        <div class="swim-header" [style.grid-template-columns]="gridTemplate()">
+          @for (c of visibleColumns(); track c.id) {
+            <div class="swim-col-title" [ngClass]="columnClass(c.id)">
+              <mat-icon>{{ c.icon }}</mat-icon>
+              <span>{{ c.label }}</span>
+            </div>
+          }
+        </div>
+
+        <div class="swim-body">
+          @for (event of visibleItems(); track eventKey(event, $index); let i = $index) {
+            @let key = eventKey(event, i);
+            @let col = columnOf(event);
+            <div class="swim-row" [style.grid-template-columns]="gridTemplate()">
+              @for (c of visibleColumns(); track c.id) {
+                <div class="swim-cell" [ngClass]="columnClass(c.id)">
+                  @if (c.id === col) {
+                    <article class="timeline-card" [ngClass]="typeClass(event.type)">
+                      <div class="min-w-0">
+                        <div class="flex flex-wrap items-center gap-2">
+                          <span class="type-badge" [ngClass]="typeClass(event.type)">
+                            {{ typeLabel(event.type) }}
+                          </span>
+                          <time class="text-xs text-ink-soft" [attr.datetime]="event.at">
+                            {{ event.at | date: 'dd/MM/yyyy HH:mm' }}
+                          </time>
+                          @if (event.deltaStock != null) {
+                            <span class="delta-badge">{{ deltaLabel(event.deltaStock) }}</span>
+                          }
+                        </div>
+                        <h2 class="m-0 mt-1 text-sm font-semibold text-ink">{{ event.title }}</h2>
+                        @if (event.subtitle) {
+                          <p class="mt-1 text-xs text-ink-soft">{{ event.subtitle }}</p>
+                        }
+                        @if (event.acteur) {
+                          <p class="mt-1 text-xs text-ink-faint">Par {{ event.acteur }}</p>
+                        }
+                      </div>
+                      <div class="timeline-actions">
+                        @if (linkFor(event); as href) {
+                          <a mat-stroked-button [routerLink]="href">Voir</a>
+                        }
+                        @if ((event.lignes?.length || 0) > 0) {
+                          <button mat-button type="button" (click)="toggleExpand(key)">
+                            {{ expandedId() === key ? 'Masquer' : 'Détail' }}
+                          </button>
+                        }
+                      </div>
+                      @if (expandedId() === key && event.lignes?.length) {
+                        <ul class="timeline-lines">
+                          @for (line of event.lignes; track $index) {
+                            <li>
+                              <div class="min-w-0 flex-1">
+                                <div class="truncate text-sm font-medium">{{ line.pieceNom }}</div>
+                                <div class="text-xs text-ink-soft">
+                                  {{ line.pieceReference || 'Sans référence' }}
+                                  @if (line.stockAvant != null && line.stockApres != null) {
+                                    · Stock {{ line.stockAvant }} → {{ line.stockApres }}
+                                  }
+                                </div>
+                              </div>
+                              <span class="text-sm font-semibold">
+                                @if (line.delta != null) {
+                                  {{ deltaLabel(line.delta) }}
+                                } @else {
+                                  × {{ line.quantite }}
+                                }
+                              </span>
+                            </li>
+                          }
+                        </ul>
+                      }
+                    </article>
+                  }
+                </div>
+              }
+            </div>
+          }
+        </div>
+      </div>
+    </div>
+  }
+</section>

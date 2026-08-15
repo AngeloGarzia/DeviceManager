@@ -177,20 +177,29 @@
           </mat-form-field>
           <mat-form-field appearance="outline">
             <mat-label>Machine / MAS</mat-label>
-            <mat-select formControlName="machineMas">
+            <mat-select formControlName="masId">
               <mat-option [value]="null">— Aucune —</mat-option>
               @for (mas of masses(); track mas.id) {
-                <mat-option [value]="masLabel(mas)">
+                <mat-option [value]="mas.id">
                   {{ masLabel(mas) }}
                   @if (!mas.utilise) {
-                    <span class="text-ink-soft"> (non utilisée)</span>
+                    <span class="text-ink-soft"> ({{ mas.statutLabel || 'hors exploitation' }})</span>
                   }
                 </mat-option>
               }
             </mat-select>
-            <mat-hint>Machines de l’atelier</mat-hint>
+            <mat-hint>Machine concernée (optionnel)</mat-hint>
           </mat-form-field>
         </div>
+
+        @if (form.controls.masId.value != null) {
+          <mat-checkbox formControlName="associerFit" class="mb-1">
+            Associer ce bon à la FIT de la machine
+          </mat-checkbox>
+          <p class="m-0 mb-2 text-xs text-ink-soft">
+            Sans cette option, le bon d’intervention reste indépendant de la fiche FIT.
+          </p>
+        }
 
         <mat-form-field appearance="outline">
           <mat-label>Motif de l’intervention</mat-label>
@@ -211,6 +220,40 @@
           <mat-label>Observations</mat-label>
           <textarea matInput rows="3" formControlName="observations"></textarea>
         </mat-form-field>
+
+        @if (requiresFitSignatures()) {
+          <div class="sig-block">
+            <h3 class="m-0 text-sm font-semibold text-ink">Signatures FIT (obligatoires)</h3>
+            <p class="m-0 text-xs text-ink-soft">
+              Le bon sera reporté sur la fiche FIT de la MAS. Deux signatures dessinées sont
+              requises.
+            </p>
+            <div class="sig-grid">
+              <div>
+                <app-signature-pad label="Signature admin / directeur" formControlName="signatureAdmin" />
+                <mat-form-field appearance="outline" class="mt-2 w-full">
+                  <mat-label>Signataire admin</mat-label>
+                  <mat-select formControlName="signataireAdminId">
+                    @for (u of admins(); track u.id) {
+                      <mat-option [value]="u.id">{{ u.displayName }}</mat-option>
+                    }
+                  </mat-select>
+                </mat-form-field>
+              </div>
+              <div>
+                <app-signature-pad label="Signature technicien" formControlName="signatureTechnicien" />
+                <mat-form-field appearance="outline" class="mt-2 w-full">
+                  <mat-label>Signataire technicien</mat-label>
+                  <mat-select formControlName="signataireTechnicienId">
+                    @for (u of techniciens(); track u.id) {
+                      <mat-option [value]="u.id">{{ u.displayName }}</mat-option>
+                    }
+                  </mat-select>
+                </mat-form-field>
+              </div>
+            </div>
+          </div>
+        }
 
         @if (successNumero()) {
           <p class="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800">

@@ -49,11 +49,16 @@ public class OrderRequestController {
     /**
      * Liste les demandes de commande de l'atelier courant — admin et technicien.
      *
+     * @param masIds si renseigné, ne garde que les commandes dont une pièce est liée à ces MAS
      * @return demandes triées par date décroissante
      */
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'TECHNICIEN')")
-    public ResponseEntity<List<OrderRequestResponse>> list() {
+    public ResponseEntity<List<OrderRequestResponse>> list(
+            @RequestParam(required = false) List<Long> masIds) {
+        if (masIds != null && !masIds.isEmpty()) {
+            return ResponseEntity.ok(orderRequestService.findByMasIds(masIds));
+        }
         return ResponseEntity.ok(orderRequestService.findAll());
     }
 

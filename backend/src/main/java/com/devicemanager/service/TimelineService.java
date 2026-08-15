@@ -5,17 +5,26 @@ import com.devicemanager.dto.TimelineLineDto;
 import com.devicemanager.entity.Commande;
 import com.devicemanager.entity.CommandeLigne;
 import com.devicemanager.entity.Device;
+import com.devicemanager.entity.Fit;
+import com.devicemanager.entity.FitLigne;
 import com.devicemanager.entity.Intervention;
 import com.devicemanager.entity.InterventionLigne;
+import com.devicemanager.entity.InterventionTechnique;
+import com.devicemanager.entity.Mas;
 import com.devicemanager.entity.StockMouvement;
 import com.devicemanager.repository.CommandeRepository;
+import com.devicemanager.repository.FitRepository;
 import com.devicemanager.repository.InterventionRepository;
+import com.devicemanager.repository.InterventionTechniqueRepository;
+import com.devicemanager.repository.MasRepository;
 import com.devicemanager.repository.StockMouvementRepository;
 import com.devicemanager.security.StockMouvementSources;
 import com.devicemanager.security.TimelineEventTypes;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -26,7 +35,7 @@ import java.util.Locale;
 import java.util.Set;
 
 /**
- * Agrège demandes, validations, réceptions, interventions et ajustements manuels de stock.
+ * Agrège commandes, bons, interventions techniques, FIT et ajustements de stock.
  */
 @Service
 @RequiredArgsConstructor
@@ -35,6 +44,9 @@ public class TimelineService {
 
     private final CommandeRepository commandeRepository;
     private final InterventionRepository interventionRepository;
+    private final InterventionTechniqueRepository interventionTechniqueRepository;
+    private final FitRepository fitRepository;
+    private final MasRepository masRepository;
     private final StockMouvementRepository stockMouvementRepository;
     private final AtelierService atelierService;
 
@@ -44,15 +56,31 @@ public class TimelineService {
      * @param from  borne basse inclusive (optionnelle)
      * @param to    borne haute inclusive (optionnelle)
      * @param types filtres de types (optionnel ; vide = tous)
+     * @param masId si renseigné, ne conserve que les événements liés à cette MAS
+     *              (bons, interventions techniques, FIT) — exclut commandes / stock global
      */
-    public List<TimelineEventResponse> findEvents(LocalDateTime from, LocalDateTime to, List<String> types) {
+    public List<TimelineEventResponse> findEvents(
+            LocalDateTime from,
+            LocalDateTime to,
+            List<String> types,
+            Long masId) {
         Long atelierId = atelierService.requireCurrentAtelier().getId();
         Set<String> typeFilter = normalizeTypes(types);
+        String masNumero = null;
+        if (masId != null) {
+            Mas mas = masRepository.findByIdAndAtelierId(masId, atelierId)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "MAS introuvable"));
+            masNumero = mas.getNumero();
+        }
 
         List<TimelineEventResponse> events = new ArrayList<>();
-        appendOrderEvents(events, atelierId, from, to, typeFilter);
-        appendInterventionEvents(events, atelierId, from, to, typeFilter);
-        appendManualStockEvents(events, atelierId, from, to, typeFilter);
+        if (masId == null) {
+            appendOrderEvents(events, atelierId, from, to, typeFilter);
+            appendManualStockEvents(events, atelierId, from, to, typeFilter);
+        }
+        appendBonEvents(events, atelierId, from, to, typeFilter, masId, masNumero);
+        appendTechniqueEvents(events, atelierId, from, to, typeFilter, masId);
+        appendFitEvents(events, atelierId, from, to, typeFilter, masId);
 
         events.sort(Comparator
                 .comparing(TimelineEventResponse::getAt, Comparator.nullsLast(Comparator.reverseOrder()))
@@ -72,61 +100,71 @@ public class TimelineService {
 
             if (include(typeFilter, TimelineEventTypes.ORDER_REQUEST)
                     && inRange(commande.getDateDemande(), from, to)) {
-                events.add(TimelineEventResponse.builder()
-                        .type(TimelineEventTypes.ORDER_REQUEST)
-                        .at(commande.getDateDemande())
-                        .title("Demande de commande #" + commande.getId())
-                        .subtitle(lignes.size() + " pièce(s) · Qté " + totalQty)
-                        .acteur(commande.getTechnicienNom())
-                        .refType("ORDER")
-                        .refId(commande.getId())
-                        .lignes(lignes)
-                        .build());
+                events.add(event(
+                        TimelineEventTypes.ORDER_REQUEST,
+                        commande.getDateDemande(),
+                        "Demande de commande #" + commande.getId(),
+                        lignes.size() + " pièce(s) · Qté " + totalQty,
+                        commande.getTechnicienNom(),
+                        "ORDER",
+                        commande.getId(),
+                        null,
+                        null,
+                        null,
+                        lignes));
             }
 
             if (include(typeFilter, TimelineEventTypes.ORDER_VALIDATED)
                     && commande.getDateValidation() != null
                     && inRange(commande.getDateValidation(), from, to)) {
-                events.add(TimelineEventResponse.builder()
-                        .type(TimelineEventTypes.ORDER_VALIDATED)
-                        .at(commande.getDateValidation())
-                        .title("Validation commande #" + commande.getId())
-                        .subtitle(lignes.size() + " pièce(s) · Qté " + totalQty)
-                        .acteur(null)
-                        .refType("ORDER")
-                        .refId(commande.getId())
-                        .lignes(lignes)
-                        .build());
+                events.add(event(
+                        TimelineEventTypes.ORDER_VALIDATED,
+                        commande.getDateValidation(),
+                        "Validation commande #" + commande.getId(),
+                        lignes.size() + " pièce(s) · Qté " + totalQty,
+                        null,
+                        "ORDER",
+                        commande.getId(),
+                        null,
+                        null,
+                        null,
+                        lignes));
             }
 
             if (include(typeFilter, TimelineEventTypes.ORDER_RECEIVED)
                     && commande.getDateReception() != null
                     && inRange(commande.getDateReception(), from, to)) {
-                events.add(TimelineEventResponse.builder()
-                        .type(TimelineEventTypes.ORDER_RECEIVED)
-                        .at(commande.getDateReception())
-                        .title("Réception commande #" + commande.getId())
-                        .subtitle("Stock +" + totalQty)
-                        .acteur(null)
-                        .refType("ORDER")
-                        .refId(commande.getId())
-                        .deltaStock(totalQty)
-                        .lignes(lignes)
-                        .build());
+                events.add(event(
+                        TimelineEventTypes.ORDER_RECEIVED,
+                        commande.getDateReception(),
+                        "Réception commande #" + commande.getId(),
+                        "Stock +" + totalQty,
+                        null,
+                        "ORDER",
+                        commande.getId(),
+                        null,
+                        null,
+                        totalQty,
+                        lignes));
             }
         }
     }
 
-    private void appendInterventionEvents(
+    private void appendBonEvents(
             List<TimelineEventResponse> events,
             Long atelierId,
             LocalDateTime from,
             LocalDateTime to,
-            Set<String> typeFilter) {
+            Set<String> typeFilter,
+            Long masId,
+            String masNumero) {
         if (!include(typeFilter, TimelineEventTypes.INTERVENTION)) {
             return;
         }
-        for (Intervention intervention : interventionRepository.findAllWithRelationsByAtelierId(atelierId)) {
+        List<Intervention> list = masId != null
+                ? interventionRepository.findByAtelierAndMas(atelierId, masId, masNumero)
+                : interventionRepository.findAllWithRelationsByAtelierId(atelierId);
+        for (Intervention intervention : list) {
             if (!inRange(intervention.getDateIntervention(), from, to)) {
                 continue;
             }
@@ -136,17 +174,105 @@ public class TimelineService {
             int totalDelta = lignes.stream()
                     .mapToInt(l -> l.getDelta() == null ? 0 : l.getDelta())
                     .sum();
-            events.add(TimelineEventResponse.builder()
-                    .type(TimelineEventTypes.INTERVENTION)
-                    .at(intervention.getDateIntervention())
-                    .title("Intervention " + intervention.getNumero())
-                    .subtitle(intervention.getMotif())
-                    .acteur(intervention.getTechnicienNom())
-                    .refType("INTERVENTION")
-                    .refId(intervention.getId())
-                    .deltaStock(totalDelta)
-                    .lignes(lignes)
-                    .build());
+            Mas mas = intervention.getMas();
+            events.add(event(
+                    TimelineEventTypes.INTERVENTION,
+                    intervention.getDateIntervention(),
+                    "Bon " + intervention.getNumero(),
+                    intervention.getMotif(),
+                    intervention.getTechnicienNom(),
+                    "INTERVENTION",
+                    intervention.getId(),
+                    mas != null ? mas.getId() : null,
+                    mas != null ? mas.getNumero() : intervention.getMachineMas(),
+                    totalDelta,
+                    lignes));
+        }
+    }
+
+    private void appendTechniqueEvents(
+            List<TimelineEventResponse> events,
+            Long atelierId,
+            LocalDateTime from,
+            LocalDateTime to,
+            Set<String> typeFilter,
+            Long masId) {
+        if (!include(typeFilter, TimelineEventTypes.INTERVENTION_TECHNIQUE)) {
+            return;
+        }
+        List<InterventionTechnique> list = masId != null
+                ? interventionTechniqueRepository.findByAtelierIdAndMasId(atelierId, masId)
+                : interventionTechniqueRepository.findAllByAtelierId(atelierId);
+        for (InterventionTechnique it : list) {
+            if (!inRange(it.getDateIntervention(), from, to)) {
+                continue;
+            }
+            Mas mas = it.getMas();
+            String links = buildTechniqueLinks(it);
+            events.add(event(
+                    TimelineEventTypes.INTERVENTION_TECHNIQUE,
+                    it.getDateIntervention(),
+                    "Intervention technique — " + (mas != null ? mas.getNumero() : "?"),
+                    it.getMotif() + (links.isEmpty() ? "" : " · " + links),
+                    it.getTechnicienNom(),
+                    "INTERVENTION_TECHNIQUE",
+                    it.getId(),
+                    mas != null ? mas.getId() : null,
+                    mas != null ? mas.getNumero() : null,
+                    null,
+                    List.of()));
+        }
+    }
+
+    private void appendFitEvents(
+            List<TimelineEventResponse> events,
+            Long atelierId,
+            LocalDateTime from,
+            LocalDateTime to,
+            Set<String> typeFilter,
+            Long masId) {
+        if (!include(typeFilter, TimelineEventTypes.FIT)) {
+            return;
+        }
+        List<Fit> fits;
+        if (masId != null) {
+            fits = fitRepository.findByAtelierIdAndMasIdWithLignes(atelierId, masId)
+                    .map(List::of)
+                    .orElse(List.of());
+        } else {
+            fits = fitRepository.findAllByAtelierId(atelierId);
+        }
+        for (Fit fit : fits) {
+            Mas mas = fit.getMas();
+            if (fit.getLignes() == null) {
+                continue;
+            }
+            for (FitLigne ligne : fit.getLignes()) {
+                LocalDateTime at = ligne.getDateOperation() != null
+                        ? ligne.getDateOperation().atStartOfDay()
+                        : ligne.getCreatedAt();
+                if (!inRange(at, from, to)) {
+                    continue;
+                }
+                String subtitle = ligne.getMotifNatureOperations();
+                if (subtitle != null && subtitle.length() > 160) {
+                    subtitle = subtitle.substring(0, 157) + "…";
+                }
+                events.add(event(
+                        TimelineEventTypes.FIT,
+                        at,
+                        "FIT — Machine " + fit.getNumeroMachineCasino(),
+                        subtitle,
+                        ligne.getSignataireTechnicienNom() != null
+                                ? ligne.getSignataireTechnicienNom()
+                                : ligne.getSignataireAdminNom(),
+                        "FIT",
+                        fit.getId(),
+                        mas != null ? mas.getId() : null,
+                        mas != null ? mas.getNumero() : fit.getNumeroMachineCasino(),
+                        null,
+                        List.of()));
+            }
         }
     }
 
@@ -177,19 +303,62 @@ public class TimelineService {
                     .delta(m.getDelta())
                     .build();
             String sign = (m.getDelta() != null && m.getDelta() > 0) ? "+" : "";
-            events.add(TimelineEventResponse.builder()
-                    .type(TimelineEventTypes.STOCK_ADJUSTMENT)
-                    .at(m.getCreatedAt())
-                    .title("Ajustement stock — " + m.getPieceNom())
-                    .subtitle("Stock " + m.getStockAvant() + " → " + m.getStockApres()
-                            + " (" + sign + m.getDelta() + ")")
-                    .acteur(m.getActeurNom())
-                    .refType("DEVICE")
-                    .refId(m.getDevice() != null ? m.getDevice().getId() : m.getSourceId())
-                    .deltaStock(m.getDelta())
-                    .lignes(List.of(line))
-                    .build());
+            events.add(event(
+                    TimelineEventTypes.STOCK_ADJUSTMENT,
+                    m.getCreatedAt(),
+                    "Ajustement stock — " + m.getPieceNom(),
+                    "Stock " + m.getStockAvant() + " → " + m.getStockApres()
+                            + " (" + sign + m.getDelta() + ")",
+                    m.getActeurNom(),
+                    "DEVICE",
+                    m.getDevice() != null ? m.getDevice().getId() : m.getSourceId(),
+                    null,
+                    null,
+                    m.getDelta(),
+                    List.of(line)));
         }
+    }
+
+    private static String buildTechniqueLinks(InterventionTechnique it) {
+        List<String> parts = new ArrayList<>();
+        if (it.getFit() != null) {
+            parts.add("FIT");
+        }
+        if (it.getCommande() != null) {
+            parts.add("Commande #" + it.getCommande().getId());
+        }
+        if (it.getBonIntervention() != null) {
+            parts.add("Bon " + it.getBonIntervention().getNumero());
+        }
+        return String.join(" · ", parts);
+    }
+
+    private TimelineEventResponse event(
+            String type,
+            LocalDateTime at,
+            String title,
+            String subtitle,
+            String acteur,
+            String refType,
+            Long refId,
+            Long masId,
+            String masNumero,
+            Integer deltaStock,
+            List<TimelineLineDto> lignes) {
+        return TimelineEventResponse.builder()
+                .type(type)
+                .column(TimelineEventTypes.columnFor(type))
+                .at(at)
+                .title(title)
+                .subtitle(subtitle)
+                .acteur(acteur)
+                .refType(refType)
+                .refId(refId)
+                .masId(masId)
+                .masNumero(masNumero)
+                .deltaStock(deltaStock)
+                .lignes(lignes)
+                .build();
     }
 
     private List<TimelineLineDto> orderLines(Commande commande) {

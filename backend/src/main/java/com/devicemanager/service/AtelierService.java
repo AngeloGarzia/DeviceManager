@@ -23,7 +23,9 @@ import com.devicemanager.repository.AtelierRepository;
 import com.devicemanager.repository.CasinoRepository;
 import com.devicemanager.repository.CommandeRepository;
 import com.devicemanager.repository.DeviceRepository;
+import com.devicemanager.repository.FitRepository;
 import com.devicemanager.repository.InterventionRepository;
+import com.devicemanager.repository.InterventionTechniqueRepository;
 import com.devicemanager.repository.MasRepository;
 import com.devicemanager.repository.SfmRepository;
 import com.devicemanager.repository.UserRepository;
@@ -65,6 +67,8 @@ public class AtelierService {
     private final SfmRepository sfmRepository;
     private final CommandeRepository commandeRepository;
     private final InterventionRepository interventionRepository;
+    private final InterventionTechniqueRepository interventionTechniqueRepository;
+    private final FitRepository fitRepository;
 
     /**
      * Liste les ateliers accessibles à un utilisateur selon son rôle et son groupe.
@@ -316,9 +320,11 @@ public class AtelierService {
         long sfms = sfmRepository.countByAtelierId(id);
         long commandes = commandeRepository.countByAtelierId(id);
         long interventions = interventionRepository.countByAtelierId(id);
-        if (devices + masses + sfms + commandes + interventions > 0) {
+        long interventionsTechniques = interventionTechniqueRepository.countByAtelierId(id);
+        long fits = fitRepository.countByAtelierId(id);
+        if (devices + masses + sfms + commandes + interventions + interventionsTechniques + fits > 0) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
-                    "Impossible de supprimer : des pièces, MAS, SFM, demandes ou bons d'intervention sont liés à cet atelier.");
+                    "Impossible de supprimer : des pièces, MAS, SFM, demandes, bons, interventions techniques ou FIT sont liés à cet atelier.");
         }
         String nom = atelier.getNom();
 

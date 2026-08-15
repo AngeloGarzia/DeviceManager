@@ -33,6 +33,30 @@ public interface CommandeRepository extends JpaRepository<Commande, Long> {
     List<Commande> findAllWithRelationsOrderByDateDesc(@Param("atelierId") Long atelierId);
 
     /**
+     * Commandes dont au moins une ligne référence une pièce rattachée à l'une des MAS.
+     */
+    @Query("""
+            select distinct c from Commande c
+            left join fetch c.lignes l
+            left join fetch l.device d
+            left join fetch d.sfm
+            left join fetch d.mas
+            join fetch c.technicien
+            where c.atelier.id = :atelierId
+              and exists (
+                    select 1 from CommandeLigne cl
+                    join cl.device cd
+                    where cl.commande = c
+                      and cd.mas is not null
+                      and cd.mas.id in :masIds
+              )
+            order by c.dateDemande desc
+            """)
+    List<Commande> findByAtelierAndDeviceMasIds(
+            @Param("atelierId") Long atelierId,
+            @Param("masIds") List<Long> masIds);
+
+    /**
      * Compte les commandes d'un atelier dont le statut est dans la liste fournie.
      *
      * @param atelierId identifiant de l'atelier

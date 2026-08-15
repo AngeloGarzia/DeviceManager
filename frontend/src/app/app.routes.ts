@@ -89,6 +89,38 @@ export const routes: Routes = [
         loadComponent: () => import('./pages/mas-list/mas-list.component').then((m) => m.MasListComponent)
       },
       {
+        path: 'mas/suivi',
+        loadComponent: () =>
+          import('./pages/mas-suivi/mas-suivi.component').then((m) => m.MasSuiviComponent)
+      },
+      {
+        path: 'mas/interventions',
+        loadComponent: () =>
+          import('./pages/intervention-technique-list/intervention-technique-list.component').then(
+            (m) => m.InterventionTechniqueListComponent
+          )
+      },
+      {
+        path: 'mas/interventions/new',
+        loadComponent: () =>
+          import('./pages/intervention-technique-form/intervention-technique-form.component').then(
+            (m) => m.InterventionTechniqueFormComponent
+          )
+      },
+      {
+        path: 'mas/fit',
+        loadComponent: () => import('./pages/fit-list/fit-list.component').then((m) => m.FitListComponent)
+      },
+      {
+        path: 'mas/fit/new',
+        loadComponent: () => import('./pages/fit-new/fit-new.component').then((m) => m.FitNewComponent)
+      },
+      {
+        path: 'mas/fit/:id',
+        loadComponent: () =>
+          import('./pages/fit-detail/fit-detail.component').then((m) => m.FitDetailComponent)
+      },
+      {
         path: 'mas/new',
         loadComponent: () => import('./pages/mas-form/mas-form.component').then((m) => m.MasFormComponent)
       },

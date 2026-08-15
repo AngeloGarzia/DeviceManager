@@ -8,7 +8,7 @@
       {{
         returnDevice
           ? 'Création depuis une pièce — retour automatique à la saisie après enregistrement'
-          : "Numéro, marque et statut d'utilisation"
+          : 'Numéro, socle, taux, dénomination et marque'
       }}
     </p>
   </header>
@@ -18,31 +18,117 @@
     <mat-card class="!rounded-xl !border !border-line !shadow-soft">
       <mat-card-content class="!pt-5">
         <form class="grid gap-3" [formGroup]="form" (ngSubmit)="submit()">
-          <mat-form-field appearance="outline">
-            <mat-label>Numéro</mat-label>
-            <input matInput formControlName="numero" />
-          </mat-form-field>
+          <div class="mas-fields-grid">
+            <div class="mas-cell mas-cell--numero">
+              <mat-form-field appearance="outline" class="mas-field" subscriptSizing="dynamic">
+                <mat-label>Numéro</mat-label>
+                <input matInput formControlName="numero" />
+              </mat-form-field>
+            </div>
 
-          <div class="flex flex-col gap-2 sm:flex-row sm:items-start">
-            <mat-form-field appearance="outline" class="w-full min-w-0 flex-1">
-              <mat-label>Marque</mat-label>
-              <mat-select formControlName="marqueId">
-                @for (m of marques(); track m.id) {
-                  <mat-option [value]="m.id">{{ m.label }}</mat-option>
-                }
-              </mat-select>
-            </mat-form-field>
-            <button
-              mat-stroked-button
-              color="primary"
-              type="button"
-              class="w-full shrink-0 sm:mt-1 sm:w-auto"
-              (click)="openNewMarque()"
-            >
-              <mat-icon>add</mat-icon>
-              Nouvelle marque
-            </button>
+            <div class="mas-cell mas-cell--taux">
+              <mat-form-field appearance="outline" class="mas-field" subscriptSizing="dynamic">
+                <mat-label>Taux de redistribution (%)</mat-label>
+                <input
+                  matInput
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  max="100"
+                  formControlName="tauxRedistribution"
+                />
+              </mat-form-field>
+            </div>
+
+            <div class="mas-cell mas-cell--marque">
+              <mat-form-field appearance="outline" class="mas-field" subscriptSizing="dynamic">
+                <mat-label>Marque</mat-label>
+                <mat-select formControlName="marqueId">
+                  @for (m of marques(); track m.id) {
+                    <mat-option [value]="m.id">{{ m.label }}</mat-option>
+                  }
+                </mat-select>
+              </mat-form-field>
+              <button
+                mat-stroked-button
+                color="primary"
+                type="button"
+                class="mas-side-btn"
+                (click)="openNewMarque()"
+              >
+                <mat-icon>add</mat-icon>
+                Nouvelle marque
+              </button>
+            </div>
+
+            <div class="mas-cell mas-cell--socle">
+              <mat-form-field appearance="outline" class="mas-field" subscriptSizing="dynamic">
+                <mat-label>Numéro de socle</mat-label>
+                <input matInput formControlName="numeroSocle" />
+              </mat-form-field>
+            </div>
+
+            <div class="mas-cell mas-cell--deno">
+              <mat-form-field appearance="outline" class="mas-field" subscriptSizing="dynamic">
+                <mat-label>Dénomination</mat-label>
+                <mat-select formControlName="denoId">
+                  <mat-option [value]="null">— Aucune —</mat-option>
+                  @for (d of denos(); track d.id) {
+                    <mat-option [value]="d.id">{{ d.label }}</mat-option>
+                  }
+                </mat-select>
+              </mat-form-field>
+            </div>
+
+            <div class="mas-cell mas-cell--action mas-cell--action-deno">
+              <button
+                mat-stroked-button
+                color="primary"
+                type="button"
+                class="mas-side-btn"
+                (click)="openNewDeno()"
+                data-tour="btn-new-deno"
+              >
+                <mat-icon>add</mat-icon>
+                Nouvelle deno
+              </button>
+            </div>
           </div>
+
+          @if (showNewDeno()) {
+            <div class="mb-1 rounded-xl border border-sky-200 bg-sky-50 p-3" [formGroup]="newDenoForm">
+              <p class="m-0 mb-2 text-sm font-medium text-ink">
+                Nouvelle dénomination — elle sera enregistrée et sélectionnée pour cette MAS
+              </p>
+              <mat-form-field appearance="outline" class="w-full">
+                <mat-label>Valeur (€)</mat-label>
+                <input
+                  matInput
+                  type="number"
+                  step="0.01"
+                  min="0.01"
+                  formControlName="valeur"
+                  placeholder="Ex. 0.50"
+                />
+                <mat-hint>Exemples : 0.01 · 0.50 · 1.00</mat-hint>
+              </mat-form-field>
+              @if (denoError()) {
+                <p class="mb-2 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{{ denoError() }}</p>
+              }
+              <div class="flex flex-wrap gap-2">
+                <button mat-button type="button" (click)="cancelNewDeno()">Annuler</button>
+                <button
+                  mat-flat-button
+                  color="primary"
+                  type="button"
+                  [disabled]="savingDeno()"
+                  (click)="createDeno()"
+                >
+                  {{ savingDeno() ? 'Création…' : 'Créer et utiliser' }}
+                </button>
+              </div>
+            </div>
+          }
 
           @if (showNewMarque()) {
             <div class="mb-3 rounded-xl border border-line bg-slate-50 p-3" [formGroup]="newMarqueForm">
@@ -69,7 +155,19 @@
             </div>
           }
 
-          <mat-checkbox formControlName="utilise" class="mb-3">Machine utilisée</mat-checkbox>
+          <div class="statut-block mb-3">
+            <div class="text-sm font-semibold text-ink mb-2">Statut de la machine</div>
+            <div class="statut-checks">
+              @for (opt of statutOptions; track opt.value) {
+                <mat-checkbox
+                  [checked]="isStatutChecked(opt.value)"
+                  (change)="onStatutToggle(opt.value, $event.checked)"
+                >
+                  {{ opt.label }}
+                </mat-checkbox>
+              }
+            </div>
+          </div>
 
           @if (error()) {
             <p class="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{{ error() }}</p>

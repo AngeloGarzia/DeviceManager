@@ -14,6 +14,7 @@ import { MasService } from '../../services/mas.service';
 import { AuthService } from '../../services/auth.service';
 import { ConfirmDialogComponent } from '../../shared/confirm-dialog.component';
 import { apiErrorMessage } from '../../shared/api-error';
+import { masStatutBadgeClass, masStatutLabel } from '../../shared/mas-statut';
 
 /**
  * Liste des MAS (modèles d'appareils de substitution) de l'atelier.
@@ -38,7 +39,9 @@ export class MasListComponent implements OnInit {
   readonly confirmOpen = signal(false);
   pendingDelete: Mas | null = null;
   query = '';
-  readonly displayedColumns = ['numero', 'marque', 'statut', 'actions'];
+  readonly displayedColumns = ['numero', 'socle', 'marque', 'deno', 'taux', 'statut', 'actions'];
+  readonly statutLabel = masStatutLabel;
+  readonly statutBadgeClass = masStatutBadgeClass;
 
   constructor(private masService: MasService) {}
 

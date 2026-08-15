@@ -1,0 +1,198 @@
+<section class="grid gap-4">
+  <header>
+    <a routerLink="/mas/interventions" class="text-sm text-ink-soft no-underline hover:underline"
+      >← Interventions techniques</a
+    >
+    <h1 class="page-title mt-1">Nouvelle intervention technique</h1>
+    <p class="page-subtitle">
+      Une ligne est créée en base pour chaque MAS sélectionnée. Les liens FIT, commande et bon sont
+      optionnels.
+    </p>
+  </header>
+
+  @if (loading()) {
+    <div class="flex justify-center py-8"><mat-spinner diameter="36"></mat-spinner></div>
+  } @else {
+    <form class="form-card grid gap-3" [formGroup]="form" (ngSubmit)="submit()">
+      <mat-form-field appearance="outline">
+        <mat-label>Date et heure</mat-label>
+        <input matInput type="datetime-local" formControlName="dateIntervention" />
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>MAS concernées</mat-label>
+        <mat-select formControlName="masIds" multiple>
+          @for (mas of masses(); track mas.id) {
+            <mat-option [value]="mas.id">{{ masLabel(mas) }}</mat-option>
+          }
+        </mat-select>
+        <mat-hint>Multi-sélection : une intervention technique par machine</mat-hint>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Emplacement</mat-label>
+        <input matInput formControlName="emplacement" />
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Motif</mat-label>
+        <input matInput formControlName="motif" />
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Diagnostic</mat-label>
+        <textarea matInput rows="3" formControlName="diagnostic"></textarea>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Travaux effectués</mat-label>
+        <textarea matInput rows="4" formControlName="travaux"></textarea>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Observations</mat-label>
+        <textarea matInput rows="3" formControlName="observations"></textarea>
+      </mat-form-field>
+
+      <div class="links-block">
+        <div class="text-sm font-semibold text-ink mb-2">Liens optionnels</div>
+        <p class="m-0 mb-2 text-xs text-ink-soft">
+          Commandes et bons proposés uniquement s’ils sont rattachés à la ou aux MAS sélectionnées.
+        </p>
+
+        <mat-form-field appearance="outline" class="w-full">
+          <mat-label>Commande de pièces</mat-label>
+          <mat-select formControlName="commandeId" [disabled]="!form.controls.masIds.value?.length">
+            <mat-option [value]="null">— Aucune —</mat-option>
+            @for (c of commandes(); track c.id) {
+              <mat-option [value]="c.id">#{{ c.id }} — {{ c.status }} — {{ c.message }}</mat-option>
+            }
+          </mat-select>
+          <mat-hint>
+            @if (loadingLinks()) {
+              Chargement…
+            } @else if (!form.controls.masIds.value?.length) {
+              Sélectionnez d’abord une MAS
+            } @else if (commandes().length === 0) {
+              Aucune commande liée aux pièces de ces MAS
+            } @else {
+              {{ commandes().length }} commande(s) liée(s)
+            }
+          </mat-hint>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="w-full">
+          <mat-label>Bon d’intervention (pièces)</mat-label>
+          <mat-select
+            formControlName="bonInterventionId"
+            [disabled]="!form.controls.masIds.value?.length"
+          >
+            <mat-option [value]="null">— Aucun —</mat-option>
+            @for (b of bons(); track b.id) {
+              <mat-option [value]="b.id">{{ b.numero }} — {{ b.motif }}</mat-option>
+            }
+          </mat-select>
+          <mat-hint>
+            @if (loadingLinks()) {
+              Chargement…
+            } @else if (!form.controls.masIds.value?.length) {
+              Sélectionnez d’abord une MAS
+            } @else if (bons().length === 0) {
+              Aucun bon rattaché à ces MAS
+            } @else {
+              {{ bons().length }} bon(s) rattaché(s)
+            }
+          </mat-hint>
+        </mat-form-field>
+
+        <mat-checkbox formControlName="associerFit">Associer à la FIT de chaque MAS</mat-checkbox>
+      </div>
+
+      @if (requiresFitSignatures()) {
+        <div class="sig-grid">
+          <div>
+            <app-signature-pad label="Signature admin / directeur" formControlName="signatureAdmin" />
+            <mat-form-field appearance="outline" class="mt-2 w-full">
+              <mat-label>Signataire admin</mat-label>
+              <mat-select formControlName="signataireAdminId">
+                @for (u of admins(); track u.id) {
+                  <mat-option [value]="u.id">{{ u.displayName }}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+          </div>
+          <div>
+            <app-signature-pad label="Signature technicien" formControlName="signatureTechnicien" />
+            <mat-form-field appearance="outline" class="mt-2 w-full">
+              <mat-label>Signataire technicien</mat-label>
+              <mat-select formControlName="signataireTechnicienId">
+                @for (u of techniciens(); track u.id) {
+                  <mat-option [value]="u.id">{{ u.displayName }}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+          </div>
+        </div>
+      }
+
+      @if (error()) {
+        <p class="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{{ error() }}</p>
+      }
+
+      <div class="flex flex-wrap gap-2">
+        <a mat-stroked-button routerLink="/mas/interventions">Annuler</a>
+        <button mat-flat-button color="primary" type="submit" [disabled]="saving()">
+          {{ saving() ? 'Enregistrement…' : 'Enregistrer' }}
+        </button>
+      </div>
+    </form>
+  }
+
+  @if (followUpOpen()) {
+    <div
+      class="fixed inset-0 z-[100] flex items-end justify-center bg-slate-900/40 p-4 sm:items-center"
+      role="presentation"
+    >
+      <div
+        class="w-full max-w-lg rounded-2xl border border-line bg-white p-5 shadow-soft"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="follow-up-title"
+      >
+        <h2 id="follow-up-title" class="m-0 text-lg font-semibold text-ink">
+          Intervention technique enregistrée
+        </h2>
+        <p class="mt-2 text-sm leading-relaxed text-ink-soft">
+          {{ createdItems().length }} ligne(s) créée(s). Souhaitez-vous enchaîner avec une
+          consommation de pièce (bon d’intervention) ou une ligne FIT sur la machine concernée&nbsp;?
+        </p>
+
+        @if (createdMasOptions().length > 1) {
+          <label class="mt-3 block text-sm font-medium text-ink" for="follow-up-mas">
+            MAS pour la suite
+          </label>
+          <select
+            id="follow-up-mas"
+            class="mt-1 w-full rounded-lg border border-line bg-white px-3 py-2 text-sm"
+            [value]="followUpMasId() ?? ''"
+            (change)="followUpMasId.set(+$any($event.target).value)"
+          >
+            @for (opt of createdMasOptions(); track opt.id) {
+              <option [value]="opt.id">{{ opt.label }}</option>
+            }
+          </select>
+        }
+
+        <div class="mt-5 grid gap-2">
+          <button mat-flat-button color="primary" type="button" (click)="chooseFollowUp('bon')">
+            Créer un bon d’intervention (consommation)
+          </button>
+          <button mat-stroked-button type="button" (click)="chooseFollowUp('fit')">
+            Créer une ligne FIT
+          </button>
+          <button mat-button type="button" (click)="chooseFollowUp('done')">Terminer</button>
+        </div>
+      </div>
+    </div>
+  }
+</section>

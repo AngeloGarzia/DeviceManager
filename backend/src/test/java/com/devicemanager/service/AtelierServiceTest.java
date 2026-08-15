@@ -12,7 +12,9 @@ import com.devicemanager.repository.AtelierRepository;
 import com.devicemanager.repository.CasinoRepository;
 import com.devicemanager.repository.CommandeRepository;
 import com.devicemanager.repository.DeviceRepository;
+import com.devicemanager.repository.FitRepository;
 import com.devicemanager.repository.InterventionRepository;
+import com.devicemanager.repository.InterventionTechniqueRepository;
 import com.devicemanager.repository.MasRepository;
 import com.devicemanager.repository.SfmRepository;
 import com.devicemanager.repository.UserRepository;
@@ -53,6 +55,8 @@ class AtelierServiceTest {
     @Mock private SfmRepository sfmRepository;
     @Mock private CommandeRepository commandeRepository;
     @Mock private InterventionRepository interventionRepository;
+    @Mock private InterventionTechniqueRepository interventionTechniqueRepository;
+    @Mock private FitRepository fitRepository;
     @InjectMocks private AtelierService atelierService;
 
     @AfterEach
@@ -291,6 +295,8 @@ class AtelierServiceTest {
         when(sfmRepository.countByAtelierId(100L)).thenReturn(0L);
         when(commandeRepository.countByAtelierId(100L)).thenReturn(0L);
         when(interventionRepository.countByAtelierId(100L)).thenReturn(0L);
+        when(interventionTechniqueRepository.countByAtelierId(100L)).thenReturn(0L);
+        when(fitRepository.countByAtelierId(100L)).thenReturn(0L);
         when(userRepository.clearPreferredAtelier(100L)).thenReturn(1);
 
         atelierService.delete("admin", 100L);

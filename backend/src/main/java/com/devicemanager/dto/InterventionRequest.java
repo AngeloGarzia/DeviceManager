@@ -26,6 +26,15 @@ public class InterventionRequest {
     @Size(max = 120, message = "La machine / MAS ne doit pas dépasser 120 caractères")
     private String machineMas;
 
+    /** Identifiant MAS (préféré pour le suivi technique). */
+    private Long masId;
+
+    /**
+     * Si {@code true} et {@link #masId} renseigné : crée une ligne FIT signée liée à ce bon.
+     * Sinon le bon reste indépendant de toute FIT.
+     */
+    private Boolean associerFit;
+
     @NotBlank(message = "Le motif de l'intervention est obligatoire")
     @Size(max = 500, message = "Le motif ne doit pas dépasser 500 caractères")
     private String motif;
@@ -39,6 +48,22 @@ public class InterventionRequest {
 
     @Size(max = 2000, message = "Les observations ne doivent pas dépasser 2000 caractères")
     private String observations;
+
+    /**
+     * Signature manuscrite admin (data URL) — obligatoire si {@link #associerFit} est vrai.
+     */
+    private String signatureAdmin;
+
+    /**
+     * Signature manuscrite technicien (data URL) — obligatoire si {@link #associerFit} est vrai.
+     */
+    private String signatureTechnicien;
+
+    @Size(max = 120)
+    private String signataireAdminNom;
+
+    @Size(max = 120)
+    private String signataireTechnicienNom;
 
     @NotEmpty(message = "Ajoutez au moins une pièce détachée consommée")
     @Valid

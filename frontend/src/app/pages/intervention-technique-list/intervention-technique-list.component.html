@@ -1,0 +1,50 @@
+<section class="grid gap-4">
+  <header class="flex flex-wrap items-start justify-between gap-3">
+    <div>
+      <h1 class="page-title">Interventions techniques</h1>
+      <p class="page-subtitle">
+        Interventions libres sur MAS — une fiche par machine ; liens optionnels FIT, commande, bon
+      </p>
+    </div>
+    <a mat-flat-button color="primary" routerLink="/mas/interventions/new">
+      <mat-icon>add</mat-icon>
+      Nouvelle intervention
+    </a>
+  </header>
+
+  @if (loading()) {
+    <div class="flex justify-center py-8"><mat-spinner diameter="36"></mat-spinner></div>
+  } @else if (error()) {
+    <p class="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{{ error() }}</p>
+  } @else if (items().length === 0) {
+    <p class="rounded-lg border border-dashed border-line px-3 py-6 text-sm text-ink-soft">
+      Aucune intervention technique.
+    </p>
+  } @else {
+    <div class="grid gap-2">
+      @for (item of items(); track item.id) {
+        <article class="it-row">
+          <div class="min-w-0 flex-1">
+            <div class="text-sm font-semibold text-ink">
+              {{ item.dateIntervention | date: 'dd/MM/yyyy HH:mm' }} · {{ masLabel(item) }}
+            </div>
+            <div class="text-xs text-ink-soft">
+              {{ item.technicienNom }} · {{ item.motif }}
+            </div>
+            <div class="mt-1 flex flex-wrap gap-1">
+              @if (item.fitId) {
+                <span class="chip">FIT</span>
+              }
+              @if (item.commandeId) {
+                <span class="chip">Commande #{{ item.commandeId }}</span>
+              }
+              @if (item.bonInterventionNumero) {
+                <span class="chip">Bon {{ item.bonInterventionNumero }}</span>
+              }
+            </div>
+          </div>
+        </article>
+      }
+    </div>
+  }
+</section>

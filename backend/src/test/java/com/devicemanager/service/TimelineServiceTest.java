@@ -8,7 +8,10 @@ import com.devicemanager.entity.Intervention;
 import com.devicemanager.entity.InterventionLigne;
 import com.devicemanager.entity.StockMouvement;
 import com.devicemanager.repository.CommandeRepository;
+import com.devicemanager.repository.FitRepository;
 import com.devicemanager.repository.InterventionRepository;
+import com.devicemanager.repository.InterventionTechniqueRepository;
+import com.devicemanager.repository.MasRepository;
 import com.devicemanager.repository.StockMouvementRepository;
 import com.devicemanager.security.Roles;
 import com.devicemanager.security.StockMouvementSources;
@@ -34,6 +37,9 @@ class TimelineServiceTest {
 
     @Mock private CommandeRepository commandeRepository;
     @Mock private InterventionRepository interventionRepository;
+    @Mock private InterventionTechniqueRepository interventionTechniqueRepository;
+    @Mock private FitRepository fitRepository;
+    @Mock private MasRepository masRepository;
     @Mock private StockMouvementRepository stockMouvementRepository;
     @Mock private AtelierService atelierService;
     @InjectMocks private TimelineService timelineService;
@@ -102,11 +108,13 @@ class TimelineServiceTest {
 
         when(commandeRepository.findAllWithRelationsOrderByDateDesc(100L)).thenReturn(List.of(commande));
         when(interventionRepository.findAllWithRelationsByAtelierId(100L)).thenReturn(List.of(intervention));
+        when(interventionTechniqueRepository.findAllByAtelierId(100L)).thenReturn(List.of());
+        when(fitRepository.findAllByAtelierId(100L)).thenReturn(List.of());
         when(stockMouvementRepository.findByAtelierAndSourceType(
                 eq(100L), eq(StockMouvementSources.MANUAL)))
                 .thenReturn(List.of(manual));
 
-        List<TimelineEventResponse> events = timelineService.findEvents(null, null, null);
+        List<TimelineEventResponse> events = timelineService.findEvents(null, null, null, null);
 
         assertThat(events).extracting(TimelineEventResponse::getType)
                 .containsExactly(
@@ -115,6 +123,7 @@ class TimelineServiceTest {
                         TimelineEventTypes.ORDER_RECEIVED,
                         TimelineEventTypes.ORDER_VALIDATED,
                         TimelineEventTypes.ORDER_REQUEST);
+        assertThat(events.getFirst().getColumn()).isEqualTo(TimelineEventTypes.COL_BONS);
     }
 
     @Test
@@ -133,9 +142,10 @@ class TimelineServiceTest {
         when(commandeRepository.findAllWithRelationsOrderByDateDesc(100L)).thenReturn(List.of(old));
 
         List<TimelineEventResponse> events = timelineService.findEvents(
-                null, null, List.of(TimelineEventTypes.ORDER_RECEIVED, TimelineEventTypes.ORDER_REQUEST));
+                null, null, List.of(TimelineEventTypes.ORDER_RECEIVED, TimelineEventTypes.ORDER_REQUEST), null);
 
         assertThat(events).hasSize(1);
         assertThat(events.getFirst().getType()).isEqualTo(TimelineEventTypes.ORDER_REQUEST);
+        assertThat(events.getFirst().getColumn()).isEqualTo(TimelineEventTypes.COL_COMMANDES);
     }
 }

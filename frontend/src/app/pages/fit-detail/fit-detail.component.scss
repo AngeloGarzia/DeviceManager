@@ -1,0 +1,56 @@
+.ligne-form {
+  padding: 1rem;
+  border: 1px solid #d7e0ea;
+  border-radius: 0.85rem;
+  background: #f8fafc;
+}
+
+.bon-grid {
+  display: grid;
+  gap: 0.75rem;
+}
+
+@media (min-width: 720px) {
+  .bon-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.sig-grid {
+  display: grid;
+  gap: 1rem;
+}
+
+@media (min-width: 900px) {
+  .sig-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.ligne-card {
+  padding: 0.9rem 1rem;
+  border: 1px solid #d7e0ea;
+  border-radius: 0.85rem;
+  background: #fff;
+}
+
+.sig-preview {
+  display: grid;
+  gap: 0.75rem;
+}
+
+@media (min-width: 720px) {
+  .sig-preview {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.sig-img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  max-height: 5rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.5rem;
+  background: #fff;
+}

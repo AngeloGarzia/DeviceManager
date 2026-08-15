@@ -7,9 +7,11 @@ import com.devicemanager.entity.Atelier;
 import com.devicemanager.entity.Device;
 import com.devicemanager.entity.Intervention;
 import com.devicemanager.entity.InterventionLigne;
+import com.devicemanager.entity.Mas;
 import com.devicemanager.entity.User;
 import com.devicemanager.repository.DeviceRepository;
 import com.devicemanager.repository.InterventionRepository;
+import com.devicemanager.repository.MasRepository;
 import com.devicemanager.repository.UserRepository;
 import com.devicemanager.security.StockMouvementSources;
 import lombok.RequiredArgsConstructor;
@@ -37,9 +39,11 @@ public class InterventionService {
 
     private final InterventionRepository interventionRepository;
     private final DeviceRepository deviceRepository;
+    private final MasRepository masRepository;
     private final UserRepository userRepository;
     private final AtelierService atelierService;
     private final StockMouvementService stockMouvementService;
+    private final FitService fitService;
 
     /**
      * Archive un bon d'intervention et décrémente le stock des pièces consommées.
@@ -56,6 +60,16 @@ public class InterventionService {
                     "Ajoutez au moins une pièce détachée consommée");
         }
 
+        Mas mas = resolveMas(request.getMasId(), atelierId);
+        boolean associerFit = Boolean.TRUE.equals(request.getAssocierFit()) && mas != null;
+        if (associerFit) {
+            FitService.validateSignatures(request.getSignatureAdmin(), request.getSignatureTechnicien());
+        }
+        String machineMas = trimToNull(request.getMachineMas());
+        if (machineMas == null && mas != null) {
+            machineMas = formatMasLabel(mas);
+        }
+
         Intervention intervention = Intervention.builder()
                 .numero(nextNumero(atelierId, request.getDateIntervention()))
                 .dateIntervention(request.getDateIntervention())
@@ -63,7 +77,8 @@ public class InterventionService {
                 .technicienNom(displayName(actor))
                 .atelier(atelier)
                 .emplacement(trimToNull(request.getEmplacement()))
-                .machineMas(trimToNull(request.getMachineMas()))
+                .machineMas(machineMas)
+                .mas(mas)
                 .motif(request.getMotif().trim())
                 .diagnostic(trimToNull(request.getDiagnostic()))
                 .travaux(request.getTravaux().trim())
@@ -115,8 +130,20 @@ public class InterventionService {
                     saved.getId(),
                     acteurNom);
         }
-        log.info("Archivage en base — Bon intervention id={} numero={} par={} pièces={} atelier={}",
-                saved.getId(), saved.getNumero(), username, saved.getLignes().size(), atelierId);
+        if (associerFit) {
+            String techNom = trimToNull(request.getSignataireTechnicienNom());
+            if (techNom == null) {
+                techNom = acteurNom;
+            }
+            fitService.appendFromIntervention(
+                    saved,
+                    request.getSignatureAdmin(),
+                    request.getSignatureTechnicien(),
+                    request.getSignataireAdminNom(),
+                    techNom);
+        }
+        log.info("Archivage en base — Bon intervention id={} numero={} par={} pièces={} atelier={} fit={}",
+                saved.getId(), saved.getNumero(), username, saved.getLignes().size(), atelierId, associerFit);
         return toResponse(saved);
     }
 
@@ -124,6 +151,19 @@ public class InterventionService {
     public List<InterventionResponse> findAll() {
         Long atelierId = atelierService.requireCurrentAtelier().getId();
         return interventionRepository.findAllWithRelationsByAtelierId(atelierId).stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    /**
+     * Interventions liées à une MAS de l'atelier courant (suivi technique).
+     */
+    @Transactional(readOnly = true)
+    public List<InterventionResponse> findByMasId(Long masId) {
+        Long atelierId = atelierService.requireCurrentAtelier().getId();
+        Mas mas = masRepository.findByIdAndAtelierId(masId, atelierId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "MAS introuvable"));
+        return interventionRepository.findByAtelierAndMas(atelierId, mas.getId(), mas.getNumero()).stream()
                 .map(this::toResponse)
                 .toList();
     }
@@ -168,6 +208,23 @@ public class InterventionService {
         return full.isBlank() ? user.getUsername() : full;
     }
 
+    private Mas resolveMas(Long masId, Long atelierId) {
+        if (masId == null) {
+            return null;
+        }
+        return masRepository.findByIdAndAtelierId(masId, atelierId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "MAS introuvable dans cet atelier."));
+    }
+
+    private static String formatMasLabel(Mas mas) {
+        if (mas.getMarque() != null && mas.getMarque().getLabel() != null
+                && !mas.getMarque().getLabel().isBlank()) {
+            return mas.getNumero() + " — " + mas.getMarque().getLabel();
+        }
+        return mas.getNumero();
+    }
+
     private static String trimToNull(String value) {
         if (value == null || value.isBlank()) {
             return null;
@@ -203,6 +260,7 @@ public class InterventionService {
                 .technicienNom(intervention.getTechnicienNom())
                 .emplacement(intervention.getEmplacement())
                 .machineMas(intervention.getMachineMas())
+                .masId(intervention.getMas() != null ? intervention.getMas().getId() : null)
                 .motif(intervention.getMotif())
                 .diagnostic(intervention.getDiagnostic())
                 .travaux(intervention.getTravaux())

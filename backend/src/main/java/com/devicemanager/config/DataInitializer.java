@@ -31,6 +31,7 @@ public class DataInitializer implements CommandLineRunner {
     private final SfmRepository sfmRepository;
     private final MasRepository masRepository;
     private final MarqueMasRepository marqueMasRepository;
+    private final DenoRepository denoRepository;
     private final GroupeRepository groupeRepository;
     private final CasinoRepository casinoRepository;
     private final AtelierRepository atelierRepository;
@@ -76,6 +77,15 @@ public class DataInitializer implements CommandLineRunner {
         ensureMarque("AMATIC", "Amatic");
         ensureMarque("MERKUR", "Merkur");
         ensureMarque("AUTRES", "Autres");
+
+        ensureDeno(new java.math.BigDecimal("0.01"), "0,01 €");
+        ensureDeno(new java.math.BigDecimal("0.02"), "0,02 €");
+        ensureDeno(new java.math.BigDecimal("0.05"), "0,05 €");
+        ensureDeno(new java.math.BigDecimal("0.10"), "0,10 €");
+        ensureDeno(new java.math.BigDecimal("0.20"), "0,20 €");
+        ensureDeno(new java.math.BigDecimal("0.50"), "0,50 €");
+        ensureDeno(new java.math.BigDecimal("1.00"), "1,00 €");
+        ensureDeno(new java.math.BigDecimal("2.00"), "2,00 €");
 
         assignExistingDataToAtelier(defaultAtelier);
 
@@ -145,6 +155,11 @@ public class DataInitializer implements CommandLineRunner {
                 .orElseGet(() -> marqueMasRepository.save(MarqueMas.builder().code(code).label(label).build()));
     }
 
+    private void ensureDeno(java.math.BigDecimal valeur, String label) {
+        denoRepository.findByValeur(valeur)
+                .orElseGet(() -> denoRepository.save(Deno.builder().valeur(valeur).label(label).build()));
+    }
+
     private void seedSfm(Atelier atelier) {
         Sfm salle = Sfm.builder()
                 .nom("SFM Salle Principale")
@@ -190,18 +205,21 @@ public class DataInitializer implements CommandLineRunner {
         masRepository.save(Mas.builder()
                 .numero("MAS-101")
                 .marque(requireMarque("ARISTOCRAT"))
+                .statut(MasStatut.UTILISEE)
                 .utilise(true)
                 .atelier(atelier)
                 .build());
         masRepository.save(Mas.builder()
                 .numero("MAS-205")
                 .marque(requireMarque("IGT"))
+                .statut(MasStatut.UTILISEE)
                 .utilise(true)
                 .atelier(atelier)
                 .build());
         masRepository.save(Mas.builder()
                 .numero("MAS-312")
                 .marque(requireMarque("NOVOMATIC"))
+                .statut(MasStatut.EN_RESERVE)
                 .utilise(false)
                 .atelier(atelier)
                 .build());

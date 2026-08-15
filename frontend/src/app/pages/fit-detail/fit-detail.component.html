@@ -1,0 +1,171 @@
+<section class="grid gap-4">
+  <header class="flex flex-wrap items-start justify-between gap-3">
+    <div>
+      <a routerLink="/mas/fit" class="text-sm text-ink-soft no-underline hover:underline">← Fiches FIT</a>
+      <h1 class="page-title mt-1">
+        @if (fit(); as f) {
+          FIT — Machine {{ f.numeroMachineCasino }}
+        } @else {
+          Fiche FIT
+        }
+      </h1>
+      @if (fit(); as f) {
+        <p class="page-subtitle">
+          {{ f.marque || 'Sans marque' }}
+          @if (f.casinoNom) {
+            · {{ f.casinoNom }}
+          }
+          · modèle {{ f.modeleNumero || '34' }}
+        </p>
+      }
+    </div>
+    <button mat-flat-button color="primary" type="button" (click)="showForm.set(!showForm())">
+      <mat-icon>{{ showForm() ? 'close' : 'draw' }}</mat-icon>
+      {{ showForm() ? 'Fermer' : 'Ajouter une intervention' }}
+    </button>
+  </header>
+
+  @if (loading()) {
+    <div class="flex justify-center py-8"><mat-spinner diameter="36"></mat-spinner></div>
+  }
+
+  @if (error()) {
+    <p class="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{{ error() }}</p>
+  }
+  @if (success()) {
+    <p class="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800">{{ success() }}</p>
+  }
+
+  @if (showForm()) {
+    <form class="ligne-form grid gap-3" [formGroup]="form" (ngSubmit)="submitLigne()">
+      <h2 class="m-0 text-base font-semibold text-ink">Nouvelle ligne d’intervention</h2>
+      <p class="m-0 text-sm text-ink-soft">
+        Socle, taux et deno sont hérités de la MAS si non saisis. Les deux signatures dessinées sont
+        obligatoires.
+      </p>
+
+      <div class="bon-grid">
+        <mat-form-field appearance="outline">
+          <mat-label>Date d’opération</mat-label>
+          <input matInput type="date" formControlName="dateOperation" />
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>N° socle</mat-label>
+          <input matInput formControlName="numeroSocle" />
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>N° emplacement</mat-label>
+          <input matInput formControlName="numeroEmplacement" />
+        </mat-form-field>
+      </div>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Motif / nature des opérations</mat-label>
+        <textarea matInput rows="4" formControlName="motifNatureOperations"></textarea>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Bon d’intervention (optionnel)</mat-label>
+        <mat-select formControlName="interventionId">
+          <mat-option [value]="null">— Aucun —</mat-option>
+          @for (item of interventions(); track item.id) {
+            <mat-option [value]="item.id">{{ interventionLabel(item) }}</mat-option>
+          }
+        </mat-select>
+        <mat-hint>La ligne FIT peut exister sans bon d’intervention</mat-hint>
+      </mat-form-field>
+
+      <div class="sig-grid">
+        <div>
+          <app-signature-pad label="Signature admin / directeur" formControlName="signatureAdmin" />
+          <mat-form-field appearance="outline" class="mt-2 w-full">
+            <mat-label>Signataire admin</mat-label>
+            <mat-select formControlName="signataireAdminId">
+              @for (u of admins(); track u.id) {
+                <mat-option [value]="u.id">{{ u.displayName }}</mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+        </div>
+        <div>
+          <app-signature-pad label="Signature technicien" formControlName="signatureTechnicien" />
+          <mat-form-field appearance="outline" class="mt-2 w-full">
+            <mat-label>Signataire technicien</mat-label>
+            <mat-select formControlName="signataireTechnicienId">
+              @for (u of techniciens(); track u.id) {
+                <mat-option [value]="u.id">{{ u.displayName }}</mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+        </div>
+      </div>
+
+      <div class="flex flex-wrap gap-2">
+        <button mat-flat-button color="primary" type="submit" [disabled]="saving()">
+          {{ saving() ? 'Enregistrement…' : 'Enregistrer la ligne' }}
+        </button>
+      </div>
+    </form>
+  }
+
+  @if (fit(); as f) {
+    <div class="grid gap-3">
+      <h2 class="m-0 text-base font-semibold text-ink">
+        Historique ({{ f.lignes?.length || 0 }})
+      </h2>
+      @if (!f.lignes?.length) {
+        <p class="rounded-lg border border-dashed border-line px-3 py-4 text-sm text-ink-soft">
+          Aucune ligne pour l’instant.
+        </p>
+      } @else {
+        @for (ligne of f.lignes; track ligne.id) {
+          <article class="ligne-card">
+            <div class="flex flex-wrap items-start justify-between gap-2">
+              <div>
+                <div class="text-sm font-semibold text-ink">
+                  {{ ligne.dateOperation | date: 'dd/MM/yyyy' }}
+                </div>
+                <div class="text-xs text-ink-soft">
+                  @if (ligne.numeroSocle) {
+                    Socle {{ ligne.numeroSocle }}
+                  }
+                  @if (ligne.numeroEmplacement) {
+                    · Emp. {{ ligne.numeroEmplacement }}
+                  }
+                  @if (ligne.tauxRedistribution != null) {
+                    · Taux {{ ligne.tauxRedistribution }} %
+                  }
+                  @if (ligne.denoLabel) {
+                    · {{ ligne.denoLabel }}
+                  }
+                  @if (ligne.interventionNumero) {
+                    · Bon {{ ligne.interventionNumero }}
+                  }
+                </div>
+              </div>
+            </div>
+            <p class="mt-2 mb-0 whitespace-pre-wrap text-sm text-ink">{{ ligne.motifNatureOperations }}</p>
+            <div class="sig-preview mt-3">
+              @if (ligne.signatureAdmin) {
+                <div>
+                  <div class="text-xs font-semibold text-ink-soft">
+                    Admin {{ ligne.signataireAdminNom || '' }}
+                  </div>
+                  <img [src]="ligne.signatureAdmin" alt="Signature admin" class="sig-img" />
+                </div>
+              }
+              @if (ligne.signatureTechnicien) {
+                <div>
+                  <div class="text-xs font-semibold text-ink-soft">
+                    Technicien {{ ligne.signataireTechnicienNom || '' }}
+                  </div>
+                  <img [src]="ligne.signatureTechnicien" alt="Signature technicien" class="sig-img" />
+                </div>
+              }
+            </div>
+          </article>
+        }
+      }
+    </div>
+  }
+</section>

@@ -19,6 +19,7 @@ public class InterventionResponse {
     private String technicienNom;
     private String emplacement;
     private String machineMas;
+    private Long masId;
     private String motif;
     private String diagnostic;
     private String travaux;

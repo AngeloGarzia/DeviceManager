@@ -10,6 +10,7 @@ import { MasService } from '../../services/mas.service';
 import { AuthService } from '../../services/auth.service';
 import { ConfirmDialogComponent } from '../../shared/confirm-dialog.component';
 import { apiErrorMessage } from '../../shared/api-error';
+import { masStatutBadgeClass, masStatutLabel } from '../../shared/mas-statut';
 
 /**
  * Fiche détaillée d'une MAS.
@@ -28,6 +29,8 @@ export class MasDetailComponent implements OnInit {
   private readonly masService = inject(MasService);
   readonly auth = inject(AuthService);
   readonly item = signal<Mas | null>(null);
+  readonly statutLabel = masStatutLabel;
+  readonly statutBadgeClass = masStatutBadgeClass;
   readonly loading = signal(true);
   readonly error = signal<string | null>(null);
   readonly confirmOpen = signal(false);

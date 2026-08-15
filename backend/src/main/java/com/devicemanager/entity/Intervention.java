@@ -47,9 +47,14 @@ public class Intervention {
     @Column(length = 200)
     private String emplacement;
 
-    /** Machine ou numéro MAS concerné. */
+    /** Machine ou numéro MAS concerné (libellé archivé). */
     @Column(name = "machine_mas", length = 120)
     private String machineMas;
+
+    /** MAS liée (suivi technique) — optionnelle pour l'historique ancien. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "mas_id", foreignKey = @ForeignKey(name = "fk_intervention_mas"))
+    private Mas mas;
 
     @Column(nullable = false, length = 500)
     private String motif;

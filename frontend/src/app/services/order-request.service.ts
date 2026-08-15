@@ -1,5 +1,5 @@
 import { Injectable, signal } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable, tap } from 'rxjs';
 import { environment } from '../../environments/environment';
 import { OrderRequest, OrderRequestForm } from '../models/models';
@@ -27,8 +27,14 @@ export class OrderRequestService {
     );
   }
 
-  list(): Observable<OrderRequest[]> {
-    return this.http.get<OrderRequest[]>(this.base);
+  list(opts?: { masIds?: number[] }): Observable<OrderRequest[]> {
+    let params = new HttpParams();
+    if (opts?.masIds?.length) {
+      for (const id of opts.masIds) {
+        params = params.append('masIds', String(id));
+      }
+    }
+    return this.http.get<OrderRequest[]>(this.base, { params });
   }
 
   validate(id: number): Observable<OrderRequest> {

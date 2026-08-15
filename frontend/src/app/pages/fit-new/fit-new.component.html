@@ -1,0 +1,97 @@
+<section class="grid gap-4">
+  <header>
+    <a routerLink="/mas/fit" class="text-sm text-ink-soft no-underline hover:underline">← Fiches FIT</a>
+    <h1 class="page-title mt-1">Ajouter une intervention FIT</h1>
+    <p class="page-subtitle">
+      Crée la fiche FIT de la MAS si besoin, puis enregistre une ligne signée (admin + technicien)
+    </p>
+  </header>
+
+  @if (loading()) {
+    <div class="flex justify-center py-8"><mat-spinner diameter="36"></mat-spinner></div>
+  } @else {
+    <form class="ligne-form grid gap-3" [formGroup]="form" (ngSubmit)="submit()">
+      <mat-form-field appearance="outline">
+        <mat-label>Machine / MAS</mat-label>
+        <mat-select formControlName="masId">
+          @for (mas of masses(); track mas.id) {
+            <mat-option [value]="mas.id">{{ masLabel(mas) }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Bon d’intervention (optionnel)</mat-label>
+        <mat-select formControlName="interventionId">
+          <mat-option [value]="null">— Aucun —</mat-option>
+          @for (item of interventions(); track item.id) {
+            <mat-option [value]="item.id">{{ interventionLabel(item) }}</mat-option>
+          }
+        </mat-select>
+        <mat-hint>La ligne FIT peut exister sans bon d’intervention</mat-hint>
+      </mat-form-field>
+
+      <div class="bon-grid">
+        <mat-form-field appearance="outline">
+          <mat-label>Date d’opération</mat-label>
+          <input matInput type="date" formControlName="dateOperation" />
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>N° socle</mat-label>
+          <input matInput formControlName="numeroSocle" />
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>N° emplacement</mat-label>
+          <input matInput formControlName="numeroEmplacement" />
+        </mat-form-field>
+      </div>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Motif / nature des opérations</mat-label>
+        <textarea matInput rows="4" formControlName="motifNatureOperations"></textarea>
+      </mat-form-field>
+
+      <div class="sig-grid">
+        <div>
+          <app-signature-pad label="Signature admin / directeur" formControlName="signatureAdmin" />
+          <mat-form-field appearance="outline" class="mt-2 w-full">
+            <mat-label>Signataire admin</mat-label>
+            <mat-select formControlName="signataireAdminId">
+              @for (u of admins(); track u.id) {
+                <mat-option [value]="u.id">{{ u.displayName }}</mat-option>
+              }
+            </mat-select>
+            @if (admins().length === 0) {
+              <mat-hint>Aucun admin dans le groupe</mat-hint>
+            }
+          </mat-form-field>
+        </div>
+        <div>
+          <app-signature-pad label="Signature technicien" formControlName="signatureTechnicien" />
+          <mat-form-field appearance="outline" class="mt-2 w-full">
+            <mat-label>Signataire technicien</mat-label>
+            <mat-select formControlName="signataireTechnicienId">
+              @for (u of techniciens(); track u.id) {
+                <mat-option [value]="u.id">{{ u.displayName }}</mat-option>
+              }
+            </mat-select>
+            @if (techniciens().length === 0) {
+              <mat-hint>Aucun technicien dans le groupe</mat-hint>
+            }
+          </mat-form-field>
+        </div>
+      </div>
+
+      @if (error()) {
+        <p class="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{{ error() }}</p>
+      }
+
+      <div class="flex flex-wrap gap-2">
+        <a mat-stroked-button routerLink="/mas/fit">Annuler</a>
+        <button mat-flat-button color="primary" type="submit" [disabled]="saving()">
+          {{ saving() ? 'Enregistrement…' : 'Enregistrer' }}
+        </button>
+      </div>
+    </form>
+  }
+</section>

@@ -169,10 +169,40 @@
         </a>
       </mat-menu>
 
-      <a routerLink="/mas" routerLinkActive="active-nav" [routerLinkActiveOptions]="{ exact: false }" class="nav-link">
+      <button
+        type="button"
+        class="nav-link"
+        data-tour="nav-mas"
+        [class.active-nav]="isMasSectionActive()"
+        [matMenuTriggerFor]="masMenu"
+        aria-label="MAS"
+        aria-haspopup="menu"
+      >
         <mat-icon>casino</mat-icon>
         <span>MAS</span>
-      </a>
+      </button>
+      <mat-menu #masMenu="matMenu" class="devices-nav-menu">
+        <a mat-menu-item routerLink="/mas" routerLinkActive="devices-menu-active" [routerLinkActiveOptions]="{ exact: true }">
+          <mat-icon>list</mat-icon>
+          <span>Liste des MAS</span>
+        </a>
+        <a mat-menu-item routerLink="/mas/new" routerLinkActive="devices-menu-active">
+          <mat-icon>add_circle</mat-icon>
+          <span>Nouvelle MAS</span>
+        </a>
+        <a mat-menu-item routerLink="/mas/suivi" routerLinkActive="devices-menu-active">
+          <mat-icon>timeline</mat-icon>
+          <span>Suivi</span>
+        </a>
+        <a mat-menu-item routerLink="/mas/interventions" routerLinkActive="devices-menu-active">
+          <mat-icon>build</mat-icon>
+          <span>Interventions techniques</span>
+        </a>
+        <a mat-menu-item routerLink="/mas/fit" routerLinkActive="devices-menu-active">
+          <mat-icon>description</mat-icon>
+          <span>Fiches FIT</span>
+        </a>
+      </mat-menu>
 
       <a routerLink="/sfm" routerLinkActive="active-nav" [routerLinkActiveOptions]="{ exact: false }" class="nav-link">
         <mat-icon>apartment</mat-icon>
