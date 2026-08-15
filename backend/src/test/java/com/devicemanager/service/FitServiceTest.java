@@ -5,9 +5,11 @@ import com.devicemanager.dto.FitLigneRequest;
 import com.devicemanager.dto.FitResponse;
 import com.devicemanager.entity.Atelier;
 import com.devicemanager.entity.Fit;
+import com.devicemanager.entity.FitLigne;
 import com.devicemanager.entity.Intervention;
 import com.devicemanager.entity.Mas;
 import com.devicemanager.repository.DenoRepository;
+import com.devicemanager.repository.FitLigneRepository;
 import com.devicemanager.repository.FitRepository;
 import com.devicemanager.repository.MasRepository;
 import com.devicemanager.support.TestFixtures;
@@ -23,6 +25,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicLong;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -39,6 +42,7 @@ class FitServiceTest {
             "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
 
     @Mock private FitRepository fitRepository;
+    @Mock private FitLigneRepository fitLigneRepository;
     @Mock private MasRepository masRepository;
     @Mock private DenoRepository denoRepository;
     @Mock private AtelierService atelierService;
@@ -125,16 +129,26 @@ class FitServiceTest {
             if (f.getId() == null) {
                 f.setId(9L);
             }
+            if (f.getLignes() == null) {
+                f.setLignes(new ArrayList<>());
+            }
             return f;
+        });
+        AtomicLong ligneSeq = new AtomicLong(100);
+        when(fitLigneRepository.saveAndFlush(any(FitLigne.class))).thenAnswer(inv -> {
+            FitLigne l = inv.getArgument(0);
+            l.setId(ligneSeq.getAndIncrement());
+            return l;
         });
 
         fitService.appendFromIntervention(intervention, SIG_ADMIN, SIG_TECH, "Admin", "Tech");
 
-        ArgumentCaptor<Fit> captor = ArgumentCaptor.forClass(Fit.class);
-        verify(fitRepository, org.mockito.Mockito.atLeastOnce()).saveAndFlush(captor.capture());
-        Fit last = captor.getAllValues().getLast();
-        assertThat(last.getLignes()).isNotEmpty();
-        assertThat(last.getLignes().getLast().getSignatureAdmin()).startsWith("data:image/");
-        assertThat(last.getLignes().getLast().getIntervention()).isEqualTo(intervention);
+        ArgumentCaptor<FitLigne> captor = ArgumentCaptor.forClass(FitLigne.class);
+        verify(fitLigneRepository).saveAndFlush(captor.capture());
+        FitLigne saved = captor.getValue();
+        assertThat(saved.getSignatureAdmin()).startsWith("data:image/");
+        assertThat(saved.getIntervention()).isEqualTo(intervention);
+        assertThat(saved.getFit()).isNotNull();
+        assertThat(saved.getFit().getId()).isEqualTo(9L);
     }
 }

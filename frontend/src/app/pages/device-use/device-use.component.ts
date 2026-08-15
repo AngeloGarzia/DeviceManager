@@ -27,6 +27,7 @@ import { FitService } from '../../services/fit.service';
 import { InterventionService } from '../../services/intervention.service';
 import { MasService } from '../../services/mas.service';
 import { SignaturePadComponent } from '../../shared/signature-pad.component';
+import { ConfirmDialogComponent } from '../../shared/confirm-dialog.component';
 import { apiErrorMessage } from '../../shared/api-error';
 
 interface DraftLine {
@@ -57,7 +58,8 @@ interface DraftLine {
     MatCardModule,
     MatIconModule,
     MatProgressSpinnerModule,
-    SignaturePadComponent
+    SignaturePadComponent,
+    ConfirmDialogComponent
   ],
   templateUrl: './device-use.component.html',
   styleUrl: './device-use.component.scss'
@@ -83,6 +85,8 @@ export class DeviceUseComponent implements OnInit {
   readonly saving = signal(false);
   readonly error = signal<string | null>(null);
   readonly successNumero = signal<string | null>(null);
+  readonly orderOutOfStockOpen = signal(false);
+  readonly outOfStockDevice = signal<Device | null>(null);
 
   readonly searchCtrl = this.fb.control<string | Device>('', { nonNullable: true });
 
@@ -289,6 +293,10 @@ export class DeviceUseComponent implements OnInit {
       this.error.set('Sélectionnez une pièce et une quantité valide.');
       return;
     }
+    if ((device.stock ?? 0) <= 0) {
+      this.proposeOrderForOutOfStock(device);
+      return;
+    }
     if (qty > (device.stock ?? 0)) {
       this.error.set(
         `Stock insuffisant pour « ${device.nom} » (disponible : ${device.stock ?? 0}).`
@@ -437,10 +445,44 @@ export class DeviceUseComponent implements OnInit {
     void this.router.navigate(['/devices/interventions']);
   }
 
+  outOfStockMessage(): string {
+    const device = this.outOfStockDevice();
+    if (!device) {
+      return 'Cette pièce n’est plus en stock. Souhaitez-vous créer une demande de commande ?';
+    }
+    return `« ${device.nom} » est en rupture de stock (0). Souhaitez-vous créer une demande de commande pour cette pièce ?`;
+  }
+
+  dismissOutOfStockOrder(): void {
+    this.orderOutOfStockOpen.set(false);
+    this.outOfStockDevice.set(null);
+  }
+
+  confirmOutOfStockOrder(): void {
+    const device = this.outOfStockDevice();
+    this.orderOutOfStockOpen.set(false);
+    this.outOfStockDevice.set(null);
+    if (!device) {
+      return;
+    }
+    void this.router.navigate(['/order-request'], { queryParams: { deviceId: device.id } });
+  }
+
+  private proposeOrderForOutOfStock(device: Device): void {
+    this.outOfStockDevice.set(device);
+    this.orderOutOfStockOpen.set(true);
+    this.error.set(
+      `Stock insuffisant pour « ${device.nom} » (disponible : ${device.stock ?? 0}).`
+    );
+  }
+
   private applyDevice(device: Device): void {
     this.selectedDevice.set(device);
     this.picker.patchValue({ deviceId: device.id });
     this.searchCtrl.setValue(this.displayDevice(device), { emitEvent: false });
+    if ((device.stock ?? 0) <= 0) {
+      this.proposeOrderForOutOfStock(device);
+    }
   }
 
   private defaultDateTimeLocal(): string {

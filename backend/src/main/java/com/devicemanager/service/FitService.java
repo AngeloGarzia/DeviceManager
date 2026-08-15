@@ -14,6 +14,7 @@ import com.devicemanager.entity.Intervention;
 import com.devicemanager.entity.Mas;
 import com.devicemanager.entity.User;
 import com.devicemanager.repository.DenoRepository;
+import com.devicemanager.repository.FitLigneRepository;
 import com.devicemanager.repository.FitRepository;
 import com.devicemanager.repository.InterventionRepository;
 import com.devicemanager.repository.MasRepository;
@@ -46,6 +47,7 @@ public class FitService {
     private static final int MIN_SIGNATURE_LENGTH = 80;
 
     private final FitRepository fitRepository;
+    private final FitLigneRepository fitLigneRepository;
     private final MasRepository masRepository;
     private final DenoRepository denoRepository;
     private final UserRepository userRepository;
@@ -196,8 +198,7 @@ public class FitService {
         if (ligne.getNumeroEmplacement() == null) {
             ligne.setNumeroEmplacement(trimToNull(mas.getNumeroSocle()));
         }
-        fit.addLigne(ligne);
-        fitRepository.saveAndFlush(fit);
+        persistLigne(fit, ligne);
         log.info("FIT mise à jour depuis intervention id={} fitId={} mas={}",
                 intervention.getId(), fit.getId(), mas.getNumero());
     }
@@ -231,10 +232,25 @@ public class FitService {
                 .intervention(bonIntervention)
                 .build();
         inheritFromMasIfPresent(ligne, mas);
-        fit.addLigne(ligne);
-        fitRepository.saveAndFlush(fit);
+        FitLigne saved = persistLigne(fit, ligne);
         log.info("FIT ligne depuis visite technique — fitId={} mas={}", fit.getId(), mas.getNumero());
-        return ligne;
+        return saved;
+    }
+
+    /**
+     * Persiste la ligne côté owning ({@code fit_ligne.fit_id}) pour qu'elle soit managée
+     * avant tout autre agrégat (ex. intervention technique) qui la référence.
+     * Évite TransientObjectException Hibernate 6 au commit.
+     */
+    private FitLigne persistLigne(Fit fit, FitLigne ligne) {
+        ligne.setFit(fit);
+        FitLigne saved = fitLigneRepository.saveAndFlush(ligne);
+        if (fit.getLignes() != null
+                && fit.getLignes().stream().noneMatch(l ->
+                l == saved || (saved.getId() != null && saved.getId().equals(l.getId())))) {
+            fit.getLignes().add(saved);
+        }
+        return saved;
     }
 
     private Fit ensureFitEntity(Atelier atelier, Mas mas) {

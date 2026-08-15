@@ -288,4 +288,15 @@
       </form>
     </mat-card-content>
   </mat-card>
+
+  <app-confirm-dialog
+    [open]="orderOutOfStockOpen()"
+    title="Pièce en rupture de stock"
+    [message]="outOfStockMessage()"
+    confirmLabel="Demander une commande"
+    cancelLabel="Fermer"
+    confirmColor="primary"
+    (confirmed)="confirmOutOfStockOrder()"
+    (dismissed)="dismissOutOfStockOrder()"
+  />
 </section>
