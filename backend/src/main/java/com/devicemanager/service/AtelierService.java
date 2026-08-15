@@ -324,7 +324,8 @@ public class AtelierService {
         long fits = fitRepository.countByAtelierId(id);
         if (devices + masses + sfms + commandes + interventions + interventionsTechniques + fits > 0) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
-                    "Impossible de supprimer : des pièces, MAS, SFM, demandes, bons, interventions techniques ou FIT sont liés à cet atelier.");
+                    "Impossible de supprimer : des pièces, MAS, SFM, demandes, bons,"
+                            + " interventions techniques ou FIT sont liés à cet atelier.");
         }
         String nom = atelier.getNom();
 

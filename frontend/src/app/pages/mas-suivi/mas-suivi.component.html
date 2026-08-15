@@ -110,7 +110,7 @@
                           <time class="text-xs text-ink-soft" [attr.datetime]="event.at">
                             {{ event.at | date: 'dd/MM/yyyy HH:mm' }}
                           </time>
-                          @if (event.deltaStock != null) {
+                          @if (event.deltaStock !== null) {
                             <span class="delta-badge">{{ deltaLabel(event.deltaStock) }}</span>
                           }
                         </div>
@@ -140,13 +140,13 @@
                                 <div class="truncate text-sm font-medium">{{ line.pieceNom }}</div>
                                 <div class="text-xs text-ink-soft">
                                   {{ line.pieceReference || 'Sans référence' }}
-                                  @if (line.stockAvant != null && line.stockApres != null) {
+                                  @if (line.stockAvant !== null && line.stockApres !== null) {
                                     · Stock {{ line.stockAvant }} → {{ line.stockApres }}
                                   }
                                 </div>
                               </div>
                               <span class="text-sm font-semibold">
-                                @if (line.delta != null) {
+                                @if (line.delta !== null) {
                                   {{ deltaLabel(line.delta) }}
                                 } @else {
                                   × {{ line.quantite }}

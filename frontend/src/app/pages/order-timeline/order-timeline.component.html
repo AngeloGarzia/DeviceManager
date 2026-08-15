@@ -72,7 +72,7 @@
                             <time class="text-xs text-ink-soft" [attr.datetime]="event.at">
                               {{ event.at | date: 'dd/MM/yyyy HH:mm' }}
                             </time>
-                            @if (event.deltaStock != null) {
+                            @if (event.deltaStock !== null) {
                               <span
                                 class="delta-badge"
                                 [class.plus]="event.deltaStock! > 0"
