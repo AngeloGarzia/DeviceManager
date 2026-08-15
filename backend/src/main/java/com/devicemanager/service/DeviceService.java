@@ -1,9 +1,11 @@
 package com.devicemanager.service;
 
+import com.devicemanager.dto.DeviceDocumentResponse;
 import com.devicemanager.dto.DevicePhotoResponse;
 import com.devicemanager.dto.DeviceRequest;
 import com.devicemanager.dto.DeviceResponse;
 import com.devicemanager.entity.Device;
+import com.devicemanager.entity.DeviceDocument;
 import com.devicemanager.entity.DevicePhoto;
 import com.devicemanager.entity.MarqueMas;
 import com.devicemanager.entity.Mas;
@@ -11,6 +13,8 @@ import com.devicemanager.entity.Sfm;
 import com.devicemanager.entity.User;
 import com.devicemanager.repository.DeviceRepository;
 import com.devicemanager.repository.UserRepository;
+import com.devicemanager.security.DeviceDocumentTypes;
+import com.devicemanager.security.FileMagicBytesValidator;
 import com.devicemanager.security.StockMouvementSources;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -42,6 +46,7 @@ import java.util.stream.Collectors;
 public class DeviceService {
 
     public static final int MAX_PHOTOS = 5;
+    public static final int MAX_DOCUMENTS = 3;
 
     private final DeviceRepository deviceRepository;
     private final SfmService sfmService;
@@ -121,18 +126,23 @@ public class DeviceService {
     }
 
     /**
-     * Crée une pièce avec photos dans l'atelier courant.
+     * Crée une pièce avec photos et documents PDF optionnels dans l'atelier courant.
      *
-     * @param request métadonnées (nom, usage, MAS/SFM, etc.)
-     * @param photos images (1 à {@link #MAX_PHOTOS})
+     * @param request   métadonnées (nom, usage, MAS/SFM, types des nouveaux PDF, etc.)
+     * @param photos    images (1 à {@link #MAX_PHOTOS})
+     * @param documents PDF (manuel / datasheet / notice), types dans {@code request.newDocumentTypes}
      * @return pièce persistée
-     * @throws org.springframework.web.server.ResponseStatusException {@code 400} si validation échoue ;
-     *         {@code 409} en cas de doublon nom/référence
      */
-    public DeviceResponse create(DeviceRequest request, List<MultipartFile> photos) {
+    public DeviceResponse create(
+            DeviceRequest request,
+            List<MultipartFile> photos,
+            List<MultipartFile> documents) {
         List<MultipartFile> files = normalizeFiles(photos);
         ensurePhotoCount(files.size(), true);
         files.forEach(this::validateImageFile);
+
+        List<MultipartFile> docs = normalizeFiles(documents);
+        List<String> docTypes = normalizeDocumentTypes(request.getNewDocumentTypes(), docs.size());
 
         var atelier = atelierService.requireCurrentAtelier();
         String nom = request.getNom().trim();
@@ -150,10 +160,12 @@ public class DeviceService {
                 .nom(nom)
                 .reference(reference)
                 .usage(request.getUsage().trim())
+                .informationTechnique(normalizeOptionalText(request.getInformationTechnique()))
                 .dateAcquisition(request.getDateAcquisition())
                 .obsolete(Boolean.TRUE.equals(request.getObsolete()))
                 .stock(normalizeStock(request.getStock()))
                 .photos(new ArrayList<>())
+                .documents(new ArrayList<>())
                 .sfm(sfm)
                 .mas(mas)
                 .marque(marque)
@@ -162,10 +174,12 @@ public class DeviceService {
 
         addNewPhotos(entity, files);
         syncPrimaryPhoto(entity);
+        addNewDocuments(entity, docs, docTypes);
 
         Device saved = deviceRepository.save(entity);
-        log.info("Création en base — Pièce id={} nom={} référence={} photos={} atelier={}",
-                saved.getId(), saved.getNom(), saved.getReference(), saved.getPhotos().size(), atelier.getId());
+        log.info("Création en base — Pièce id={} nom={} référence={} photos={} docs={} atelier={}",
+                saved.getId(), saved.getNom(), saved.getReference(),
+                saved.getPhotos().size(), saved.getDocuments().size(), atelier.getId());
         return toResponse(saved);
     }
 
@@ -210,16 +224,19 @@ public class DeviceService {
     }
 
     /**
-     * Met à jour une pièce et remplace éventuellement ses photos.
+     * Met à jour une pièce, ses photos et ses documents PDF.
      *
-     * @param id identifiant de la pièce
-     * @param request métadonnées mises à jour (incluant {@code keepPhotoIds})
-     * @param photos nouvelles images à ajouter
+     * @param id         identifiant de la pièce
+     * @param request    métadonnées ({@code keepPhotoIds}, {@code keepDocumentIds}, {@code newDocumentTypes})
+     * @param photos     nouvelles images
+     * @param documents  nouveaux PDF
      * @return pièce modifiée
-     * @throws org.springframework.web.server.ResponseStatusException {@code 404} si introuvable ;
-     *         {@code 409} en cas de conflit nom/référence
      */
-    public DeviceResponse update(Long id, DeviceRequest request, List<MultipartFile> photos) {
+    public DeviceResponse update(
+            Long id,
+            DeviceRequest request,
+            List<MultipartFile> photos,
+            List<MultipartFile> documents) {
         Device entity = getEntity(id);
         String nom = request.getNom().trim();
         String reference = normalizeOptionalText(request.getReference());
@@ -228,6 +245,7 @@ public class DeviceService {
         entity.setNom(nom);
         entity.setReference(reference);
         entity.setUsage(request.getUsage().trim());
+        entity.setInformationTechnique(normalizeOptionalText(request.getInformationTechnique()));
         entity.setDateAcquisition(request.getDateAcquisition());
         entity.setObsolete(Boolean.TRUE.equals(request.getObsolete()));
         entity.setStock(normalizeStock(request.getStock()));
@@ -282,12 +300,15 @@ public class DeviceService {
         addNewPhotos(entity, newFiles);
         syncPrimaryPhoto(entity);
 
+        applyDocumentUpdates(entity, request, documents);
+
         Device saved = deviceRepository.save(entity);
-        log.info("Modification en base — Pièce id={} nom={} référence={} photos={} atelier={}",
+        log.info("Modification en base — Pièce id={} nom={} référence={} photos={} docs={} atelier={}",
                 saved.getId(),
                 saved.getNom(),
                 saved.getReference(),
                 saved.getPhotos().size(),
+                saved.getDocuments() == null ? 0 : saved.getDocuments().size(),
                 saved.getAtelier() != null ? saved.getAtelier().getId() : null);
         return toResponse(saved);
     }
@@ -308,6 +329,13 @@ public class DeviceService {
                 storageService.delete(photo.getPhotoKey());
             }
         }
+        if (entity.getDocuments() != null) {
+            for (DeviceDocument doc : entity.getDocuments()) {
+                if (doc.getFileKey() != null) {
+                    storageService.delete(doc.getFileKey());
+                }
+            }
+        }
         if (entity.getPhotoKey() != null
                 && entity.getPhotos().stream().noneMatch(p -> Objects.equals(p.getPhotoKey(), entity.getPhotoKey()))) {
             storageService.delete(entity.getPhotoKey());
@@ -315,6 +343,140 @@ public class DeviceService {
         deviceRepository.delete(entity);
         log.info("Suppression en base — Pièce id={} nom={} référence={} atelier={}",
                 id, nom, reference, atelierId);
+    }
+
+    private void applyDocumentUpdates(
+            Device entity,
+            DeviceRequest request,
+            List<MultipartFile> documents) {
+        if (entity.getDocuments() == null) {
+            entity.setDocuments(new ArrayList<>());
+        }
+        List<MultipartFile> docs = normalizeFiles(documents);
+        List<String> docTypes = normalizeDocumentTypes(request.getNewDocumentTypes(), docs.size());
+
+        List<Long> keepOrder = request.getKeepDocumentIds() == null
+                ? List.of()
+                : request.getKeepDocumentIds().stream().filter(Objects::nonNull).toList();
+        Set<Long> keepIds = new HashSet<>(keepOrder);
+
+        Map<Long, DeviceDocument> byId = entity.getDocuments().stream()
+                .filter(d -> d.getId() != null)
+                .collect(Collectors.toMap(DeviceDocument::getId, d -> d, (a, b) -> a));
+
+        List<DeviceDocument> kept = new ArrayList<>();
+        for (Long keepId : keepOrder) {
+            DeviceDocument doc = byId.get(keepId);
+            if (doc != null) {
+                kept.add(doc);
+            }
+        }
+
+        for (DeviceDocument doc : List.copyOf(entity.getDocuments())) {
+            if (!keepIds.contains(doc.getId())) {
+                if (doc.getFileKey() != null) {
+                    storageService.delete(doc.getFileKey());
+                }
+                entity.getDocuments().remove(doc);
+            }
+        }
+
+        entity.getDocuments().clear();
+        for (DeviceDocument doc : kept) {
+            doc.setDevice(entity);
+            entity.getDocuments().add(doc);
+        }
+        addNewDocuments(entity, docs, docTypes);
+    }
+
+    private void addNewDocuments(Device entity, List<MultipartFile> files, List<String> types) {
+        if (entity.getDocuments() == null) {
+            entity.setDocuments(new ArrayList<>());
+        }
+        Set<String> usedTypes = entity.getDocuments().stream()
+                .map(DeviceDocument::getDocType)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toCollection(HashSet::new));
+
+        for (int i = 0; i < files.size(); i++) {
+            MultipartFile file = files.get(i);
+            String type = types.get(i);
+            if (usedTypes.contains(type)) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "Un document « " + typeLabel(type) + " » est déjà présent pour cette pièce");
+            }
+            validatePdfFile(file);
+            StorageService.StoredObject stored = storageService.store(file);
+            String original = file.getOriginalFilename();
+            if (original == null || original.isBlank()) {
+                original = type.toLowerCase() + ".pdf";
+            }
+            DeviceDocument doc = DeviceDocument.builder()
+                    .device(entity)
+                    .docType(type)
+                    .fileKey(stored.key())
+                    .fileUrl(stored.url())
+                    .originalName(original.length() > 255 ? original.substring(0, 255) : original)
+                    .contentType(stored.contentType() != null ? stored.contentType() : "application/pdf")
+                    .fileSize(stored.size())
+                    .build();
+            entity.getDocuments().add(doc);
+            usedTypes.add(type);
+        }
+        if (entity.getDocuments().size() > MAX_DOCUMENTS) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Maximum " + MAX_DOCUMENTS + " documents PDF par pièce (manuel, datasheet, notice)");
+        }
+    }
+
+    private List<String> normalizeDocumentTypes(List<String> rawTypes, int fileCount) {
+        List<String> types = rawTypes == null ? List.of() : rawTypes.stream()
+                .map(DeviceDocumentTypes::normalize)
+                .toList();
+        if (fileCount == 0) {
+            return List.of();
+        }
+        if (types.size() != fileCount || types.stream().anyMatch(Objects::isNull)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Chaque PDF doit avoir un type : MANUAL, DATASHEET ou NOTICE");
+        }
+        Set<String> unique = new HashSet<>();
+        for (String t : types) {
+            if (!unique.add(t)) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "Deux PDF du même type (« " + typeLabel(t) + " ») dans le même envoi");
+            }
+        }
+        return types;
+    }
+
+    private void validatePdfFile(MultipartFile file) {
+        String contentType = file.getContentType();
+        String name = file.getOriginalFilename() == null ? "" : file.getOriginalFilename().toLowerCase();
+        boolean pdfType = contentType != null && (
+                contentType.equalsIgnoreCase("application/pdf")
+                        || contentType.equalsIgnoreCase("application/x-pdf"));
+        boolean pdfName = name.endsWith(".pdf");
+        if (!pdfType && !pdfName) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Le document doit être un fichier PDF");
+        }
+        try {
+            FileMagicBytesValidator.validatePdfMagicBytes(file.getBytes());
+        } catch (ResponseStatusException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Document PDF illisible");
+        }
+    }
+
+    private static String typeLabel(String type) {
+        return switch (type) {
+            case DeviceDocumentTypes.MANUAL -> "manuel";
+            case DeviceDocumentTypes.DATASHEET -> "datasheet";
+            case DeviceDocumentTypes.NOTICE -> "notice";
+            default -> type;
+        };
     }
 
     private void addNewPhotos(Device entity, List<MultipartFile> files) {
@@ -381,6 +543,7 @@ public class DeviceService {
         Device entity = deviceRepository.findByIdWithRelations(id, atelierId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Pièce détachée introuvable"));
         Hibernate.initialize(entity.getPhotos());
+        Hibernate.initialize(entity.getDocuments());
         return entity;
     }
 
@@ -478,6 +641,19 @@ public class DeviceService {
                         .build())
                 .toList();
 
+        List<DeviceDocumentResponse> documents = entity.getDocuments() == null
+                ? List.of()
+                : entity.getDocuments().stream()
+                .map(d -> DeviceDocumentResponse.builder()
+                        .id(d.getId())
+                        .docType(d.getDocType())
+                        .fileUrl(d.getFileUrl())
+                        .originalName(d.getOriginalName())
+                        .contentType(d.getContentType())
+                        .fileSize(d.getFileSize())
+                        .build())
+                .toList();
+
         String primaryUrl = entity.getPhotoUrl();
         if ((primaryUrl == null || primaryUrl.isBlank()) && !photos.isEmpty()) {
             primaryUrl = photos.getFirst().getPhotoUrl();
@@ -488,6 +664,7 @@ public class DeviceService {
                 .nom(entity.getNom())
                 .reference(entity.getReference())
                 .usage(entity.getUsage())
+                .informationTechnique(entity.getInformationTechnique())
                 .dateAcquisition(entity.getDateAcquisition())
                 .obsolete(entity.isObsolete())
                 .stock(entity.getStock())
@@ -495,6 +672,7 @@ public class DeviceService {
                 .contentType(entity.getContentType())
                 .fileSize(entity.getFileSize())
                 .photos(photos)
+                .documents(documents)
                 .sfmId(entity.getSfm() != null ? entity.getSfm().getId() : null)
                 .sfmNom(entity.getSfm() != null ? entity.getSfm().getNom() : null)
                 .masId(mas != null ? mas.getId() : null)

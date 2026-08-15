@@ -172,6 +172,73 @@
             }
           </div>
 
+          <div class="docs-block sm:col-span-2">
+            <h2 class="m-0 mb-2 text-base font-semibold text-ink">Documents PDF</h2>
+            <p class="m-0 mb-3 text-sm text-ink-soft">
+              Ajoutez un manuel, une datasheet et/ou une notice (un fichier PDF par type).
+            </p>
+
+            @if (existingDocuments().length > 0 || newDocuments().length > 0) {
+              <ul class="doc-list mb-3">
+                @for (doc of existingDocuments(); track doc.id) {
+                  <li class="doc-row">
+                    <mat-icon>picture_as_pdf</mat-icon>
+                    <div class="min-w-0 flex-1">
+                      <div class="text-sm font-medium">{{ documentTypeLabel(doc.docType) }}</div>
+                      <div class="truncate text-xs text-ink-soft">{{ doc.originalName }}</div>
+                    </div>
+                    <button
+                      mat-icon-button
+                      type="button"
+                      color="warn"
+                      (click)="removeExistingDocument(doc.id)"
+                      aria-label="Retirer le document"
+                    >
+                      <mat-icon>close</mat-icon>
+                    </button>
+                  </li>
+                }
+                @for (doc of newDocuments(); track $index) {
+                  <li class="doc-row">
+                    <mat-icon>picture_as_pdf</mat-icon>
+                    <div class="min-w-0 flex-1">
+                      <div class="text-sm font-medium">{{ documentTypeLabel(doc.type) }}</div>
+                      <div class="truncate text-xs text-ink-soft">{{ doc.file.name }} (nouveau)</div>
+                    </div>
+                    <button
+                      mat-icon-button
+                      type="button"
+                      color="warn"
+                      (click)="removeNewDocument($index)"
+                      aria-label="Retirer le document"
+                    >
+                      <mat-icon>close</mat-icon>
+                    </button>
+                  </li>
+                }
+              </ul>
+            }
+
+            @if (availableDocTypes().length > 0) {
+              <div class="flex flex-wrap gap-2">
+                @for (opt of availableDocTypes(); track opt.type) {
+                  <label class="doc-add-btn">
+                    <mat-icon>upload_file</mat-icon>
+                    {{ opt.label }}
+                    <input
+                      type="file"
+                      accept="application/pdf,.pdf"
+                      class="sr-only"
+                      (change)="onPdfSelected($event, opt.type)"
+                    />
+                  </label>
+                }
+              </div>
+            } @else {
+              <p class="m-0 text-xs text-ink-faint">Les 3 types de documents sont renseignés.</p>
+            }
+          </div>
+
           <mat-form-field appearance="outline" subscriptSizing="dynamic">
             <mat-label>Nom</mat-label>
             <input matInput formControlName="nom" />
@@ -198,6 +265,18 @@
             @if (form.controls.usage.invalid && form.controls.usage.touched) {
               <mat-error>Obligatoire (500 caractères max)</mat-error>
             }
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" class="sm:col-span-2">
+            <mat-label>Informations techniques</mat-label>
+            <textarea
+              matInput
+              rows="8"
+              formControlName="informationTechnique"
+              maxlength="8000"
+              placeholder="Caractéristiques, compatibilité, précautions… (manuel / datasheet / notice)"
+            ></textarea>
+            <mat-hint align="end">{{ informationTechniqueLength }} / 8000</mat-hint>
           </mat-form-field>
 
           <mat-form-field appearance="outline">
@@ -271,10 +350,18 @@
           @if (error()) {
             <p class="sm:col-span-2 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{{ error() }}</p>
           }
+          @if (analyzingPdf()) {
+            <p class="sm:col-span-2 rounded-lg bg-sky-50 px-3 py-2 text-sm text-sky-800">
+              Analyse du PDF en cours…
+            </p>
+          }
+          @if (aiHint()) {
+            <p class="sm:col-span-2 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800">{{ aiHint() }}</p>
+          }
 
           <div class="sm:col-span-2 mt-2 grid grid-cols-1 gap-3 sm:grid-cols-2">
             <button mat-stroked-button type="button" (click)="cancel()">Annuler</button>
-            <button mat-flat-button color="primary" type="submit" [disabled]="saving()">
+            <button mat-flat-button color="primary" type="submit" [disabled]="saving() || analyzingPdf()">
               {{ saving() ? 'Enregistrement…' : 'Enregistrer' }}
             </button>
           </div>
@@ -282,6 +369,17 @@
       </mat-card-content>
     </mat-card>
   }
+
+  <app-confirm-dialog
+    [open]="pdfAnalyzeOpen()"
+    title="Analyser le PDF avec l’IA ?"
+    message="Souhaitez-vous extraire les informations techniques de ce document et les ajouter au champ « Informations techniques » ?"
+    confirmLabel="Analyser"
+    cancelLabel="Plus tard"
+    confirmColor="primary"
+    (confirmed)="confirmPdfAnalyze()"
+    (dismissed)="dismissPdfAnalyze()"
+  />
 
   <app-confirm-dialog
     [open]="marqueMismatchOpen()"

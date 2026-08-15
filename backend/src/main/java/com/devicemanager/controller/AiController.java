@@ -4,6 +4,7 @@ import com.devicemanager.dto.AiChatRequest;
 import com.devicemanager.dto.AiChatResponse;
 import com.devicemanager.dto.AiLabelScanResponse;
 import com.devicemanager.dto.AiModelsResponse;
+import com.devicemanager.dto.AiPdfScanResponse;
 import com.devicemanager.service.AiAssistantService;
 import com.devicemanager.service.AiModelDiscoveryService;
 import jakarta.validation.Valid;
@@ -84,5 +85,18 @@ public class AiController {
     @PreAuthorize("hasAnyRole('ADMIN', 'TECHNICIEN')")
     public ResponseEntity<AiLabelScanResponse> labelScan(@RequestPart("image") MultipartFile image) {
         return ResponseEntity.ok(aiAssistantService.scanLabel(image));
+    }
+
+    /**
+     * Analyse un PDF (manuel / datasheet / notice) pour remplir « information technique ».
+     */
+    @PostMapping(value = "/pdf-scan", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasAnyRole('ADMIN', 'TECHNICIEN')")
+    public ResponseEntity<AiPdfScanResponse> pdfScan(
+            @RequestPart("pdf") MultipartFile pdf,
+            @RequestParam(value = "docType", required = false) String docType,
+            @RequestParam(value = "nom", required = false) String nom,
+            @RequestParam(value = "reference", required = false) String reference) {
+        return ResponseEntity.ok(aiAssistantService.analyzePdf(pdf, docType, nom, reference));
     }
 }

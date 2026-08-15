@@ -16,6 +16,7 @@ public class DeviceResponse {
     private String nom;
     private String reference;
     private String usage;
+    private String informationTechnique;
     private LocalDate dateAcquisition;
     private boolean obsolete;
     /** Quantité disponible en stock. */
@@ -25,6 +26,7 @@ public class DeviceResponse {
     private String contentType;
     private Long fileSize;
     private List<DevicePhotoResponse> photos;
+    private List<DeviceDocumentResponse> documents;
     private Long sfmId;
     private String sfmNom;
     private Long masId;

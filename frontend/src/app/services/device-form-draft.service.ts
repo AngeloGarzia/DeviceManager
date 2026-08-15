@@ -5,6 +5,7 @@ export interface DeviceFormDraftValues {
   nom: string;
   reference: string;
   usage: string;
+  informationTechnique: string;
   dateAcquisition: string;
   obsolete: boolean;
   stock: number;

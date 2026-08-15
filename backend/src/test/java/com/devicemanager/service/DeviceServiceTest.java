@@ -81,7 +81,7 @@ class DeviceServiceTest {
             return d;
         });
 
-        DeviceResponse response = deviceService.create(request(), List.of(photo));
+        DeviceResponse response = deviceService.create(request(), List.of(photo), List.of());
 
         assertThat(response.getNom()).isEqualTo("Carte mère");
         assertThat(response.getReference()).isEqualTo("REF-100");
@@ -106,7 +106,7 @@ class DeviceServiceTest {
             return d;
         });
 
-        DeviceResponse response = deviceService.create(req, List.of(photo));
+        DeviceResponse response = deviceService.create(req, List.of(photo), List.of());
 
         assertThat(response.getReference()).isNull();
         assertThat(response.getSfmId()).isNull();
@@ -118,7 +118,7 @@ class DeviceServiceTest {
 
     @Test
     void create_requiresPhoto() {
-        assertThatThrownBy(() -> deviceService.create(request(), List.of()))
+        assertThatThrownBy(() -> deviceService.create(request(), List.of(), List.of()))
                 .isInstanceOf(ResponseStatusException.class)
                 .extracting(ex -> ((ResponseStatusException) ex).getReason())
                 .isEqualTo("Ajoutez au moins une photo de la pièce");
@@ -132,7 +132,7 @@ class DeviceServiceTest {
         MockMultipartFile p5 = new MockMultipartFile("photos", "5.jpg", MediaType.IMAGE_JPEG_VALUE, new byte[]{5});
         MockMultipartFile p6 = new MockMultipartFile("photos", "6.jpg", MediaType.IMAGE_JPEG_VALUE, new byte[]{6});
 
-        assertThatThrownBy(() -> deviceService.create(request(), List.of(photo, p2, p3, p4, p5, p6)))
+        assertThatThrownBy(() -> deviceService.create(request(), List.of(photo, p2, p3, p4, p5, p6), List.of()))
                 .isInstanceOf(ResponseStatusException.class)
                 .extracting(ex -> ((ResponseStatusException) ex).getReason())
                 .isEqualTo("Maximum 5 photos par pièce détachée");
@@ -142,7 +142,7 @@ class DeviceServiceTest {
     void create_rejectsNonImage() {
         MockMultipartFile bad = new MockMultipartFile("photos", "a.pdf", "application/pdf", new byte[]{1});
 
-        assertThatThrownBy(() -> deviceService.create(request(), List.of(bad)))
+        assertThatThrownBy(() -> deviceService.create(request(), List.of(bad), List.of()))
                 .isInstanceOf(ResponseStatusException.class)
                 .extracting(ex -> ((ResponseStatusException) ex).getReason())
                 .isEqualTo("Le fichier doit être une photo (JPEG, PNG…)");
@@ -152,7 +152,7 @@ class DeviceServiceTest {
     void create_rejectsDuplicateNom() {
         when(deviceRepository.existsByNomIgnoreCaseAndAtelierId("Carte mère", 100L)).thenReturn(true);
 
-        assertThatThrownBy(() -> deviceService.create(request(), List.of(photo)))
+        assertThatThrownBy(() -> deviceService.create(request(), List.of(photo), List.of()))
                 .isInstanceOf(ResponseStatusException.class)
                 .satisfies(ex -> {
                     ResponseStatusException rse = (ResponseStatusException) ex;
@@ -166,7 +166,7 @@ class DeviceServiceTest {
         when(deviceRepository.existsByNomIgnoreCaseAndAtelierId("Carte mère", 100L)).thenReturn(false);
         when(deviceRepository.existsByReferenceIgnoreCaseAndAtelierId("REF-100", 100L)).thenReturn(true);
 
-        assertThatThrownBy(() -> deviceService.create(request(), List.of(photo)))
+        assertThatThrownBy(() -> deviceService.create(request(), List.of(photo), List.of()))
                 .isInstanceOf(ResponseStatusException.class)
                 .extracting(ex -> ((ResponseStatusException) ex).getReason())
                 .isEqualTo("Référence déjà utilisée dans cet atelier");

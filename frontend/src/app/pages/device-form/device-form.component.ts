@@ -28,7 +28,7 @@ import { DeviceFormDraftService } from '../../services/device-form-draft.service
 import { SfmService } from '../../services/sfm.service';
 import { MasService } from '../../services/mas.service';
 import { AiService } from '../../services/ai.service';
-import { DeviceForm, DevicePhoto, Mas, Sfm } from '../../models/models';
+import { DeviceDocument, DeviceDocumentType, DeviceForm, DevicePhoto, Mas, Sfm } from '../../models/models';
 import { ConfirmDialogComponent } from '../../shared/confirm-dialog.component';
 import { ImageEditorDialogComponent } from '../../shared/image-editor-dialog.component';
 import { apiErrorMessage } from '../../shared/api-error';
@@ -38,9 +38,14 @@ interface NewPhotoItem {
   previewUrl: string;
 }
 
+interface NewDocumentItem {
+  file: File;
+  type: DeviceDocumentType;
+}
+
 /**
  * Formulaire de création ou modification d'une pièce détachée.
- * Gère la capture photo (caméra ou galerie), le rattachement SFM/MAS,
+ * Gère la capture photo (caméra ou galerie), documents PDF, rattachement SFM/MAS,
  * le scan IA d'étiquette et la sauvegarde avec brouillon de retour.
  */
 @Component({
@@ -97,8 +102,14 @@ export class DeviceFormComponent implements OnInit, AfterViewInit, OnDestroy {
   readonly selectedSfmId = signal<number | null>(null);
   readonly existingPhotos = signal<DevicePhoto[]>([]);
   readonly newPhotos = signal<NewPhotoItem[]>([]);
+  readonly existingDocuments = signal<DeviceDocument[]>([]);
+  readonly newDocuments = signal<NewDocumentItem[]>([]);
   readonly offerAnotherOpen = signal(false);
   readonly marqueMismatchOpen = signal(false);
+  /** Modale analyse IA après ajout d'un PDF. */
+  readonly pdfAnalyzeOpen = signal(false);
+  readonly analyzingPdf = signal(false);
+  private pendingPdfAnalyze: NewDocumentItem | null = null;
   private savedDeviceId: number | null = null;
 
   private mediaStream: MediaStream | null = null;
@@ -113,6 +124,7 @@ export class DeviceFormComponent implements OnInit, AfterViewInit, OnDestroy {
     nom: ['', [Validators.required, Validators.maxLength(120)]],
     reference: ['', [Validators.maxLength(80)]],
     usage: ['', [Validators.required, Validators.maxLength(500)]],
+    informationTechnique: ['', [Validators.maxLength(8000)]],
     dateAcquisition: [this.todayIso(), Validators.required],
     obsolete: [false],
     stock: [0, [Validators.required, Validators.min(0)]],
@@ -125,6 +137,28 @@ export class DeviceFormComponent implements OnInit, AfterViewInit, OnDestroy {
   );
 
   readonly canAddPhoto = computed(() => this.photoCount() < DeviceFormComponent.MAX_PHOTOS);
+
+  readonly occupiedDocTypes = computed(() => {
+    const types = new Set<string>();
+    for (const d of this.existingDocuments()) {
+      types.add(d.docType);
+    }
+    for (const d of this.newDocuments()) {
+      types.add(d.type);
+    }
+    return types;
+  });
+
+  readonly availableDocTypes = computed(() => {
+    const occupied = this.occupiedDocTypes();
+    return (
+      [
+        { type: 'MANUAL' as const, label: 'Manuel' },
+        { type: 'DATASHEET' as const, label: 'Datasheet' },
+        { type: 'NOTICE' as const, label: 'Notice' }
+      ] as const
+    ).filter((t) => !occupied.has(t.type));
+  });
 
   readonly selectedMasMarque = computed(() => {
     const masId = this.selectedMasId();
@@ -162,6 +196,10 @@ export class DeviceFormComponent implements OnInit, AfterViewInit, OnDestroy {
   /** Longueur actuelle du champ usage (compteur d'affichage). */
   get usageLength(): number {
     return this.form.controls.usage.value?.length ?? 0;
+  }
+
+  get informationTechniqueLength(): number {
+    return this.form.controls.informationTechnique.value?.length ?? 0;
   }
 
   /** Nombre maximal de photos autorisées par pièce. */
@@ -202,6 +240,7 @@ export class DeviceFormComponent implements OnInit, AfterViewInit, OnDestroy {
             nom: device.nom,
             reference: device.reference ?? '',
             usage: device.usage,
+            informationTechnique: device.informationTechnique ?? '',
             dateAcquisition: device.dateAcquisition,
             obsolete: device.obsolete,
             stock: device.stock ?? 0,
@@ -223,6 +262,7 @@ export class DeviceFormComponent implements OnInit, AfterViewInit, OnDestroy {
                   ]
                 : [];
           this.existingPhotos.set(photos);
+          this.existingDocuments.set([...(device.documents || [])]);
           this.applyQuerySelections(querySfmId, queryMasId);
           this.loading.set(false);
           setTimeout(() => void this.startCamera(), 0);
@@ -559,6 +599,101 @@ export class DeviceFormComponent implements OnInit, AfterViewInit, OnDestroy {
     this.existingPhotos.update((list) => list.filter((p) => p.id !== photoId));
   }
 
+  removeExistingDocument(docId: number): void {
+    this.existingDocuments.update((list) => list.filter((d) => d.id !== docId));
+  }
+
+  removeNewDocument(index: number): void {
+    this.newDocuments.update((list) => list.filter((_, i) => i !== index));
+  }
+
+  onPdfSelected(event: Event, type: DeviceDocumentType): void {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = '';
+    if (!file) {
+      return;
+    }
+    const name = (file.name || '').toLowerCase();
+    if (file.type !== 'application/pdf' && !name.endsWith('.pdf')) {
+      this.error.set('Seuls les fichiers PDF sont acceptés pour les documents.');
+      return;
+    }
+    if (this.occupiedDocTypes().has(type)) {
+      this.error.set('Ce type de document est déjà présent.');
+      return;
+    }
+    this.error.set(null);
+    this.newDocuments.update((list) => [...list, { file, type }]);
+    if (this.aiService.enabled()) {
+      this.pendingPdfAnalyze = { file, type };
+      this.pdfAnalyzeOpen.set(true);
+    }
+  }
+
+  dismissPdfAnalyze(): void {
+    this.pdfAnalyzeOpen.set(false);
+    this.pendingPdfAnalyze = null;
+  }
+
+  confirmPdfAnalyze(): void {
+    const pending = this.pendingPdfAnalyze;
+    this.pdfAnalyzeOpen.set(false);
+    if (!pending) {
+      return;
+    }
+    this.analyzingPdf.set(true);
+    this.error.set(null);
+    this.aiService
+      .analyzePdf(pending.file, {
+        docType: pending.type,
+        nom: this.form.controls.nom.value,
+        reference: this.form.controls.reference.value
+      })
+      .subscribe({
+        next: (res) => {
+          this.analyzingPdf.set(false);
+          this.pendingPdfAnalyze = null;
+          const text = res.informationTechnique?.trim();
+          if (!text) {
+            this.aiHint.set('Aucune information technique extractible de ce PDF.');
+            return;
+          }
+          const current = (this.form.controls.informationTechnique.value || '').trim();
+          const merged = current
+            ? `${current}\n\n--- ${this.documentTypeLabel(pending.type)} ---\n${text}`.slice(0, 8000)
+            : text.slice(0, 8000);
+          this.form.patchValue({ informationTechnique: merged });
+          const note = res.notes?.trim();
+          this.aiHint.set(
+            note
+              ? `Informations techniques mises à jour depuis le PDF. ${note}`
+              : 'Informations techniques mises à jour depuis le PDF.'
+          );
+        },
+        error: (err) => {
+          this.analyzingPdf.set(false);
+          this.pendingPdfAnalyze = null;
+          this.error.set(
+            apiErrorMessage(err, 'Analyse PDF impossible. Vérifiez que l’IA est activée dans Paramètres.')
+          );
+        }
+      });
+  }
+
+  documentTypeLabel(type: string): string {
+    switch (type) {
+      case 'MANUAL':
+        return 'Manuel';
+      case 'DATASHEET':
+        return 'Datasheet';
+      case 'NOTICE':
+        return 'Notice';
+      default:
+        return type;
+    }
+  }
+
   /** Retire une nouvelle photo non encore enregistrée. */
   removeNewPhoto(index: number): void {
     const list = [...this.newPhotos()];
@@ -641,18 +776,23 @@ export class DeviceFormComponent implements OnInit, AfterViewInit, OnDestroy {
     const keepPhotoIds = this.existingPhotos()
       .map((p) => p.id)
       .filter((id) => id > 0);
+    const keepDocumentIds = this.existingDocuments()
+      .map((d) => d.id)
+      .filter((id) => id > 0);
     const payload = {
       ...(this.form.getRawValue() as DeviceForm),
-      keepPhotoIds
+      keepPhotoIds,
+      keepDocumentIds
     };
     const files = this.newPhotos().map((p) => p.file);
+    const documents = this.newDocuments().map((d) => ({ file: d.file, type: d.type }));
 
     this.saving.set(true);
     this.error.set(null);
     this.draftService.clear();
     const req$ = this.id
-      ? this.deviceService.update(this.id, payload, files)
-      : this.deviceService.create(payload, files);
+      ? this.deviceService.update(this.id, payload, files, documents)
+      : this.deviceService.create(payload, files, documents);
     req$.subscribe({
       next: (saved) => {
         this.saving.set(false);
@@ -701,12 +841,15 @@ export class DeviceFormComponent implements OnInit, AfterViewInit, OnDestroy {
     }
     this.newPhotos.set([]);
     this.existingPhotos.set([]);
+    this.newDocuments.set([]);
+    this.existingDocuments.set([]);
     const keepSfmId = this.form.controls.sfmId.value;
     const keepMasId = this.form.controls.masId.value;
     this.form.reset({
       nom: '',
       reference: '',
       usage: '',
+      informationTechnique: '',
       dateAcquisition: this.todayIso(),
       obsolete: false,
       stock: 0,
@@ -742,6 +885,7 @@ export class DeviceFormComponent implements OnInit, AfterViewInit, OnDestroy {
         nom: raw.nom ?? '',
         reference: raw.reference ?? '',
         usage: raw.usage ?? '',
+        informationTechnique: raw.informationTechnique ?? '',
         dateAcquisition: raw.dateAcquisition || this.todayIso(),
         obsolete: !!raw.obsolete,
         stock: Number(raw.stock) || 0,

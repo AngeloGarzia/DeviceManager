@@ -64,10 +64,12 @@ public class DeviceController {
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<DeviceResponse> create(
             @Valid @RequestPart("data") DeviceRequest data,
-            @RequestPart(value = "photos", required = false) MultipartFile[] photos) {
-        List<MultipartFile> list = photos == null ? List.of() : Arrays.asList(photos);
+            @RequestPart(value = "photos", required = false) MultipartFile[] photos,
+            @RequestPart(value = "documents", required = false) MultipartFile[] documents) {
+        List<MultipartFile> photoList = photos == null ? List.of() : Arrays.asList(photos);
+        List<MultipartFile> docList = documents == null ? List.of() : Arrays.asList(documents);
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(deviceService.create(data, list));
+                .body(deviceService.create(data, photoList, docList));
     }
 
     /**
@@ -100,9 +102,11 @@ public class DeviceController {
     public ResponseEntity<DeviceResponse> update(
             @PathVariable Long id,
             @Valid @RequestPart("data") DeviceRequest data,
-            @RequestPart(value = "photos", required = false) MultipartFile[] photos) {
-        List<MultipartFile> list = photos == null ? List.of() : Arrays.asList(photos);
-        return ResponseEntity.ok(deviceService.update(id, data, list));
+            @RequestPart(value = "photos", required = false) MultipartFile[] photos,
+            @RequestPart(value = "documents", required = false) MultipartFile[] documents) {
+        List<MultipartFile> photoList = photos == null ? List.of() : Arrays.asList(photos);
+        List<MultipartFile> docList = documents == null ? List.of() : Arrays.asList(documents);
+        return ResponseEntity.ok(deviceService.update(id, data, photoList, docList));
     }
 
     /**

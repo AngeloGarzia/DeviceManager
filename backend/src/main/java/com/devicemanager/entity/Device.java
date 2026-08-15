@@ -41,6 +41,12 @@ public class Device {
     @Column(name = "usage_text", nullable = false, length = 500)
     private String usage;
 
+    /**
+     * Fiche technique détaillée (manuel / datasheet / notice, saisie ou extrait IA).
+     */
+    @Column(name = "information_technique", columnDefinition = "TEXT")
+    private String informationTechnique;
+
     @Column(name = "date_acquisition", nullable = false)
     private LocalDate dateAcquisition;
 
@@ -71,6 +77,12 @@ public class Device {
     @BatchSize(size = 50)
     @Builder.Default
     private List<DevicePhoto> photos = new ArrayList<>();
+
+    /** Documents PDF (manuel, datasheet, notice) — un par type. */
+    @OneToMany(mappedBy = "device", cascade = CascadeType.ALL, orphanRemoval = true)
+    @BatchSize(size = 50)
+    @Builder.Default
+    private List<DeviceDocument> documents = new ArrayList<>();
 
     /** Fournisseur SFM associé (optionnel). */
     @ManyToOne(fetch = FetchType.LAZY)

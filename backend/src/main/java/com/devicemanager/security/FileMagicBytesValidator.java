@@ -28,6 +28,23 @@ public final class FileMagicBytesValidator {
                 "Photo illisible ou format non pris en charge");
     }
 
+    /**
+     * Vérifie que les octets correspondent à un PDF ({@code %PDF}).
+     *
+     * @param data contenu du fichier
+     */
+    public static void validatePdfMagicBytes(byte[] data) {
+        if (data == null || data.length < 5) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Document PDF illisible ou format non pris en charge");
+        }
+        if (data[0] == '%' && data[1] == 'P' && data[2] == 'D' && data[3] == 'F') {
+            return;
+        }
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                "Le fichier doit être un PDF valide");
+    }
+
     private static boolean isJpeg(byte[] d) {
         return d[0] == (byte) 0xFF && d[1] == (byte) 0xD8 && d[2] == (byte) 0xFF;
     }

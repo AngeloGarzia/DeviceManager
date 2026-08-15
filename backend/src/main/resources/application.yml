@@ -55,8 +55,8 @@ spring:
     locations: classpath:db/migration
   servlet:
     multipart:
-      max-file-size: 15MB
-      max-request-size: 15MB
+      max-file-size: 20MB
+      max-request-size: 45MB
   mail:
     host: ${MAIL_HOST:}
     port: ${MAIL_PORT:587}

@@ -27,6 +27,10 @@ public class DeviceRequest {
     @Size(max = 500, message = "L'usage ne doit pas dépasser 500 caractères")
     private String usage;
 
+    /** Informations techniques (manuel / datasheet / notice). */
+    @Size(max = 8000, message = "Les informations techniques ne doivent pas dépasser 8000 caractères")
+    private String informationTechnique;
+
     @NotNull(message = "La date d'acquisition est obligatoire")
     private LocalDate dateAcquisition;
 
@@ -45,4 +49,13 @@ public class DeviceRequest {
 
     /** Identifiants des photos existantes à conserver lors d'une mise à jour. */
     private List<Long> keepPhotoIds = new ArrayList<>();
+
+    /** Identifiants des documents PDF existants à conserver lors d'une mise à jour. */
+    private List<Long> keepDocumentIds = new ArrayList<>();
+
+    /**
+     * Types des nouveaux PDF uploadés ({@code MANUAL}, {@code DATASHEET}, {@code NOTICE}),
+     * dans le même ordre que les fichiers {@code documents} du multipart.
+     */
+    private List<String> newDocumentTypes = new ArrayList<>();
 }

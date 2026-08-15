@@ -5,12 +5,18 @@ import com.devicemanager.ai.AiPromptDefaults;
 import com.devicemanager.ai.AiProviders;
 import com.devicemanager.dto.AiChatResponse;
 import com.devicemanager.dto.AiLabelScanResponse;
+import com.devicemanager.dto.AiPdfScanResponse;
 import com.devicemanager.dto.AiProviderAvailability;
+import com.devicemanager.security.DeviceDocumentTypes;
+import com.devicemanager.security.FileMagicBytesValidator;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import com.google.genai.Client;
+import org.apache.pdfbox.Loader;
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.text.PDFTextStripper;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.content.Media;
 import org.springframework.ai.google.genai.GoogleGenAiChatModel;
@@ -201,6 +207,119 @@ public class AiAssistantService {
             log.error("Échec scan étiquette IA: {}", ex.getMessage(), ex);
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
                     "Analyse de l'étiquette impossible. Réessayez ou changez de fournisseur dans Paramètres.");
+        }
+    }
+
+    /**
+     * Analyse un PDF (manuel / datasheet / notice) et propose une fiche « information technique ».
+     *
+     * @param pdf     fichier PDF
+     * @param docType {@code MANUAL}, {@code DATASHEET} ou {@code NOTICE} (optionnel)
+     * @param nom     nom de pièce déjà saisi (contexte, optionnel)
+     * @param reference référence déjà saisie (contexte, optionnel)
+     */
+    public AiPdfScanResponse analyzePdf(
+            MultipartFile pdf,
+            String docType,
+            String nom,
+            String reference) {
+        requireEnabled();
+        if (pdf == null || pdf.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Fichier PDF obligatoire");
+        }
+        String type = DeviceDocumentTypes.normalize(docType);
+        if (type == null) {
+            type = DeviceDocumentTypes.DATASHEET;
+        }
+        byte[] bytes;
+        try {
+            bytes = pdf.getBytes();
+        } catch (Exception ex) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "PDF illisible");
+        }
+        FileMagicBytesValidator.validatePdfMagicBytes(bytes);
+
+        String extractedText = extractPdfText(bytes);
+        if (extractedText == null || extractedText.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Aucun texte extractible dans ce PDF (scan image ou PDF protégé). "
+                            + "Essayez un PDF textuel ou saisissez les informations manuellement.");
+        }
+        if (extractedText.length() > 14_000) {
+            extractedText = extractedText.substring(0, 14_000) + "\n…";
+        }
+
+        String provider = resolveProviderId();
+        String apiKey = requireApiKey(provider);
+        String model = resolveChatModelForProvider(provider);
+
+        String typeLabel = switch (type) {
+            case DeviceDocumentTypes.MANUAL -> "manuel";
+            case DeviceDocumentTypes.NOTICE -> "notice";
+            default -> "datasheet / fiche technique";
+        };
+
+        String prompt = """
+                Tu es un technicien casino. Analyse le texte extrait d'un %s de pièce détachée.
+                Produis UNIQUEMENT un JSON :
+                {"informationTechnique":"...","notes":"..."}
+                - informationTechnique : synthèse claire et structurée (caractéristiques, références,
+                  compatibilité, précautions, procédure résumée si présente). Max 4000 caractères.
+                  En français. Pas de markdown.
+                - notes : incertitudes ou absences d'info (peut être null).
+                Contexte pièce (peut être vide) : nom=%s ; référence=%s
+                Texte PDF :
+                ---
+                %s
+                ---
+                """.formatted(
+                typeLabel,
+                nullToDash(blankToNull(nom)),
+                nullToDash(blankToNull(reference)),
+                extractedText);
+
+        try {
+            ChatClient chatClient = buildChatClient(apiKey, provider, model, 0.2);
+            String reply = chatClient.prompt()
+                    .system(systemPrompt())
+                    .user(prompt)
+                    .call()
+                    .content();
+            JsonNode node = parseJsonObject(reply);
+            String info = textOrNull(node, "informationTechnique");
+            if (info == null || info.isBlank()) {
+                // Fallback : utiliser le corps de réponse nettoyé
+                info = blankToNull(reply);
+            }
+            if (info != null && info.length() > 8000) {
+                info = info.substring(0, 7997) + "...";
+            }
+            if (info == null || info.isBlank()) {
+                throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
+                        "L'IA n'a pas pu extraire d'informations techniques de ce PDF.");
+            }
+            return AiPdfScanResponse.builder()
+                    .enabled(true)
+                    .informationTechnique(info)
+                    .notes(textOrNull(node, "notes"))
+                    .build();
+        } catch (ResponseStatusException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            log.error("Échec analyse PDF IA: {}", ex.getMessage(), ex);
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
+                    friendlyAiError(provider, ex));
+        }
+    }
+
+    private static String extractPdfText(byte[] bytes) {
+        try (PDDocument document = Loader.loadPDF(bytes)) {
+            PDFTextStripper stripper = new PDFTextStripper();
+            stripper.setSortByPosition(true);
+            return stripper.getText(document);
+        } catch (Exception ex) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Impossible de lire le PDF : " + ex.getMessage());
         }
     }
 

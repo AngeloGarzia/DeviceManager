@@ -25,6 +25,12 @@ export interface AiLabelScanResponse {
   notes?: string | null;
 }
 
+export interface AiPdfScanResponse {
+  enabled: boolean;
+  informationTechnique?: string | null;
+  notes?: string | null;
+}
+
 export interface AiModelOption {
   id: string;
   label: string;
@@ -104,6 +110,25 @@ export class AiService {
         : new File([image], `label-${Date.now()}.jpg`, { type: image.type || 'image/jpeg' });
     form.append('image', file);
     return this.http.post<AiLabelScanResponse>(`${this.base}/label-scan`, form);
+  }
+
+  analyzePdf(
+    pdf: File,
+    opts?: { docType?: string; nom?: string | null; reference?: string | null }
+  ): Observable<AiPdfScanResponse> {
+    const form = new FormData();
+    form.append('pdf', pdf, pdf.name || 'document.pdf');
+    const params: Record<string, string> = {};
+    if (opts?.docType) {
+      params['docType'] = opts.docType;
+    }
+    if (opts?.nom?.trim()) {
+      params['nom'] = opts.nom.trim();
+    }
+    if (opts?.reference?.trim()) {
+      params['reference'] = opts.reference.trim();
+    }
+    return this.http.post<AiPdfScanResponse>(`${this.base}/pdf-scan`, form, { params });
   }
 
   /** Modèles chat disponibles en ligne pour un fournisseur (pas de catalogue en dur). */

@@ -78,8 +78,25 @@ export class DeviceDetailComponent implements OnInit {
         .map((p) => this.deviceService.resolvePhotoUrl(p.photoUrl))
         .filter((url) => !!url);
     }
-    const primary = this.photoUrl(device);
-    return primary ? [primary] : [];
+    const single = this.photoUrl(device);
+    return single ? [single] : [];
+  }
+
+  resolveDocumentUrl(fileUrl: string): string {
+    return this.deviceService.resolveDocumentUrl(fileUrl);
+  }
+
+  documentTypeLabel(type: string): string {
+    switch (type) {
+      case 'MANUAL':
+        return 'Manuel';
+      case 'DATASHEET':
+        return 'Datasheet';
+      case 'NOTICE':
+        return 'Notice';
+      default:
+        return type;
+    }
   }
 
   /** Supprime la pièce et retourne à la liste. */

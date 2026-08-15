@@ -199,11 +199,23 @@ export interface DevicePhoto {
   position: number;
 }
 
+export type DeviceDocumentType = 'MANUAL' | 'DATASHEET' | 'NOTICE';
+
+export interface DeviceDocument {
+  id: number;
+  docType: DeviceDocumentType | string;
+  fileUrl: string;
+  originalName: string;
+  contentType?: string;
+  fileSize?: number;
+}
+
 export interface Device {
   id: number;
   nom: string;
   reference?: string | null;
   usage: string;
+  informationTechnique?: string | null;
   dateAcquisition: string;
   obsolete: boolean;
   /** Quantité disponible en stock (0 = rupture). */
@@ -212,6 +224,7 @@ export interface Device {
   contentType?: string;
   fileSize?: number;
   photos?: DevicePhoto[];
+  documents?: DeviceDocument[];
   sfmId?: number | null;
   sfmNom?: string | null;
   masId?: number | null;
@@ -226,12 +239,15 @@ export interface DeviceForm {
   nom: string;
   reference?: string | null;
   usage: string;
+  informationTechnique?: string | null;
   dateAcquisition: string;
   obsolete: boolean;
   stock: number;
   sfmId: number | null;
   masId: number | null;
   keepPhotoIds?: number[];
+  keepDocumentIds?: number[];
+  newDocumentTypes?: DeviceDocumentType[];
 }
 
 export interface OrderRequestLineForm {

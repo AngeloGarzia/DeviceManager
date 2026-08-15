@@ -60,3 +60,64 @@
   height: 1.75rem !important;
   transform: scale(0.85);
 }
+
+.docs-block {
+  padding: 0.85rem 1rem;
+  border: 1px solid #d7e0ea;
+  border-radius: 0.75rem;
+  background: #f8fafc;
+}
+
+.doc-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.doc-row {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.45rem 0.55rem;
+  border-radius: 0.55rem;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+}
+
+.doc-row mat-icon {
+  color: #be123c;
+}
+
+.doc-add-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.4rem 0.75rem;
+  border-radius: 0.55rem;
+  border: 1px dashed #94a3b8;
+  background: #fff;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #334155;
+  cursor: pointer;
+}
+
+.doc-add-btn mat-icon {
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
