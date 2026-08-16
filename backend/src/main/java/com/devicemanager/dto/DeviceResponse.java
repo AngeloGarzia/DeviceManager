@@ -21,6 +21,9 @@ public class DeviceResponse {
     private boolean obsolete;
     /** Quantité disponible en stock. */
     private int stock;
+    /** Dernier prix unitaire HT confirmé (historique devis). */
+    private java.math.BigDecimal lastUnitPriceHt;
+    private java.time.LocalDateTime lastUnitPriceAt;
     /** URL de la photo principale (compatibilité listes et commandes). */
     private String photoUrl;
     private String contentType;

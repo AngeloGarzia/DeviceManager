@@ -22,6 +22,34 @@ export class DeviceService {
     return this.http.get<Device>(`${this.base}/${id}`);
   }
 
+  prixHistory(id: number): Observable<
+    {
+      id: number;
+      unitPriceHt: number;
+      currency: string;
+      commandeId?: number | null;
+      observedAt: string;
+      confirmedAt: string;
+      confirmedBy: string;
+      devisDesignation?: string | null;
+      devisReference?: string | null;
+    }[]
+  > {
+    return this.http.get<
+      {
+        id: number;
+        unitPriceHt: number;
+        currency: string;
+        commandeId?: number | null;
+        observedAt: string;
+        confirmedAt: string;
+        confirmedBy: string;
+        devisDesignation?: string | null;
+        devisReference?: string | null;
+      }[]
+    >(`${this.base}/${id}/prix-history`);
+  }
+
   create(
     payload: DeviceForm,
     photos: File[],

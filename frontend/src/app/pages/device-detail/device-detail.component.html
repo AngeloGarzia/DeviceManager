@@ -74,6 +74,21 @@
               <dd class="mt-1 m-0 text-base text-ink">{{ device.dateAcquisition | date: 'dd/MM/yyyy' }}</dd>
             </div>
             <div>
+              <dt class="text-xs uppercase tracking-wide text-ink-faint">Dernier prix HT</dt>
+              <dd class="mt-1 m-0 text-base text-ink">
+                @if (device.lastUnitPriceHt !== null && device.lastUnitPriceHt !== undefined) {
+                  {{ device.lastUnitPriceHt | number: '1.2-2' }} €
+                  @if (device.lastUnitPriceAt) {
+                    <span class="text-xs text-ink-soft">
+                      ({{ device.lastUnitPriceAt | date: 'dd/MM/yyyy' }})
+                    </span>
+                  }
+                } @else {
+                  —
+                }
+              </dd>
+            </div>
+            <div>
               <dt class="text-xs uppercase tracking-wide text-ink-faint">SFM</dt>
               <dd class="mt-1 m-0">
                 @if (device.sfmId) {
@@ -108,6 +123,36 @@
               </div>
             }
           </dl>
+
+          @if (prixHistory().length) {
+            <div class="mt-5">
+              <h2 class="m-0 mb-2 text-base font-semibold text-ink">Historique des prix (devis)</h2>
+              <ul class="m-0 grid list-none gap-2 p-0">
+                @for (p of prixHistory(); track p.id) {
+                  <li class="rounded-lg border border-line bg-slate-50 px-3 py-2 text-sm">
+                    <div class="font-medium text-ink">
+                      {{ p.unitPriceHt | number: '1.2-2' }} {{ p.currency || 'EUR' }} HT
+                    </div>
+                    <div class="text-xs text-ink-soft">
+                      {{ p.observedAt | date: 'dd/MM/yyyy HH:mm' }}
+                      @if (p.commandeId) {
+                        · commande #{{ p.commandeId }}
+                      }
+                      · {{ p.confirmedBy }}
+                    </div>
+                    @if (p.devisDesignation || p.devisReference) {
+                      <div class="mt-0.5 text-xs text-ink-soft">
+                        {{ p.devisDesignation || '—' }}
+                        @if (p.devisReference) {
+                          · réf. {{ p.devisReference }}
+                        }
+                      </div>
+                    }
+                  </li>
+                }
+              </ul>
+            </div>
+          }
 
           @if (device.documents?.length) {
             <div class="mt-5">

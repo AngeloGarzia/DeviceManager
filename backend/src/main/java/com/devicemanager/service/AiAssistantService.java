@@ -5,11 +5,16 @@ import com.devicemanager.ai.AiPromptDefaults;
 import com.devicemanager.ai.AiProviders;
 import com.devicemanager.dto.AiChatResponse;
 import com.devicemanager.dto.AiDevisOrderLineContext;
+import com.devicemanager.dto.AiDevisPrixScanResponse;
+import com.devicemanager.dto.AiDevisPrixSuggestion;
 import com.devicemanager.dto.AiDevisScanResponse;
 import com.devicemanager.dto.AiDevisSuggestion;
 import com.devicemanager.dto.AiDevisUnmatchedPart;
 import com.devicemanager.dto.AiLabelScanResponse;
 import com.devicemanager.dto.AiPdfScanResponse;
+import com.devicemanager.dto.AiPrixDeviceContext;
+import com.devicemanager.dto.AiPrixHistoryPoint;
+import com.devicemanager.dto.AiPrixIncoherenceResult;
 import com.devicemanager.dto.AiProviderAvailability;
 import com.devicemanager.security.DeviceDocumentTypes;
 import com.devicemanager.security.FileMagicBytesValidator;
@@ -35,6 +40,8 @@ import org.springframework.util.MimeTypeUtils;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -480,6 +487,314 @@ public class AiAssistantService {
                 .suggestions(suggestions)
                 .unmatched(unmatched)
                 .build();
+    }
+
+    /**
+     * Extrait les prix unitaires HT du devis et les rattache aux pièces de la commande.
+     */
+    public AiDevisPrixScanResponse analyzeDevisPrices(
+            byte[] pdfBytes,
+            List<AiDevisOrderLineContext> lines) {
+        requireEnabled();
+        if (pdfBytes == null || pdfBytes.length == 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Fichier PDF obligatoire");
+        }
+        FileMagicBytesValidator.validatePdfMagicBytes(pdfBytes);
+
+        List<AiDevisOrderLineContext> safeLines = lines == null ? List.of() : lines.stream()
+                .filter(Objects::nonNull)
+                .filter(l -> l.getDeviceId() != null)
+                .toList();
+        if (safeLines.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "La commande ne contient aucune pièce à tarifer.");
+        }
+
+        String extractedText = extractPdfText(pdfBytes);
+        if (extractedText == null || extractedText.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Aucun texte extractible dans ce devis PDF (scan image ou PDF protégé).");
+        }
+        if (extractedText.length() > 16_000) {
+            extractedText = extractedText.substring(0, 16_000) + "\n…";
+        }
+
+        StringBuilder linesBlock = new StringBuilder();
+        for (AiDevisOrderLineContext line : safeLines) {
+            linesBlock.append("- deviceId=").append(line.getDeviceId())
+                    .append(" ; nom=").append(nullToDash(blankToNull(line.getNom())))
+                    .append(" ; reference=").append(nullToDash(blankToNull(line.getReference())))
+                    .append('\n');
+        }
+
+        String provider = resolveProviderId();
+        String apiKey = requireApiKey(provider);
+        String model = resolveChatModelForProvider(provider);
+
+        String prompt = """
+                Tu es un acheteur pièces détachées casino. Analyse le texte d'un DEVIS fournisseur.
+                Pour chaque pièce de la COMMANDE, trouve le prix unitaire HT en euros (pas le total ligne si possible).
+                Produis UNIQUEMENT un JSON :
+                {
+                  "matches":[
+                    {
+                      "deviceId":123,
+                      "unitPriceHt":12.50,
+                      "quantity":2,
+                      "devisDesignation":"...",
+                      "devisReference":"...",
+                      "confidence":"HIGH|MEDIUM|LOW"
+                    }
+                  ],
+                  "unmatched":[{"designation":"...","reference":"..."}],
+                  "notes":"..."
+                }
+                Règles :
+                - matches : une entrée par deviceId UNIQUEMENT si prix unitaire HT identifiable.
+                - unitPriceHt : nombre décimal (point), >= 0, prix unitaire HT EUR.
+                - quantity : quantité devis si connue sinon null.
+                - confidence HIGH si référence exacte + prix clair ; MEDIUM sinon.
+                - unmatched : lignes devis non rattachées (peut être []).
+                - notes : incertitudes (peut être null). Pas de markdown.
+                Pièces :
+                %s
+                Texte devis :
+                ---
+                %s
+                ---
+                """.formatted(linesBlock, extractedText);
+
+        try {
+            ChatClient chatClient = buildChatClient(apiKey, provider, model, 0.1);
+            String reply = chatClient.prompt()
+                    .system(systemPrompt())
+                    .user(prompt)
+                    .call()
+                    .content();
+            JsonNode node = parseJsonObject(reply);
+            return buildDevisPrixScanResponse(safeLines, node);
+        } catch (ResponseStatusException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            log.error("Échec analyse prix devis IA: {}", ex.getMessage(), ex);
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
+                    friendlyAiError(provider, ex));
+        }
+    }
+
+    /**
+     * Analyse narrative des incohérences de prix pour un lot de pièces.
+     */
+    public List<AiPrixIncoherenceResult> analyzePrixIncoherences(List<AiPrixDeviceContext> contexts) {
+        requireEnabled();
+        if (contexts == null || contexts.isEmpty()) {
+            return List.of();
+        }
+
+        StringBuilder block = new StringBuilder();
+        for (AiPrixDeviceContext ctx : contexts) {
+            block.append("- deviceId=").append(ctx.getDeviceId())
+                    .append(" ; nom=").append(nullToDash(blankToNull(ctx.getNom())))
+                    .append(" ; reference=").append(nullToDash(blankToNull(ctx.getReference())))
+                    .append(" ; newUnitPriceHt=").append(ctx.getNewUnitPriceHt())
+                    .append(" ; history=[");
+            if (ctx.getHistory() != null) {
+                for (AiPrixHistoryPoint p : ctx.getHistory()) {
+                    block.append("{price=").append(p.getUnitPriceHt())
+                            .append(",at=").append(p.getObservedAt())
+                            .append(",commandeId=").append(p.getCommandeId())
+                            .append("},");
+                }
+            }
+            block.append("]\n");
+        }
+
+        String provider = resolveProviderId();
+        String apiKey = requireApiKey(provider);
+        String model = resolveChatModelForProvider(provider);
+
+        String prompt = """
+                Tu analyses des prix de pièces détachées casino (EUR HT).
+                Pour chaque deviceId, juge si le nouveau prix est cohérent avec l'historique.
+                Produis UNIQUEMENT un JSON :
+                {
+                  "items":[
+                    {
+                      "deviceId":123,
+                      "severity":"OK|WATCH|ALERT",
+                      "reasons":["..."],
+                      "suggestedAction":"...",
+                      "summary":"..."
+                    }
+                  ]
+                }
+                Règles :
+                - OK si variation normale ; WATCH si doute ; ALERT si anomalie nette.
+                - reasons : 1 à 3 phrases courtes.
+                - suggestedAction : accepter / vérifier fournisseur / demander autre devis.
+                - Ne traite que les deviceId fournis. Pas de markdown.
+                Données :
+                %s
+                """.formatted(block);
+
+        try {
+            ChatClient chatClient = buildChatClient(apiKey, provider, model, 0.1);
+            String reply = chatClient.prompt()
+                    .system(systemPrompt())
+                    .user(prompt)
+                    .call()
+                    .content();
+            JsonNode node = parseJsonObject(reply);
+            return buildPrixIncoherenceResults(contexts, node);
+        } catch (ResponseStatusException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            log.warn("Analyse IA incohérence prix échouée (règles déterministes restent) : {}", ex.getMessage());
+            return List.of();
+        }
+    }
+
+    private AiDevisPrixScanResponse buildDevisPrixScanResponse(
+            List<AiDevisOrderLineContext> lines,
+            JsonNode node) {
+        java.util.Map<Long, AiDevisOrderLineContext> byId = new java.util.LinkedHashMap<>();
+        for (AiDevisOrderLineContext line : lines) {
+            byId.put(line.getDeviceId(), line);
+        }
+
+        List<AiDevisPrixSuggestion> suggestions = new ArrayList<>();
+        JsonNode matches = node.get("matches");
+        if (matches != null && matches.isArray()) {
+            for (JsonNode m : matches) {
+                Long deviceId = longOrNull(m, "deviceId");
+                if (deviceId == null || !byId.containsKey(deviceId)) {
+                    continue;
+                }
+                BigDecimal price = decimalOrNull(m, "unitPriceHt");
+                if (price == null || price.compareTo(BigDecimal.ZERO) < 0) {
+                    continue;
+                }
+                price = price.setScale(2, RoundingMode.HALF_UP);
+                AiDevisOrderLineContext current = byId.get(deviceId);
+                String confidence = textOrNull(m, "confidence");
+                if (confidence == null) {
+                    confidence = "MEDIUM";
+                } else {
+                    confidence = confidence.trim().toUpperCase(Locale.ROOT);
+                    if (!List.of("HIGH", "MEDIUM", "LOW").contains(confidence)) {
+                        confidence = "MEDIUM";
+                    }
+                }
+                Integer qty = null;
+                if (m.has("quantity") && !m.get("quantity").isNull()) {
+                    Long q = longOrNull(m, "quantity");
+                    if (q != null && q > 0 && q <= Integer.MAX_VALUE) {
+                        qty = q.intValue();
+                    }
+                }
+                suggestions.add(AiDevisPrixSuggestion.builder()
+                        .deviceId(deviceId)
+                        .currentNom(current.getNom())
+                        .currentReference(current.getReference())
+                        .suggestedUnitPriceHt(price)
+                        .quantityOnQuote(qty)
+                        .devisDesignation(textOrNull(m, "devisDesignation"))
+                        .devisReference(textOrNull(m, "devisReference"))
+                        .confidence(confidence)
+                        .build());
+            }
+        }
+
+        List<AiDevisUnmatchedPart> unmatched = new ArrayList<>();
+        JsonNode unmatchedNode = node.get("unmatched");
+        if (unmatchedNode != null && unmatchedNode.isArray()) {
+            for (JsonNode u : unmatchedNode) {
+                String designation = textOrNull(u, "designation");
+                String reference = textOrNull(u, "reference");
+                if (designation == null && reference == null) {
+                    continue;
+                }
+                unmatched.add(AiDevisUnmatchedPart.builder()
+                        .designation(designation)
+                        .reference(reference)
+                        .build());
+            }
+        }
+
+        return AiDevisPrixScanResponse.builder()
+                .enabled(true)
+                .notes(textOrNull(node, "notes"))
+                .suggestions(suggestions)
+                .unmatched(unmatched)
+                .build();
+    }
+
+    private List<AiPrixIncoherenceResult> buildPrixIncoherenceResults(
+            List<AiPrixDeviceContext> contexts,
+            JsonNode node) {
+        java.util.Set<Long> known = contexts.stream()
+                .map(AiPrixDeviceContext::getDeviceId)
+                .filter(Objects::nonNull)
+                .collect(java.util.stream.Collectors.toSet());
+        List<AiPrixIncoherenceResult> out = new ArrayList<>();
+        JsonNode items = node.get("items");
+        if (items == null || !items.isArray()) {
+            return out;
+        }
+        for (JsonNode item : items) {
+            Long deviceId = longOrNull(item, "deviceId");
+            if (deviceId == null || !known.contains(deviceId)) {
+                continue;
+            }
+            String severity = textOrNull(item, "severity");
+            if (severity == null) {
+                severity = "WATCH";
+            } else {
+                severity = severity.trim().toUpperCase(Locale.ROOT);
+                if (!List.of("OK", "WATCH", "ALERT").contains(severity)) {
+                    severity = "WATCH";
+                }
+            }
+            List<String> reasons = new ArrayList<>();
+            JsonNode reasonsNode = item.get("reasons");
+            if (reasonsNode != null && reasonsNode.isArray()) {
+                for (JsonNode r : reasonsNode) {
+                    if (r != null && r.isTextual() && !r.asText().isBlank()) {
+                        reasons.add(r.asText().trim());
+                    }
+                }
+            }
+            out.add(AiPrixIncoherenceResult.builder()
+                    .deviceId(deviceId)
+                    .severity(severity)
+                    .reasons(reasons)
+                    .suggestedAction(textOrNull(item, "suggestedAction"))
+                    .summary(textOrNull(item, "summary"))
+                    .build());
+        }
+        return out;
+    }
+
+    private static BigDecimal decimalOrNull(JsonNode node, String field) {
+        if (node == null || !node.has(field) || node.get(field).isNull()) {
+            return null;
+        }
+        JsonNode v = node.get(field);
+        try {
+            if (v.isNumber()) {
+                return v.decimalValue();
+            }
+            if (v.isTextual()) {
+                String raw = v.asText().trim().replace(',', '.').replaceAll("[^0-9.\\-]", "");
+                if (raw.isBlank()) {
+                    return null;
+                }
+                return new BigDecimal(raw);
+            }
+        } catch (Exception ex) {
+            return null;
+        }
+        return null;
     }
 
     private static Long longOrNull(JsonNode node, String field) {

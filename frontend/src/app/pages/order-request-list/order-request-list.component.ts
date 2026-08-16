@@ -10,9 +10,11 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { OrderRequest, OrderRequestForm, OrderRequestLine } from '../../models/models';
 import {
   AiDevisApplyItem,
+  AiDevisPrixSuggestion,
   AiDevisScanResponse,
   AiDevisSuggestion,
   AiDevisUnmatchedPart,
+  DevicePrixAlerte,
   MailPreviewItem,
   OrderRequestService
 } from '../../services/order-request.service';
@@ -26,6 +28,11 @@ interface DevisReviewRow {
   suggestion: AiDevisSuggestion;
   acceptNom: boolean;
   acceptReference: boolean;
+}
+
+interface DevisPrixReviewRow {
+  suggestion: AiDevisPrixSuggestion;
+  accept: boolean;
 }
 
 /**
@@ -84,6 +91,14 @@ export class OrderRequestListComponent implements OnInit {
   readonly devisReviewRows = signal<DevisReviewRow[]>([]);
   readonly devisReviewUnmatched = signal<AiDevisUnmatchedPart[]>([]);
   readonly devisReviewNotes = signal<string | null>(null);
+  private pendingDevisFile: File | null = null;
+
+  /** Modale revue prix devis. */
+  readonly devisPrixReviewOpen = signal(false);
+  readonly devisPrixRows = signal<DevisPrixReviewRow[]>([]);
+  readonly devisPrixUnmatched = signal<AiDevisUnmatchedPart[]>([]);
+  readonly devisPrixNotes = signal<string | null>(null);
+  readonly devisPrixAlertes = signal<DevicePrixAlerte[]>([]);
 
   ngOnInit(): void {
     this.aiService.refreshStatus();
@@ -96,8 +111,9 @@ export class OrderRequestListComponent implements OnInit {
     this.error.set(null);
     this.orderService.list().subscribe({
       next: (data) => {
-        this.items.set(data);
-        this.syncEditDrafts(data);
+        const sorted = this.sortByStatus(data);
+        this.items.set(sorted);
+        this.syncEditDrafts(sorted);
         this.loading.set(false);
         this.orderService.refreshPendingCount();
       },
@@ -106,6 +122,35 @@ export class OrderRequestListComponent implements OnInit {
         this.loading.set(false);
       }
     });
+  }
+
+  /**
+   * Trie par statut métier (en attente → validée → reçue), puis date décroissante.
+   */
+  private sortByStatus(data: OrderRequest[]): OrderRequest[] {
+    return [...data].sort((a, b) => {
+      const rankDiff = this.statusSortRank(a.status) - this.statusSortRank(b.status);
+      if (rankDiff !== 0) {
+        return rankDiff;
+      }
+      const dateA = Date.parse(a.dateDemande || a.createdAt || '') || 0;
+      const dateB = Date.parse(b.dateDemande || b.createdAt || '') || 0;
+      return dateB - dateA;
+    });
+  }
+
+  /** Rang de tri : plus petit = plus prioritaire à l'affichage. */
+  private statusSortRank(status: string): number {
+    if (this.isPending(status)) {
+      return 0;
+    }
+    if (this.isValidated(status)) {
+      return 1;
+    }
+    if (this.isReceived(status)) {
+      return 2;
+    }
+    return 3;
   }
 
   /** Indique si la demande est en attente de validation. */
@@ -163,6 +208,7 @@ export class OrderRequestListComponent implements OnInit {
         this.devisUploadingId.set(null);
         this.success.set(`Devis associé à la demande #${updated.id}.`);
         if (this.aiService.enabled() && isPdfFile(file)) {
+          this.pendingDevisFile = file;
           this.runDevisAnalyze(updated.id, file);
         }
       },
@@ -180,8 +226,9 @@ export class OrderRequestListComponent implements OnInit {
       error: (err) => {
         this.devisAnalyzing.set(false);
         this.error.set(
-          apiErrorMessage(err, 'Devis enregistré, mais l’analyse IA a échoué.')
+          apiErrorMessage(err, 'Devis enregistré, mais l’analyse IA (noms) a échoué.')
         );
+        this.runDevisPrixAnalyze(orderId, file);
       }
     });
   }
@@ -201,19 +248,25 @@ export class OrderRequestListComponent implements OnInit {
     );
     if (suggestions.length === 0 && (scan.unmatched?.length ?? 0) === 0) {
       this.success.set(
-        `Devis associé — l’IA n’a trouvé aucun écart à proposer pour la demande #${orderId}.`
+        `Devis associé — aucun écart nom/réf. pour la demande #${orderId}.`
       );
+      this.runDevisPrixAnalyze(orderId, this.pendingDevisFile);
       return;
     }
     this.devisReviewOpen.set(true);
   }
 
   closeDevisReview(): void {
+    const orderId = this.devisReviewOrderId();
+    const file = this.pendingDevisFile;
     this.devisReviewOpen.set(false);
     this.devisReviewOrderId.set(null);
     this.devisReviewRows.set([]);
     this.devisReviewUnmatched.set([]);
     this.devisReviewNotes.set(null);
+    if (orderId != null) {
+      this.runDevisPrixAnalyze(orderId, file);
+    }
   }
 
   setAcceptNom(deviceId: number, value: boolean): void {
@@ -248,9 +301,16 @@ export class OrderRequestListComponent implements OnInit {
       }))
       .filter((item) => item.updateNom || item.updateReference);
 
+    const file = this.pendingDevisFile;
+
     if (items.length === 0) {
-      this.closeDevisReview();
-      this.success.set('Aucune mise à jour appliquée.');
+      this.devisReviewOpen.set(false);
+      this.devisReviewOrderId.set(null);
+      this.devisReviewRows.set([]);
+      this.devisReviewUnmatched.set([]);
+      this.devisReviewNotes.set(null);
+      this.success.set('Aucune mise à jour nom/réf. appliquée.');
+      this.runDevisPrixAnalyze(orderId, file);
       return;
     }
 
@@ -261,7 +321,11 @@ export class OrderRequestListComponent implements OnInit {
         if (res.order) {
           this.replaceItem(res.order);
         }
-        this.closeDevisReview();
+        this.devisReviewOpen.set(false);
+        this.devisReviewOrderId.set(null);
+        this.devisReviewRows.set([]);
+        this.devisReviewUnmatched.set([]);
+        this.devisReviewNotes.set(null);
         const errCount = res.errors?.length ?? 0;
         if (errCount > 0) {
           this.error.set(
@@ -272,12 +336,129 @@ export class OrderRequestListComponent implements OnInit {
             `${res.updatedCount} pièce(s) mise(s) à jour à partir du devis.`
           );
         }
+        this.runDevisPrixAnalyze(orderId, file);
       },
       error: (err) => {
         this.devisApplying.set(false);
         this.error.set(apiErrorMessage(err, 'Application des mises à jour impossible.'));
       }
     });
+  }
+
+  private runDevisPrixAnalyze(orderId: number, file: File | null): void {
+    if (!file || !this.aiService.enabled() || !isPdfFile(file)) {
+      this.pendingDevisFile = null;
+      return;
+    }
+    this.devisAnalyzing.set(true);
+    this.orderService.analyzeDevisPrices(orderId, file).subscribe({
+      next: (scan) => {
+        this.devisAnalyzing.set(false);
+        this.openDevisPrixReview(orderId, scan.suggestions ?? [], scan.unmatched ?? [], scan.notes);
+      },
+      error: (err) => {
+        this.devisAnalyzing.set(false);
+        this.pendingDevisFile = null;
+        this.error.set(
+          apiErrorMessage(err, 'Analyse des prix du devis impossible.')
+        );
+      }
+    });
+  }
+
+  private openDevisPrixReview(
+    orderId: number,
+    suggestions: AiDevisPrixSuggestion[],
+    unmatched: AiDevisUnmatchedPart[],
+    notes?: string | null
+  ): void {
+    this.devisReviewOrderId.set(orderId);
+    this.devisPrixNotes.set(notes?.trim() || null);
+    this.devisPrixUnmatched.set(unmatched);
+    this.devisPrixRows.set(
+      suggestions.map((suggestion) => ({ suggestion, accept: true }))
+    );
+    this.devisPrixAlertes.set([]);
+    if (suggestions.length === 0) {
+      this.pendingDevisFile = null;
+      this.success.set(
+        (this.success() ? this.success() + ' ' : '') +
+          `Aucun prix extractible pour la demande #${orderId}.`
+      );
+      return;
+    }
+    this.devisPrixReviewOpen.set(true);
+  }
+
+  closeDevisPrixReview(): void {
+    this.devisPrixReviewOpen.set(false);
+    this.devisPrixRows.set([]);
+    this.devisPrixUnmatched.set([]);
+    this.devisPrixNotes.set(null);
+    this.devisPrixAlertes.set([]);
+    this.pendingDevisFile = null;
+  }
+
+  setAcceptPrix(deviceId: number, value: boolean): void {
+    this.devisPrixRows.update((rows) =>
+      rows.map((row) =>
+        row.suggestion.deviceId === deviceId ? { ...row, accept: value } : row
+      )
+    );
+  }
+
+  applyDevisPrixReview(): void {
+    const orderId = this.devisReviewOrderId();
+    if (orderId == null) {
+      return;
+    }
+    const items = this.devisPrixRows()
+      .filter((row) => row.accept && row.suggestion.suggestedUnitPriceHt != null)
+      .map((row) => ({
+        deviceId: row.suggestion.deviceId,
+        unitPriceHt: Number(row.suggestion.suggestedUnitPriceHt),
+        quantityOnQuote: row.suggestion.quantityOnQuote ?? null,
+        devisDesignation: row.suggestion.devisDesignation ?? null,
+        devisReference: row.suggestion.devisReference ?? null
+      }));
+    if (items.length === 0) {
+      this.closeDevisPrixReview();
+      this.success.set('Aucun prix confirmé.');
+      return;
+    }
+    this.devisApplying.set(true);
+    this.orderService.confirmDevisPrices(orderId, items).subscribe({
+      next: (res) => {
+        this.devisApplying.set(false);
+        this.pendingDevisFile = null;
+        this.devisPrixAlertes.set(res.alertes ?? []);
+        const alertCount = res.alertes?.length ?? 0;
+        const errCount = res.errors?.length ?? 0;
+        let msg = `${res.confirmedCount} prix confirmé(s) dans l’historique.`;
+        if (alertCount > 0) {
+          msg += ` ${alertCount} alerte(s) d’incohérence.`;
+        }
+        if (errCount > 0) {
+          this.error.set(`${msg} Erreurs : ${(res.errors || []).join(' ; ')}`);
+        } else {
+          this.success.set(msg);
+        }
+        if (alertCount === 0) {
+          this.closeDevisPrixReview();
+        }
+      },
+      error: (err) => {
+        this.devisApplying.set(false);
+        this.error.set(apiErrorMessage(err, 'Confirmation des prix impossible.'));
+      }
+    });
+  }
+
+  formatPrice(value?: number | null): string {
+    if (value === null || value === undefined || Number.isNaN(Number(value))) {
+      return '—';
+    }
+    return `${Number(value).toFixed(2)} €`;
   }
 
   confidenceLabel(value?: string | null): string {
@@ -578,7 +759,9 @@ export class OrderRequestListComponent implements OnInit {
   }
 
   private replaceItem(updated: OrderRequest): void {
-    this.items.update((list) => list.map((o) => (o.id === updated.id ? updated : o)));
+    this.items.update((list) =>
+      this.sortByStatus(list.map((o) => (o.id === updated.id ? updated : o)))
+    );
     this.editLinesById.update((map) => ({
       ...map,
       [updated.id]: this.cloneLines(updated)

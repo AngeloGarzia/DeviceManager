@@ -52,6 +52,73 @@ export interface AiDevisApplyResponse {
   errors?: string[];
 }
 
+export interface AiDevisPrixSuggestion {
+  deviceId: number;
+  currentNom?: string | null;
+  currentReference?: string | null;
+  lastUnitPriceHt?: number | null;
+  suggestedUnitPriceHt: number;
+  quantityOnQuote?: number | null;
+  devisDesignation?: string | null;
+  devisReference?: string | null;
+  confidence?: string | null;
+}
+
+export interface AiDevisPrixScanResponse {
+  enabled: boolean;
+  notes?: string | null;
+  suggestions?: AiDevisPrixSuggestion[];
+  unmatched?: AiDevisUnmatchedPart[];
+}
+
+export interface AiDevisPrixConfirmItem {
+  deviceId: number;
+  unitPriceHt: number;
+  quantityOnQuote?: number | null;
+  devisDesignation?: string | null;
+  devisReference?: string | null;
+}
+
+export interface DevicePrixObservation {
+  id: number;
+  deviceId: number;
+  deviceNom?: string | null;
+  commandeId?: number | null;
+  source: string;
+  unitPriceHt: number;
+  currency: string;
+  quantityOnQuote?: number | null;
+  devisDesignation?: string | null;
+  devisReference?: string | null;
+  observedAt: string;
+  confirmedAt: string;
+  confirmedBy: string;
+  invalidated: boolean;
+}
+
+export interface DevicePrixAlerte {
+  id: number;
+  deviceId: number;
+  deviceNom?: string | null;
+  deviceReference?: string | null;
+  observationId: number;
+  unitPriceHt?: number | null;
+  severity: string;
+  signals?: string[];
+  aiSummary?: string | null;
+  status: string;
+  createdAt: string;
+  ackBy?: string | null;
+  ackAt?: string | null;
+}
+
+export interface AiDevisPrixConfirmResponse {
+  confirmedCount: number;
+  observations?: DevicePrixObservation[];
+  alertes?: DevicePrixAlerte[];
+  errors?: string[];
+}
+
 @Injectable({ providedIn: 'root' })
 export class OrderRequestService {
   private readonly base = `${environment.apiUrl}/api/order-requests`;
@@ -113,6 +180,21 @@ export class OrderRequestService {
   /** Applique les mises à jour acceptées après analyse du devis. */
   applyDevisUpdates(id: number, payload: AiDevisApplyRequest): Observable<AiDevisApplyResponse> {
     return this.http.post<AiDevisApplyResponse>(`${this.base}/${id}/devis/apply-updates`, payload);
+  }
+
+  analyzeDevisPrices(id: number, file: File): Observable<AiDevisPrixScanResponse> {
+    const form = new FormData();
+    form.append('file', file, file.name);
+    return this.http.post<AiDevisPrixScanResponse>(`${this.base}/${id}/devis/analyze-prices`, form);
+  }
+
+  confirmDevisPrices(
+    id: number,
+    items: AiDevisPrixConfirmItem[]
+  ): Observable<AiDevisPrixConfirmResponse> {
+    return this.http.post<AiDevisPrixConfirmResponse>(`${this.base}/${id}/devis/confirm-prices`, {
+      items
+    });
   }
 
   resolveDevisUrl(fileUrl?: string | null): string {

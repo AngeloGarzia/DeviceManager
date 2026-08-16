@@ -704,6 +704,8 @@ public class DeviceService {
                 .dateAcquisition(entity.getDateAcquisition())
                 .obsolete(entity.isObsolete())
                 .stock(entity.getStock())
+                .lastUnitPriceHt(entity.getLastUnitPriceHt())
+                .lastUnitPriceAt(entity.getLastUnitPriceAt())
                 .photoUrl(primaryUrl)
                 .contentType(entity.getContentType())
                 .fileSize(entity.getFileSize())

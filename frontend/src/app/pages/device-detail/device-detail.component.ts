@@ -37,6 +37,18 @@ export class DeviceDetailComponent implements OnInit {
   readonly auth = inject(AuthService);
 
   readonly item = signal<Device | null>(null);
+  readonly prixHistory = signal<
+    {
+      id: number;
+      unitPriceHt: number;
+      currency: string;
+      commandeId?: number | null;
+      observedAt: string;
+      confirmedBy: string;
+      devisDesignation?: string | null;
+      devisReference?: string | null;
+    }[]
+  >([]);
   readonly loading = signal(true);
   readonly error = signal<string | null>(null);
   readonly confirmOpen = signal(false);
@@ -47,6 +59,10 @@ export class DeviceDetailComponent implements OnInit {
       next: (data) => {
         this.item.set(data);
         this.loading.set(false);
+        this.deviceService.prixHistory(id).subscribe({
+          next: (hist) => this.prixHistory.set(hist),
+          error: () => this.prixHistory.set([])
+        });
       },
       error: () => {
         this.error.set('Pièce introuvable.');

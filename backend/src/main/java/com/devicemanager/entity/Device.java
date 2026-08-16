@@ -59,6 +59,13 @@ public class Device {
     @Builder.Default
     private int stock = 0;
 
+    /** Dernier prix unitaire HT confirmé (dénormalisé depuis l'historique). */
+    @Column(name = "last_unit_price_ht", precision = 12, scale = 2)
+    private java.math.BigDecimal lastUnitPriceHt;
+
+    @Column(name = "last_unit_price_at")
+    private java.time.LocalDateTime lastUnitPriceAt;
+
     /** Photo principale (1re) — synchronisée pour listes et commandes. */
     @Column(name = "photo_key", length = 512)
     private String photoKey;

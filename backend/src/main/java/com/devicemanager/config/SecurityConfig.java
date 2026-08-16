@@ -118,6 +118,7 @@ public class SecurityConfig {
                             .hasAnyRole(Roles.ADMIN, Roles.TECHNICIEN)
                         .requestMatchers("/api/order-requests", "/api/order-requests/**")
                             .hasAnyRole(Roles.ADMIN, Roles.TECHNICIEN)
+                        .requestMatchers("/api/prix-alertes", "/api/prix-alertes/**").hasRole(Roles.ADMIN)
                         .requestMatchers("/api/interventions", "/api/interventions/**")
                             .hasAnyRole(Roles.ADMIN, Roles.TECHNICIEN)
                         .requestMatchers("/api/interventions-techniques", "/api/interventions-techniques/**")

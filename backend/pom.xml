@@ -223,8 +223,9 @@
                         <exclude>com/devicemanager/controller/**</exclude>
                         <exclude>com/devicemanager/dto/**</exclude>
                         <exclude>com/devicemanager/logging/**</exclude>
-                        <!-- Appels HTTP fournisseurs IA (RestClient) : peu unit-testables sans MockWebServer. -->
+                        <!-- Appels HTTP fournisseurs IA (RestClient / ChatClient) : peu unit-testables sans MockWebServer. -->
                         <exclude>com/devicemanager/service/AiModelDiscoveryService.class</exclude>
+                        <exclude>com/devicemanager/service/AiAssistantService.class</exclude>
                     </excludes>
                     <rules>
                         <rule>

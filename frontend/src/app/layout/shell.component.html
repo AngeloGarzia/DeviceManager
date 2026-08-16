@@ -114,6 +114,10 @@
         <span>Pièces</span>
       </button>
       <mat-menu #devicesMenu="matMenu" class="devices-nav-menu">
+        <a mat-menu-item routerLink="/devices" routerLinkActive="devices-menu-active" [routerLinkActiveOptions]="{ exact: true }">
+          <mat-icon>list</mat-icon>
+          <span>Liste des pièces</span>
+        </a>
         <a mat-menu-item routerLink="/devices/new" routerLinkActive="devices-menu-active">
           <mat-icon>add_circle</mat-icon>
           <span>Créer une nouvelle pièce</span>
@@ -158,7 +162,7 @@
         </a>
         <a mat-menu-item routerLink="/order-requests" routerLinkActive="orders-menu-active">
           <mat-icon>inbox</mat-icon>
-          <span>Demandes en cours</span>
+          <span>Liste des commandes</span>
           @if (orders.pendingCount() > 0) {
             <span class="orders-menu-count">{{ orders.pendingCount() > 99 ? '99+' : orders.pendingCount() }}</span>
           }

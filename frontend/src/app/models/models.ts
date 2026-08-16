@@ -235,6 +235,9 @@ export interface Device {
   obsolete: boolean;
   /** Quantité disponible en stock (0 = rupture). */
   stock: number;
+  /** Dernier prix unitaire HT confirmé (historique devis). */
+  lastUnitPriceHt?: number | null;
+  lastUnitPriceAt?: string | null;
   photoUrl?: string;
   contentType?: string;
   fileSize?: number;
