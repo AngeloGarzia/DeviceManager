@@ -13,7 +13,9 @@
     grid-template-areas:
       'numero taux   marque'
       'socle  deno   .'
-      '.      btnd   .';
+      '.      btnd   .'
+      'type   serie  mise'
+      'cess   dest   dest';
     column-gap: 0.75rem;
     row-gap: 0.75rem;
   }
@@ -40,6 +42,26 @@
 
   .mas-cell--action-deno {
     grid-area: btnd;
+  }
+
+  .mas-cell--type {
+    grid-area: type;
+  }
+
+  .mas-cell--serie {
+    grid-area: serie;
+  }
+
+  .mas-cell--mise-service {
+    grid-area: mise;
+  }
+
+  .mas-cell--cessation {
+    grid-area: cess;
+  }
+
+  .mas-cell--destination {
+    grid-area: dest;
   }
 }
 

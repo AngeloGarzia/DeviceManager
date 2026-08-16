@@ -30,9 +30,11 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * Agrège commandes, bons, interventions techniques, FIT et ajustements de stock.
@@ -86,6 +88,41 @@ public class TimelineService {
                 .comparing(TimelineEventResponse::getAt, Comparator.nullsLast(Comparator.reverseOrder()))
                 .thenComparing(TimelineEventResponse::getRefId, Comparator.nullsLast(Comparator.reverseOrder())));
         return events;
+    }
+
+    /**
+     * Identifiants des MAS de l'atelier courant qui ont déjà des données de suivi
+     * (bons d'intervention, interventions techniques ou FIT).
+     */
+    public List<Long> findMasIdsWithSuivi() {
+        Long atelierId = atelierService.requireCurrentAtelier().getId();
+        Set<Long> ids = new LinkedHashSet<>();
+        ids.addAll(interventionRepository.findDistinctMasIdsByAtelierId(atelierId));
+        ids.addAll(interventionTechniqueRepository.findDistinctMasIdsByAtelierId(atelierId));
+        ids.addAll(fitRepository.findDistinctMasIdsByAtelierId(atelierId));
+
+        List<String> orphanLabels = interventionRepository.findOrphanMachineMasLabelsByAtelierId(atelierId);
+        if (!orphanLabels.isEmpty()) {
+            List<Mas> allMas = masRepository.findAllByAtelierId(atelierId);
+            for (String label : orphanLabels) {
+                if (label == null || label.isBlank()) {
+                    continue;
+                }
+                String lower = label.toLowerCase(Locale.ROOT).trim();
+                for (Mas mas : allMas) {
+                    if (mas.getNumero() == null || mas.getId() == null) {
+                        continue;
+                    }
+                    String numero = mas.getNumero().toLowerCase(Locale.ROOT).trim();
+                    if (lower.equals(numero)
+                            || lower.startsWith(numero + " — ")
+                            || lower.startsWith(numero + " - ")) {
+                        ids.add(mas.getId());
+                    }
+                }
+            }
+        }
+        return ids.stream().sorted().collect(Collectors.toList());
     }
 
     private void appendOrderEvents(

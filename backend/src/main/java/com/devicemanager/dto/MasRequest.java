@@ -8,6 +8,7 @@ import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 
 /**
  * Requête de création ou mise à jour d'une référence MAS.
@@ -25,6 +26,19 @@ public class MasRequest {
     @DecimalMin(value = "0.00", inclusive = true, message = "Le taux de redistribution doit être au moins 0")
     @DecimalMax(value = "100.00", inclusive = true, message = "Le taux de redistribution ne doit pas dépasser 100")
     private BigDecimal tauxRedistribution;
+
+    private LocalDate dateMiseEnService;
+
+    @Size(max = 120, message = "Le type de machine ne doit pas dépasser 120 caractères")
+    private String typeMachine;
+
+    @Size(max = 120, message = "Le numéro de série ne doit pas dépasser 120 caractères")
+    private String numeroSerie;
+
+    private LocalDate dateCessation;
+
+    @Size(max = 255, message = "La destination ne doit pas dépasser 255 caractères")
+    private String destinationMachineUsagee;
 
     /** Identifiant de la marque du catalogue. */
     @NotNull(message = "La marque MAS est obligatoire")

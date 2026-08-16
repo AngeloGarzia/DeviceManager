@@ -1,5 +1,8 @@
 package com.devicemanager.controller;
 
+import com.devicemanager.dto.AiDevisApplyRequest;
+import com.devicemanager.dto.AiDevisApplyResponse;
+import com.devicemanager.dto.AiDevisScanResponse;
 import com.devicemanager.dto.MailPreviewItem;
 import com.devicemanager.dto.OrderRequestDto;
 import com.devicemanager.dto.OrderRequestResponse;
@@ -7,10 +10,12 @@ import com.devicemanager.service.OrderRequestService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.Map;
@@ -155,6 +160,47 @@ public class OrderRequestController {
             @Valid @RequestBody(required = false) OrderRequestDto request,
             Authentication authentication) {
         return ResponseEntity.ok(orderRequestService.receive(id, request, authentication.getName()));
+    }
+
+    /**
+     * Associe un devis (PDF ou image) à une commande validée (ou réceptionnée) — admin uniquement.
+     *
+     * @param id             identifiant de la demande
+     * @param file           fichier PDF ou capture ({@code multipart} part {@code file})
+     * @param authentication administrateur
+     * @return demande avec métadonnées du devis
+     */
+    @PostMapping(value = "/{id}/devis", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<OrderRequestResponse> attachDevis(
+            @PathVariable Long id,
+            @RequestPart("file") MultipartFile file,
+            Authentication authentication) {
+        return ResponseEntity.ok(orderRequestService.attachDevis(id, file, authentication.getName()));
+    }
+
+    /**
+     * Analyse un devis PDF (IA) et propose des mises à jour nom/référence pour les pièces.
+     */
+    @PostMapping(value = "/{id}/devis/analyze", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<AiDevisScanResponse> analyzeDevis(
+            @PathVariable Long id,
+            @RequestPart("file") MultipartFile file) {
+        return ResponseEntity.ok(orderRequestService.analyzeDevis(id, file));
+    }
+
+    /**
+     * Applique les mises à jour acceptées après analyse du devis.
+     */
+    @PostMapping("/{id}/devis/apply-updates")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<AiDevisApplyResponse> applyDevisUpdates(
+            @PathVariable Long id,
+            @Valid @RequestBody AiDevisApplyRequest request,
+            Authentication authentication) {
+        return ResponseEntity.ok(
+                orderRequestService.applyDevisUpdates(id, request, authentication.getName()));
     }
 
     /**

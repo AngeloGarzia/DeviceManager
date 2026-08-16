@@ -169,6 +169,16 @@ export interface Mas {
   numero: string;
   numeroSocle?: string | null;
   tauxRedistribution?: number | null;
+  dateMiseEnService?: string | null;
+  typeMachine?: string | null;
+  numeroSerie?: string | null;
+  dateCessation?: string | null;
+  destinationMachineUsagee?: string | null;
+  destructionFileUrl?: string | null;
+  destructionOriginalName?: string | null;
+  destructionContentType?: string | null;
+  destructionFileSize?: number | null;
+  destructionUploadedAt?: string | null;
   marqueId: number;
   marque?: string;
   marqueLabel?: string;
@@ -185,6 +195,11 @@ export interface MasForm {
   numero: string;
   numeroSocle?: string | null;
   tauxRedistribution?: number | null;
+  dateMiseEnService?: string | null;
+  typeMachine?: string | null;
+  numeroSerie?: string | null;
+  dateCessation?: string | null;
+  destinationMachineUsagee?: string | null;
   marqueId: number | null;
   denoId?: number | null;
   statut: MasStatut | string;
@@ -289,6 +304,11 @@ export interface OrderRequest {
   dateReception?: string | null;
   createdAt: string;
   lignes?: OrderRequestLine[];
+  devisFileUrl?: string | null;
+  devisOriginalName?: string | null;
+  devisContentType?: string | null;
+  devisFileSize?: number | null;
+  devisUploadedAt?: string | null;
 }
 
 export type TimelineEventType =

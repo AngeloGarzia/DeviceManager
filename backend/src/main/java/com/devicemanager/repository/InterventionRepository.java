@@ -62,6 +62,21 @@ public interface InterventionRepository extends JpaRepository<Intervention, Long
     long countByAtelierId(Long atelierId);
 
     @Query("""
+            select distinct i.mas.id from Intervention i
+            where i.atelier.id = :atelierId and i.mas is not null
+            """)
+    List<Long> findDistinctMasIdsByAtelierId(@Param("atelierId") Long atelierId);
+
+    @Query("""
+            select distinct i.machineMas from Intervention i
+            where i.atelier.id = :atelierId
+              and i.mas is null
+              and i.machineMas is not null
+              and trim(i.machineMas) <> ''
+            """)
+    List<String> findOrphanMachineMasLabelsByAtelierId(@Param("atelierId") Long atelierId);
+
+    @Query("""
             select count(i) from Intervention i
             where i.atelier.id = :atelierId
               and year(i.dateIntervention) = :year

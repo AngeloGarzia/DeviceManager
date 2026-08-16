@@ -35,4 +35,11 @@ public class OrderRequestResponse {
     private Integer quantite;
     private Long deviceId;
     private String photoUrl;
+
+    /** Devis PDF (présent après association post-validation). */
+    private String devisFileUrl;
+    private String devisOriginalName;
+    private String devisContentType;
+    private Long devisFileSize;
+    private LocalDateTime devisUploadedAt;
 }

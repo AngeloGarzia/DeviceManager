@@ -116,6 +116,11 @@ export const routes: Routes = [
         loadComponent: () => import('./pages/fit-new/fit-new.component').then((m) => m.FitNewComponent)
       },
       {
+        path: 'mas/fit/feuille',
+        loadComponent: () =>
+          import('./pages/fit-feuille/fit-feuille.component').then((m) => m.FitFeuilleComponent)
+      },
+      {
         path: 'mas/fit/:id',
         loadComponent: () =>
           import('./pages/fit-detail/fit-detail.component').then((m) => m.FitDetailComponent)

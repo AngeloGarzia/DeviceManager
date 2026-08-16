@@ -4,13 +4,29 @@ import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
+import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { OrderRequest, OrderRequestForm, OrderRequestLine } from '../../models/models';
-import { MailPreviewItem, OrderRequestService } from '../../services/order-request.service';
+import {
+  AiDevisApplyItem,
+  AiDevisScanResponse,
+  AiDevisSuggestion,
+  AiDevisUnmatchedPart,
+  MailPreviewItem,
+  OrderRequestService
+} from '../../services/order-request.service';
+import { AiService } from '../../services/ai.service';
 import { AuthService } from '../../services/auth.service';
 import { ConfirmDialogComponent } from '../../shared/confirm-dialog.component';
 import { apiErrorMessage } from '../../shared/api-error';
+import { isPdfFile, isPdfOrImageFile, PDF_OR_IMAGE_ACCEPT } from '../../shared/document-upload';
+
+interface DevisReviewRow {
+  suggestion: AiDevisSuggestion;
+  acceptNom: boolean;
+  acceptReference: boolean;
+}
 
 /**
  * Liste des demandes de commande de pièces détachées.
@@ -25,6 +41,7 @@ import { apiErrorMessage } from '../../shared/api-error';
     RouterLink,
     MatButtonModule,
     MatCardModule,
+    MatCheckboxModule,
     MatIconModule,
     MatProgressSpinnerModule,
     ConfirmDialogComponent
@@ -35,12 +52,17 @@ import { apiErrorMessage } from '../../shared/api-error';
 export class OrderRequestListComponent implements OnInit {
   readonly auth = inject(AuthService);
   private readonly orderService = inject(OrderRequestService);
+  private readonly aiService = inject(AiService);
+  readonly pdfOrImageAccept = PDF_OR_IMAGE_ACCEPT;
   readonly items = signal<OrderRequest[]>([]);
   readonly loading = signal(false);
   readonly validatingId = signal<number | null>(null);
   readonly savingId = signal<number | null>(null);
   readonly receivingId = signal<number | null>(null);
   readonly deletingId = signal<number | null>(null);
+  readonly devisUploadingId = signal<number | null>(null);
+  readonly devisAnalyzing = signal(false);
+  readonly devisApplying = signal(false);
   readonly previewLoadingId = signal<number | null>(null);
   readonly previewsById = signal<Record<number, MailPreviewItem[]>>({});
   /** Brouillons de lignes éditables (quantités reçues) indexés par id de demande. */
@@ -56,7 +78,15 @@ export class OrderRequestListComponent implements OnInit {
   pendingDelete: OrderRequest | null = null;
   pendingReceive: OrderRequest | null = null;
 
+  /** Modale revue IA devis → pièces. */
+  readonly devisReviewOpen = signal(false);
+  readonly devisReviewOrderId = signal<number | null>(null);
+  readonly devisReviewRows = signal<DevisReviewRow[]>([]);
+  readonly devisReviewUnmatched = signal<AiDevisUnmatchedPart[]>([]);
+  readonly devisReviewNotes = signal<string | null>(null);
+
   ngOnInit(): void {
+    this.aiService.refreshStatus();
     this.load();
   }
 
@@ -91,6 +121,173 @@ export class OrderRequestListComponent implements OnInit {
   /** Indique si la réception a été confirmée. */
   isReceived(status: string): boolean {
     return status === 'RECEIVED';
+  }
+
+  /** Devis PDF ou image autorisé après validation (y compris réceptionnée). */
+  canAttachDevis(status: string): boolean {
+    return this.isValidated(status) || this.isReceived(status);
+  }
+
+  devisUrl(item: OrderRequest): string {
+    return this.orderService.resolveDevisUrl(item.devisFileUrl);
+  }
+
+  isDevisImage(item: OrderRequest): boolean {
+    const ct = (item.devisContentType || '').toLowerCase();
+    const name = (item.devisOriginalName || '').toLowerCase();
+    return ct.startsWith('image/') || /\.(png|jpe?g|webp|gif)$/.test(name);
+  }
+
+  pickDevis(orderId: number): void {
+    const input = document.getElementById(`devis-input-${orderId}`) as HTMLInputElement | null;
+    input?.click();
+  }
+
+  onDevisSelected(item: OrderRequest, event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = '';
+    if (!file || !this.auth.isAdmin() || !this.canAttachDevis(item.status)) {
+      return;
+    }
+    if (!isPdfOrImageFile(file)) {
+      this.error.set('Le devis doit être un PDF ou une capture image.');
+      return;
+    }
+    this.devisUploadingId.set(item.id);
+    this.error.set(null);
+    this.success.set(null);
+    this.orderService.attachDevis(item.id, file).subscribe({
+      next: (updated) => {
+        this.replaceItem(updated);
+        this.devisUploadingId.set(null);
+        this.success.set(`Devis associé à la demande #${updated.id}.`);
+        if (this.aiService.enabled() && isPdfFile(file)) {
+          this.runDevisAnalyze(updated.id, file);
+        }
+      },
+      error: (err) => {
+        this.devisUploadingId.set(null);
+        this.error.set(apiErrorMessage(err, 'Envoi du devis impossible.'));
+      }
+    });
+  }
+
+  private runDevisAnalyze(orderId: number, file: File): void {
+    this.devisAnalyzing.set(true);
+    this.orderService.analyzeDevis(orderId, file).subscribe({
+      next: (scan) => this.openDevisReview(orderId, scan),
+      error: (err) => {
+        this.devisAnalyzing.set(false);
+        this.error.set(
+          apiErrorMessage(err, 'Devis enregistré, mais l’analyse IA a échoué.')
+        );
+      }
+    });
+  }
+
+  private openDevisReview(orderId: number, scan: AiDevisScanResponse): void {
+    this.devisAnalyzing.set(false);
+    const suggestions = (scan.suggestions ?? []).filter((s) => s.hasChanges !== false);
+    this.devisReviewOrderId.set(orderId);
+    this.devisReviewNotes.set(scan.notes?.trim() || null);
+    this.devisReviewUnmatched.set(scan.unmatched ?? []);
+    this.devisReviewRows.set(
+      suggestions.map((suggestion) => ({
+        suggestion,
+        acceptNom: !!suggestion.suggestedNom,
+        acceptReference: !!suggestion.suggestedReference
+      }))
+    );
+    if (suggestions.length === 0 && (scan.unmatched?.length ?? 0) === 0) {
+      this.success.set(
+        `Devis associé — l’IA n’a trouvé aucun écart à proposer pour la demande #${orderId}.`
+      );
+      return;
+    }
+    this.devisReviewOpen.set(true);
+  }
+
+  closeDevisReview(): void {
+    this.devisReviewOpen.set(false);
+    this.devisReviewOrderId.set(null);
+    this.devisReviewRows.set([]);
+    this.devisReviewUnmatched.set([]);
+    this.devisReviewNotes.set(null);
+  }
+
+  setAcceptNom(deviceId: number, value: boolean): void {
+    this.devisReviewRows.update((rows) =>
+      rows.map((row) =>
+        row.suggestion.deviceId === deviceId ? { ...row, acceptNom: value } : row
+      )
+    );
+  }
+
+  setAcceptReference(deviceId: number, value: boolean): void {
+    this.devisReviewRows.update((rows) =>
+      rows.map((row) =>
+        row.suggestion.deviceId === deviceId ? { ...row, acceptReference: value } : row
+      )
+    );
+  }
+
+  applyDevisReview(): void {
+    const orderId = this.devisReviewOrderId();
+    if (orderId == null) {
+      return;
+    }
+    const items: AiDevisApplyItem[] = this.devisReviewRows()
+      .filter((row) => row.acceptNom || row.acceptReference)
+      .map((row) => ({
+        deviceId: row.suggestion.deviceId,
+        updateNom: row.acceptNom && !!row.suggestion.suggestedNom,
+        updateReference: row.acceptReference && !!row.suggestion.suggestedReference,
+        suggestedNom: row.suggestion.suggestedNom,
+        suggestedReference: row.suggestion.suggestedReference
+      }))
+      .filter((item) => item.updateNom || item.updateReference);
+
+    if (items.length === 0) {
+      this.closeDevisReview();
+      this.success.set('Aucune mise à jour appliquée.');
+      return;
+    }
+
+    this.devisApplying.set(true);
+    this.orderService.applyDevisUpdates(orderId, { items }).subscribe({
+      next: (res) => {
+        this.devisApplying.set(false);
+        if (res.order) {
+          this.replaceItem(res.order);
+        }
+        this.closeDevisReview();
+        const errCount = res.errors?.length ?? 0;
+        if (errCount > 0) {
+          this.error.set(
+            `${res.updatedCount} pièce(s) mise(s) à jour. ${errCount} erreur(s) : ${(res.errors || []).join(' ; ')}`
+          );
+        } else {
+          this.success.set(
+            `${res.updatedCount} pièce(s) mise(s) à jour à partir du devis.`
+          );
+        }
+      },
+      error: (err) => {
+        this.devisApplying.set(false);
+        this.error.set(apiErrorMessage(err, 'Application des mises à jour impossible.'));
+      }
+    });
+  }
+
+  confidenceLabel(value?: string | null): string {
+    if (value === 'HIGH') {
+      return 'Élevée';
+    }
+    if (value === 'LOW') {
+      return 'Faible';
+    }
+    return 'Moyenne';
   }
 
   /** Libellé français du statut de demande. */

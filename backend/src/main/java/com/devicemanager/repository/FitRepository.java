@@ -40,6 +40,12 @@ public interface FitRepository extends JpaRepository<Fit, Long> {
     long countByAtelierId(Long atelierId);
 
     @Query("""
+            select distinct f.mas.id from Fit f
+            where f.atelier.id = :atelierId and f.mas is not null
+            """)
+    List<Long> findDistinctMasIdsByAtelierId(@Param("atelierId") Long atelierId);
+
+    @Query("""
             select distinct f from Fit f
             left join fetch f.lignes
             left join fetch f.mas

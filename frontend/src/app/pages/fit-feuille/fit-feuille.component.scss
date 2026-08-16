@@ -1,0 +1,301 @@
+$fit-green: #1f7a3a;
+$fit-green-dark: #166032;
+$fit-green-soft: #d8eedc;
+$fit-line: #7cbc8a;
+
+.panel {
+  padding: 1.25rem;
+  border: 1px solid #d7e0ea;
+  border-radius: 0.85rem;
+  background: #fff;
+}
+
+.mas-option-line {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.15rem;
+}
+
+.mas-numero {
+  font-weight: 600;
+}
+
+.mas-numero-suivi {
+  background: #ccff00;
+  color: #1a1a00;
+  font-weight: 800;
+  padding: 0.05rem 0.28rem;
+  border-radius: 0.2rem;
+}
+
+.mas-marque {
+  color: #64748b;
+}
+
+.fit-sheet {
+  background: #fff;
+  border: 2px solid $fit-green;
+  padding: 1rem 1.1rem 1.25rem;
+  color: $fit-green-dark;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  overflow-x: auto;
+}
+
+.sheet-top {
+  display: grid;
+  grid-template-columns: minmax(8rem, 1fr) minmax(14rem, 2.2fr) minmax(8rem, 1fr);
+  gap: 0.75rem;
+  align-items: start;
+  margin-bottom: 0.85rem;
+}
+
+.sheet-box {
+  border: 2px solid $fit-green;
+  min-height: 3.4rem;
+  padding: 0.35rem 0.5rem;
+}
+
+.box-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: $fit-green;
+  text-transform: none;
+}
+
+.box-value {
+  margin-top: 0.2rem;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #0f172a;
+  word-break: break-word;
+}
+
+.sheet-title-block {
+  text-align: center;
+  padding-top: 0.15rem;
+}
+
+.sheet-title {
+  margin: 0;
+  font-size: clamp(1rem, 2.4vw, 1.35rem);
+  font-weight: 800;
+  color: $fit-green;
+  line-height: 1.25;
+}
+
+.sheet-legal {
+  margin-top: 0.35rem;
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: $fit-green;
+  line-height: 1.35;
+}
+
+.sheet-identity {
+  display: grid;
+  gap: 0.35rem;
+  margin-bottom: 0.9rem;
+  font-size: 0.82rem;
+}
+
+.id-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.6rem;
+  align-items: baseline;
+}
+
+.id-row--split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem 1rem;
+}
+
+.id-label {
+  font-weight: 700;
+  color: $fit-green;
+  white-space: nowrap;
+}
+
+.id-label::after {
+  content: ' :';
+}
+
+.id-dots {
+  color: #0f172a;
+  font-weight: 600;
+  border-bottom: 1px dotted $fit-line;
+  min-width: 6rem;
+  flex: 1;
+  padding-bottom: 0.05rem;
+}
+
+.sheet-table-wrap {
+  overflow-x: auto;
+}
+
+.fit-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  min-width: 52rem;
+  font-size: 0.72rem;
+}
+
+.fit-table th,
+.fit-table td {
+  border: 1.5px solid $fit-green;
+  vertical-align: top;
+}
+
+.fit-table thead th {
+  background: $fit-green;
+  color: #fff;
+  font-weight: 700;
+  text-align: center;
+  padding: 0.4rem 0.3rem;
+  line-height: 1.25;
+  letter-spacing: 0.01em;
+}
+
+.fit-table tbody td {
+  min-height: 3.2rem;
+  height: 3.4rem;
+  padding: 0.25rem 0.3rem;
+  color: #0f172a;
+  background: #fff;
+}
+
+.col-date {
+  width: 6.5%;
+  text-align: center;
+  font-weight: 700;
+}
+
+.col-stack {
+  width: 16%;
+}
+
+.col-taux {
+  width: 11%;
+  text-align: center;
+  font-weight: 600;
+}
+
+.col-valeur {
+  width: 11%;
+  text-align: right;
+  position: relative;
+  padding-right: 1.1rem !important;
+  font-weight: 600;
+}
+
+.col-motif {
+  width: 36%;
+}
+
+.col-sig {
+  width: 19.5%;
+}
+
+.stack-line {
+  border-bottom: 1px solid $fit-green-soft;
+  min-height: 1rem;
+  padding: 0.1rem 0.15rem;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.stack-line:last-child {
+  border-bottom: none;
+}
+
+.euro {
+  position: absolute;
+  right: 0.3rem;
+  bottom: 0.25rem;
+  color: $fit-green;
+  font-weight: 800;
+}
+
+.motif-text {
+  white-space: pre-wrap;
+  line-height: 1.35;
+  font-weight: 500;
+}
+
+.motif-meta {
+  margin-top: 0.25rem;
+  font-size: 0.65rem;
+  color: #64748b;
+  font-weight: 600;
+}
+
+.sig-cell {
+  display: grid;
+  gap: 0.2rem;
+  justify-items: center;
+}
+
+.sig-img {
+  max-width: 100%;
+  max-height: 2.4rem;
+  object-fit: contain;
+}
+
+.sig-img--tech {
+  max-height: 1.8rem;
+  opacity: 0.92;
+}
+
+.sig-name {
+  font-size: 0.62rem;
+  font-weight: 700;
+  color: $fit-green-dark;
+  text-align: center;
+  line-height: 1.2;
+}
+
+.sig-name--tech {
+  color: #475569;
+  font-weight: 600;
+}
+
+.empty-row td {
+  background: #fcfffc;
+}
+
+@media (max-width: 900px) {
+  .sheet-top {
+    grid-template-columns: 1fr;
+  }
+
+  .id-row--split {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+
+  .feuille-page {
+    display: block;
+  }
+
+  .fit-sheet {
+    border-width: 1.5px;
+    padding: 0.4rem;
+  }
+
+  .fit-table {
+    min-width: 0;
+    font-size: 8pt;
+  }
+
+  .fit-table tbody td {
+    height: auto;
+    min-height: 1.8rem;
+  }
+}

@@ -68,4 +68,10 @@ public interface InterventionTechniqueRepository extends JpaRepository<Intervent
             @Param("atelierId") Long atelierId);
 
     long countByAtelierId(Long atelierId);
+
+    @Query("""
+            select distinct i.mas.id from InterventionTechnique i
+            where i.atelier.id = :atelierId and i.mas is not null
+            """)
+    List<Long> findDistinctMasIdsByAtelierId(@Param("atelierId") Long atelierId);
 }

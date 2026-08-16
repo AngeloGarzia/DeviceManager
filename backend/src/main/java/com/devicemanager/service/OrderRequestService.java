@@ -1,5 +1,9 @@
 package com.devicemanager.service;
 
+import com.devicemanager.dto.AiDevisApplyRequest;
+import com.devicemanager.dto.AiDevisApplyResponse;
+import com.devicemanager.dto.AiDevisOrderLineContext;
+import com.devicemanager.dto.AiDevisScanResponse;
 import com.devicemanager.dto.MailPreviewItem;
 import com.devicemanager.dto.OrderRequestDto;
 import com.devicemanager.dto.OrderRequestLineResponse;
@@ -14,6 +18,7 @@ import com.devicemanager.entity.User;
 import com.devicemanager.repository.CommandeRepository;
 import com.devicemanager.repository.DeviceRepository;
 import com.devicemanager.repository.UserRepository;
+import com.devicemanager.security.DocumentUploadValidator;
 import com.devicemanager.security.OrderStatuses;
 import com.devicemanager.security.Roles;
 import com.devicemanager.security.StockMouvementSources;
@@ -23,6 +28,7 @@ import org.hibernate.Hibernate;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
@@ -38,8 +44,8 @@ import java.util.stream.Collectors;
  * Service métier des demandes de commande de pièces détachées.
  * <p>
  * Flux : création ({@code PENDING}) → validation admin + e-mails SFM ({@code VALIDATED})
- * → vérification/ajustement des quantités → réception ({@code RECEIVED}) avec mise à jour
- * du stock des pièces. Scopé à l'atelier courant ({@code X-Atelier-Id}).
+ * → devis PDF optionnel → vérification/ajustement des quantités → réception ({@code RECEIVED})
+ * avec mise à jour du stock des pièces. Scopé à l'atelier courant ({@code X-Atelier-Id}).
  */
 @Service
 @RequiredArgsConstructor
@@ -53,6 +59,9 @@ public class OrderRequestService {
     private final MailService mailService;
     private final AtelierService atelierService;
     private final StockMouvementService stockMouvementService;
+    private final StorageService storageService;
+    private final AiAssistantService aiAssistantService;
+    private final DeviceService deviceService;
 
     /**
      * Crée une demande {@code PENDING} et notifie l'administrateur par e-mail.
@@ -307,9 +316,189 @@ public class OrderRequestService {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
                     "Impossible de supprimer une demande déjà réceptionnée (le stock a déjà été mis à jour).");
         }
+        clearDevisStorage(commande);
         commandeRepository.delete(commande);
         log.info("Suppression en base — Demande commande id={} par={} atelier={}",
                 id, adminUsername, atelierId);
+    }
+
+    /**
+     * Associe (ou remplace) un devis PDF ou image à une commande validée ou réceptionnée.
+     *
+     * @param id             identifiant de la commande
+     * @param file           fichier PDF ou capture image
+     * @param adminUsername  administrateur
+     * @return commande avec métadonnées devis
+     */
+    public OrderRequestResponse attachDevis(Long id, MultipartFile file, String adminUsername) {
+        DocumentUploadValidator.validatePdfOrImage(file, "devis");
+
+        Long atelierId = atelierService.requireCurrentAtelier().getId();
+        Commande commande = commandeRepository.findByIdWithRelations(id, atelierId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Demande de commande introuvable"));
+        if (!OrderStatuses.canAttachDevis(commande.getStatus())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Le devis ne peut être associé qu'après validation de la commande.");
+        }
+
+        String previousKey = commande.getDevisFileKey();
+        StorageService.StoredObject stored = storageService.store(file);
+        String original = file.getOriginalFilename();
+        if (original == null || original.isBlank()) {
+            original = DocumentUploadValidator.looksLikePdf(file) ? "devis.pdf" : "devis.jpg";
+        }
+        if (original.length() > 255) {
+            original = original.substring(0, 255);
+        }
+
+        commande.setDevisFileKey(stored.key());
+        commande.setDevisFileUrl(stored.url());
+        commande.setDevisOriginalName(original);
+        commande.setDevisContentType(
+                stored.contentType() != null ? stored.contentType() : "application/octet-stream");
+        commande.setDevisFileSize(stored.size());
+        commande.setDevisUploadedAt(LocalDateTime.now());
+        Commande saved = commandeRepository.save(commande);
+
+        if (previousKey != null && !previousKey.isBlank() && !previousKey.equals(stored.key())) {
+            try {
+                storageService.delete(previousKey);
+            } catch (Exception ex) {
+                log.warn("Ancien devis non supprimé du stockage (commande id={}, key={}): {}",
+                        id, previousKey, ex.getMessage());
+            }
+        }
+
+        log.info("Devis associé — commande id={} file={} par={} atelier={}",
+                id, original, adminUsername, atelierId);
+        return toResponse(saved);
+    }
+
+    /**
+     * Analyse le devis PDF avec l'IA et propose des mises à jour nom/référence
+     * pour les pièces de la commande.
+     * (L'analyse texte n'est disponible que pour les PDF.)
+     */
+    public AiDevisScanResponse analyzeDevis(Long id, MultipartFile file) {
+        Long atelierId = atelierService.requireCurrentAtelier().getId();
+        Commande commande = commandeRepository.findByIdWithRelations(id, atelierId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Demande de commande introuvable"));
+        if (!OrderStatuses.canAttachDevis(commande.getStatus())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "L'analyse du devis n'est possible qu'après validation de la commande.");
+        }
+        DocumentUploadValidator.Kind kind = DocumentUploadValidator.validatePdfOrImage(file, "devis");
+        if (kind != DocumentUploadValidator.Kind.PDF) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "L'analyse IA du devis est disponible uniquement pour les fichiers PDF textuels");
+        }
+
+        List<AiDevisOrderLineContext> lines = commande.getLignes() == null
+                ? List.of()
+                : commande.getLignes().stream()
+                .filter(l -> l.getDevice() != null)
+                .map(l -> AiDevisOrderLineContext.builder()
+                        .deviceId(l.getDevice().getId())
+                        .nom(l.getDevice().getNom())
+                        .reference(l.getDevice().getReference())
+                        .build())
+                .toList();
+
+        byte[] bytes;
+        try {
+            bytes = file.getBytes();
+        } catch (Exception ex) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Devis PDF illisible");
+        }
+
+        AiDevisScanResponse response = aiAssistantService.analyzeDevis(bytes, lines);
+        log.info("Analyse devis IA — commande id={} suggestions={} unmatched={}",
+                id,
+                response.getSuggestions() == null ? 0 : response.getSuggestions().size(),
+                response.getUnmatched() == null ? 0 : response.getUnmatched().size());
+        return response;
+    }
+
+    /**
+     * Applique les mises à jour acceptées (nom / référence) sur les pièces de la commande.
+     */
+    public AiDevisApplyResponse applyDevisUpdates(
+            Long id,
+            AiDevisApplyRequest request,
+            String adminUsername) {
+        Long atelierId = atelierService.requireCurrentAtelier().getId();
+        Commande commande = commandeRepository.findByIdWithRelations(id, atelierId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Demande de commande introuvable"));
+        if (!OrderStatuses.canAttachDevis(commande.getStatus())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Mise à jour des pièces via devis possible uniquement après validation.");
+        }
+
+        Set<Long> orderDeviceIds = commande.getLignes() == null
+                ? Set.of()
+                : commande.getLignes().stream()
+                .filter(l -> l.getDevice() != null)
+                .map(l -> l.getDevice().getId())
+                .collect(Collectors.toSet());
+
+        List<String> errors = new ArrayList<>();
+        int updated = 0;
+        for (AiDevisApplyRequest.Item item : request.getItems()) {
+            if (item.getDeviceId() == null || !orderDeviceIds.contains(item.getDeviceId())) {
+                errors.add("Pièce hors commande (id=" + item.getDeviceId() + ")");
+                continue;
+            }
+            boolean doNom = Boolean.TRUE.equals(item.getUpdateNom());
+            boolean doRef = Boolean.TRUE.equals(item.getUpdateReference());
+            if (!doNom && !doRef) {
+                continue;
+            }
+            String nom = doNom ? item.getSuggestedNom() : null;
+            String reference = doRef ? item.getSuggestedReference() : null;
+            if (doNom && (nom == null || nom.isBlank())) {
+                errors.add("Nom manquant pour la pièce id=" + item.getDeviceId());
+                continue;
+            }
+            try {
+                deviceService.updateNomAndReference(item.getDeviceId(), nom, reference);
+                updated++;
+            } catch (ResponseStatusException ex) {
+                errors.add("Pièce id=" + item.getDeviceId() + " : "
+                        + (ex.getReason() != null ? ex.getReason() : "mise à jour refusée"));
+            } catch (Exception ex) {
+                errors.add("Pièce id=" + item.getDeviceId() + " : erreur technique");
+                log.warn("Échec apply devis deviceId={}: {}", item.getDeviceId(), ex.getMessage());
+            }
+        }
+
+        // Recharger pour refléter les noms/réfs mis à jour dans les lignes
+        Commande refreshed = commandeRepository.findByIdWithRelations(id, atelierId).orElse(commande);
+        log.info("Application devis — commande id={} updated={} errors={} par={}",
+                id, updated, errors.size(), adminUsername);
+        return AiDevisApplyResponse.builder()
+                .order(toResponse(refreshed))
+                .updatedCount(updated)
+                .errors(errors)
+                .build();
+    }
+
+    private void clearDevisStorage(Commande commande) {
+        String key = commande.getDevisFileKey();
+        if (key == null || key.isBlank()) {
+            return;
+        }
+        try {
+            storageService.delete(key);
+        } catch (Exception ex) {
+            log.warn("Devis non supprimé du stockage (commande id={}, key={}): {}",
+                    commande.getId(), key, ex.getMessage());
+        }
+        commande.setDevisFileKey(null);
+        commande.setDevisFileUrl(null);
+        commande.setDevisOriginalName(null);
+        commande.setDevisContentType(null);
+        commande.setDevisFileSize(null);
+        commande.setDevisUploadedAt(null);
     }
 
     private void replaceLines(Commande commande, OrderRequestDto request, Long atelierId) {
@@ -674,6 +863,11 @@ public class OrderRequestService {
                 .quantite(totalQty)
                 .deviceId(first != null ? first.getDeviceId() : null)
                 .photoUrl(first != null ? first.getPhotoUrl() : null)
+                .devisFileUrl(entity.getDevisFileUrl())
+                .devisOriginalName(entity.getDevisOriginalName())
+                .devisContentType(entity.getDevisContentType())
+                .devisFileSize(entity.getDevisFileSize())
+                .devisUploadedAt(entity.getDevisUploadedAt())
                 .build();
     }
 

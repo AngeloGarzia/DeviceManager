@@ -8,7 +8,7 @@
       {{
         returnDevice
           ? 'Création depuis une pièce — retour automatique à la saisie après enregistrement'
-          : 'Numéro, socle, taux, dénomination et marque'
+          : 'Numéro, identification machine, socle, taux et marque'
       }}
     </p>
   </header>
@@ -92,6 +92,53 @@
                 <mat-icon>add</mat-icon>
                 Nouvelle deno
               </button>
+            </div>
+
+            <div class="mas-cell mas-cell--type">
+              <mat-form-field appearance="outline" class="mas-field" subscriptSizing="dynamic">
+                <mat-label>Type</mat-label>
+                <input
+                  matInput
+                  formControlName="typeMachine"
+                  list="mas-type-suggestions"
+                  placeholder="Machine à sous, Poker…"
+                />
+                <datalist id="mas-type-suggestions">
+                  @for (t of typeOptions; track t) {
+                    <option [value]="t"></option>
+                  }
+                </datalist>
+              </mat-form-field>
+            </div>
+
+            <div class="mas-cell mas-cell--serie">
+              <mat-form-field appearance="outline" class="mas-field" subscriptSizing="dynamic">
+                <mat-label>N° de série</mat-label>
+                <input matInput formControlName="numeroSerie" />
+              </mat-form-field>
+            </div>
+
+            <div class="mas-cell mas-cell--mise-service">
+              <mat-form-field appearance="outline" class="mas-field" subscriptSizing="dynamic">
+                <mat-label>Date de mise en service</mat-label>
+                <input matInput type="date" formControlName="dateMiseEnService" />
+              </mat-form-field>
+            </div>
+
+            <div class="mas-cell mas-cell--cessation">
+              <mat-form-field appearance="outline" class="mas-field" subscriptSizing="dynamic">
+                <mat-label>Date de cessation</mat-label>
+                <input matInput type="date" formControlName="dateCessation" />
+                <mat-hint>Accessible si Vendue, En réserve ou Détruite</mat-hint>
+              </mat-form-field>
+            </div>
+
+            <div class="mas-cell mas-cell--destination">
+              <mat-form-field appearance="outline" class="mas-field" subscriptSizing="dynamic">
+                <mat-label>Destination machine usagée</mat-label>
+                <input matInput formControlName="destinationMachineUsagee" />
+                <mat-hint>Accessible uniquement si Vendue</mat-hint>
+              </mat-form-field>
             </div>
           </div>
 

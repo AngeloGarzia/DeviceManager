@@ -21,6 +21,15 @@ const MAS_STATUT_OPTIONS: { value: MasStatut; label: string }[] = [
   { value: 'DETRUITE', label: 'Détruite' }
 ];
 
+const MAS_TYPE_OPTIONS = [
+  'Machine à sous',
+  'Poker',
+  'Roulette',
+  'Blackjack',
+  'Bingo',
+  'Autre'
+];
+
 /**
  * Formulaire de création ou modification d'une MAS.
  * Permet aussi la création inline d'une marque / dénomination.
@@ -61,6 +70,7 @@ export class MasFormComponent implements OnInit {
   readonly marques = signal<MarqueMasOption[]>([]);
   readonly denos = signal<DenoOption[]>([]);
   readonly statutOptions = MAS_STATUT_OPTIONS;
+  readonly typeOptions = MAS_TYPE_OPTIONS;
   id: number | null = null;
   returnDevice: string | null = null;
   private returnForOrderRequest = false;
@@ -69,6 +79,11 @@ export class MasFormComponent implements OnInit {
     numero: ['', [Validators.required, Validators.maxLength(80)]],
     numeroSocle: ['', Validators.maxLength(80)],
     tauxRedistribution: [null as number | null, [Validators.min(0), Validators.max(100)]],
+    dateMiseEnService: [''],
+    typeMachine: ['', Validators.maxLength(120)],
+    numeroSerie: ['', Validators.maxLength(120)],
+    dateCessation: [''],
+    destinationMachineUsagee: ['', Validators.maxLength(255)],
     marqueId: [null as number | null, Validators.required],
     denoId: [null as number | null],
     statut: ['UTILISEE' as string, Validators.required]
@@ -86,6 +101,17 @@ export class MasFormComponent implements OnInit {
     return this.id !== null;
   }
 
+  /** Date de cessation : accessible si Vendue, En réserve ou Détruite. */
+  canEditDateCessation(): boolean {
+    const s = this.form.controls.statut.value;
+    return s === 'VENDUE' || s === 'EN_RESERVE' || s === 'DETRUITE';
+  }
+
+  /** Destination machine usagée : accessible uniquement si Vendue. */
+  canEditDestination(): boolean {
+    return this.form.controls.statut.value === 'VENDUE';
+  }
+
   isStatutChecked(value: string): boolean {
     return this.form.controls.statut.value === value;
   }
@@ -94,10 +120,31 @@ export class MasFormComponent implements OnInit {
   onStatutToggle(value: MasStatut, checked: boolean): void {
     if (checked) {
       this.form.patchValue({ statut: value });
+      this.syncStatutDependentFields();
       return;
     }
     if (this.form.controls.statut.value === value) {
       this.form.patchValue({ statut: 'UTILISEE' });
+      this.syncStatutDependentFields();
+    }
+  }
+
+  private syncStatutDependentFields(): void {
+    const dateCtrl = this.form.controls.dateCessation;
+    const destCtrl = this.form.controls.destinationMachineUsagee;
+
+    if (this.canEditDateCessation()) {
+      dateCtrl.enable({ emitEvent: false });
+    } else {
+      dateCtrl.setValue('', { emitEvent: false });
+      dateCtrl.disable({ emitEvent: false });
+    }
+
+    if (this.canEditDestination()) {
+      destCtrl.enable({ emitEvent: false });
+    } else {
+      destCtrl.setValue('', { emitEvent: false });
+      destCtrl.disable({ emitEvent: false });
     }
   }
 
@@ -106,6 +153,8 @@ export class MasFormComponent implements OnInit {
     this.returnForOrderRequest = this.route.snapshot.queryParamMap.get('forOrderRequest') === '1';
     this.loadMarques();
     this.loadDenos();
+    this.syncStatutDependentFields();
+    this.form.controls.statut.valueChanges.subscribe(() => this.syncStatutDependentFields());
 
     const rawId = this.route.snapshot.paramMap.get('id');
     if (rawId) {
@@ -117,10 +166,16 @@ export class MasFormComponent implements OnInit {
             numero: mas.numero,
             numeroSocle: mas.numeroSocle || '',
             tauxRedistribution: mas.tauxRedistribution ?? null,
+            dateMiseEnService: mas.dateMiseEnService || '',
+            typeMachine: mas.typeMachine || '',
+            numeroSerie: mas.numeroSerie || '',
+            dateCessation: mas.dateCessation || '',
+            destinationMachineUsagee: mas.destinationMachineUsagee || '',
             marqueId: mas.marqueId,
             denoId: mas.denoId ?? null,
             statut: mas.statut || (mas.utilise ? 'UTILISEE' : 'EN_RESERVE')
           });
+          this.syncStatutDependentFields();
           this.loading.set(false);
         },
         error: () => {
@@ -255,6 +310,15 @@ export class MasFormComponent implements OnInit {
       numero: raw.numero!.trim(),
       numeroSocle: raw.numeroSocle?.trim() || null,
       tauxRedistribution: Number.isFinite(taux as number) ? (taux as number) : null,
+      dateMiseEnService: raw.dateMiseEnService?.trim() || null,
+      typeMachine: raw.typeMachine?.trim() || null,
+      numeroSerie: raw.numeroSerie?.trim() || null,
+      dateCessation: this.canEditDateCessation()
+        ? raw.dateCessation?.trim() || null
+        : null,
+      destinationMachineUsagee: this.canEditDestination()
+        ? raw.destinationMachineUsagee?.trim() || null
+        : null,
       marqueId: raw.marqueId,
       denoId: raw.denoId,
       statut: raw.statut || 'UTILISEE',

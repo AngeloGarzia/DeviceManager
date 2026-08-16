@@ -111,11 +111,13 @@
 
           @if (device.documents?.length) {
             <div class="mt-5">
-              <h2 class="m-0 mb-2 text-base font-semibold text-ink">Documents PDF</h2>
+              <h2 class="m-0 mb-2 text-base font-semibold text-ink">Documents</h2>
               <ul class="m-0 grid list-none gap-2 p-0">
                 @for (doc of device.documents; track doc.id) {
                   <li class="flex flex-wrap items-center gap-2 rounded-lg border border-line bg-slate-50 px-3 py-2">
-                    <mat-icon class="text-rose-700">picture_as_pdf</mat-icon>
+                    <mat-icon [class]="isDocumentImage(doc) ? 'text-brand' : 'text-rose-700'">
+                      {{ isDocumentImage(doc) ? 'image' : 'picture_as_pdf' }}
+                    </mat-icon>
                     <div class="min-w-0 flex-1">
                       <div class="text-sm font-medium text-ink">{{ documentTypeLabel(doc.docType) }}</div>
                       <div class="truncate text-xs text-ink-soft">{{ doc.originalName }}</div>

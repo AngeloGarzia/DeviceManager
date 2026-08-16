@@ -173,16 +173,16 @@
           </div>
 
           <div class="docs-block sm:col-span-2">
-            <h2 class="m-0 mb-2 text-base font-semibold text-ink">Documents PDF</h2>
+            <h2 class="m-0 mb-2 text-base font-semibold text-ink">Documents</h2>
             <p class="m-0 mb-3 text-sm text-ink-soft">
-              Ajoutez un manuel, une datasheet et/ou une notice (un fichier PDF par type).
+              Ajoutez un manuel, une datasheet et/ou une notice (PDF ou capture image, un fichier par type).
             </p>
 
             @if (existingDocuments().length > 0 || newDocuments().length > 0) {
               <ul class="doc-list mb-3">
                 @for (doc of existingDocuments(); track doc.id) {
                   <li class="doc-row">
-                    <mat-icon>picture_as_pdf</mat-icon>
+                    <mat-icon>{{ isDocImage(doc.originalName, doc.contentType) ? 'image' : 'picture_as_pdf' }}</mat-icon>
                     <div class="min-w-0 flex-1">
                       <div class="text-sm font-medium">{{ documentTypeLabel(doc.docType) }}</div>
                       <div class="truncate text-xs text-ink-soft">{{ doc.originalName }}</div>
@@ -200,7 +200,7 @@
                 }
                 @for (doc of newDocuments(); track $index) {
                   <li class="doc-row">
-                    <mat-icon>picture_as_pdf</mat-icon>
+                    <mat-icon>{{ isDocImage(doc.file.name, doc.file.type) ? 'image' : 'picture_as_pdf' }}</mat-icon>
                     <div class="min-w-0 flex-1">
                       <div class="text-sm font-medium">{{ documentTypeLabel(doc.type) }}</div>
                       <div class="truncate text-xs text-ink-soft">{{ doc.file.name }} (nouveau)</div>
@@ -227,7 +227,7 @@
                     {{ opt.label }}
                     <input
                       type="file"
-                      accept="application/pdf,.pdf"
+                      [accept]="pdfOrImageAccept"
                       class="sr-only"
                       (change)="onPdfSelected($event, opt.type)"
                     />

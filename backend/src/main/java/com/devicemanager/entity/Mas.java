@@ -4,6 +4,8 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 /**
  * Référence MAS (Matériel After-Sales) d'un atelier.
@@ -38,6 +40,41 @@ public class Mas {
     /** Taux de redistribution en pourcentage (0–100). */
     @Column(name = "taux_redistribution", precision = 6, scale = 2)
     private BigDecimal tauxRedistribution;
+
+    @Column(name = "date_mise_en_service")
+    private LocalDate dateMiseEnService;
+
+    /** Type de machine : machine à sous, poker, etc. */
+    @Column(name = "type_machine", length = 120)
+    private String typeMachine;
+
+    @Column(name = "numero_serie", length = 120)
+    private String numeroSerie;
+
+    @Column(name = "date_cessation")
+    private LocalDate dateCessation;
+
+    @Column(name = "destination_machine_usagee", length = 255)
+    private String destinationMachineUsagee;
+
+    /** Bon de destruction (PDF ou image), si statut = DETRUITE. */
+    @Column(name = "destruction_file_key", length = 512)
+    private String destructionFileKey;
+
+    @Column(name = "destruction_file_url", length = 1024)
+    private String destructionFileUrl;
+
+    @Column(name = "destruction_original_name", length = 255)
+    private String destructionOriginalName;
+
+    @Column(name = "destruction_content_type", length = 120)
+    private String destructionContentType;
+
+    @Column(name = "destruction_file_size")
+    private Long destructionFileSize;
+
+    @Column(name = "destruction_uploaded_at")
+    private LocalDateTime destructionUploadedAt;
 
     @ManyToOne(optional = false, fetch = FetchType.EAGER)
     @JoinColumn(name = "marque_id",

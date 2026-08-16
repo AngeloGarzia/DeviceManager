@@ -4,6 +4,10 @@ import com.devicemanager.ai.AiApiKeyBattery;
 import com.devicemanager.ai.AiPromptDefaults;
 import com.devicemanager.ai.AiProviders;
 import com.devicemanager.dto.AiChatResponse;
+import com.devicemanager.dto.AiDevisOrderLineContext;
+import com.devicemanager.dto.AiDevisScanResponse;
+import com.devicemanager.dto.AiDevisSuggestion;
+import com.devicemanager.dto.AiDevisUnmatchedPart;
 import com.devicemanager.dto.AiLabelScanResponse;
 import com.devicemanager.dto.AiPdfScanResponse;
 import com.devicemanager.dto.AiProviderAvailability;
@@ -31,7 +35,10 @@ import org.springframework.util.MimeTypeUtils;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
+import java.util.Objects;
 
 /**
  * Service de l'assistant IA intégré à DeviceManager.
@@ -310,6 +317,197 @@ public class AiAssistantService {
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
                     friendlyAiError(provider, ex));
         }
+    }
+
+    /**
+     * Analyse un devis PDF et propose, pour chaque pièce de la commande, une désignation /
+     * référence à aligner (si trouvée dans le devis).
+     *
+     * @param pdfBytes contenu PDF
+     * @param lines    pièces de la commande (deviceId, nom, référence actuels)
+     */
+    public AiDevisScanResponse analyzeDevis(byte[] pdfBytes, List<AiDevisOrderLineContext> lines) {
+        requireEnabled();
+        if (pdfBytes == null || pdfBytes.length == 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Fichier PDF obligatoire");
+        }
+        FileMagicBytesValidator.validatePdfMagicBytes(pdfBytes);
+
+        List<AiDevisOrderLineContext> safeLines = lines == null ? List.of() : lines.stream()
+                .filter(Objects::nonNull)
+                .filter(l -> l.getDeviceId() != null)
+                .toList();
+        if (safeLines.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "La commande ne contient aucune pièce à rapprocher du devis.");
+        }
+
+        String extractedText = extractPdfText(pdfBytes);
+        if (extractedText == null || extractedText.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Aucun texte extractible dans ce devis PDF (scan image ou PDF protégé).");
+        }
+        if (extractedText.length() > 16_000) {
+            extractedText = extractedText.substring(0, 16_000) + "\n…";
+        }
+
+        StringBuilder linesBlock = new StringBuilder();
+        for (AiDevisOrderLineContext line : safeLines) {
+            linesBlock.append("- deviceId=").append(line.getDeviceId())
+                    .append(" ; nom=").append(nullToDash(blankToNull(line.getNom())))
+                    .append(" ; reference=").append(nullToDash(blankToNull(line.getReference())))
+                    .append('\n');
+        }
+
+        String provider = resolveProviderId();
+        String apiKey = requireApiKey(provider);
+        String model = resolveChatModelForProvider(provider);
+
+        String prompt = """
+                Tu es un technicien casino. Analyse le texte d'un DEVIS fournisseur (PDF).
+                Repère les lignes de pièces détachées (désignation / désignation commerciale, référence / code article).
+                Relie chaque pièce de la COMMANDE ci-dessous à la meilleure ligne du devis.
+                Produis UNIQUEMENT un JSON :
+                {
+                  "matches":[
+                    {
+                      "deviceId":123,
+                      "suggestedNom":"...",
+                      "suggestedReference":"...",
+                      "confidence":"HIGH|MEDIUM|LOW"
+                    }
+                  ],
+                  "unmatched":[{"designation":"...","reference":"..."}],
+                  "notes":"..."
+                }
+                Règles :
+                - matches : une entrée par deviceId de la commande UNIQUEMENT si une correspondance plausible existe.
+                - suggestedNom = désignation du devis (nettoyer espaces) ; null si identique / absente.
+                - suggestedReference = référence article du devis ; null si identique / absente.
+                - confidence HIGH si référence exacte ou quasi exacte ; MEDIUM si nom proche ; LOW sinon.
+                - unmatched : lignes devis sans pièce commande correspondante (peut être []).
+                - notes : incertitudes (peut être null). Pas de markdown.
+                Pièces de la commande :
+                %s
+                Texte devis :
+                ---
+                %s
+                ---
+                """.formatted(linesBlock, extractedText);
+
+        try {
+            ChatClient chatClient = buildChatClient(apiKey, provider, model, 0.1);
+            String reply = chatClient.prompt()
+                    .system(systemPrompt())
+                    .user(prompt)
+                    .call()
+                    .content();
+            JsonNode node = parseJsonObject(reply);
+            return buildDevisScanResponse(safeLines, node);
+        } catch (ResponseStatusException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            log.error("Échec analyse devis IA: {}", ex.getMessage(), ex);
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
+                    friendlyAiError(provider, ex));
+        }
+    }
+
+    private AiDevisScanResponse buildDevisScanResponse(
+            List<AiDevisOrderLineContext> lines,
+            JsonNode node) {
+        java.util.Map<Long, AiDevisOrderLineContext> byId = new java.util.LinkedHashMap<>();
+        for (AiDevisOrderLineContext line : lines) {
+            byId.put(line.getDeviceId(), line);
+        }
+
+        List<AiDevisSuggestion> suggestions = new ArrayList<>();
+        JsonNode matches = node.get("matches");
+        if (matches != null && matches.isArray()) {
+            for (JsonNode m : matches) {
+                Long deviceId = longOrNull(m, "deviceId");
+                if (deviceId == null || !byId.containsKey(deviceId)) {
+                    continue;
+                }
+                AiDevisOrderLineContext current = byId.get(deviceId);
+                String suggestedNom = textOrNull(m, "suggestedNom");
+                String suggestedReference = textOrNull(m, "suggestedReference");
+                String confidence = textOrNull(m, "confidence");
+                if (confidence == null) {
+                    confidence = "MEDIUM";
+                } else {
+                    confidence = confidence.trim().toUpperCase(Locale.ROOT);
+                    if (!List.of("HIGH", "MEDIUM", "LOW").contains(confidence)) {
+                        confidence = "MEDIUM";
+                    }
+                }
+                boolean nomChanged = differsIgnoringCase(current.getNom(), suggestedNom);
+                boolean refChanged = differsIgnoringCase(current.getReference(), suggestedReference);
+                if (!nomChanged && !refChanged) {
+                    continue;
+                }
+                suggestions.add(AiDevisSuggestion.builder()
+                        .deviceId(deviceId)
+                        .currentNom(current.getNom())
+                        .currentReference(current.getReference())
+                        .suggestedNom(nomChanged ? suggestedNom : null)
+                        .suggestedReference(refChanged ? suggestedReference : null)
+                        .confidence(confidence)
+                        .hasChanges(true)
+                        .build());
+            }
+        }
+
+        List<AiDevisUnmatchedPart> unmatched = new ArrayList<>();
+        JsonNode unmatchedNode = node.get("unmatched");
+        if (unmatchedNode != null && unmatchedNode.isArray()) {
+            for (JsonNode u : unmatchedNode) {
+                String designation = textOrNull(u, "designation");
+                String reference = textOrNull(u, "reference");
+                if (designation == null && reference == null) {
+                    continue;
+                }
+                unmatched.add(AiDevisUnmatchedPart.builder()
+                        .designation(designation)
+                        .reference(reference)
+                        .build());
+            }
+        }
+
+        return AiDevisScanResponse.builder()
+                .enabled(true)
+                .notes(textOrNull(node, "notes"))
+                .suggestions(suggestions)
+                .unmatched(unmatched)
+                .build();
+    }
+
+    private static Long longOrNull(JsonNode node, String field) {
+        if (node == null || !node.has(field) || node.get(field).isNull()) {
+            return null;
+        }
+        JsonNode v = node.get(field);
+        if (v.isNumber()) {
+            return v.longValue();
+        }
+        if (v.isTextual()) {
+            try {
+                return Long.parseLong(v.asText().trim());
+            } catch (NumberFormatException ex) {
+                return null;
+            }
+        }
+        return null;
+    }
+
+    private static boolean differsIgnoringCase(String current, String suggested) {
+        if (suggested == null || suggested.isBlank()) {
+            return false;
+        }
+        if (current == null || current.isBlank()) {
+            return true;
+        }
+        return !current.trim().equalsIgnoreCase(suggested.trim());
     }
 
     private static String extractPdfText(byte[] bytes) {

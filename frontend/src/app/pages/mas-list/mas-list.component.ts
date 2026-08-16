@@ -12,13 +12,11 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { Mas } from '../../models/models';
 import { MasService } from '../../services/mas.service';
 import { AuthService } from '../../services/auth.service';
-import { ConfirmDialogComponent } from '../../shared/confirm-dialog.component';
-import { apiErrorMessage } from '../../shared/api-error';
 import { masStatutBadgeClass, masStatutLabel } from '../../shared/mas-statut';
 
 /**
- * Liste des MAS (modèles d'appareils de substitution) de l'atelier.
- * Permet la recherche, la consultation et la suppression des MAS.
+ * Liste des MAS de l'atelier.
+ * Consultation et édition (changement de statut) — pas de suppression en base.
  */
 @Component({
   selector: 'app-mas-list',
@@ -26,7 +24,7 @@ import { masStatutBadgeClass, masStatutLabel } from '../../shared/mas-statut';
   imports: [
     CommonModule, FormsModule, RouterLink, MatButtonModule, MatIconModule,
     MatFormFieldModule, MatInputModule, MatCardModule, MatTableModule,
-    MatProgressSpinnerModule, ConfirmDialogComponent
+    MatProgressSpinnerModule
   ],
   templateUrl: './mas-list.component.html',
   styleUrl: './mas-list.component.scss'
@@ -36,8 +34,6 @@ export class MasListComponent implements OnInit {
   readonly items = signal<Mas[]>([]);
   readonly loading = signal(false);
   readonly error = signal<string | null>(null);
-  readonly confirmOpen = signal(false);
-  pendingDelete: Mas | null = null;
   query = '';
   readonly displayedColumns = ['numero', 'socle', 'marque', 'deno', 'taux', 'statut', 'actions'];
   readonly statutLabel = masStatutLabel;
@@ -58,21 +54,6 @@ export class MasListComponent implements OnInit {
     this.masService.list(this.query).subscribe({
       next: (data) => { this.items.set(data); this.loading.set(false); },
       error: () => { this.error.set('Impossible de charger les MAS.'); this.loading.set(false); }
-    });
-  }
-
-  /** Demande confirmation avant suppression d'une MAS. */
-  askDelete(item: Mas): void { this.pendingDelete = item; this.confirmOpen.set(true); }
-  /** Annule la suppression en cours. */
-  cancelDelete(): void { this.pendingDelete = null; this.confirmOpen.set(false); }
-  /** Supprime la MAS sélectionnée après confirmation. */
-  confirmDelete(): void {
-    if (!this.pendingDelete) return;
-    const id = this.pendingDelete.id;
-    this.confirmOpen.set(false);
-    this.masService.delete(id).subscribe({
-      next: () => { this.pendingDelete = null; this.load(); },
-      error: (err) => { this.error.set(apiErrorMessage(err, 'Suppression impossible.')); this.pendingDelete = null; }
     });
   }
 }

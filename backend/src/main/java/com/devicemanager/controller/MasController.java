@@ -10,8 +10,10 @@ import com.devicemanager.service.MasService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -116,11 +118,20 @@ public class MasController {
     }
 
     /**
-     * Supprime une MAS de l'atelier courant.
+     * Associe un bon de destruction (PDF ou image) à une MAS au statut {@code DETRUITE}.
+     */
+    @PostMapping(value = "/{id}/bon-destruction", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<MasResponse> attachBonDestruction(
+            @PathVariable Long id,
+            @RequestPart("file") MultipartFile file) {
+        return ResponseEntity.ok(masService.attachBonDestruction(id, file));
+    }
+
+    /**
+     * Refusé : une MAS ne se supprime pas, elle change de statut.
      *
      * @param id identifiant de la MAS
-     * @return réponse vide ({@code 204})
-     * @throws org.springframework.web.server.ResponseStatusException {@code 404} si introuvable
+     * @throws org.springframework.web.server.ResponseStatusException {@code 405}
      */
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(@PathVariable Long id) {

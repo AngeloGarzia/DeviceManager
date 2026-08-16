@@ -50,4 +50,11 @@ public final class OrderStatuses {
     public static boolean canEditLines(String status) {
         return isPending(status) || isValidated(status);
     }
+
+    /**
+     * Un devis (PDF ou image) peut être associé une fois la demande validée (y compris après réception).
+     */
+    public static boolean canAttachDevis(String status) {
+        return isValidated(status) || isReceived(status);
+    }
 }

@@ -12,6 +12,46 @@ export interface MailPreviewItem {
   sfmNom?: string | null;
 }
 
+export interface AiDevisSuggestion {
+  deviceId: number;
+  currentNom?: string | null;
+  currentReference?: string | null;
+  suggestedNom?: string | null;
+  suggestedReference?: string | null;
+  confidence?: string | null;
+  hasChanges?: boolean;
+}
+
+export interface AiDevisUnmatchedPart {
+  designation?: string | null;
+  reference?: string | null;
+}
+
+export interface AiDevisScanResponse {
+  enabled: boolean;
+  notes?: string | null;
+  suggestions?: AiDevisSuggestion[];
+  unmatched?: AiDevisUnmatchedPart[];
+}
+
+export interface AiDevisApplyItem {
+  deviceId: number;
+  updateNom?: boolean;
+  updateReference?: boolean;
+  suggestedNom?: string | null;
+  suggestedReference?: string | null;
+}
+
+export interface AiDevisApplyRequest {
+  items: AiDevisApplyItem[];
+}
+
+export interface AiDevisApplyResponse {
+  order: OrderRequest;
+  updatedCount: number;
+  errors?: string[];
+}
+
 @Injectable({ providedIn: 'root' })
 export class OrderRequestService {
   private readonly base = `${environment.apiUrl}/api/order-requests`;
@@ -54,6 +94,35 @@ export class OrderRequestService {
    */
   receive(id: number, payload?: OrderRequestForm): Observable<OrderRequest> {
     return this.http.post<OrderRequest>(`${this.base}/${id}/receive`, payload ?? {});
+  }
+
+  /** Associe (ou remplace) un devis PDF à une commande validée / réceptionnée. */
+  attachDevis(id: number, file: File): Observable<OrderRequest> {
+    const form = new FormData();
+    form.append('file', file, file.name);
+    return this.http.post<OrderRequest>(`${this.base}/${id}/devis`, form);
+  }
+
+  /** Analyse IA du devis : propositions de mise à jour nom/référence des pièces. */
+  analyzeDevis(id: number, file: File): Observable<AiDevisScanResponse> {
+    const form = new FormData();
+    form.append('file', file, file.name);
+    return this.http.post<AiDevisScanResponse>(`${this.base}/${id}/devis/analyze`, form);
+  }
+
+  /** Applique les mises à jour acceptées après analyse du devis. */
+  applyDevisUpdates(id: number, payload: AiDevisApplyRequest): Observable<AiDevisApplyResponse> {
+    return this.http.post<AiDevisApplyResponse>(`${this.base}/${id}/devis/apply-updates`, payload);
+  }
+
+  resolveDevisUrl(fileUrl?: string | null): string {
+    if (!fileUrl) {
+      return '';
+    }
+    if (fileUrl.startsWith('http')) {
+      return fileUrl;
+    }
+    return `${environment.apiUrl}${fileUrl}`;
   }
 
   delete(id: number): Observable<void> {

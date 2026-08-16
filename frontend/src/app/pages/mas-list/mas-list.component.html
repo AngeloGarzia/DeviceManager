@@ -57,7 +57,6 @@
             <div class="mt-4 flex flex-wrap gap-2">
               <a mat-stroked-button [routerLink]="['/mas', item.id]">Voir</a>
               <a mat-button [routerLink]="['/mas', item.id, 'edit']">Éditer</a>
-              <button mat-button color="warn" type="button" (click)="askDelete(item)">Suppr.</button>
             </div>
           </mat-card-content>
         </mat-card>
@@ -90,7 +89,6 @@
             <div class="flex justify-end gap-1">
               <a mat-button [routerLink]="['/mas', item.id]">Voir</a>
               <a mat-button [routerLink]="['/mas', item.id, 'edit']">Éditer</a>
-              <button mat-button color="warn" type="button" (click)="askDelete(item)">Suppr.</button>
             </div>
           </td>
         </ng-container>
@@ -100,7 +98,4 @@
     </div>
   }
 
-  <app-confirm-dialog [open]="confirmOpen()" title="Supprimer la MAS"
-    [message]="pendingDelete ? 'Confirmer la suppression de « ' + pendingDelete.numero + ' » ?' : ''"
-    (confirmed)="confirmDelete()" (dismissed)="cancelDelete()" />
 </section>

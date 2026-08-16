@@ -23,6 +23,16 @@
       <mat-icon>{{ showForm() ? 'close' : 'draw' }}</mat-icon>
       {{ showForm() ? 'Fermer' : 'Ajouter une intervention' }}
     </button>
+    @if (fit(); as f) {
+      <a
+        mat-stroked-button
+        [routerLink]="['/mas/fit/feuille']"
+        [queryParams]="f.masId ? { masId: f.masId, fitId: f.id } : { fitId: f.id }"
+      >
+        <mat-icon>article</mat-icon>
+        Voir fiche modèle 34
+      </a>
+    }
   </header>
 
   @if (loading()) {

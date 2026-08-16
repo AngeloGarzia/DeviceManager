@@ -127,6 +127,63 @@
 
             <p class="mt-3 text-sm leading-relaxed text-ink">{{ item.message }}</p>
 
+            @if (canAttachDevis(item.status)) {
+              <div class="mt-3 rounded-lg border border-line bg-slate-50 px-3 py-3">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                  <div class="min-w-0">
+                    <div class="text-sm font-medium text-ink">Devis (PDF ou image)</div>
+                    @if (item.devisFileUrl) {
+                      <a
+                        class="mt-1 inline-flex items-center gap-1 text-sm text-brand underline-offset-2 hover:underline"
+                        [href]="devisUrl(item)"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        <mat-icon class="!text-base">{{ isDevisImage(item) ? 'image' : 'picture_as_pdf' }}</mat-icon>
+                        {{ item.devisOriginalName || 'Ouvrir le devis' }}
+                      </a>
+                      @if (item.devisUploadedAt) {
+                        <div class="mt-0.5 text-xs text-ink-soft">
+                          Ajouté le {{ item.devisUploadedAt | date: 'dd/MM/yyyy HH:mm' }}
+                        </div>
+                      }
+                    } @else {
+                      <p class="m-0 mt-1 text-xs text-ink-soft">
+                        Aucun devis associé pour le moment.
+                      </p>
+                    }
+                  </div>
+                  @if (auth.isAdmin()) {
+                    <div>
+                      <input
+                        type="file"
+                        [accept]="pdfOrImageAccept"
+                        class="sr-only"
+                        [id]="'devis-input-' + item.id"
+                        (change)="onDevisSelected(item, $event)"
+                      />
+                      <button
+                        mat-stroked-button
+                        type="button"
+                        class="w-full sm:w-auto"
+                        [disabled]="devisUploadingId() === item.id"
+                        (click)="pickDevis(item.id)"
+                      >
+                        <mat-icon>upload_file</mat-icon>
+                        {{
+                          devisUploadingId() === item.id
+                            ? 'Envoi…'
+                            : item.devisFileUrl
+                              ? 'Remplacer le devis'
+                              : 'Associer un devis'
+                        }}
+                      </button>
+                    </div>
+                  }
+                </div>
+              </div>
+            }
+
             @if (auth.isAdmin()) {
               <div class="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
                 @if (isPending(item.status)) {
@@ -252,5 +309,134 @@
       (confirmed)="confirmAction()"
       (dismissed)="cancelConfirm()"
     />
+  }
+
+  @if (devisAnalyzing()) {
+    <div
+      class="fixed inset-0 z-[110] flex items-center justify-center bg-slate-900/40 p-4"
+      role="status"
+      aria-live="polite"
+    >
+      <div class="flex items-center gap-3 rounded-2xl border border-line bg-white px-5 py-4 shadow-soft">
+        <mat-spinner diameter="28"></mat-spinner>
+        <span class="text-sm text-ink">Analyse du devis par l’IA…</span>
+      </div>
+    </div>
+  }
+
+  @if (devisReviewOpen()) {
+    <div
+      class="fixed inset-0 z-[120] flex items-end justify-center bg-slate-900/40 p-4 sm:items-center"
+      role="presentation"
+    >
+      <div
+        class="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-line bg-white p-5 shadow-soft"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="devis-review-title"
+      >
+        <h2 id="devis-review-title" class="m-0 text-lg font-semibold text-ink">
+          Mises à jour proposées depuis le devis
+        </h2>
+        <p class="mt-2 text-sm text-ink-soft">
+          Acceptez ou refusez chaque modification de désignation / référence pour les pièces de la
+          commande.
+        </p>
+
+        @if (devisReviewNotes()) {
+          <p class="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900">
+            {{ devisReviewNotes() }}
+          </p>
+        }
+
+        <div class="mt-4 grid gap-3">
+          @for (row of devisReviewRows(); track row.suggestion.deviceId) {
+            <article class="rounded-xl border border-line bg-slate-50 px-3 py-3">
+              <div class="flex flex-wrap items-start justify-between gap-2">
+                <div class="min-w-0">
+                  <div class="text-sm font-medium text-ink">
+                    {{ row.suggestion.currentNom || 'Pièce' }}
+                  </div>
+                  <div class="text-xs text-ink-soft">
+                    Réf. actuelle : {{ row.suggestion.currentReference || '—' }}
+                    · Confiance {{ confidenceLabel(row.suggestion.confidence) }}
+                  </div>
+                </div>
+              </div>
+
+              @if (row.suggestion.suggestedNom) {
+                <mat-checkbox
+                  class="mt-3 !items-start text-sm text-ink"
+                  [checked]="row.acceptNom"
+                  (change)="setAcceptNom(row.suggestion.deviceId, $event.checked)"
+                >
+                  <span class="font-medium">Désignation</span>
+                  <span class="mt-0.5 block text-ink-soft">
+                    {{ row.suggestion.currentNom || '—' }}
+                    →
+                    <span class="font-medium text-ink">{{ row.suggestion.suggestedNom }}</span>
+                  </span>
+                </mat-checkbox>
+              }
+
+              @if (row.suggestion.suggestedReference) {
+                <mat-checkbox
+                  class="mt-2 !items-start text-sm text-ink"
+                  [checked]="row.acceptReference"
+                  (change)="setAcceptReference(row.suggestion.deviceId, $event.checked)"
+                >
+                  <span class="font-medium">Référence</span>
+                  <span class="mt-0.5 block text-ink-soft">
+                    {{ row.suggestion.currentReference || '—' }}
+                    →
+                    <span class="font-medium text-ink">{{
+                      row.suggestion.suggestedReference
+                    }}</span>
+                  </span>
+                </mat-checkbox>
+              }
+            </article>
+          } @empty {
+            <p class="m-0 text-sm text-ink-soft">Aucune proposition de mise à jour pour les pièces liées.</p>
+          }
+        </div>
+
+        @if (devisReviewUnmatched().length) {
+          <div class="mt-4">
+            <h3 class="m-0 text-sm font-semibold text-ink">Lignes devis non rattachées</h3>
+            <ul class="mt-2 list-disc space-y-1 pl-5 text-xs text-ink-soft">
+              @for (u of devisReviewUnmatched(); track $index) {
+                <li>
+                  {{ u.designation || '—' }}
+                  @if (u.reference) {
+                    · réf. {{ u.reference }}
+                  }
+                </li>
+              }
+            </ul>
+          </div>
+        }
+
+        <div class="mt-5 grid grid-cols-2 gap-3">
+          <button
+            mat-stroked-button
+            type="button"
+            [disabled]="devisApplying()"
+            (click)="closeDevisReview()"
+          >
+            Tout refuser
+          </button>
+          <button
+            mat-flat-button
+            color="primary"
+            type="button"
+            [disabled]="devisApplying()"
+            (click)="applyDevisReview()"
+          >
+            {{ devisApplying() ? 'Application…' : 'Appliquer la sélection' }}
+          </button>
+        </div>
+      </div>
+    </div>
   }
 </section>

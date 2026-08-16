@@ -17,6 +17,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
@@ -32,12 +33,17 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class OrderRequestServiceTest {
 
+    private static final byte[] PDF_BYTES = "%PDF-1.4 minimal".getBytes();
+
     @Mock private CommandeRepository commandeRepository;
     @Mock private DeviceRepository deviceRepository;
     @Mock private UserRepository userRepository;
     @Mock private MailService mailService;
     @Mock private AtelierService atelierService;
     @Mock private StockMouvementService stockMouvementService;
+    @Mock private StorageService storageService;
+    @Mock private AiAssistantService aiAssistantService;
+    @Mock private DeviceService deviceService;
     @InjectMocks private OrderRequestService orderRequestService;
 
     @BeforeEach
@@ -327,5 +333,58 @@ class OrderRequestServiceTest {
                 .extracting(ex -> ((ResponseStatusException) ex).getReason())
                 .asString()
                 .contains("réceptionnée");
+    }
+
+    @Test
+    void attachDevis_storesPdfOnValidatedOrder() {
+        Commande commande = Commande.builder()
+                .id(90L)
+                .technicien(TestFixtures.user("tech", Roles.TECHNICIEN))
+                .technicienNom("tech")
+                .message("x")
+                .dateDemande(LocalDateTime.now())
+                .status(OrderStatuses.VALIDATED)
+                .atelier(TestFixtures.atelier())
+                .lignes(new ArrayList<>())
+                .build();
+        when(commandeRepository.findByIdWithRelations(90L, 100L)).thenReturn(Optional.of(commande));
+        when(storageService.store(any())).thenReturn(
+                new StorageService.StoredObject("devis/90.pdf", "/uploads/devis-90.pdf", "application/pdf", 42L));
+        when(commandeRepository.save(any(Commande.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        MockMultipartFile file = new MockMultipartFile(
+                "file", "devis-sfm.pdf", "application/pdf", PDF_BYTES);
+
+        OrderRequestResponse response = orderRequestService.attachDevis(90L, file, "admin");
+
+        assertThat(response.getDevisOriginalName()).isEqualTo("devis-sfm.pdf");
+        assertThat(response.getDevisFileUrl()).isEqualTo("/uploads/devis-90.pdf");
+        assertThat(response.getDevisFileSize()).isEqualTo(42L);
+        assertThat(commande.getDevisFileKey()).isEqualTo("devis/90.pdf");
+        assertThat(commande.getDevisUploadedAt()).isNotNull();
+    }
+
+    @Test
+    void attachDevis_rejectsPendingOrder() {
+        Commande commande = Commande.builder()
+                .id(91L)
+                .technicien(TestFixtures.user("tech", Roles.TECHNICIEN))
+                .technicienNom("tech")
+                .message("x")
+                .dateDemande(LocalDateTime.now())
+                .status(OrderStatuses.PENDING)
+                .atelier(TestFixtures.atelier())
+                .lignes(new ArrayList<>())
+                .build();
+        when(commandeRepository.findByIdWithRelations(91L, 100L)).thenReturn(Optional.of(commande));
+
+        MockMultipartFile file = new MockMultipartFile(
+                "file", "devis.pdf", "application/pdf", PDF_BYTES);
+
+        assertThatThrownBy(() -> orderRequestService.attachDevis(91L, file, "admin"))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getReason())
+                .asString()
+                .containsIgnoringCase("validation");
     }
 }

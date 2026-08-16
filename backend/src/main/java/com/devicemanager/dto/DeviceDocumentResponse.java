@@ -4,7 +4,7 @@ import lombok.Builder;
 import lombok.Data;
 
 /**
- * Document PDF d'une pièce (manuel / datasheet / notice).
+ * Document d'une pièce (manuel / datasheet / notice) — PDF ou image.
  */
 @Data
 @Builder

@@ -32,6 +32,7 @@ import { DeviceDocument, DeviceDocumentType, DeviceForm, DevicePhoto, Mas, Sfm }
 import { ConfirmDialogComponent } from '../../shared/confirm-dialog.component';
 import { ImageEditorDialogComponent } from '../../shared/image-editor-dialog.component';
 import { apiErrorMessage } from '../../shared/api-error';
+import { isPdfFile, isPdfOrImageFile, PDF_OR_IMAGE_ACCEPT } from '../../shared/document-upload';
 
 interface NewPhotoItem {
   file: File;
@@ -45,7 +46,7 @@ interface NewDocumentItem {
 
 /**
  * Formulaire de création ou modification d'une pièce détachée.
- * Gère la capture photo (caméra ou galerie), documents PDF, rattachement SFM/MAS,
+ * Gère la capture photo (caméra ou galerie), documents PDF ou image, rattachement SFM/MAS,
  * le scan IA d'étiquette et la sauvegarde avec brouillon de retour.
  */
 @Component({
@@ -85,6 +86,7 @@ export class DeviceFormComponent implements OnInit, AfterViewInit, OnDestroy {
   private readonly masService = inject(MasService);
   private readonly dialog = inject(MatDialog);
   readonly aiService = inject(AiService);
+  readonly pdfOrImageAccept = PDF_OR_IMAGE_ACCEPT;
 
   readonly loading = signal(false);
   readonly saving = signal(false);
@@ -614,9 +616,8 @@ export class DeviceFormComponent implements OnInit, AfterViewInit, OnDestroy {
     if (!file) {
       return;
     }
-    const name = (file.name || '').toLowerCase();
-    if (file.type !== 'application/pdf' && !name.endsWith('.pdf')) {
-      this.error.set('Seuls les fichiers PDF sont acceptés pour les documents.');
+    if (!isPdfOrImageFile(file)) {
+      this.error.set('Le document doit être un PDF ou une capture image.');
       return;
     }
     if (this.occupiedDocTypes().has(type)) {
@@ -625,10 +626,16 @@ export class DeviceFormComponent implements OnInit, AfterViewInit, OnDestroy {
     }
     this.error.set(null);
     this.newDocuments.update((list) => [...list, { file, type }]);
-    if (this.aiService.enabled()) {
+    if (this.aiService.enabled() && isPdfFile(file)) {
       this.pendingPdfAnalyze = { file, type };
       this.pdfAnalyzeOpen.set(true);
     }
+  }
+
+  isDocImage(name: string | null | undefined, contentType?: string | null): boolean {
+    const ct = (contentType || '').toLowerCase();
+    const n = (name || '').toLowerCase();
+    return ct.startsWith('image/') || /\.(png|jpe?g|webp|gif)$/.test(n);
   }
 
   dismissPdfAnalyze(): void {

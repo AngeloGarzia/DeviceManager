@@ -52,6 +52,25 @@ public class Commande {
     @Column(nullable = false, length = 30)
     private String status;
 
+    /** Clé de stockage du devis (PDF ou image, après validation). */
+    @Column(name = "devis_file_key", length = 512)
+    private String devisFileKey;
+
+    @Column(name = "devis_file_url", length = 1024)
+    private String devisFileUrl;
+
+    @Column(name = "devis_original_name", length = 255)
+    private String devisOriginalName;
+
+    @Column(name = "devis_content_type", length = 120)
+    private String devisContentType;
+
+    @Column(name = "devis_file_size")
+    private Long devisFileSize;
+
+    @Column(name = "devis_uploaded_at")
+    private LocalDateTime devisUploadedAt;
+
     @OneToMany(mappedBy = "commande", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<CommandeLigne> lignes = new ArrayList<>();

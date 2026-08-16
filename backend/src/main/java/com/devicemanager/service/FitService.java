@@ -270,7 +270,12 @@ public class FitService {
                             .mas(mas)
                             .casinoNom(atelier.getCasino() != null ? atelier.getCasino().getNom() : null)
                             .numeroMachineCasino(mas.getNumero())
+                            .dateMiseEnService(mas.getDateMiseEnService())
                             .marque(mas.getMarque() != null ? mas.getMarque().getLabel() : null)
+                            .typeMachine(mas.getTypeMachine())
+                            .numeroSerieMachine(mas.getNumeroSerie())
+                            .dateCessation(mas.getDateCessation())
+                            .destinationMachineUsagee(mas.getDestinationMachineUsagee())
                             .lignes(new ArrayList<>())
                             .build();
                     Fit saved = fitRepository.saveAndFlush(created);

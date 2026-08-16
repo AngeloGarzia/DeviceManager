@@ -46,4 +46,13 @@ public class TimelineController {
             @RequestParam(required = false) Long masId) {
         return ResponseEntity.ok(timelineService.findEvents(from, to, types, masId));
     }
+
+    /**
+     * MAS de l'atelier courant ayant déjà un historique de suivi (bons, interventions, FIT).
+     */
+    @GetMapping("/mas-with-suivi")
+    @PreAuthorize("hasAnyRole('ADMIN', 'TECHNICIEN')")
+    public ResponseEntity<List<Long>> masIdsWithSuivi() {
+        return ResponseEntity.ok(timelineService.findMasIdsWithSuivi());
+    }
 }

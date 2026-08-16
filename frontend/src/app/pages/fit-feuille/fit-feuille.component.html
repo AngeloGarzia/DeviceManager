@@ -1,0 +1,198 @@
+<section class="feuille-page grid gap-4">
+  <header class="no-print flex flex-wrap items-start justify-between gap-3">
+    <div>
+      <a routerLink="/mas/fit" class="text-sm text-ink-soft no-underline hover:underline">← Fiches FIT</a>
+      <h1 class="page-title mt-1" data-tour="page-fit-feuille">Suivi FIT</h1>
+      <p class="page-subtitle">
+        Fiche inventaire technique (modèle n° 34) — lignes chronologiques
+      </p>
+    </div>
+    <div class="flex flex-wrap gap-2">
+      <a mat-stroked-button routerLink="/mas/suivi">
+        <mat-icon>timeline</mat-icon>
+        Suivi MAS
+      </a>
+      <button
+        mat-stroked-button
+        type="button"
+        [disabled]="!fit()"
+        (click)="print()"
+      >
+        <mat-icon>print</mat-icon>
+        Imprimer
+      </button>
+      @if (fit(); as f) {
+        <a mat-flat-button color="primary" [routerLink]="['/mas/fit', f.id]">
+          <mat-icon>edit</mat-icon>
+          Gérer les lignes
+        </a>
+      }
+    </div>
+  </header>
+
+  <mat-form-field appearance="outline" class="no-print w-full max-w-xl">
+    <mat-label>MAS</mat-label>
+    <mat-select [formControl]="masCtrl">
+      <mat-option [value]="null">— Choisir une MAS —</mat-option>
+      @for (mas of masses(); track mas.id) {
+        <mat-option [value]="mas.id">
+          <span class="mas-option-line">
+            <span class="mas-numero" [class.mas-numero-suivi]="hasSuivi(mas.id)">{{ mas.numero }}</span>
+            @if (masMarquePart(mas); as marque) {
+              <span class="mas-marque"> — {{ marque }}</span>
+            }
+          </span>
+        </mat-option>
+      }
+    </mat-select>
+    <mat-hint>Sélectionnez la machine pour afficher sa fiche FIT</mat-hint>
+  </mat-form-field>
+
+  @if (error()) {
+    <p class="no-print rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{{ error() }}</p>
+  }
+
+  @if (loadingMas() || loading()) {
+    <div class="no-print flex justify-center py-10"><mat-spinner diameter="36"></mat-spinner></div>
+  } @else if (!fit()) {
+    <div class="no-print panel">
+      <h2 class="m-0 text-lg font-semibold">Aucune fiche affichée</h2>
+      <p class="mt-2 text-sm text-ink-soft">
+        Choisissez une MAS pour consulter le suivi FIT au format réglementaire.
+      </p>
+      <a mat-stroked-button class="mt-3" routerLink="/mas/fit/new">Créer une FIT</a>
+    </div>
+  } @else {
+    @let f = fit()!;
+
+    <article class="fit-sheet" aria-label="Fiche inventaire technique machine à sous">
+      <div class="sheet-top">
+        <div class="sheet-box casino-box">
+          <div class="box-label">Casino</div>
+          <div class="box-value">{{ f.casinoNom || '—' }}</div>
+        </div>
+        <div class="sheet-title-block">
+          <h2 class="sheet-title">Fiche inventaire technique machine à sous</h2>
+          <div class="sheet-legal">
+            Modèle n° {{ f.modeleNumero || '34' }} /
+            {{ f.referenceLegale || "Article 67-29 de l'arrêté du 14 Mai 2007" }}
+          </div>
+        </div>
+        <div class="sheet-box machine-box">
+          <div class="box-label">N° machine du casino</div>
+          <div class="box-value">{{ f.numeroMachineCasino }}</div>
+        </div>
+      </div>
+
+      <div class="sheet-identity">
+        <div class="id-row">
+          <span class="id-label">Date de mise en service</span>
+          <span class="id-dots">{{ formatDate(f.dateMiseEnService) || '……………………' }}</span>
+        </div>
+        <div class="id-row id-row--split">
+          <div>
+            <span class="id-label">Marque</span>
+            <span class="id-dots">{{ f.marque || '……………………' }}</span>
+          </div>
+          <div>
+            <span class="id-label">Type</span>
+            <span class="id-dots">{{ f.typeMachine || '……………………' }}</span>
+          </div>
+        </div>
+        <div class="id-row">
+          <span class="id-label">N° de série machine</span>
+          <span class="id-dots">{{ f.numeroSerieMachine || '……………………' }}</span>
+        </div>
+        <div class="id-row">
+          <span class="id-label">N° de série du lecteur de carte de paiement</span>
+          <span class="id-dots">{{ f.numeroSerieLecteur || '……………………' }}</span>
+        </div>
+        <div class="id-row">
+          <span class="id-label">Date de cessation</span>
+          <span class="id-dots">{{ formatDate(f.dateCessation) || '……………………' }}</span>
+        </div>
+        <div class="id-row">
+          <span class="id-label">Destination de la machine usagée</span>
+          <span class="id-dots">{{ f.destinationMachineUsagee || '……………………' }}</span>
+        </div>
+      </div>
+
+      <div class="sheet-table-wrap">
+        <table class="fit-table">
+          <thead>
+            <tr>
+              <th class="col-date">DATE</th>
+              <th class="col-stack">
+                N° SOCLE<br />
+                N° EMPLACEMENT<br />
+                N° DE SÉRIE DU LECTEUR
+              </th>
+              <th class="col-taux">TAUX DE<br />REDISTRIBUTION</th>
+              <th class="col-valeur">VALEUR UNITAIRE<br />DES MISES</th>
+              <th class="col-motif">
+                MOTIF ET NATURE DES OPÉRATIONS<br />AYANT AFFECTÉ LA MACHINE
+              </th>
+              <th class="col-sig">
+                Signature du Directeur responsable<br />
+                ou du membre du comité spécial
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (ligne of chronologicalLignes(); track trackLigne($index, ligne)) {
+              <tr>
+                <td class="col-date">{{ formatDate(ligne.dateOperation) }}</td>
+                <td class="col-stack">
+                  <div class="stack-line">{{ ligne.numeroSocle || '—' }}</div>
+                  <div class="stack-line">{{ ligne.numeroEmplacement || '—' }}</div>
+                  <div class="stack-line">{{ ligne.numeroSerieLecteur || '—' }}</div>
+                </td>
+                <td class="col-taux">{{ formatTaux(ligne.tauxRedistribution) }}</td>
+                <td class="col-valeur">
+                  <span class="valeur-num">{{ formatMoney(ligne.valeurUnitaireMises) }}</span>
+                  <span class="euro">€</span>
+                </td>
+                <td class="col-motif">
+                  <div class="motif-text">{{ ligne.motifNatureOperations }}</div>
+                  @if (ligne.interventionNumero) {
+                    <div class="motif-meta">Bon {{ ligne.interventionNumero }}</div>
+                  }
+                </td>
+                <td class="col-sig">
+                  <div class="sig-cell">
+                    @if (ligne.signatureAdmin) {
+                      <img [src]="ligne.signatureAdmin" alt="Signature" class="sig-img" />
+                    }
+                    @if (ligne.signataireAdminNom) {
+                      <div class="sig-name">{{ ligne.signataireAdminNom }}</div>
+                    }
+                    @if (ligne.signatureTechnicien) {
+                      <img [src]="ligne.signatureTechnicien" alt="Signature tech" class="sig-img sig-img--tech" />
+                    }
+                    @if (ligne.signataireTechnicienNom) {
+                      <div class="sig-name sig-name--tech">Tech. {{ ligne.signataireTechnicienNom }}</div>
+                    }
+                  </div>
+                </td>
+              </tr>
+            }
+            @for (_ of emptyRows(); track $index) {
+              <tr class="empty-row">
+                <td class="col-date"></td>
+                <td class="col-stack">
+                  <div class="stack-line">&nbsp;</div>
+                  <div class="stack-line">&nbsp;</div>
+                  <div class="stack-line">&nbsp;</div>
+                </td>
+                <td class="col-taux"></td>
+                <td class="col-valeur"><span class="euro">€</span></td>
+                <td class="col-motif"></td>
+                <td class="col-sig"></td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </article>
+  }
+</section>

@@ -25,12 +25,17 @@ export class TimelineService {
     }
     if (opts?.types?.length) {
       for (const t of opts.types) {
-        params = params.append('types', t);
+        params = params.append('types', String(t));
       }
     }
     if (opts?.masId != null) {
       params = params.set('masId', String(opts.masId));
     }
     return this.http.get<TimelineEvent[]>(this.base, { params });
+  }
+
+  /** Identifiants des MAS ayant déjà des données de suivi. */
+  masIdsWithSuivi(): Observable<number[]> {
+    return this.http.get<number[]>(`${this.base}/mas-with-suivi`);
   }
 }

@@ -7,6 +7,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatSelectModule } from '@angular/material/select';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { forkJoin } from 'rxjs';
 import { Mas, TimelineColumn, TimelineEvent, TimelineEventType } from '../../models/models';
 import { MasService } from '../../services/mas.service';
 import { TimelineService } from '../../services/timeline.service';
@@ -49,6 +50,8 @@ export class MasSuiviComponent implements OnInit {
   ];
 
   readonly masses = signal<Mas[]>([]);
+  /** MAS ayant déjà des données de suivi (bons / interventions / FIT). */
+  readonly masIdsWithSuivi = signal<Set<number>>(new Set());
   readonly items = signal<TimelineEvent[]>([]);
   readonly selectedMas = signal<Mas | null>(null);
   readonly activeColumns = signal<Set<TimelineColumn>>(
@@ -77,11 +80,14 @@ export class MasSuiviComponent implements OnInit {
 
   ngOnInit(): void {
     this.loadingMas.set(true);
-    this.masService.list().subscribe({
-      next: (list) => {
-        this.masses.set(
-          [...list].sort((a, b) => a.numero.localeCompare(b.numero, 'fr', { numeric: true }))
-        );
+    forkJoin({
+      list: this.masService.list(),
+      withSuivi: this.timelineService.masIdsWithSuivi()
+    }).subscribe({
+      next: ({ list, withSuivi }) => {
+        const suiviSet = new Set((withSuivi ?? []).filter((id) => id != null));
+        this.masIdsWithSuivi.set(suiviSet);
+        this.masses.set(this.sortMasses(list, suiviSet));
         this.loadingMas.set(false);
         const raw = this.route.snapshot.queryParamMap.get('masId');
         const fromQuery = raw ? Number(raw) : NaN;
@@ -97,6 +103,18 @@ export class MasSuiviComponent implements OnInit {
     });
 
     this.masCtrl.valueChanges.subscribe((id) => this.onMasSelected(id));
+  }
+
+  hasSuivi(masId: number): boolean {
+    return this.masIdsWithSuivi().has(masId);
+  }
+
+  private sortMasses(list: Mas[], suiviSet: Set<number>): Mas[] {
+    const byNumero = (a: Mas, b: Mas) =>
+      a.numero.localeCompare(b.numero, 'fr', { numeric: true });
+    const withData = list.filter((m) => suiviSet.has(m.id)).sort(byNumero);
+    const without = list.filter((m) => !suiviSet.has(m.id)).sort(byNumero);
+    return [...withData, ...without];
   }
 
   onMasSelected(masId: number | null): void {
@@ -233,6 +251,10 @@ export class MasSuiviComponent implements OnInit {
   masOptionLabel(mas: Mas): string {
     const marque = (mas.marqueLabel || mas.marque || '').trim();
     return marque ? `${mas.numero} — ${marque}` : mas.numero;
+  }
+
+  masMarquePart(mas: Mas): string {
+    return (mas.marqueLabel || mas.marque || '').trim();
   }
 
   deltaLabel(delta?: number | null): string {

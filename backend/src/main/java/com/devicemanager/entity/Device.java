@@ -78,7 +78,7 @@ public class Device {
     @Builder.Default
     private List<DevicePhoto> photos = new ArrayList<>();
 
-    /** Documents PDF (manuel, datasheet, notice) — un par type. */
+    /** Documents (PDF ou image : manuel, datasheet, notice) — un par type. */
     @OneToMany(mappedBy = "device", cascade = CascadeType.ALL, orphanRemoval = true)
     @BatchSize(size = 50)
     @Builder.Default

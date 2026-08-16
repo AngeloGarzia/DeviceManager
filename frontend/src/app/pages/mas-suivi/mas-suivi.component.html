@@ -18,14 +18,35 @@
   </header>
 
   <mat-form-field appearance="outline" class="w-full max-w-xl">
-    <mat-label>Machine / MAS</mat-label>
+    <mat-label>MAS</mat-label>
     <mat-select [formControl]="masCtrl">
+      <mat-select-trigger>
+        @if (selectedMas(); as mas) {
+          <span class="mas-option-line">
+            <span class="mas-numero" [class.mas-numero-suivi]="hasSuivi(mas.id)">{{ mas.numero }}</span>
+            @if (masMarquePart(mas); as marque) {
+              <span class="mas-marque"> — {{ marque }}</span>
+            }
+          </span>
+        } @else {
+          — Choisir une MAS —
+        }
+      </mat-select-trigger>
       <mat-option [value]="null">— Choisir une MAS —</mat-option>
       @for (mas of masses(); track mas.id) {
-        <mat-option [value]="mas.id">{{ masOptionLabel(mas) }}</mat-option>
+        <mat-option [value]="mas.id">
+          <span class="mas-option-line">
+            <span class="mas-numero" [class.mas-numero-suivi]="hasSuivi(mas.id)">{{ mas.numero }}</span>
+            @if (masMarquePart(mas); as marque) {
+              <span class="mas-marque"> — {{ marque }}</span>
+            }
+          </span>
+        </mat-option>
       }
     </mat-select>
-    <mat-hint>Sélectionnez une machine pour afficher son historique multi-colonnes</mat-hint>
+    <mat-hint>
+      Les numéros surlignés ont déjà un historique de suivi (affichés en premier)
+    </mat-hint>
   </mat-form-field>
 
   @if (masCtrl.value !== null) {
@@ -55,7 +76,7 @@
     <div class="panel">
       <h2 class="m-0 text-lg font-semibold">Aucune MAS sélectionnée</h2>
       <p class="mt-2 text-sm text-ink-soft">
-        Choisissez une machine pour voir la timeline de ses bons, interventions et FIT.
+        Choisissez une MAS pour voir la timeline de ses bons, interventions et FIT.
       </p>
     </div>
   } @else if (visibleItems().length === 0) {
@@ -69,6 +90,7 @@
         <a mat-flat-button color="primary" routerLink="/devices/utiliser">Utiliser une pièce</a>
         <a mat-stroked-button routerLink="/mas/interventions/new">Nouvelle intervention</a>
         <a mat-stroked-button routerLink="/mas/fit">Fiches FIT</a>
+        <a mat-stroked-button routerLink="/mas/fit/feuille">Suivi FIT</a>
       </div>
     </div>
   } @else {

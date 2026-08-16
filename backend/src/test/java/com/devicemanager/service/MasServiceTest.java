@@ -38,6 +38,7 @@ class MasServiceTest {
     @Mock private MarqueMasRepository marqueMasRepository;
     @Mock private DenoRepository denoRepository;
     @Mock private AtelierService atelierService;
+    @Mock private StorageService storageService;
     @InjectMocks private MasService masService;
 
     @BeforeEach
@@ -132,11 +133,14 @@ class MasServiceTest {
     }
 
     @Test
-    void delete_removesEntity() {
-        when(masRepository.findByIdAndAtelierId(20L, 100L)).thenReturn(Optional.of(TestFixtures.mas()));
-
-        masService.delete(20L);
-
-        verify(masRepository).delete(any(Mas.class));
+    void delete_isForbidden_byBusinessRule() {
+        assertThatThrownBy(() -> masService.delete(20L))
+                .isInstanceOf(ResponseStatusException.class)
+                .satisfies(ex -> {
+                    ResponseStatusException rse = (ResponseStatusException) ex;
+                    assertThat(rse.getStatusCode()).isEqualTo(HttpStatus.METHOD_NOT_ALLOWED);
+                    assertThat(rse.getReason()).containsIgnoringCase("statut");
+                });
+        verify(masRepository, never()).delete(any(Mas.class));
     }
 }

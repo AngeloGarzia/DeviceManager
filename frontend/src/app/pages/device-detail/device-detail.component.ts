@@ -86,6 +86,12 @@ export class DeviceDetailComponent implements OnInit {
     return this.deviceService.resolveDocumentUrl(fileUrl);
   }
 
+  isDocumentImage(doc: { originalName?: string | null; contentType?: string | null }): boolean {
+    const ct = (doc.contentType || '').toLowerCase();
+    const name = (doc.originalName || '').toLowerCase();
+    return ct.startsWith('image/') || /\.(png|jpe?g|webp|gif)$/.test(name);
+  }
+
   documentTypeLabel(type: string): string {
     switch (type) {
       case 'MANUAL':

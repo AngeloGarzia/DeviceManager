@@ -14,11 +14,13 @@ import com.devicemanager.entity.MasStatut;
 import com.devicemanager.repository.DenoRepository;
 import com.devicemanager.repository.MarqueMasRepository;
 import com.devicemanager.repository.MasRepository;
+import com.devicemanager.security.DocumentUploadValidator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
@@ -26,6 +28,7 @@ import java.math.RoundingMode;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
 import java.text.Normalizer;
+import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
@@ -46,6 +49,7 @@ public class MasService {
     private final MarqueMasRepository marqueMasRepository;
     private final DenoRepository denoRepository;
     private final AtelierService atelierService;
+    private final StorageService storageService;
 
     @Transactional(readOnly = true)
     public List<MasResponse> findAll(String q) {
@@ -124,11 +128,17 @@ public class MasService {
                 .numero(numero)
                 .numeroSocle(trimToNull(request.getNumeroSocle()))
                 .tauxRedistribution(normalizeTaux(request.getTauxRedistribution()))
+                .dateMiseEnService(request.getDateMiseEnService())
+                .typeMachine(trimToNull(request.getTypeMachine()))
+                .numeroSerie(trimToNull(request.getNumeroSerie()))
+                .dateCessation(request.getDateCessation())
+                .destinationMachineUsagee(trimToNull(request.getDestinationMachineUsagee()))
                 .marque(getMarque(request.getMarqueId()))
                 .deno(resolveOptionalDeno(request.getDenoId()))
                 .atelier(atelier)
                 .build();
         entity.applyStatut(resolveStatut(request));
+        applyIdentificationRules(entity, entity.getStatut());
         Mas saved = masRepository.save(entity);
         log.info("Création en base — MAS id={} numero={} marque={} atelier={}",
                 saved.getId(),
@@ -145,9 +155,16 @@ public class MasService {
         entity.setNumero(numero);
         entity.setNumeroSocle(trimToNull(request.getNumeroSocle()));
         entity.setTauxRedistribution(normalizeTaux(request.getTauxRedistribution()));
+        entity.setDateMiseEnService(request.getDateMiseEnService());
+        entity.setTypeMachine(trimToNull(request.getTypeMachine()));
+        entity.setNumeroSerie(trimToNull(request.getNumeroSerie()));
+        entity.setDateCessation(request.getDateCessation());
+        entity.setDestinationMachineUsagee(trimToNull(request.getDestinationMachineUsagee()));
         entity.setMarque(getMarque(request.getMarqueId()));
         entity.setDeno(resolveOptionalDeno(request.getDenoId()));
-        entity.applyStatut(resolveStatut(request));
+        MasStatut statut = resolveStatut(request);
+        entity.applyStatut(statut);
+        applyIdentificationRules(entity, statut);
         Mas saved = masRepository.save(entity);
         log.info("Modification en base — MAS id={} numero={} marque={} atelier={}",
                 saved.getId(),
@@ -157,12 +174,62 @@ public class MasService {
         return toResponse(saved);
     }
 
+    /**
+     * Interdit : une MAS ne se supprime pas en base, elle change uniquement de statut.
+     *
+     * @param id identifiant (ignoré — refus systématique)
+     */
     public void delete(Long id) {
+        throw new ResponseStatusException(HttpStatus.METHOD_NOT_ALLOWED,
+                "Une MAS ne peut pas être supprimée : modifiez son statut (ex. détruite, vendue, en réserve).");
+    }
+
+    /**
+     * Associe (ou remplace) un bon de destruction PDF / image à une MAS détruite.
+     */
+    public MasResponse attachBonDestruction(Long id, MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Sélectionnez un PDF ou une image du bon de destruction");
+        }
+        validateDestructionFile(file);
+
         Mas entity = getEntity(id);
-        Long atelierId = entity.getAtelier() != null ? entity.getAtelier().getId() : null;
-        String numero = entity.getNumero();
-        masRepository.delete(entity);
-        log.info("Suppression en base — MAS id={} numero={} atelier={}", id, numero, atelierId);
+        if (entity.getStatut() != MasStatut.DETRUITE) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Le bon de destruction ne peut être associé que si la MAS est détruite.");
+        }
+
+        String previousKey = entity.getDestructionFileKey();
+        StorageService.StoredObject stored = storageService.store(file);
+        String original = file.getOriginalFilename();
+        if (original == null || original.isBlank()) {
+            original = "bon-destruction";
+        }
+        if (original.length() > 255) {
+            original = original.substring(0, 255);
+        }
+
+        entity.setDestructionFileKey(stored.key());
+        entity.setDestructionFileUrl(stored.url());
+        entity.setDestructionOriginalName(original);
+        entity.setDestructionContentType(
+                stored.contentType() != null ? stored.contentType() : file.getContentType());
+        entity.setDestructionFileSize(stored.size());
+        entity.setDestructionUploadedAt(LocalDateTime.now());
+        Mas saved = masRepository.save(entity);
+
+        if (previousKey != null && !previousKey.isBlank() && !previousKey.equals(stored.key())) {
+            try {
+                storageService.delete(previousKey);
+            } catch (Exception ex) {
+                log.warn("Ancien bon de destruction non supprimé (mas id={}, key={}): {}",
+                        id, previousKey, ex.getMessage());
+            }
+        }
+
+        log.info("Bon de destruction associé — MAS id={} file={}", id, original);
+        return toResponse(saved);
     }
 
     public Mas getEntity(Long id) {
@@ -201,6 +268,16 @@ public class MasService {
                 .numero(entity.getNumero())
                 .numeroSocle(entity.getNumeroSocle())
                 .tauxRedistribution(entity.getTauxRedistribution())
+                .dateMiseEnService(entity.getDateMiseEnService())
+                .typeMachine(entity.getTypeMachine())
+                .numeroSerie(entity.getNumeroSerie())
+                .dateCessation(entity.getDateCessation())
+                .destinationMachineUsagee(entity.getDestinationMachineUsagee())
+                .destructionFileUrl(entity.getDestructionFileUrl())
+                .destructionOriginalName(entity.getDestructionOriginalName())
+                .destructionContentType(entity.getDestructionContentType())
+                .destructionFileSize(entity.getDestructionFileSize())
+                .destructionUploadedAt(entity.getDestructionUploadedAt())
                 .marqueId(marque != null ? marque.getId() : null)
                 .marque(marque != null ? marque.getCode() : null)
                 .marqueLabel(marque != null ? marque.getLabel() : null)
@@ -226,6 +303,48 @@ public class MasService {
             return MasStatut.fromUtilise(Boolean.TRUE.equals(request.getUtilise()));
         }
         return MasStatut.UTILISEE;
+    }
+
+    /**
+     * Date de cessation : Vendue / En réserve / Détruite.
+     * Destination machine usagée : Vendue uniquement.
+     * Bon de destruction : uniquement si Détruite.
+     */
+    private void applyIdentificationRules(Mas entity, MasStatut statut) {
+        if (statut == null || statut == MasStatut.UTILISEE) {
+            entity.setDateCessation(null);
+            entity.setDestinationMachineUsagee(null);
+            clearDestructionStorage(entity);
+            return;
+        }
+        if (statut != MasStatut.VENDUE) {
+            entity.setDestinationMachineUsagee(null);
+        }
+        if (statut != MasStatut.DETRUITE) {
+            clearDestructionStorage(entity);
+        }
+    }
+
+    private void clearDestructionStorage(Mas entity) {
+        String key = entity.getDestructionFileKey();
+        if (key != null && !key.isBlank()) {
+            try {
+                storageService.delete(key);
+            } catch (Exception ex) {
+                log.warn("Bon de destruction non supprimé du stockage (mas id={}, key={}): {}",
+                        entity.getId(), key, ex.getMessage());
+            }
+        }
+        entity.setDestructionFileKey(null);
+        entity.setDestructionFileUrl(null);
+        entity.setDestructionOriginalName(null);
+        entity.setDestructionContentType(null);
+        entity.setDestructionFileSize(null);
+        entity.setDestructionUploadedAt(null);
+    }
+
+    private void validateDestructionFile(MultipartFile file) {
+        DocumentUploadValidator.validatePdfOrImage(file, "bon de destruction");
     }
 
     private MarqueMasResponse toMarqueResponse(MarqueMas marque) {

@@ -49,7 +49,20 @@ export class MasService {
     return this.http.put<Mas>(`${this.base}/${id}`, payload);
   }
 
-  delete(id: number): Observable<void> {
-    return this.http.delete<void>(`${this.base}/${id}`);
+  /** Associe un bon de destruction (PDF ou image) à une MAS détruite. */
+  attachBonDestruction(id: number, file: File): Observable<Mas> {
+    const form = new FormData();
+    form.append('file', file, file.name);
+    return this.http.post<Mas>(`${this.base}/${id}/bon-destruction`, form);
+  }
+
+  resolveFileUrl(fileUrl?: string | null): string {
+    if (!fileUrl) {
+      return '';
+    }
+    if (fileUrl.startsWith('http')) {
+      return fileUrl;
+    }
+    return `${environment.apiUrl}${fileUrl}`;
   }
 }

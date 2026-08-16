@@ -198,9 +198,13 @@
           <mat-icon>build</mat-icon>
           <span>Interventions techniques</span>
         </a>
-        <a mat-menu-item routerLink="/mas/fit" routerLinkActive="devices-menu-active">
+        <a mat-menu-item routerLink="/mas/fit" routerLinkActive="devices-menu-active" [routerLinkActiveOptions]="{ exact: true }">
           <mat-icon>description</mat-icon>
           <span>Fiches FIT</span>
+        </a>
+        <a mat-menu-item routerLink="/mas/fit/feuille" routerLinkActive="devices-menu-active">
+          <mat-icon>article</mat-icon>
+          <span>Suivi FIT (modèle 34)</span>
         </a>
       </mat-menu>
 

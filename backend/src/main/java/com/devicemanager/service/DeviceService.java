@@ -14,7 +14,7 @@ import com.devicemanager.entity.User;
 import com.devicemanager.repository.DeviceRepository;
 import com.devicemanager.repository.UserRepository;
 import com.devicemanager.security.DeviceDocumentTypes;
-import com.devicemanager.security.FileMagicBytesValidator;
+import com.devicemanager.security.DocumentUploadValidator;
 import com.devicemanager.security.StockMouvementSources;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -216,6 +216,62 @@ public class DeviceService {
         return toResponse(saved);
     }
 
+    /**
+     * Met à jour uniquement le nom et/ou la référence d'une pièce (ex. alignement devis).
+     *
+     * @param id        identifiant pièce
+     * @param nom       nouveau nom (null = inchangé)
+     * @param reference nouvelle référence (null = inchangé ; chaîne vide = effacer)
+     * @return pièce mise à jour
+     */
+    public DeviceResponse updateNomAndReference(Long id, String nom, String reference) {
+        Device entity = getEntity(id);
+        Long atelierId = entity.getAtelier().getId();
+        boolean changed = false;
+
+        if (nom != null) {
+            String cleaned = nom.trim();
+            if (cleaned.isBlank()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Le nom de pièce est obligatoire");
+            }
+            if (cleaned.length() > 120) {
+                cleaned = cleaned.substring(0, 120);
+            }
+            if (!cleaned.equalsIgnoreCase(entity.getNom())) {
+                ensureUniqueNom(cleaned, atelierId, entity.getId());
+                entity.setNom(cleaned);
+                changed = true;
+            }
+        }
+
+        if (reference != null) {
+            String cleaned = reference.trim();
+            if (cleaned.isBlank()) {
+                if (entity.getReference() != null && !entity.getReference().isBlank()) {
+                    entity.setReference(null);
+                    changed = true;
+                }
+            } else {
+                if (cleaned.length() > 80) {
+                    cleaned = cleaned.substring(0, 80);
+                }
+                if (entity.getReference() == null || !cleaned.equalsIgnoreCase(entity.getReference())) {
+                    ensureUniqueReference(cleaned, atelierId, entity.getId());
+                    entity.setReference(cleaned);
+                    changed = true;
+                }
+            }
+        }
+
+        if (!changed) {
+            return toResponse(entity);
+        }
+        Device saved = deviceRepository.save(entity);
+        log.info("Mise à jour identité — Pièce id={} nom={} référence={}",
+                saved.getId(), saved.getNom(), saved.getReference());
+        return toResponse(saved);
+    }
+
     private String displayUserName(User user) {
         String prenom = user.getPrenom() == null ? "" : user.getPrenom().trim();
         String nom = user.getNom() == null ? "" : user.getNom().trim();
@@ -405,11 +461,11 @@ public class DeviceService {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                         "Un document « " + typeLabel(type) + " » est déjà présent pour cette pièce");
             }
-            validatePdfFile(file);
+            DocumentUploadValidator.validatePdfOrImage(file, "document");
             StorageService.StoredObject stored = storageService.store(file);
             String original = file.getOriginalFilename();
             if (original == null || original.isBlank()) {
-                original = type.toLowerCase() + ".pdf";
+                original = type.toLowerCase() + (DocumentUploadValidator.looksLikePdf(file) ? ".pdf" : ".jpg");
             }
             DeviceDocument doc = DeviceDocument.builder()
                     .device(entity)
@@ -417,7 +473,7 @@ public class DeviceService {
                     .fileKey(stored.key())
                     .fileUrl(stored.url())
                     .originalName(original.length() > 255 ? original.substring(0, 255) : original)
-                    .contentType(stored.contentType() != null ? stored.contentType() : "application/pdf")
+                    .contentType(stored.contentType() != null ? stored.contentType() : "application/octet-stream")
                     .fileSize(stored.size())
                     .build();
             entity.getDocuments().add(doc);
@@ -425,7 +481,7 @@ public class DeviceService {
         }
         if (entity.getDocuments().size() > MAX_DOCUMENTS) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "Maximum " + MAX_DOCUMENTS + " documents PDF par pièce (manuel, datasheet, notice)");
+                    "Maximum " + MAX_DOCUMENTS + " documents par pièce (manuel, datasheet, notice)");
         }
     }
 
@@ -438,36 +494,16 @@ public class DeviceService {
         }
         if (types.size() != fileCount || types.stream().anyMatch(Objects::isNull)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "Chaque PDF doit avoir un type : MANUAL, DATASHEET ou NOTICE");
+                    "Chaque document doit avoir un type : MANUAL, DATASHEET ou NOTICE");
         }
         Set<String> unique = new HashSet<>();
         for (String t : types) {
             if (!unique.add(t)) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                        "Deux PDF du même type (« " + typeLabel(t) + " ») dans le même envoi");
+                        "Deux documents du même type (« " + typeLabel(t) + " ») dans le même envoi");
             }
         }
         return types;
-    }
-
-    private void validatePdfFile(MultipartFile file) {
-        String contentType = file.getContentType();
-        String name = file.getOriginalFilename() == null ? "" : file.getOriginalFilename().toLowerCase();
-        boolean pdfType = contentType != null && (
-                contentType.equalsIgnoreCase("application/pdf")
-                        || contentType.equalsIgnoreCase("application/x-pdf"));
-        boolean pdfName = name.endsWith(".pdf");
-        if (!pdfType && !pdfName) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "Le document doit être un fichier PDF");
-        }
-        try {
-            FileMagicBytesValidator.validatePdfMagicBytes(file.getBytes());
-        } catch (ResponseStatusException ex) {
-            throw ex;
-        } catch (Exception ex) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Document PDF illisible");
-        }
     }
 
     private static String typeLabel(String type) {

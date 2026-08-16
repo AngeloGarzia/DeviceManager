@@ -4,6 +4,8 @@ import lombok.Builder;
 import lombok.Data;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 /**
  * Représentation d'une référence MAS renvoyée par l'API.
@@ -15,6 +17,17 @@ public class MasResponse {
     private String numero;
     private String numeroSocle;
     private BigDecimal tauxRedistribution;
+    private LocalDate dateMiseEnService;
+    private String typeMachine;
+    private String numeroSerie;
+    private LocalDate dateCessation;
+    private String destinationMachineUsagee;
+    /** Bon de destruction (PDF / image) si statut DETRUITE. */
+    private String destructionFileUrl;
+    private String destructionOriginalName;
+    private String destructionContentType;
+    private Long destructionFileSize;
+    private LocalDateTime destructionUploadedAt;
     private Long marqueId;
     /** Code court de la marque. */
     private String marque;
