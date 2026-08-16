@@ -61,10 +61,22 @@ describe('MasService', () => {
     req.flush({ id: 1, ...payload, marque: 'N', marqueLabel: 'Novomatic', denoLabel: '0,50 €' });
   });
 
-  it('should delete MAS', () => {
-    service.delete(9).subscribe({ next: () => expect().nothing() });
-    const req = http.expectOne('/api/mas/9');
-    expect(req.request.method).toBe('DELETE');
-    req.flush(null);
+  it('should attach bon de destruction', () => {
+    const file = new File(['%PDF'], 'bon.pdf', { type: 'application/pdf' });
+    service.attachBonDestruction(9, file).subscribe((m) => expect(m.id).toBe(9));
+    const req = http.expectOne('/api/mas/9/bon-destruction');
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body instanceof FormData).toBeTrue();
+    req.flush({
+      id: 9,
+      numero: 'M1',
+      marqueId: 1,
+      marque: 'N',
+      marqueLabel: 'Novomatic',
+      statut: 'DETRUITE',
+      statutLabel: 'Détruite',
+      utilise: false,
+      destructionOriginalName: 'bon.pdf'
+    });
   });
 });

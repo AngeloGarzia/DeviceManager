@@ -32,8 +32,8 @@ public final class DocumentUploadValidator {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "Sélectionnez un PDF ou une image (" + labelFr + ")");
         }
-        String contentType = file.getContentType() == null ? "" : file.getContentType().toLowerCase(Locale.ROOT);
-        String name = file.getOriginalFilename() == null ? "" : file.getOriginalFilename().toLowerCase(Locale.ROOT);
+        String contentType = normalizeContentType(file);
+        String name = normalizeFilename(file);
         boolean pdf = contentType.contains("pdf") || name.endsWith(".pdf");
         boolean image = contentType.startsWith("image/")
                 || name.endsWith(".jpg")
@@ -64,8 +64,24 @@ public final class DocumentUploadValidator {
         if (file == null) {
             return false;
         }
-        String contentType = file.getContentType() == null ? "" : file.getContentType().toLowerCase(Locale.ROOT);
-        String name = file.getOriginalFilename() == null ? "" : file.getOriginalFilename().toLowerCase(Locale.ROOT);
+        String contentType = normalizeContentType(file);
+        String name = normalizeFilename(file);
         return contentType.contains("pdf") || name.endsWith(".pdf");
+    }
+
+    private static String normalizeContentType(MultipartFile file) {
+        String raw = file.getContentType();
+        if (raw == null) {
+            return "";
+        }
+        return raw.toLowerCase(Locale.ROOT);
+    }
+
+    private static String normalizeFilename(MultipartFile file) {
+        String raw = file.getOriginalFilename();
+        if (raw == null) {
+            return "";
+        }
+        return raw.toLowerCase(Locale.ROOT);
     }
 }
