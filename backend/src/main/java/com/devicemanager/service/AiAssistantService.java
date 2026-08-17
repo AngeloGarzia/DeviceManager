@@ -64,6 +64,7 @@ public class AiAssistantService {
     private final AiModelDiscoveryService aiModelDiscoveryService;
     private final ImageOptimizationService imageOptimizationService;
     private final WebEnrichmentService webEnrichmentService;
+    private final VisiteQuadriService visiteQuadriService;
     private final ObjectMapper objectMapper;
 
     /**
@@ -927,9 +928,18 @@ public class AiAssistantService {
     }
 
     private String systemPrompt() {
-        return firstNonBlank(
+        String base = firstNonBlank(
                 appSettingsService.get(AppSettingsService.AI_SYSTEM_PROMPT, ""),
                 AiPromptDefaults.SYSTEM);
+        try {
+            String summary = visiteQuadriService.statusSummaryForAi();
+            if (summary != null && !summary.isBlank()) {
+                return base + "\n\nContexte atelier — " + summary;
+            }
+        } catch (Exception ex) {
+            log.debug("Résumé visites quadri indisponible pour le contexte IA: {}", ex.getMessage());
+        }
+        return base;
     }
 
     private String labelExtractPrompt() {

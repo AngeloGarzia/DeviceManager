@@ -32,6 +32,8 @@ import java.time.Duration;
 public class AuthController {
 
     static final String REFRESH_COOKIE = "dm_refresh";
+    /** Marqueur HttpOnly : session persistante (« Se souvenir »). */
+    static final String PERSIST_COOKIE = "dm_persist";
 
     private final AuthService authService;
     private final JwtService jwtService;
@@ -39,7 +41,7 @@ public class AuthController {
     /**
      * Authentifie un utilisateur et retourne un jeton d'accès ; pose le cookie refresh.
      *
-     * @param request     identifiants de connexion
+     * @param request     identifiants de connexion (+ option « Se souvenir »)
      * @param httpRequest requête HTTP (schéma / proxy)
      * @return réponse contenant le jeton, le rôle, le groupe et l'atelier par défaut
      */
@@ -48,26 +50,32 @@ public class AuthController {
             @Valid @RequestBody LoginRequest request,
             HttpServletRequest httpRequest) {
         AuthService.AuthSession session = authService.login(request);
-        return ResponseEntity.ok()
-                .header(HttpHeaders.SET_COOKIE, refreshCookie(session.refreshToken(), httpRequest).toString())
-                .body(session.response());
+        boolean persist = Boolean.TRUE.equals(request.getRememberMe());
+        HttpHeaders headers = new HttpHeaders();
+        headers.add(HttpHeaders.SET_COOKIE, refreshCookie(session.refreshToken(), persist, httpRequest).toString());
+        headers.add(HttpHeaders.SET_COOKIE, persistMarkerCookie(persist, httpRequest).toString());
+        return ResponseEntity.ok().headers(headers).body(session.response());
     }
 
     /**
      * Renouvelle la session à partir du cookie refresh (rotation).
      *
      * @param refreshToken cookie {@code dm_refresh}
+     * @param persistMarker cookie {@code dm_persist} (présent si « Se souvenir »)
      * @param httpRequest  requête HTTP
      * @return nouvelle réponse d'authentification
      */
     @PostMapping("/refresh")
     public ResponseEntity<AuthResponse> refresh(
             @CookieValue(name = REFRESH_COOKIE, required = false) String refreshToken,
+            @CookieValue(name = PERSIST_COOKIE, required = false) String persistMarker,
             HttpServletRequest httpRequest) {
         AuthService.AuthSession session = authService.refresh(refreshToken);
-        return ResponseEntity.ok()
-                .header(HttpHeaders.SET_COOKIE, refreshCookie(session.refreshToken(), httpRequest).toString())
-                .body(session.response());
+        boolean persist = persistMarker != null && !persistMarker.isBlank();
+        HttpHeaders headers = new HttpHeaders();
+        headers.add(HttpHeaders.SET_COOKIE, refreshCookie(session.refreshToken(), persist, httpRequest).toString());
+        headers.add(HttpHeaders.SET_COOKIE, persistMarkerCookie(persist, httpRequest).toString());
+        return ResponseEntity.ok().headers(headers).body(session.response());
     }
 
     /**
@@ -82,9 +90,10 @@ public class AuthController {
             @CookieValue(name = REFRESH_COOKIE, required = false) String refreshToken,
             HttpServletRequest httpRequest) {
         authService.logout(refreshToken);
-        return ResponseEntity.noContent()
-                .header(HttpHeaders.SET_COOKIE, clearRefreshCookie(httpRequest).toString())
-                .build();
+        HttpHeaders headers = new HttpHeaders();
+        headers.add(HttpHeaders.SET_COOKIE, clearRefreshCookie(httpRequest).toString());
+        headers.add(HttpHeaders.SET_COOKIE, clearPersistCookie(httpRequest).toString());
+        return ResponseEntity.noContent().headers(headers).build();
     }
 
     /**
@@ -102,11 +111,28 @@ public class AuthController {
         return ResponseEntity.noContent().build();
     }
 
-    private ResponseCookie refreshCookie(String rawToken, HttpServletRequest request) {
+    private ResponseCookie refreshCookie(String rawToken, boolean persist, HttpServletRequest request) {
         boolean secure = isSecureRequest(request);
-        // Prod front/API cross-origin : SameSite=None + Secure pour que le cookie refresh parte en XHR.
-        // Dev same-origin (proxy) : Lax suffit sur HTTP local.
-        return ResponseCookie.from(REFRESH_COOKIE, rawToken)
+        ResponseCookie.ResponseCookieBuilder builder = ResponseCookie.from(REFRESH_COOKIE, rawToken)
+                .httpOnly(true)
+                .secure(secure)
+                .path("/api/auth")
+                .sameSite(secure ? "None" : "Lax");
+        if (persist) {
+            builder.maxAge(Duration.ofMillis(jwtService.getRefreshExpirationMs()));
+        } else {
+            // Cookie de session : supprimé à la fermeture du navigateur.
+            builder.maxAge(Duration.ofSeconds(-1));
+        }
+        return builder.build();
+    }
+
+    private ResponseCookie persistMarkerCookie(boolean persist, HttpServletRequest request) {
+        boolean secure = isSecureRequest(request);
+        if (!persist) {
+            return clearPersistCookie(request);
+        }
+        return ResponseCookie.from(PERSIST_COOKIE, "1")
                 .httpOnly(true)
                 .secure(secure)
                 .path("/api/auth")
@@ -118,6 +144,17 @@ public class AuthController {
     private ResponseCookie clearRefreshCookie(HttpServletRequest request) {
         boolean secure = isSecureRequest(request);
         return ResponseCookie.from(REFRESH_COOKIE, "")
+                .httpOnly(true)
+                .secure(secure)
+                .path("/api/auth")
+                .maxAge(0)
+                .sameSite(secure ? "None" : "Lax")
+                .build();
+    }
+
+    private ResponseCookie clearPersistCookie(HttpServletRequest request) {
+        boolean secure = isSecureRequest(request);
+        return ResponseCookie.from(PERSIST_COOKIE, "")
                 .httpOnly(true)
                 .secure(secure)
                 .path("/api/auth")

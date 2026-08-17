@@ -35,6 +35,13 @@
           </button>
         </mat-form-field>
 
+        <mat-checkbox formControlName="rememberMe" color="primary" data-tour="login-remember">
+          Se souvenir
+        </mat-checkbox>
+        <p class="m-0 -mt-1 text-xs text-ink-soft">
+          Mémorise l’identifiant et conserve la session après fermeture du navigateur.
+        </p>
+
         @if (error()) {
           <p class="mb-3 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{{ error() }}</p>
         }

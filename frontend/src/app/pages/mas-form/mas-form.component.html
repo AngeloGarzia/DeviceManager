@@ -80,6 +80,13 @@
               </mat-form-field>
             </div>
 
+            <div class="mas-cell mas-cell--multi-deno">
+              <mat-checkbox formControlName="multiDeno" color="primary" data-tour="chk-multi-deno">
+                Multi déno
+              </mat-checkbox>
+              <p class="mas-multi-deno-hint">Si coché, l’affichage devient « MultiDéno » (sans valeur unique).</p>
+            </div>
+
             <div class="mas-cell mas-cell--action mas-cell--action-deno">
               <button
                 mat-stroked-button
@@ -87,6 +94,7 @@
                 type="button"
                 class="mas-side-btn"
                 (click)="openNewDeno()"
+                [disabled]="isMultiDeno()"
                 data-tour="btn-new-deno"
               >
                 <mat-icon>add</mat-icon>

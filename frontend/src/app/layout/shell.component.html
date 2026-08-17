@@ -175,15 +175,30 @@
 
       <button
         type="button"
-        class="nav-link"
+        class="nav-link nav-link--badge"
         data-tour="nav-mas"
         [class.active-nav]="isMasSectionActive()"
         [matMenuTriggerFor]="masMenu"
         aria-label="MAS"
         aria-haspopup="menu"
       >
-        <mat-icon>casino</mat-icon>
-        <span>MAS</span>
+        <span class="nav-icon-wrap">
+          <mat-icon>casino</mat-icon>
+          @if (visites.warningCount() > 0) {
+            <span
+              class="pending-badge"
+              [attr.aria-label]="visites.warningCount() + ' visite(s) quadritrimestrielle(s) à traiter'"
+            >
+              {{ visites.warningCount() > 99 ? '99+' : visites.warningCount() }}
+            </span>
+          }
+        </span>
+        <span class="mas-nav-label-wrap">
+          <span [class.pending-label-blink]="visites.warningCount() > 0">MAS</span>
+          @if (visites.warningCount() > 0) {
+            <span class="mas-warning-label pending-label-blink" aria-hidden="true">WARNING</span>
+          }
+        </span>
       </button>
       <mat-menu #masMenu="matMenu" class="devices-nav-menu">
         <a mat-menu-item routerLink="/mas" routerLinkActive="devices-menu-active" [routerLinkActiveOptions]="{ exact: true }">
@@ -197,6 +212,18 @@
         <a mat-menu-item routerLink="/mas/suivi" routerLinkActive="devices-menu-active">
           <mat-icon>timeline</mat-icon>
           <span>Suivi</span>
+        </a>
+        <a
+          mat-menu-item
+          routerLink="/mas/visites-quadri"
+          routerLinkActive="devices-menu-active"
+          data-tour="nav-visites-quadri"
+        >
+          <mat-icon>event_repeat</mat-icon>
+          <span>Visite quadritrimestrielle</span>
+          @if (visites.warningCount() > 0) {
+            <span class="orders-menu-count">{{ visites.warningCount() > 99 ? '99+' : visites.warningCount() }}</span>
+          }
         </a>
         <a mat-menu-item routerLink="/mas/interventions" routerLinkActive="devices-menu-active">
           <mat-icon>build</mat-icon>

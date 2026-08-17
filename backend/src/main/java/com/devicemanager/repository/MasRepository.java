@@ -24,6 +24,7 @@ public interface MasRepository extends JpaRepository<Mas, Long> {
                 OR LOWER(m.marque.label) LIKE LOWER(CONCAT('%', :q, '%'))
                 OR LOWER(m.marque.code) LIKE LOWER(CONCAT('%', :q, '%'))
                 OR (m.deno IS NOT NULL AND LOWER(m.deno.label) LIKE LOWER(CONCAT('%', :q, '%')))
+                OR (m.multiDeno = TRUE AND LOWER('MultiDéno') LIKE LOWER(CONCAT('%', :q, '%')))
               )
             ORDER BY m.numero
             """)

@@ -1,6 +1,8 @@
 export interface LoginRequest {
   username: string;
   password: string;
+  /** Cookie refresh persistant + mémorisation de l'identifiant. */
+  rememberMe?: boolean;
 }
 
 export interface AuthResponse {
@@ -185,6 +187,8 @@ export interface Mas {
   denoId?: number | null;
   denoValeur?: number | null;
   denoLabel?: string | null;
+  /** true = MAS multi-dénomination (affichage « MultiDéno »). */
+  multiDeno?: boolean;
   statut: MasStatut | string;
   statutLabel?: string;
   /** true si statut = UTILISEE */
@@ -202,6 +206,7 @@ export interface MasForm {
   destinationMachineUsagee?: string | null;
   marqueId: number | null;
   denoId?: number | null;
+  multiDeno?: boolean;
   statut: MasStatut | string;
   utilise?: boolean;
 }
@@ -553,5 +558,36 @@ export interface AppSetting {
   label: string;
   category: string;
   secret: boolean;
+}
+
+/** Obligation de visite quadritrimestrielle SFM × marque. */
+export interface VisiteQuadriObligation {
+  sfmId: number;
+  sfmNom: string;
+  marqueId: number;
+  marqueLabel: string;
+  lastVisitDate?: string | null;
+  dueDate: string;
+  daysRemaining: number;
+  level: 'OK' | 'WARN' | 'OVERDUE' | string;
+}
+
+export interface VisiteQuadri {
+  id: number;
+  sfmId: number;
+  sfmNom: string;
+  marqueId: number;
+  marqueLabel: string;
+  dateVisite: string;
+  notes?: string | null;
+  createdBy?: string | null;
+  createdAt?: string | null;
+}
+
+export interface VisiteQuadriForm {
+  sfmId: number;
+  marqueId: number;
+  dateVisite: string;
+  notes?: string | null;
 }
 

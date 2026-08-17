@@ -8,8 +8,11 @@ import { MatInputModule } from '@angular/material/input';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatCheckboxModule } from '@angular/material/checkbox';
 import { AuthService } from '../../services/auth.service';
 import { apiErrorMessage } from '../../shared/api-error';
+
+const REMEMBER_USERNAME_KEY = 'dm_remember_username';
 
 /**
  * Page de connexion à DeviceManager.
@@ -28,6 +31,7 @@ import { apiErrorMessage } from '../../shared/api-error';
     MatInputModule,
     MatButtonModule,
     MatIconModule,
+    MatCheckboxModule,
     MatProgressSpinnerModule
   ],
   templateUrl: './login.component.html',
@@ -45,10 +49,16 @@ export class LoginComponent {
 
   readonly form = this.fb.nonNullable.group({
     username: ['', Validators.required],
-    password: ['', Validators.required]
+    password: ['', Validators.required],
+    rememberMe: [false]
   });
 
   constructor() {
+    const remembered = localStorage.getItem(REMEMBER_USERNAME_KEY)?.trim() || '';
+    if (remembered) {
+      this.form.patchValue({ username: remembered, rememberMe: true });
+    }
+
     if (this.auth.isLoggedIn()) {
       void this.router.navigate([this.auth.mustChangePassword() ? '/change-password' : '/devices']);
       return;
@@ -78,10 +88,15 @@ export class LoginComponent {
     }
     this.loading.set(true);
     this.error.set(null);
-    const { username, password } = this.form.getRawValue();
-    this.auth.login({ username, password }).subscribe({
+    const { username, password, rememberMe } = this.form.getRawValue();
+    this.auth.login({ username, password, rememberMe }).subscribe({
       next: () => {
         this.loading.set(false);
+        if (rememberMe) {
+          localStorage.setItem(REMEMBER_USERNAME_KEY, username.trim());
+        } else {
+          localStorage.removeItem(REMEMBER_USERNAME_KEY);
+        }
         void this.router.navigate([this.auth.mustChangePassword() ? '/change-password' : '/devices']);
       },
       error: (err) => {

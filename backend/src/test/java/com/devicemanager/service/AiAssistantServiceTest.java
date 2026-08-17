@@ -29,6 +29,8 @@ class AiAssistantServiceTest {
     @Mock
     private WebEnrichmentService webEnrichmentService;
     @Mock
+    private VisiteQuadriService visiteQuadriService;
+    @Mock
     private ObjectMapper objectMapper;
 
     @InjectMocks

@@ -44,8 +44,11 @@ public class MasRequest {
     @NotNull(message = "La marque MAS est obligatoire")
     private Long marqueId;
 
-    /** Identifiant de la dénomination (optionnel). */
+    /** Identifiant de la dénomination (optionnel ; ignoré si {@link #multiDeno}). */
     private Long denoId;
+
+    /** Si vrai, MAS multi-dénomination (pas de deno unique). */
+    private Boolean multiDeno;
 
     /**
      * Statut d'exploitation : {@code UTILISEE}, {@code EN_RESERVE}, {@code VENDUE}, {@code DETRUITE}.

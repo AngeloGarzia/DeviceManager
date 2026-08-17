@@ -82,6 +82,8 @@ export class AuthService {
 
   private sessionExpiredHandled = false;
   private refreshInFlight: Observable<AuthResponse> | null = null;
+  /** Empêche tryRestoreSession juste après une déconnexion volontaire. */
+  private skipNextSessionRestore = false;
 
   constructor(private http: HttpClient, private router: Router) {
     this.purgeLegacyAccessToken();
@@ -89,6 +91,7 @@ export class AuthService {
   }
 
   login(payload: LoginRequest): Observable<AuthResponse> {
+    this.skipNextSessionRestore = false;
     return this.http
       .post<AuthResponse>(`${environment.apiUrl}/api/auth/login`, payload, { withCredentials: true })
       .pipe(tap((res) => this.applyAuthResponse(res, true)));
@@ -132,12 +135,13 @@ export class AuthService {
   }
 
   logout(): void {
-    this.http.post(`${environment.apiUrl}/api/auth/logout`, {}, { withCredentials: true }).subscribe({
-      error: () => undefined,
-      complete: () => undefined
-    });
+    this.skipNextSessionRestore = true;
+    this.refreshInFlight = null;
     this.clearSession();
-    this.router.navigate(['/login']);
+    this.http.post(`${environment.apiUrl}/api/auth/logout`, {}, { withCredentials: true }).subscribe({
+      error: () => undefined
+    });
+    void this.router.navigate(['/login']);
   }
 
   /** Rafraîchit l'access token via le cookie HttpOnly refresh (single-flight). */
@@ -160,6 +164,10 @@ export class AuthService {
    * Restaure la session après rechargement de page (access token perdu, cookie refresh présent).
    */
   tryRestoreSession(): Observable<boolean> {
+    if (this.skipNextSessionRestore) {
+      this.skipNextSessionRestore = false;
+      return of(false);
+    }
     if (this.isLoggedIn()) {
       return of(true);
     }

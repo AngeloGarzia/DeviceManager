@@ -94,6 +94,11 @@ export const routes: Routes = [
           import('./pages/mas-suivi/mas-suivi.component').then((m) => m.MasSuiviComponent)
       },
       {
+        path: 'mas/visites-quadri',
+        loadComponent: () =>
+          import('./pages/visite-quadri/visite-quadri.component').then((m) => m.VisiteQuadriComponent)
+      },
+      {
         path: 'mas/interventions',
         loadComponent: () =>
           import('./pages/intervention-technique-list/intervention-technique-list.component').then(

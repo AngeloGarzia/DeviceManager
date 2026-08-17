@@ -85,6 +85,19 @@ describe('AuthService', () => {
     expect(router.navigate).toHaveBeenCalledWith(['/login']);
   });
 
+  it('should not restore session right after logout', () => {
+    service.logout();
+    const logoutReq = http.expectOne('/api/auth/logout');
+    logoutReq.flush({});
+
+    let restored: boolean | undefined;
+    service.tryRestoreSession().subscribe((ok) => {
+      restored = ok;
+    });
+    http.expectNone('/api/auth/refresh');
+    expect(restored).toBeFalse();
+  });
+
   it('should purge legacy dm_token from localStorage on construct', () => {
     localStorage.setItem('dm_token', 'leaked-jwt');
     TestBed.resetTestingModule();

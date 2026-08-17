@@ -86,6 +86,7 @@ export class MasFormComponent implements OnInit {
     destinationMachineUsagee: ['', Validators.maxLength(255)],
     marqueId: [null as number | null, Validators.required],
     denoId: [null as number | null],
+    multiDeno: [false],
     statut: ['UTILISEE' as string, Validators.required]
   });
 
@@ -148,13 +149,31 @@ export class MasFormComponent implements OnInit {
     }
   }
 
+  /** Multi-déno : désactive la sélection d'une dénomination unique. */
+  isMultiDeno(): boolean {
+    return !!this.form.controls.multiDeno.value;
+  }
+
+  private syncMultiDenoFields(): void {
+    const denoCtrl = this.form.controls.denoId;
+    if (this.isMultiDeno()) {
+      denoCtrl.setValue(null, { emitEvent: false });
+      denoCtrl.disable({ emitEvent: false });
+      this.showNewDeno.set(false);
+      return;
+    }
+    denoCtrl.enable({ emitEvent: false });
+  }
+
   ngOnInit(): void {
     this.returnDevice = this.route.snapshot.queryParamMap.get('returnDevice');
     this.returnForOrderRequest = this.route.snapshot.queryParamMap.get('forOrderRequest') === '1';
     this.loadMarques();
     this.loadDenos();
     this.syncStatutDependentFields();
+    this.syncMultiDenoFields();
     this.form.controls.statut.valueChanges.subscribe(() => this.syncStatutDependentFields());
+    this.form.controls.multiDeno.valueChanges.subscribe(() => this.syncMultiDenoFields());
 
     const rawId = this.route.snapshot.paramMap.get('id');
     if (rawId) {
@@ -172,10 +191,12 @@ export class MasFormComponent implements OnInit {
             dateCessation: mas.dateCessation || '',
             destinationMachineUsagee: mas.destinationMachineUsagee || '',
             marqueId: mas.marqueId,
-            denoId: mas.denoId ?? null,
+            denoId: mas.multiDeno ? null : (mas.denoId ?? null),
+            multiDeno: !!mas.multiDeno,
             statut: mas.statut || (mas.utilise ? 'UTILISEE' : 'EN_RESERVE')
           });
           this.syncStatutDependentFields();
+          this.syncMultiDenoFields();
           this.loading.set(false);
         },
         error: () => {
@@ -247,6 +268,9 @@ export class MasFormComponent implements OnInit {
   }
 
   openNewDeno(): void {
+    if (this.isMultiDeno()) {
+      return;
+    }
     this.showNewDeno.set(true);
     this.denoError.set(null);
     this.newDenoForm.reset({ valeur: null });
@@ -320,7 +344,8 @@ export class MasFormComponent implements OnInit {
         ? raw.destinationMachineUsagee?.trim() || null
         : null,
       marqueId: raw.marqueId,
-      denoId: raw.denoId,
+      denoId: raw.multiDeno ? null : raw.denoId,
+      multiDeno: !!raw.multiDeno,
       statut: raw.statut || 'UTILISEE',
       utilise: (raw.statut || 'UTILISEE') === 'UTILISEE'
     };

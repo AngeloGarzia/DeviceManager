@@ -45,6 +45,9 @@ import java.util.Locale;
 @Slf4j
 public class MasService {
 
+    /** Libellé d'affichage pour une MAS multi-dénomination. */
+    public static final String MULTI_DENO_LABEL = "MultiDéno";
+
     private final MasRepository masRepository;
     private final MarqueMasRepository marqueMasRepository;
     private final DenoRepository denoRepository;
@@ -134,9 +137,9 @@ public class MasService {
                 .dateCessation(request.getDateCessation())
                 .destinationMachineUsagee(trimToNull(request.getDestinationMachineUsagee()))
                 .marque(getMarque(request.getMarqueId()))
-                .deno(resolveOptionalDeno(request.getDenoId()))
                 .atelier(atelier)
                 .build();
+        applyDeno(entity, request);
         entity.applyStatut(resolveStatut(request));
         applyIdentificationRules(entity, entity.getStatut());
         Mas saved = masRepository.save(entity);
@@ -161,7 +164,7 @@ public class MasService {
         entity.setDateCessation(request.getDateCessation());
         entity.setDestinationMachineUsagee(trimToNull(request.getDestinationMachineUsagee()));
         entity.setMarque(getMarque(request.getMarqueId()));
-        entity.setDeno(resolveOptionalDeno(request.getDenoId()));
+        applyDeno(entity, request);
         MasStatut statut = resolveStatut(request);
         entity.applyStatut(statut);
         applyIdentificationRules(entity, statut);
@@ -251,6 +254,20 @@ public class MasService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Dénomination introuvable"));
     }
 
+    /**
+     * Multi-déno : flag à true et aucune deno unique.
+     * Sinon : dénomination optionnelle du référentiel.
+     */
+    private void applyDeno(Mas entity, MasRequest request) {
+        boolean multi = Boolean.TRUE.equals(request.getMultiDeno());
+        entity.setMultiDeno(multi);
+        if (multi) {
+            entity.setDeno(null);
+            return;
+        }
+        entity.setDeno(resolveOptionalDeno(request.getDenoId()));
+    }
+
     private void ensureUniqueNumero(String numero, Long atelierId, Long excludeId) {
         boolean exists = excludeId == null
                 ? masRepository.existsByNumeroIgnoreCaseAndAtelierId(numero, atelierId)
@@ -281,9 +298,12 @@ public class MasService {
                 .marqueId(marque != null ? marque.getId() : null)
                 .marque(marque != null ? marque.getCode() : null)
                 .marqueLabel(marque != null ? marque.getLabel() : null)
-                .denoId(deno != null ? deno.getId() : null)
-                .denoValeur(deno != null ? deno.getValeur() : null)
-                .denoLabel(deno != null ? deno.getLabel() : null)
+                .multiDeno(entity.isMultiDeno())
+                .denoId(entity.isMultiDeno() || deno == null ? null : deno.getId())
+                .denoValeur(entity.isMultiDeno() || deno == null ? null : deno.getValeur())
+                .denoLabel(entity.isMultiDeno()
+                        ? MULTI_DENO_LABEL
+                        : (deno != null ? deno.getLabel() : null))
                 .statut(entity.getStatut() != null ? entity.getStatut().name() : MasStatut.UTILISEE.name())
                 .statutLabel(entity.getStatut() != null ? entity.getStatut().label() : MasStatut.UTILISEE.label())
                 .utilise(entity.isUtilise())

@@ -17,4 +17,10 @@ public class LoginRequest {
     @NotBlank(message = "Le mot de passe est obligatoire")
     @Size(min = 4, max = 100, message = "Le mot de passe doit contenir entre 4 et 100 caractères")
     private String password;
+
+    /**
+     * Si {@code true}, cookie refresh persistant (durée JWT refresh).
+     * Si {@code false} / absent, cookie de session (supprimé à la fermeture du navigateur).
+     */
+    private Boolean rememberMe;
 }

@@ -133,6 +133,35 @@ class MasServiceTest {
     }
 
     @Test
+    void create_multiDeno_setsLabelAndClearsDeno() {
+        when(masRepository.existsByNumeroIgnoreCaseAndAtelierId("MAS-MD", 100L)).thenReturn(false);
+        when(marqueMasRepository.findById(5L)).thenReturn(Optional.of(TestFixtures.marque()));
+        when(masRepository.save(any(Mas.class))).thenAnswer(inv -> {
+            Mas m = inv.getArgument(0);
+            m.setId(101L);
+            return m;
+        });
+
+        MasRequest request = new MasRequest();
+        request.setNumero("MAS-MD");
+        request.setMarqueId(5L);
+        request.setMultiDeno(true);
+        request.setDenoId(9L);
+        request.setUtilise(true);
+
+        MasResponse response = masService.create(request);
+
+        ArgumentCaptor<Mas> captor = ArgumentCaptor.forClass(Mas.class);
+        verify(masRepository).save(captor.capture());
+        assertThat(captor.getValue().isMultiDeno()).isTrue();
+        assertThat(captor.getValue().getDeno()).isNull();
+        assertThat(response.isMultiDeno()).isTrue();
+        assertThat(response.getDenoLabel()).isEqualTo(MasService.MULTI_DENO_LABEL);
+        assertThat(response.getDenoId()).isNull();
+        verify(denoRepository, never()).findById(any());
+    }
+
+    @Test
     void delete_isForbidden_byBusinessRule() {
         assertThatThrownBy(() -> masService.delete(20L))
                 .isInstanceOf(ResponseStatusException.class)

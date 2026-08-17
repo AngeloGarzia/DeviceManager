@@ -88,6 +88,14 @@ public class Mas {
     private Deno deno;
 
     /**
+     * Si vrai, la MAS est multi-dénomination : pas de {@link #deno} unique,
+     * l'affichage API utilise le libellé « MultiDéno ».
+     */
+    @Column(name = "multi_deno", nullable = false)
+    @Builder.Default
+    private boolean multiDeno = false;
+
+    /**
      * Statut d'exploitation (utilisée, en réserve, vendue, détruite).
      * {@link #utilise} reste synchronisé pour compatibilité.
      */

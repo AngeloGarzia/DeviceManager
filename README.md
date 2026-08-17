@@ -1,8 +1,10 @@
 # DeviceManager
 
-Application **mobile-first** de gestion d’atelier casino : inventaire des **pièces détachées**, suivi des **machines à sous (MAS)**, demandes de commande auprès des **SFM**, **bons d’intervention**, **interventions techniques** et fiches **FIT**.
+Application **mobile-first** de gestion d’atelier casino : inventaire des **pièces détachées**, suivi des **machines à sous (MAS)**, demandes de commande auprès des **SFM**, **bons d’intervention**, **interventions techniques**, fiches **FIT**, **visites quadritrimestrielles** SFM × marque, historique de **prix** (devis / IA) et assistant **IA**.
 
 Chaque utilisateur travaille dans le périmètre d’un **atelier** (multi-tenant : Groupe → Casino → Atelier).
+
+Version applicative : **1.1.0** (alignée `package.json` racine / `backend/pom.xml`).
 
 ---
 
@@ -16,8 +18,11 @@ DeviceManager/
 ├── sql/init.sql
 ├── render.yaml        ← Blueprint Render
 ├── RENDER.md          ← guide déploiement production
+├── CHANGELOG.md
 └── docker-compose.yml
 ```
+
+Migrations Flyway : `backend/src/main/resources/db/migration/` (**V1 → V22**).
 
 ---
 
@@ -25,12 +30,13 @@ DeviceManager/
 
 | Couche | Technologie |
 |--------|-------------|
-| Backend | Java 21, Spring Boot 3.5, JPA, Security JWT, Flyway, SpringDoc OpenAPI, Spring AI |
-| Frontend | Angular 19, Material, Tailwind, driver.js (tutoriel), ExcelJS / jsPDF |
+| Backend | Java 21, Spring Boot 3.5, JPA, Security JWT (+ refresh cookie HttpOnly), Flyway, SpringDoc OpenAPI, Spring AI |
+| Frontend | Angular 19, Material, Tailwind, driver.js (tutoriel), ExcelJS / jsPDF, ngx-image-cropper |
+| Qualité | Checkstyle, SpotBugs, JaCoCo (backend) ; ESLint / tests Karma (frontend) ; Playwright e2e |
 | Base | MySQL (Docker local ; Aiven Free en prod documenté) |
 | Fichiers | Disque `/uploads` et/ou S3 (paramétrable) |
 | Déploiement | Docker Compose, Blueprint Render (`RENDER.md`) |
-| CI | GitHub Actions (tests, Checkstyle, SpotBugs, lint, build, CodeQL) |
+| CI | GitHub Actions (tests, Checkstyle, SpotBugs, JaCoCo, lint, build, CodeQL) |
 
 ---
 
@@ -38,8 +44,8 @@ DeviceManager/
 
 | Rôle | Capacités |
 |------|-----------|
-| **ADMIN** | Accès métier complet sur les ateliers de son **groupe** ; sélecteur Casino → Atelier ; **Comptes** ; **Paramètres** (Setup) ; validation / réception / suppression des commandes |
-| **TECHNICIEN** | Accès métier (pièces, MAS, SFM, bons, interventions techniques, FIT, commandes en création/consultation, timeline, IA si activée) ; atelier **figé** (préféré) ; pas d’admin ni de validation/réception commande |
+| **ADMIN** | Accès métier complet sur les ateliers de son **groupe** ; sélecteur Casino → Atelier ; **Comptes** ; **Paramètres** (Setup) ; validation / réception / suppression des commandes ; association devis ; alertes prix |
+| **TECHNICIEN** | Accès métier (pièces, MAS, SFM, bons, interventions techniques, FIT, visites quadri, commandes en création/consultation, timeline, IA si activée) ; atelier **figé** (préféré) ; pas d’admin ni de validation/réception commande |
 
 ---
 
@@ -62,7 +68,19 @@ Consommation de **pièces détachées** (décrémente le stock). Créé via **Ut
 Fiche **libre** sur une ou plusieurs MAS (**sans** consommation de stock). Une visite multi-MAS crée **une ligne par machine** (même `visite_groupe_id`). Liens optionnels : commande, bon, FIT.
 
 ### FIT (fiche inventaire / intervention technique)
-Document type réglementaire lié à une MAS (1 FIT par atelier + MAS). Historique de **lignes** signées (admin + technicien).
+Document type réglementaire lié à une MAS (1 FIT par atelier + MAS). Historique de **lignes** signées (admin + technicien). Feuille de suivi type modèle 34 (`/mas/fit/feuille`).
+
+### Visite quadritrimestrielle
+Chaque **SFM** doit couvrir chaque **marque** de ses compétences **tous les 4 mois**. Les visites sont stockées en base. À l’ouverture de session (et au changement d’atelier), un contrôle **déterministe** calcule les échéances : badge / libellé **WARNING** clignotant sur le menu **MAS** si une échéance tombe dans **≤ 7 jours** (ou en retard / jamais visitée). L’assistant IA reçoit un résumé de ce statut dans son contexte (pas d’appel LLM dédié à la vérification).
+
+### Dénomination MAS
+Valeur numérique du référentiel **ou** case **Multi déno** → affichage **MultiDéno** partout (liste, détail, recherche).
+
+### Documents uploadés
+Règle transversale : **PDF ou image** (bons de destruction MAS, devis de commande, documents pièce). L’analyse texte IA de devis reste **PDF-only**.
+
+### Prix & devis
+Après association d’un devis à une commande validée/reçue : revue IA des désignations / références, puis revue des **prix unitaires** (±30 % + incohérences IA optionnelles). Historique des prix sur la fiche pièce ; alertes prix (admin).
 
 ### Liens optionnels
 
@@ -72,6 +90,7 @@ Document type réglementaire lié à une MAS (1 FIT par atelier + MAS). Historiq
 | Intervention technique | FIT | Case « Associer à la FIT » + signatures |
 | Intervention technique | Bon / Commande | Sélecteurs filtrés sur les MAS choisies |
 | Après IT | Bon ou ligne FIT | Modale post-enregistrement |
+| Commande | Devis | Upload PDF/image (admin) + analyse IA |
 
 ### Statut MAS
 
@@ -80,7 +99,19 @@ Document type réglementaire lié à une MAS (1 FIT par atelier + MAS). Historiq
 | `UTILISEE` | Machine utilisée |
 | `EN_RESERVE` | En réserve |
 | `VENDUE` | Vendue |
-| `DETRUITE` | Détruite |
+| `DETRUITE` | Détruite (+ bon de destruction PDF/image) |
+
+**Règle** : une MAS **ne se supprime pas** ; on change uniquement son statut.
+
+### Statut commande
+
+| Code | Libellé UI |
+|------|------------|
+| `PENDING` / `SENT` | En attente (badge clignotant) |
+| `VALIDATED` | Validée |
+| `RECEIVED` | Reçue |
+
+Liste des commandes triée : en attente → validée → reçue (puis date).
 
 ---
 
@@ -105,9 +136,9 @@ Redirect par défaut après login : **Liste des pièces** (`/devices`).
 
 | Entrée | Route | Options / actions |
 |--------|-------|-------------------|
-| Liste (via logo) | `/devices` | Recherche ; détail / éditer / supprimer ; tuile stock à zéro → demande |
-| Créer une pièce | `/devices/new` | Photos (caméra / galerie / crop), stock, obsolète, SFM, MAS, **scan IA étiquette**, documents PDF (**manuel / datasheet / notice**) |
-| Éditer / détail | `/devices/:id/edit`, `/devices/:id` | Fiche complète + ouverture des PDF |
+| Liste des pièces | `/devices` | Recherche ; détail / éditer / supprimer ; tuile stock à zéro → demande |
+| Créer une pièce | `/devices/new` | Photos (caméra / galerie / crop), stock, obsolète, SFM, MAS, **scan IA étiquette**, documents PDF/image (**manuel / datasheet / notice**), info technique |
+| Éditer / détail | `/devices/:id/edit`, `/devices/:id` | Fiche complète + documents + **historique des prix** / dernier prix |
 | Utiliser une pièce | `/devices/utiliser` | Lignes de consommation → **bon** ; motif / diagnostic / travaux ; MAS optionnelle ; **Associer FIT** + signatures |
 | Bons d’intervention | `/devices/interventions` | Archive des bons |
 | Éditer le stock | `/devices/stock` | Ajustement quantités ; regroupement SFM / marque ; **export Excel / PDF** |
@@ -119,7 +150,7 @@ Redirect par défaut après login : **Liste des pièces** (`/devices`).
 | Entrée | Route | Options / actions |
 |--------|-------|-------------------|
 | Nouvelle demande | `/order-request` | Création `PENDING` ; preview mails ; notif admin |
-| Demandes en cours | `/order-requests` | Liste + **badge** pending ; **ADMIN** : valider → mails SFM, éditer quantités, réceptionner (+ stock), supprimer |
+| Liste des commandes | `/order-requests` | Liste triée par statut + **badge** pending ; statut « En attente » **clignotant** ; **ADMIN** : valider → mails SFM, éditer quantités, **joindre devis**, réceptionner (+ stock), supprimer |
 | Timeline | `/order-timeline` | Colonnes : **Commandes \| Bons \| Interventions techniques \| FIT \| Stock** (filtres) |
 
 **Cycle commande** : `PENDING` → `VALIDATED` (admin) → `RECEIVED` (admin, stock +).
@@ -130,14 +161,18 @@ Redirect par défaut après login : **Liste des pièces** (`/devices`).
 
 | Entrée | Route | Options / actions |
 |--------|-------|-------------------|
-| Liste des MAS | `/mas` | N°, socle, marque, déno, taux, **statut** ; CRUD |
-| Nouvelle MAS | `/mas/new` | Formulaire 3 colonnes ; création marque / déno ; statut exclusif |
-| Détail / édition | `/mas/:id`, `/mas/:id/edit` | Liens vers Suivi, FIT, édition |
+| Liste des MAS | `/mas` | N°, socle, marque, déno / **MultiDéno**, taux, **statut** ; pas de suppression |
+| Nouvelle MAS | `/mas/new` | Formulaire ; création marque / déno ; **Multi déno** ; statut exclusif ; identification (type, n° série, dates, destination, bon destruction si détruite) |
+| Détail / édition | `/mas/:id`, `/mas/:id/edit` | Liens vers Suivi, FIT, édition ; bon de destruction si `DETRUITE` |
 | Suivi | `/mas/suivi` | Timeline filtrée MAS : **Bons \| Interventions techniques \| FIT** |
+| Visite quadritrimestrielle | `/mas/visites-quadri` | Obligations SFM × marque ; enregistrer une visite ; historique ; alerte ≤ 7 j |
 | Interventions techniques | `/mas/interventions` | Liste |
 | Nouvelle IT | `/mas/interventions/new` | Multi-MAS ; motif / travaux ; liens commande & bon **filtrés** ; associer FIT ; **modale** ensuite (bon consommation ou ligne FIT) |
 | Fiches FIT | `/mas/fit` | Liste |
 | Nouvelle / détail FIT | `/mas/fit/new`, `/mas/fit/:id` | Création depuis MAS ; ajout de lignes signées |
+| Suivi FIT (modèle 34) | `/mas/fit/feuille` | Feuille de suivi |
+
+Badge **WARNING** clignotant sur le bouton **MAS** si des visites quadri sont dues / en retard.
 
 ---
 
@@ -145,7 +180,7 @@ Redirect par défaut après login : **Liste des pièces** (`/devices`).
 
 | Route | Options / actions |
 |-------|-------------------|
-| `/sfm`, `/sfm/new`, `/sfm/:id`, `/sfm/:id/edit` | CRUD fournisseurs ; contacts (e-mails commande, technicien SFM réutilisable) |
+| `/sfm`, `/sfm/new`, `/sfm/:id`, `/sfm/:id/edit` | CRUD fournisseurs ; marques couvertes ; contacts (e-mails commande, technicien SFM réutilisable) ; **modale de modification** par contact |
 
 ---
 
@@ -162,23 +197,28 @@ Redirect par défaut après login : **Liste des pièces** (`/devices`).
 
 | Route | Options |
 |-------|---------|
-| `/ai` | Chat métier (si `AI_ENABLED`) ; scan d’étiquette aussi depuis le formulaire pièce |
+| `/ai` | Chat métier (si `AI_ENABLED`) ; contexte atelier incluant le résumé des visites quadri |
+| Formulaire pièce | Scan d’étiquette (vision) |
+| Liste commandes | Analyse devis (désignations / références / prix) |
 
 ---
 
 ## Modèle de données (aperçu)
 
 ### Pièce (`device`)
-nom, référence, usage, date d’acquisition, stock, obsolete, photos, documents PDF (manuel / datasheet / notice), FK `sfm`, FK `mas`, marque.
+nom, référence, usage, date d’acquisition, stock, obsolete, photos, documents (manuel / datasheet / notice), info technique, FK `sfm`, FK `mas`, marque, dernier prix unitaire (dénormalisé).
+
+### Historique prix
+`device_prix_observation`, `device_prix_alerte` — observations confirmées depuis devis ; alertes d’écart.
 
 ### SFM
-nom, contacts (téléphone, e-mail, flags réception commande / technicien SFM).
+nom, contacts (téléphone, e-mail, flags réception commande / technicien SFM), marques couvertes (`sfm_marque`).
 
 ### MAS
-numéro, socle, marque, déno, taux redistribution, **statut** (`UTILISEE` / `EN_RESERVE` / `VENDUE` / `DETRUITE`).
+numéro, socle, marque, déno **ou** `multi_deno`, taux redistribution, identification machine, **statut**, bon de destruction (si détruite).
 
 ### Commande
-message, statut, dates demande / validation / réception, lignes (pièce + quantité).
+message, statut, dates demande / validation / réception, lignes (pièce + quantité), devis (fichier + métadonnées).
 
 ### Bon d’intervention
 numéro, date, technicien, motif, travaux, lignes de pièces consommées, MAS optionnelle, lien FIT optionnel.
@@ -188,6 +228,9 @@ date, MAS, motif, travaux ; liens optionnels FIT / commande / bon ; `visite_grou
 
 ### FIT
 en-tête machine + lignes (date, socle, emplacement, motif, signatures admin & technicien, bon lié optionnel).
+
+### Visite quadritrimestrielle
+`visite_quadritrimestrelle` : atelier, SFM, marque, `date_visite`, notes, auteur.
 
 ---
 
@@ -200,7 +243,7 @@ Toutes les configs sensibles sont dans les fichiers `.env` du **backend** unique
 | Développement | `backend/.env.development` | défaut |
 | Production | `backend/.env.production` | `APP_ENV=production` |
 
-Le frontend n’a accès à aucun secret (JWT, BDD, mail, S3, etc.).
+Le frontend n’a accès à aucun secret (JWT, BDD, mail, S3, clés IA, etc.).
 
 ---
 
@@ -228,6 +271,13 @@ $env:APP_ENV="production"
 mvn spring-boot:run
 ```
 
+**Qualité backend (local)** :
+
+```powershell
+cd backend
+mvn -B test checkstyle:check spotbugs:check jacoco:report jacoco:check
+```
+
 **Production Render** : voir [`RENDER.md`](./RENDER.md) — Blueprint `render.yaml` + MySQL Aiven Free.
 
 | | |
@@ -244,21 +294,23 @@ mvn spring-boot:run
 | Préfixe | Rôle |
 |---------|------|
 | `/api/auth` | login, refresh, logout, change-password |
-| `/api/devices` | CRUD pièces + `PATCH /{id}/stock` |
-| `/api/sfm` | CRUD SFM |
-| `/api/mas` | CRUD MAS (+ marques / déno) |
-| `/api/order-requests` | demandes (+ validate / receive admin) |
+| `/api/devices` | CRUD pièces + `PATCH /{id}/stock` + historique prix |
+| `/api/prix-alertes` | alertes prix (admin) |
+| `/api/sfm` | CRUD SFM + techniciens réutilisables |
+| `/api/mas` | CRUD MAS (+ marques / déno / multi-déno / bon destruction) |
+| `/api/visites-quadri` | status, warning-count, historique, enregistrement visite |
+| `/api/order-requests` | demandes (+ validate / receive / devis / mail-preview) |
 | `/api/interventions` | bons d’intervention |
 | `/api/interventions-techniques` | interventions techniques |
-| `/api/fit` | FIT (from-mas, lignes, signataires) |
+| `/api/fit` | FIT (from-mas, lignes, signataires, feuille) |
 | `/api/timeline` | événements agrégés (filtres `types`, `masId`) |
 | `/api/ateliers` | ateliers / casinos / preferred |
 | `/api/users` | comptes (admin) |
 | `/api/setup` | paramètres + test mail |
 | `/api/logs` | logs mémoire (admin) |
-| `/api/ai` | status, chat, label-scan |
+| `/api/ai` | status, chat, label-scan, analyses devis / prix |
 | `/api/privacy` | contenu RGPD (GET public) |
-| `/uploads/**` | photos |
+| `/uploads/**` | photos / fichiers |
 
 En-tête métier : **`X-Atelier-Id`**. Health : `/actuator/health`.
 
@@ -283,6 +335,7 @@ flowchart TB
 
   Cmd --> Demande[Demande PENDING]
   Demande --> Val[VALIDATION admin]
+  Val --> Devis[Devis + IA prix]
   Val --> Rec[RÉCEPTION + stock]
 
   Mas --> IT[Intervention technique]
@@ -291,6 +344,9 @@ flowchart TB
   IT -.-> Demande
   Mas --> Suivi[Suivi multi-colonnes]
   Mas --> Fit
+  Mas --> VQ[Visites quadri SFM x marque]
+  Sfm --> VQ
 
   Cmd --> Timeline[Timeline atelier]
+  Shell -.->|warningCount| VQ
 ```

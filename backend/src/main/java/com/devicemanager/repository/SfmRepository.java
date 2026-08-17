@@ -28,6 +28,17 @@ public interface SfmRepository extends JpaRepository<Sfm, Long> {
     List<Sfm> findAllWithContacts(@Param("atelierId") Long atelierId);
 
     /**
+     * Liste les SFM d'un atelier avec marques préchargées (visites quadritrimestrielles).
+     */
+    @Query("""
+            SELECT DISTINCT s FROM Sfm s
+            LEFT JOIN FETCH s.marques
+            WHERE s.atelier.id = :atelierId
+            ORDER BY s.nom
+            """)
+    List<Sfm> findAllWithMarques(@Param("atelierId") Long atelierId);
+
+    /**
      * Recherche textuelle de SFM dans un atelier (nom, responsable, contacts, marques).
      *
      * @param atelierId identifiant de l'atelier
@@ -69,6 +80,13 @@ public interface SfmRepository extends JpaRepository<Sfm, Long> {
             WHERE s.id = :id AND s.atelier.id = :atelierId
             """)
     Optional<Sfm> findByIdWithContacts(@Param("id") Long id, @Param("atelierId") Long atelierId);
+
+    @Query("""
+            SELECT s FROM Sfm s
+            LEFT JOIN FETCH s.marques
+            WHERE s.id = :id AND s.atelier.id = :atelierId
+            """)
+    Optional<Sfm> findByIdWithMarques(@Param("id") Long id, @Param("atelierId") Long atelierId);
 
     /**
      * Vérifie l'existence d'un SFM portant ce nom dans l'atelier (insensible à la casse).

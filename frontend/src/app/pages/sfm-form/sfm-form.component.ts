@@ -54,6 +54,11 @@ export class SfmFormComponent implements OnInit {
   readonly techniciens = signal<SfmTechnicien[]>([]);
   /** Remise à null après chaque affectation (sélecteur global). */
   readonly assignSelectValue = signal<number | null>(null);
+  /** Modale édition / création d'un contact. */
+  readonly contactModalOpen = signal(false);
+  /** Index du contact édité, ou null pour une création. */
+  readonly contactEditIndex = signal<number | null>(null);
+  readonly contactModalError = signal<string | null>(null);
   id: number | null = null;
   returnDevice: string | null = null;
   private returnForOrderRequest = false;
@@ -66,6 +71,15 @@ export class SfmFormComponent implements OnInit {
 
   readonly newMarqueForm = this.fb.nonNullable.group({
     label: ['', [Validators.required, Validators.maxLength(80)]]
+  });
+
+  readonly contactEditForm = this.fb.group({
+    id: [null as number | null],
+    nom: ['', [Validators.required, Validators.maxLength(120)]],
+    telephone: ['', [Validators.required, Validators.maxLength(40)]],
+    email: ['', [Validators.required, Validators.email, Validators.maxLength(160)]],
+    receiveOrderMails: [true],
+    technicienSfm: [false]
   });
 
   /** Indique si le formulaire est en mode édition. */
@@ -198,7 +212,129 @@ export class SfmFormComponent implements OnInit {
     });
   }
 
-  /** Ajoute une ligne contact au formulaire SFM. */
+  /** Libellé résumé d'un contact dans la liste. */
+  contactDisplayName(index: number): string {
+    const nom = String(this.contacts.at(index).get('nom')?.value || '').trim();
+    return nom || `Contact ${index + 1} (à compléter)`;
+  }
+
+  /** Ouvre la modale pour modifier un contact existant. */
+  openEditContactModal(index: number): void {
+    const group = this.contacts.at(index);
+    this.contactEditIndex.set(index);
+    this.contactModalError.set(null);
+    this.contactEditForm.reset({
+      id: (group.get('id')?.value as number | null) ?? null,
+      nom: String(group.get('nom')?.value || ''),
+      telephone: String(group.get('telephone')?.value || ''),
+      email: String(group.get('email')?.value || ''),
+      receiveOrderMails: group.get('receiveOrderMails')?.value !== false,
+      technicienSfm: !!group.get('technicienSfm')?.value
+    });
+    this.contactModalOpen.set(true);
+  }
+
+  /** Ouvre la modale pour ajouter un contact. */
+  openNewContactModal(): void {
+    this.contactEditIndex.set(null);
+    this.contactModalError.set(null);
+    this.contactEditForm.reset({
+      id: null,
+      nom: '',
+      telephone: '',
+      email: '',
+      receiveOrderMails: true,
+      technicienSfm: false
+    });
+    this.contactModalOpen.set(true);
+  }
+
+  /** Ferme la modale contact sans appliquer. */
+  closeContactModal(): void {
+    this.contactModalOpen.set(false);
+    this.contactEditIndex.set(null);
+    this.contactModalError.set(null);
+  }
+
+  /** Applique les champs de la modale sur le FormArray contacts. */
+  applyContactModal(): void {
+    if (this.contactEditForm.invalid) {
+      this.contactEditForm.markAllAsTouched();
+      this.contactModalError.set('Complétez nom, téléphone et e-mail.');
+      return;
+    }
+    const raw = this.contactEditForm.getRawValue();
+    const values: Partial<SfmContact> = {
+      id: raw.id != null ? Number(raw.id) : undefined,
+      nom: String(raw.nom || '').trim(),
+      telephone: String(raw.telephone || '').trim(),
+      email: String(raw.email || '').trim(),
+      receiveOrderMails: raw.receiveOrderMails !== false,
+      technicienSfm: !!raw.technicienSfm
+    };
+    const index = this.contactEditIndex();
+    if (index == null) {
+      this.contacts.push(this.createContactGroup(values));
+    } else {
+      this.contacts.at(index).patchValue({
+        id: values.id ?? null,
+        nom: values.nom,
+        telephone: values.telephone,
+        email: values.email,
+        receiveOrderMails: values.receiveOrderMails,
+        technicienSfm: values.technicienSfm
+      });
+    }
+    this.closeContactModal();
+    this.error.set(null);
+  }
+
+  /** Préremplit la modale avec un technicien SFM existant. */
+  reuseTechnicienInModal(techId: number | null): void {
+    if (techId == null) {
+      this.contactEditForm.patchValue({
+        id: null,
+        nom: '',
+        telephone: '',
+        email: '',
+        receiveOrderMails: true,
+        technicienSfm: true
+      });
+      return;
+    }
+    const tech = this.techniciens().find((t) => t.id === techId);
+    if (!tech) {
+      return;
+    }
+    this.contactEditForm.patchValue({
+      id: tech.id,
+      nom: tech.nom,
+      telephone: tech.telephone,
+      email: tech.email,
+      receiveOrderMails: tech.receiveOrderMails !== false,
+      technicienSfm: true
+    });
+  }
+
+  /** Contact de la modale lié à une fiche technicien existante. */
+  isModalLinkedTechnicien(): boolean {
+    return !!this.contactEditForm.controls.technicienSfm.value
+      && this.contactEditForm.controls.id.value != null;
+  }
+
+  /** Techniciens disponibles dans la modale (hors déjà choisis ailleurs). */
+  modalAvailableTechniciens(): SfmTechnicien[] {
+    const editIndex = this.contactEditIndex();
+    const usedIds = new Set(
+      this.contacts.controls
+        .map((c, i) => (i === editIndex ? null : (c.get('id')?.value as number | null)))
+        .filter((id): id is number => id != null)
+    );
+    const currentId = this.contactEditForm.controls.id.value;
+    return this.techniciens().filter((t) => !usedIds.has(t.id) || t.id === currentId);
+  }
+
+  /** Ajoute une ligne contact vide (compatibilité / affectation globale). */
   addContact(): void {
     this.contacts.push(this.createContactGroup());
   }
@@ -280,6 +416,9 @@ export class SfmFormComponent implements OnInit {
     if (this.contacts.length <= 1) {
       this.error.set('Un SFM doit avoir au moins un contact.');
       return;
+    }
+    if (this.contactEditIndex() === index) {
+      this.closeContactModal();
     }
     this.contacts.removeAt(index);
     this.error.set(null);

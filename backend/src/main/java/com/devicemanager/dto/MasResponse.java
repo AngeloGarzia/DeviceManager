@@ -35,7 +35,10 @@ public class MasResponse {
     private String marqueLabel;
     private Long denoId;
     private BigDecimal denoValeur;
+    /** Libellé deno, ou « MultiDéno » si {@link #multiDeno}. */
     private String denoLabel;
+    /** true = MAS multi-dénomination. */
+    private boolean multiDeno;
     /** Code statut : UTILISEE | EN_RESERVE | VENDUE | DETRUITE. */
     private String statut;
     /** Libellé statut pour l'UI. */
