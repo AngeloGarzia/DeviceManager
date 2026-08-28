@@ -60,7 +60,8 @@ public interface MasRepository extends JpaRepository<Mas, Long> {
     @Query("""
             SELECT DISTINCT m FROM Mas m
             JOIN FETCH m.marque
-            JOIN FETCH m.reglesJeux
+            LEFT JOIN FETCH m.deno
+            LEFT JOIN FETCH m.reglesJeux
             WHERE m.atelier.id = :atelierId AND m.id IN :ids
             """)
     List<Mas> findAllByIdInAndAtelierId(@Param("ids") Collection<Long> ids, @Param("atelierId") Long atelierId);

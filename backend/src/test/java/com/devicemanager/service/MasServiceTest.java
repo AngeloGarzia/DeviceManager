@@ -280,6 +280,37 @@ class MasServiceTest {
     }
 
     @Test
+    void linkMasToRegleJeux_attachesMasWithoutExistingRules() {
+        RegleJeux regle = RegleJeux.builder()
+                .id(10L)
+                .code("RJ10")
+                .label("Règle catalogue")
+                .fileKey("k")
+                .fileUrl("/u")
+                .originalName("r.pdf")
+                .build();
+        Mas mas = TestFixtures.mas();
+        mas.setReglesJeux(new HashSet<>());
+
+        RegleJeuxMasLinkRequest request = new RegleJeuxMasLinkRequest();
+        request.setMasIds(List.of(20L));
+
+        when(regleJeuxRepository.findById(10L)).thenReturn(Optional.of(regle));
+        when(masRepository.findAllByIdInAndAtelierId(Set.of(20L), 100L)).thenReturn(List.of(mas));
+        when(masRepository.findAllByRegleJeuxIdAndAtelierId(10L, 100L))
+                .thenReturn(List.of())
+                .thenReturn(List.of(mas));
+        when(masRepository.findByIdAndAtelierId(20L, 100L)).thenReturn(Optional.of(mas));
+        when(masRepository.save(any(Mas.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        RegleJeuxResponse response = masService.linkMasToRegleJeux(10L, request);
+
+        assertThat(response.getMasIds()).containsExactly(20L);
+        assertThat(mas.getReglesJeux()).anyMatch(r -> r.getId().equals(10L));
+        verify(masRepository).save(mas);
+    }
+
+    @Test
     void linkMasToRegleJeux_rejectsDetachingLastRuleFromMas() {
         RegleJeux regle = RegleJeux.builder()
                 .id(10L)

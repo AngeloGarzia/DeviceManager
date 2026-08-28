@@ -235,8 +235,9 @@ export class ReglesJeuxComponent implements OnInit {
     this.saving.set(true);
     this.error.set(null);
     this.success.set(null);
-    const masIds = this.masLinkForm.controls.masIds.value ?? [];
-    this.masService.linkRegleJeuxMas(regleId, [...masIds]).subscribe({
+    const raw = this.masLinkForm.controls.masIds.value ?? [];
+    const masIds = raw.map((id) => Number(id)).filter((id) => Number.isFinite(id));
+    this.masService.linkRegleJeuxMas(regleId, masIds).subscribe({
       next: (updated) => {
         this.saving.set(false);
         this.linkingRegleId.set(null);
