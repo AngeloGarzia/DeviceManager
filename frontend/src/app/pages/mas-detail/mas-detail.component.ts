@@ -57,6 +57,10 @@ export class MasDetailComponent implements OnInit {
     return this.masService.resolveFileUrl(mas.destructionFileUrl);
   }
 
+  regleJeuxUrl(regle: { fileUrl?: string | null }): string {
+    return this.masService.resolveFileUrl(regle.fileUrl);
+  }
+
   pickDestructionFile(): void {
     const input = document.getElementById('bon-destruction-input') as HTMLInputElement | null;
     input?.click();

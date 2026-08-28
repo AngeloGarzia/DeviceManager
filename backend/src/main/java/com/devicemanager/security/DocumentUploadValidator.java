@@ -27,6 +27,30 @@ public final class DocumentUploadValidator {
      * @param labelFr libellé métier pour les messages d'erreur (ex. « devis », « document »)
      * @return type détecté
      */
+    /**
+     * Valide qu'un fichier est un PDF (contenu et extension).
+     */
+    public static void validatePdf(MultipartFile file, String labelFr) {
+        if (file == null || file.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Sélectionnez un PDF (" + labelFr + ")");
+        }
+        String contentType = normalizeContentType(file);
+        String name = normalizeFilename(file);
+        boolean pdf = contentType.contains("pdf") || name.endsWith(".pdf");
+        if (!pdf) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "La " + labelFr + " doit être un fichier PDF");
+        }
+        try {
+            FileMagicBytesValidator.validatePdfMagicBytes(file.getBytes());
+        } catch (ResponseStatusException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Fichier " + labelFr + " illisible");
+        }
+    }
+
     public static Kind validatePdfOrImage(MultipartFile file, String labelFr) {
         if (file == null || file.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,

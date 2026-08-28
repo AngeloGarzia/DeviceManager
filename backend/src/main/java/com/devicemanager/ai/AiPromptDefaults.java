@@ -59,6 +59,21 @@ public final class AiPromptDefaults {
             Réponds uniquement avec le texte d'usage, sans titre ni JSON.
             """;
 
+    public static final String REGLE_JEUX_EXTRACT = """
+            Tu analyses le texte extrait d'un PDF de règle de jeux / règlement pour machines à sous (casino).
+            Extrais un libellé catalogue et une description synthétique.
+            Réponds UNIQUEMENT avec un JSON valide, sans markdown :
+            {
+              "label": "titre court identifiable (jeu, version, type machine, date si pertinent)",
+              "description": "résumé en 2 à 4 phrases du contenu et du périmètre",
+              "notes": "incertitudes ou éléments manquants, sinon null"
+            }
+            Contraintes :
+            - label : max 200 caractères, en français
+            - description : max 500 caractères, en français
+            - ne pas inventer d'informations absentes du texte
+            """;
+
     private AiPromptDefaults() {
     }
 }

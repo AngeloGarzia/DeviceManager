@@ -150,6 +150,52 @@
             </div>
           </div>
 
+          <div class="regles-jeux-block">
+            <div class="flex flex-col gap-2 sm:flex-row sm:items-start">
+              <mat-form-field appearance="outline" class="w-full flex-1">
+                <mat-label>Règles de jeux</mat-label>
+                <mat-select formControlName="regleJeuxIds" multiple>
+                  @for (r of reglesJeux(); track r.id) {
+                    <mat-option [value]="r.id">{{ r.label }}</mat-option>
+                  }
+                </mat-select>
+                <mat-hint>Au moins une règle obligatoire — document PDF dans le catalogue</mat-hint>
+                @if (form.controls.regleJeuxIds.invalid && form.controls.regleJeuxIds.touched) {
+                  <mat-error>Sélectionnez au moins une règle de jeux</mat-error>
+                }
+              </mat-form-field>
+              <button
+                mat-stroked-button
+                color="primary"
+                type="button"
+                class="w-full shrink-0 sm:mt-1 sm:w-auto"
+                (click)="openNewRegleJeux()"
+              >
+                <mat-icon>add</mat-icon>
+                Nouvelle règle
+              </button>
+            </div>
+          </div>
+
+          <input
+            id="regle-jeux-pdf-input"
+            type="file"
+            class="sr-only"
+            [accept]="pdfAccept"
+            (change)="onRegleJeuxFileSelected($event)"
+          />
+
+          <app-regle-jeux-ai-dialog
+            [open]="aiDialogOpen()"
+            [scanning]="aiScanning()"
+            [saving]="savingRegleJeux()"
+            [fileName]="pendingRegleJeuxFile?.name ?? null"
+            [scanNotes]="aiScanNotes()"
+            [suggested]="aiSuggested()"
+            (dismissed)="cancelRegleJeuxDialog()"
+            (confirmed)="confirmRegleJeuxDialog($event)"
+          />
+
           @if (showNewDeno()) {
             <div class="mb-1 rounded-xl border border-sky-200 bg-sky-50 p-3" [formGroup]="newDenoForm">
               <p class="m-0 mb-2 text-sm font-medium text-ink">

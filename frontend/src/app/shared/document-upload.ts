@@ -2,6 +2,8 @@
 export const PDF_OR_IMAGE_ACCEPT =
   'application/pdf,.pdf,image/*,.jpg,.jpeg,.png,.webp,.gif';
 
+export const PDF_ACCEPT = 'application/pdf,.pdf';
+
 /** Indique si le fichier est un PDF (par type MIME ou extension). */
 export function isPdfFile(file: File): boolean {
   const name = (file.name || '').toLowerCase();

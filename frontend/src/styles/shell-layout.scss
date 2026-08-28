@@ -108,6 +108,25 @@
   padding-bottom: 0.55rem;
 }
 
+.arret-maintenance-alert {
+  display: block;
+  margin-top: 0.35rem;
+  max-width: min(18rem, 100%);
+  font-size: 0.72rem;
+  line-height: 1.35;
+  font-weight: 700;
+  color: #c62828;
+  text-decoration: none;
+}
+
+.arret-maintenance-alert:hover {
+  text-decoration: underline;
+}
+
+::ng-deep .arret-maintenance-tooltip {
+  white-space: pre-line;
+}
+
 .shell-footer {
   width: 100%;
   max-width: 64rem;

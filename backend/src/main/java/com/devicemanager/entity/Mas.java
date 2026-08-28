@@ -6,6 +6,8 @@ import lombok.*;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.HashSet;
+import java.util.Set;
 
 /**
  * Référence MAS (Matériel After-Sales) d'un atelier.
@@ -112,6 +114,18 @@ public class Mas {
     @ManyToOne(optional = false, fetch = FetchType.LAZY)
     @JoinColumn(name = "atelier_id", foreignKey = @ForeignKey(name = "fk_mas_atelier"))
     private Atelier atelier;
+
+    /**
+     * Règles de jeux applicables — au moins une obligatoire (validée côté service).
+     */
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(
+            name = "mas_regle_jeux",
+            joinColumns = @JoinColumn(name = "mas_id"),
+            inverseJoinColumns = @JoinColumn(name = "regle_jeux_id")
+    )
+    @Builder.Default
+    private Set<RegleJeux> reglesJeux = new HashSet<>();
 
     public void applyStatut(MasStatut next) {
         this.statut = next != null ? next : MasStatut.UTILISEE;

@@ -10,6 +10,7 @@ import { MatMenuModule } from '@angular/material/menu';
 import { AuthService } from '../services/auth.service';
 import { OrderRequestService } from '../services/order-request.service';
 import { VisiteQuadriService } from '../services/visite-quadri.service';
+import { ArretMaintenanceService } from '../services/arret-maintenance.service';
 import { AiService } from '../services/ai.service';
 import { AppTourService } from '../services/app-tour.service';
 
@@ -40,6 +41,7 @@ export class ShellComponent implements OnInit {
   readonly auth = inject(AuthService);
   readonly orders = inject(OrderRequestService);
   readonly visites = inject(VisiteQuadriService);
+  readonly arrets = inject(ArretMaintenanceService);
   readonly ai = inject(AiService);
   readonly router = inject(Router);
   private readonly tour = inject(AppTourService);
@@ -52,15 +54,17 @@ export class ShellComponent implements OnInit {
       if (this.auth.getToken()) {
         this.orders.refreshPendingCount();
         this.visites.refreshWarningCount();
+        this.arrets.refreshAlert();
       }
     });
   }
 
-  /** Charge le compteur de commandes en attente et le statut IA au démarrage. */
+  /** Charge les badges au démarrage. */
   ngOnInit(): void {
     if (this.auth.getToken()) {
       this.orders.refreshPendingCount();
       this.visites.refreshWarningCount();
+      this.arrets.refreshAlert();
       this.ai.refreshStatus();
       // Premier login : lance le parcours après rendu du shell
       window.setTimeout(() => {

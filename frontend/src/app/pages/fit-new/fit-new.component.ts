@@ -16,6 +16,7 @@ import { InterventionService } from '../../services/intervention.service';
 import { MasService } from '../../services/mas.service';
 import { SignaturePadComponent } from '../../shared/signature-pad.component';
 import { apiErrorMessage } from '../../shared/api-error';
+import { fitLigneDefaultsFromMas } from '../fit/fit-ligne-defaults';
 
 /**
  * Crée (si besoin) la FIT d'une MAS puis ajoute une ligne d'intervention signée.
@@ -86,7 +87,7 @@ export class FitNewComponent implements OnInit {
         const fromQuery = raw ? Number(raw) : NaN;
         if (Number.isFinite(fromQuery) && masses.some((m) => m.id === fromQuery)) {
           this.form.patchValue({ masId: fromQuery });
-          this.loadInterventions(fromQuery);
+          this.applyMasDefaults(fromQuery);
         }
         const motif = this.route.snapshot.queryParamMap.get('motif');
         if (motif) {
@@ -102,6 +103,38 @@ export class FitNewComponent implements OnInit {
     this.form.controls.masId.valueChanges.subscribe((masId) => {
       this.form.patchValue({ interventionId: null }, { emitEvent: false });
       this.loadInterventions(masId);
+      if (masId != null) {
+        this.applyMasDefaults(masId);
+      } else {
+        this.form.patchValue({ numeroSocle: '', numeroEmplacement: '' });
+      }
+    });
+
+    this.form.controls.interventionId.valueChanges.subscribe((interventionId) => {
+      if (interventionId == null) {
+        return;
+      }
+      const item = this.interventions().find((i) => i.id === interventionId);
+      if (item?.emplacement?.trim()) {
+        this.form.patchValue({ numeroEmplacement: item.emplacement.trim() });
+      }
+    });
+  }
+
+  private applyMasDefaults(masId: number): void {
+    const mas = this.masses().find((m) => m.id === masId);
+    if (!mas) {
+      return;
+    }
+    this.fitService.listByMas(masId).subscribe({
+      next: (fits) => {
+        const fit = fits[0] ?? null;
+        const defaults = fitLigneDefaultsFromMas(mas, fit);
+        this.form.patchValue(defaults);
+      },
+      error: () => {
+        this.form.patchValue(fitLigneDefaultsFromMas(mas));
+      }
     });
   }
 

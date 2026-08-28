@@ -6,6 +6,10 @@ import com.devicemanager.dto.MarqueMasRequest;
 import com.devicemanager.dto.MarqueMasResponse;
 import com.devicemanager.dto.MasRequest;
 import com.devicemanager.dto.MasResponse;
+import com.devicemanager.dto.RegleJeuxMasLinkRequest;
+import com.devicemanager.dto.RegleJeuxRequest;
+import com.devicemanager.dto.RegleJeuxResponse;
+import com.devicemanager.dto.AiRegleJeuxScanResponse;
 import com.devicemanager.service.MasService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -77,6 +81,82 @@ public class MasController {
     @PostMapping("/denos")
     public ResponseEntity<DenoResponse> createDeno(@Valid @RequestBody DenoRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(masService.createDeno(request));
+    }
+
+    /**
+     * Liste les règles de jeux (référentiel global avec PDF).
+     */
+    @GetMapping("/regles-jeux")
+    public ResponseEntity<List<RegleJeuxResponse>> reglesJeux() {
+        return ResponseEntity.ok(masService.listReglesJeux());
+    }
+
+    /**
+     * Crée une règle de jeux avec son document PDF.
+     */
+    @PostMapping(value = "/regles-jeux", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<RegleJeuxResponse> createRegleJeux(
+            @RequestParam("label") String label,
+            @RequestParam(value = "description", required = false) String description,
+            @RequestPart("file") MultipartFile file) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(masService.createRegleJeux(label, description, file));
+    }
+
+    /**
+     * Analyse un PDF de règle de jeux (IA) pour proposer libellé et description.
+     */
+    @PostMapping(value = "/regles-jeux/analyze", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<AiRegleJeuxScanResponse> analyzeRegleJeux(
+            @RequestPart("file") MultipartFile file) {
+        return ResponseEntity.ok(masService.analyzeRegleJeuxPdf(file));
+    }
+
+    /**
+     * Retourne une règle de jeux par identifiant.
+     */
+    @GetMapping("/regles-jeux/{id}")
+    public ResponseEntity<RegleJeuxResponse> getRegleJeux(@PathVariable Long id) {
+        return ResponseEntity.ok(masService.findRegleJeuxById(id));
+    }
+
+    /**
+     * Met à jour le libellé / la description d'une règle de jeux.
+     */
+    @PutMapping("/regles-jeux/{id}")
+    public ResponseEntity<RegleJeuxResponse> updateRegleJeux(
+            @PathVariable Long id,
+            @Valid @RequestBody RegleJeuxRequest request) {
+        return ResponseEntity.ok(masService.updateRegleJeux(id, request));
+    }
+
+    /**
+     * Rattache une ou plusieurs MAS de l'atelier courant à une règle de jeux.
+     */
+    @PutMapping("/regles-jeux/{id}/mas")
+    public ResponseEntity<RegleJeuxResponse> linkMasToRegleJeux(
+            @PathVariable Long id,
+            @RequestBody RegleJeuxMasLinkRequest request) {
+        return ResponseEntity.ok(masService.linkMasToRegleJeux(id, request));
+    }
+
+    /**
+     * Remplace le PDF d'une règle de jeux.
+     */
+    @PostMapping(value = "/regles-jeux/{id}/document", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<RegleJeuxResponse> replaceRegleJeuxDocument(
+            @PathVariable Long id,
+            @RequestPart("file") MultipartFile file) {
+        return ResponseEntity.ok(masService.replaceRegleJeuxDocument(id, file));
+    }
+
+    /**
+     * Supprime une règle de jeux non rattachée à une MAS.
+     */
+    @DeleteMapping("/regles-jeux/{id}")
+    public ResponseEntity<Void> deleteRegleJeux(@PathVariable Long id) {
+        masService.deleteRegleJeux(id);
+        return ResponseEntity.noContent().build();
     }
 
     /**

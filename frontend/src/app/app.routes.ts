@@ -94,6 +94,18 @@ export const routes: Routes = [
           import('./pages/mas-suivi/mas-suivi.component').then((m) => m.MasSuiviComponent)
       },
       {
+        path: 'mas/arrets-maintenance',
+        loadComponent: () =>
+          import('./pages/arret-maintenance/arret-maintenance.component').then(
+            (m) => m.ArretMaintenanceComponent
+          )
+      },
+      {
+        path: 'mas/regles-jeux',
+        loadComponent: () =>
+          import('./pages/regles-jeux/regles-jeux.component').then((m) => m.ReglesJeuxComponent)
+      },
+      {
         path: 'mas/visites-quadri',
         loadComponent: () =>
           import('./pages/visite-quadri/visite-quadri.component').then((m) => m.VisiteQuadriComponent)

@@ -9,6 +9,7 @@ import lombok.Data;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 
 /**
  * Requête de création ou mise à jour d'une référence MAS.
@@ -59,4 +60,7 @@ public class MasRequest {
 
     /** Compatibilité : true = UTILISEE, false = EN_RESERVE (si statut absent). */
     private Boolean utilise;
+
+    /** Identifiants des règles de jeux — au moins une obligatoire. */
+    private List<Long> regleJeuxIds;
 }

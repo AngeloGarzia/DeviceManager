@@ -49,6 +49,36 @@ class FitServiceTest {
     @InjectMocks private FitService fitService;
 
     @Test
+    void ensureForMas_freezesHeaderSnapshotFromMas() {
+        Atelier atelier = TestFixtures.atelier();
+        Mas mas = TestFixtures.mas();
+        mas.setNumeroSocle("SOC-1");
+        mas.setTauxRedistribution(new java.math.BigDecimal("85.50"));
+        when(atelierService.requireCurrentAtelier()).thenReturn(atelier);
+        when(masRepository.findByIdAndAtelierId(mas.getId(), atelier.getId())).thenReturn(Optional.of(mas));
+        when(fitRepository.findByAtelierIdAndMasId(atelier.getId(), mas.getId())).thenReturn(Optional.empty());
+        when(fitRepository.findByAtelierIdAndNumeroMachineCasinoIgnoreCase(atelier.getId(), mas.getNumero()))
+                .thenReturn(Optional.empty());
+        ArgumentCaptor<Fit> fitCaptor = ArgumentCaptor.forClass(Fit.class);
+        when(fitRepository.saveAndFlush(fitCaptor.capture())).thenAnswer(inv -> {
+            Fit f = inv.getArgument(0);
+            f.setId(7L);
+            return f;
+        });
+        when(fitRepository.findByIdAndAtelierId(7L, atelier.getId())).thenAnswer(inv -> Optional.of(fitCaptor.getValue()));
+
+        FitFromMasRequest request = new FitFromMasRequest();
+        request.setMasId(mas.getId());
+        FitResponse response = fitService.ensureForMas(request);
+
+        Fit saved = fitCaptor.getValue();
+        assertThat(saved.isHeaderFrozen()).isTrue();
+        assertThat(saved.getNumeroSocle()).isEqualTo("SOC-1");
+        assertThat(saved.getTauxRedistribution()).isEqualByComparingTo("85.50");
+        assertThat(response.getNumeroSocle()).isEqualTo("SOC-1");
+    }
+
+    @Test
     void ensureForMas_createsFitWhenMissing() {
         Atelier atelier = TestFixtures.atelier();
         Mas mas = TestFixtures.mas();

@@ -1,19 +1,26 @@
 package com.devicemanager.service;
 
+import com.devicemanager.dto.AiRegleJeuxScanResponse;
 import com.devicemanager.dto.DenoRequest;
 import com.devicemanager.dto.DenoResponse;
 import com.devicemanager.dto.MarqueMasRequest;
 import com.devicemanager.dto.MarqueMasResponse;
 import com.devicemanager.dto.MasRequest;
 import com.devicemanager.dto.MasResponse;
+import com.devicemanager.dto.RegleJeuxMasLinkRequest;
+import com.devicemanager.dto.RegleJeuxMasSummary;
+import com.devicemanager.dto.RegleJeuxRequest;
+import com.devicemanager.dto.RegleJeuxResponse;
 import com.devicemanager.entity.Atelier;
 import com.devicemanager.entity.Deno;
 import com.devicemanager.entity.MarqueMas;
 import com.devicemanager.entity.Mas;
 import com.devicemanager.entity.MasStatut;
+import com.devicemanager.entity.RegleJeux;
 import com.devicemanager.repository.DenoRepository;
 import com.devicemanager.repository.MarqueMasRepository;
 import com.devicemanager.repository.MasRepository;
+import com.devicemanager.repository.RegleJeuxRepository;
 import com.devicemanager.security.DocumentUploadValidator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -30,8 +37,12 @@ import java.text.DecimalFormatSymbols;
 import java.text.Normalizer;
 import java.time.LocalDateTime;
 import java.util.Comparator;
+import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * Service métier des MAS (Machines À Sous), marques et dénominations associées.
@@ -51,8 +62,11 @@ public class MasService {
     private final MasRepository masRepository;
     private final MarqueMasRepository marqueMasRepository;
     private final DenoRepository denoRepository;
+    private final RegleJeuxRepository regleJeuxRepository;
+    private final AiAssistantService aiAssistantService;
     private final AtelierService atelierService;
     private final StorageService storageService;
+    private final FitService fitService;
 
     @Transactional(readOnly = true)
     public List<MasResponse> findAll(String q) {
@@ -123,6 +137,197 @@ public class MasService {
         return toDenoResponse(saved);
     }
 
+    @Transactional(readOnly = true)
+    public List<RegleJeuxResponse> listReglesJeux() {
+        return regleJeuxRepository.findAllByOrderByLabelAsc().stream()
+                .sorted(Comparator.comparing(RegleJeux::getLabel, String.CASE_INSENSITIVE_ORDER))
+                .map(this::toRegleJeuxResponse)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public RegleJeuxResponse findRegleJeuxById(Long id) {
+        RegleJeux regle = getRegleJeuxEntity(id);
+        Long atelierId = atelierService.requireCurrentAtelier().getId();
+        return toRegleJeuxResponseDetailed(regle, atelierId);
+    }
+
+    /**
+     * Rattache des MAS de l'atelier courant à une règle de jeux (remplace les liens existants pour cet atelier).
+     * Chaque MAS détachée doit conserver au moins une autre règle.
+     */
+    public RegleJeuxResponse linkMasToRegleJeux(Long regleId, RegleJeuxMasLinkRequest request) {
+        RegleJeux regle = getRegleJeuxEntity(regleId);
+        Long atelierId = atelierService.requireCurrentAtelier().getId();
+        List<Long> rawIds = request.getMasIds() == null ? List.of() : request.getMasIds();
+        Set<Long> targetIds = new LinkedHashSet<>(rawIds);
+
+        if (!targetIds.isEmpty()) {
+            List<Mas> found = masRepository.findAllByIdInAndAtelierId(targetIds, atelierId);
+            if (found.size() != targetIds.size()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "Une ou plusieurs MAS sont introuvables dans cet atelier");
+            }
+        }
+
+        List<Mas> currentlyLinked = masRepository.findAllByRegleJeuxIdAndAtelierId(regleId, atelierId);
+        Set<Long> currentIds = currentlyLinked.stream().map(Mas::getId).collect(Collectors.toSet());
+
+        Set<Long> toRemove = new HashSet<>(currentIds);
+        toRemove.removeAll(targetIds);
+
+        Set<Long> toAdd = new HashSet<>(targetIds);
+        toAdd.removeAll(currentIds);
+
+        for (Mas mas : currentlyLinked) {
+            if (!toRemove.contains(mas.getId())) {
+                continue;
+            }
+            mas.getReglesJeux().removeIf(r -> r.getId().equals(regleId));
+            if (mas.getReglesJeux().isEmpty()) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT,
+                        "La MAS " + mas.getNumero() + " doit conserver au moins une règle de jeux");
+            }
+            masRepository.save(mas);
+        }
+
+        for (Long masId : toAdd) {
+            Mas mas = getEntity(masId);
+            mas.getReglesJeux().add(regle);
+            masRepository.save(mas);
+        }
+
+        log.info("Rattachement MAS — Règle de jeux id={} mas={}", regleId, targetIds.size());
+        return toRegleJeuxResponseDetailed(regle, atelierId);
+    }
+
+    /**
+     * Crée une règle de jeux dans le catalogue global avec son PDF.
+     */
+    public RegleJeuxResponse createRegleJeux(String labelRaw, String descriptionRaw, MultipartFile file) {
+        if (labelRaw == null || labelRaw.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Le libellé de la règle de jeux est obligatoire");
+        }
+        DocumentUploadValidator.validatePdf(file, "règle de jeux");
+        String label = labelRaw.trim();
+        if (label.length() > 200) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Le libellé de la règle de jeux ne doit pas dépasser 200 caractères");
+        }
+        if (regleJeuxRepository.existsByLabelIgnoreCase(label)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Cette règle de jeux existe déjà");
+        }
+        String code = toCode(label);
+        String uniqueCode = code;
+        int i = 2;
+        while (regleJeuxRepository.existsByCodeIgnoreCase(uniqueCode)) {
+            uniqueCode = code + "_" + i++;
+        }
+        StorageService.StoredObject stored = storageService.store(file);
+        String original = normalizeOriginalFilename(file.getOriginalFilename(), "regle-jeux.pdf");
+        String description = trimToNull(descriptionRaw);
+        if (description != null && description.length() > 500) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "La description ne doit pas dépasser 500 caractères");
+        }
+        RegleJeux saved = regleJeuxRepository.save(RegleJeux.builder()
+                .code(uniqueCode)
+                .label(label)
+                .description(description)
+                .fileKey(stored.key())
+                .fileUrl(stored.url())
+                .originalName(original)
+                .contentType(stored.contentType() != null ? stored.contentType() : file.getContentType())
+                .fileSize(stored.size())
+                .uploadedAt(LocalDateTime.now())
+                .build());
+        log.info("Création en base — Règle de jeux id={} label={} code={}",
+                saved.getId(), saved.getLabel(), saved.getCode());
+        return toRegleJeuxResponse(saved);
+    }
+
+    /**
+     * Analyse un PDF de règle de jeux via l'IA (libellé + description proposés).
+     * Si l'IA est indisponible, renvoie {@code enabled=false} pour saisie manuelle.
+     */
+    public AiRegleJeuxScanResponse analyzeRegleJeuxPdf(MultipartFile file) {
+        DocumentUploadValidator.validatePdf(file, "règle de jeux");
+        try {
+            return aiAssistantService.analyzeRegleJeuxPdf(file);
+        } catch (ResponseStatusException ex) {
+            if (ex.getStatusCode() == HttpStatus.SERVICE_UNAVAILABLE) {
+                return AiRegleJeuxScanResponse.builder()
+                        .enabled(false)
+                        .notes(ex.getReason())
+                        .build();
+            }
+            throw ex;
+        }
+    }
+
+    public RegleJeuxResponse updateRegleJeux(Long id, RegleJeuxRequest request) {
+        RegleJeux entity = getRegleJeuxEntity(id);
+        String label = request.getLabel().trim();
+        if (regleJeuxRepository.existsByLabelIgnoreCaseAndIdNot(label, id)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Cette règle de jeux existe déjà");
+        }
+        String description = trimToNull(request.getDescription());
+        if (description != null && description.length() > 500) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "La description ne doit pas dépasser 500 caractères");
+        }
+        entity.setLabel(label);
+        entity.setDescription(description);
+        RegleJeux saved = regleJeuxRepository.save(entity);
+        log.info("Modification en base — Règle de jeux id={} label={}", saved.getId(), saved.getLabel());
+        return toRegleJeuxResponse(saved);
+    }
+
+    public RegleJeuxResponse replaceRegleJeuxDocument(Long id, MultipartFile file) {
+        DocumentUploadValidator.validatePdf(file, "règle de jeux");
+        RegleJeux entity = getRegleJeuxEntity(id);
+        String previousKey = entity.getFileKey();
+        StorageService.StoredObject stored = storageService.store(file);
+        String original = normalizeOriginalFilename(file.getOriginalFilename(), "regle-jeux.pdf");
+        entity.setFileKey(stored.key());
+        entity.setFileUrl(stored.url());
+        entity.setOriginalName(original);
+        entity.setContentType(stored.contentType() != null ? stored.contentType() : file.getContentType());
+        entity.setFileSize(stored.size());
+        entity.setUploadedAt(LocalDateTime.now());
+        RegleJeux saved = regleJeuxRepository.save(entity);
+        if (previousKey != null && !previousKey.isBlank() && !previousKey.equals(stored.key())) {
+            try {
+                storageService.delete(previousKey);
+            } catch (Exception ex) {
+                log.warn("Ancien PDF règle de jeux non supprimé (id={}, key={}): {}",
+                        id, previousKey, ex.getMessage());
+            }
+        }
+        log.info("PDF règle de jeux remplacé — id={} file={}", id, original);
+        return toRegleJeuxResponse(saved);
+    }
+
+    public void deleteRegleJeux(Long id) {
+        RegleJeux entity = getRegleJeuxEntity(id);
+        long links = regleJeuxRepository.countMasLinks(id);
+        if (links > 0) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Impossible de supprimer : " + links + " MAS utilisent cette règle de jeux");
+        }
+        String key = entity.getFileKey();
+        regleJeuxRepository.delete(entity);
+        if (key != null && !key.isBlank()) {
+            try {
+                storageService.delete(key);
+            } catch (Exception ex) {
+                log.warn("PDF règle de jeux non supprimé du stockage (id={}, key={}): {}",
+                        id, key, ex.getMessage());
+            }
+        }
+        log.info("Suppression en base — Règle de jeux id={} label={}", id, entity.getLabel());
+    }
+
     public MasResponse create(MasRequest request) {
         Atelier atelier = atelierService.requireCurrentAtelier();
         String numero = request.getNumero().trim();
@@ -140,6 +345,7 @@ public class MasService {
                 .atelier(atelier)
                 .build();
         applyDeno(entity, request);
+        applyReglesJeux(entity, request.getRegleJeuxIds());
         entity.applyStatut(resolveStatut(request));
         applyIdentificationRules(entity, entity.getStatut());
         Mas saved = masRepository.save(entity);
@@ -148,6 +354,7 @@ public class MasService {
                 saved.getNumero(),
                 saved.getMarque() != null ? saved.getMarque().getLabel() : null,
                 atelier.getId());
+        fitService.ensureFitSnapshotForMas(saved);
         return toResponse(saved);
     }
 
@@ -165,6 +372,7 @@ public class MasService {
         entity.setDestinationMachineUsagee(trimToNull(request.getDestinationMachineUsagee()));
         entity.setMarque(getMarque(request.getMarqueId()));
         applyDeno(entity, request);
+        applyReglesJeux(entity, request.getRegleJeuxIds());
         MasStatut statut = resolveStatut(request);
         entity.applyStatut(statut);
         applyIdentificationRules(entity, statut);
@@ -174,6 +382,7 @@ public class MasService {
                 saved.getNumero(),
                 saved.getMarque() != null ? saved.getMarque().getLabel() : null,
                 saved.getAtelier() != null ? saved.getAtelier().getId() : null);
+        fitService.syncEvolvingFieldsOnMasUpdate(saved);
         return toResponse(saved);
     }
 
@@ -258,6 +467,21 @@ public class MasService {
      * Multi-déno : flag à true et aucune deno unique.
      * Sinon : dénomination optionnelle du référentiel.
      */
+    private void applyReglesJeux(Mas entity, List<Long> regleJeuxIds) {
+        if (regleJeuxIds == null || regleJeuxIds.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Sélectionnez au moins une règle de jeux");
+        }
+        Set<Long> uniqueIds = new LinkedHashSet<>(regleJeuxIds);
+        List<RegleJeux> regles = regleJeuxRepository.findAllById(uniqueIds);
+        if (regles.size() != uniqueIds.size()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Une ou plusieurs règles de jeux sont introuvables");
+        }
+        entity.getReglesJeux().clear();
+        entity.getReglesJeux().addAll(regles);
+    }
+
     private void applyDeno(Mas entity, MasRequest request) {
         boolean multi = Boolean.TRUE.equals(request.getMultiDeno());
         entity.setMultiDeno(multi);
@@ -280,6 +504,12 @@ public class MasService {
     private MasResponse toResponse(Mas entity) {
         MarqueMas marque = entity.getMarque();
         Deno deno = entity.getDeno();
+        List<RegleJeuxResponse> regles = entity.getReglesJeux() == null
+                ? List.of()
+                : entity.getReglesJeux().stream()
+                        .sorted(Comparator.comparing(RegleJeux::getLabel, String.CASE_INSENSITIVE_ORDER))
+                        .map(this::toRegleJeuxResponse)
+                        .toList();
         return MasResponse.builder()
                 .id(entity.getId())
                 .numero(entity.getNumero())
@@ -307,6 +537,8 @@ public class MasService {
                 .statut(entity.getStatut() != null ? entity.getStatut().name() : MasStatut.UTILISEE.name())
                 .statutLabel(entity.getStatut() != null ? entity.getStatut().label() : MasStatut.UTILISEE.label())
                 .utilise(entity.isUtilise())
+                .regleJeuxIds(regles.stream().map(RegleJeuxResponse::getId).collect(Collectors.toList()))
+                .reglesJeux(regles)
                 .build();
     }
 
@@ -383,6 +615,62 @@ public class MasService {
                 .label(deno.getLabel())
                 .value(deno.getId())
                 .build();
+    }
+
+    private RegleJeux getRegleJeuxEntity(Long id) {
+        return regleJeuxRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Règle de jeux introuvable"));
+    }
+
+    private RegleJeuxResponse toRegleJeuxResponse(RegleJeux regle) {
+        return RegleJeuxResponse.builder()
+                .id(regle.getId())
+                .code(regle.getCode())
+                .label(regle.getLabel())
+                .description(regle.getDescription())
+                .fileUrl(regle.getFileUrl())
+                .originalName(regle.getOriginalName())
+                .contentType(regle.getContentType())
+                .fileSize(regle.getFileSize())
+                .uploadedAt(regle.getUploadedAt())
+                .value(regle.getId())
+                .masCount(regleJeuxRepository.countMasLinks(regle.getId()))
+                .build();
+    }
+
+    private RegleJeuxResponse toRegleJeuxResponseDetailed(RegleJeux regle, Long atelierId) {
+        List<Mas> linked = masRepository.findAllByRegleJeuxIdAndAtelierId(regle.getId(), atelierId);
+        List<RegleJeuxMasSummary> masses = linked.stream()
+                .map(m -> RegleJeuxMasSummary.builder()
+                        .id(m.getId())
+                        .numero(m.getNumero())
+                        .marqueLabel(m.getMarque() != null ? m.getMarque().getLabel() : null)
+                        .build())
+                .toList();
+        List<Long> masIds = masses.stream().map(RegleJeuxMasSummary::getId).toList();
+        return RegleJeuxResponse.builder()
+                .id(regle.getId())
+                .code(regle.getCode())
+                .label(regle.getLabel())
+                .description(regle.getDescription())
+                .fileUrl(regle.getFileUrl())
+                .originalName(regle.getOriginalName())
+                .contentType(regle.getContentType())
+                .fileSize(regle.getFileSize())
+                .uploadedAt(regle.getUploadedAt())
+                .value(regle.getId())
+                .masCount(masIds.size())
+                .masIds(masIds)
+                .masses(masses)
+                .build();
+    }
+
+    private static String normalizeOriginalFilename(String raw, String fallback) {
+        if (raw == null || raw.isBlank()) {
+            return fallback;
+        }
+        String trimmed = raw.trim();
+        return trimmed.length() > 255 ? trimmed.substring(0, 255) : trimmed;
     }
 
     static String toCode(String label) {

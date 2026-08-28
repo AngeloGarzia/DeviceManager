@@ -64,12 +64,13 @@
     </div>
   } @else {
     @let f = fit()!;
+    @let h = headerDisplay()!;
 
     <article class="fit-sheet" aria-label="Fiche inventaire technique machine à sous">
       <div class="sheet-top">
         <div class="sheet-box casino-box">
           <div class="box-label">Casino</div>
-          <div class="box-value">{{ f.casinoNom || '—' }}</div>
+          <div class="box-value">{{ h.casinoNom || '—' }}</div>
         </div>
         <div class="sheet-title-block">
           <h2 class="sheet-title">Fiche inventaire technique machine à sous</h2>
@@ -80,40 +81,56 @@
         </div>
         <div class="sheet-box machine-box">
           <div class="box-label">N° machine du casino</div>
-          <div class="box-value">{{ f.numeroMachineCasino }}</div>
+          <div class="box-value">{{ h.numeroMachineCasino || '—' }}</div>
         </div>
       </div>
 
       <div class="sheet-identity">
         <div class="id-row">
           <span class="id-label">Date de mise en service</span>
-          <span class="id-dots">{{ formatDate(f.dateMiseEnService) || '……………………' }}</span>
+          <span class="id-dots">{{ formatDate(h.dateMiseEnService) || '……………………' }}</span>
         </div>
         <div class="id-row id-row--split">
           <div>
             <span class="id-label">Marque</span>
-            <span class="id-dots">{{ f.marque || '……………………' }}</span>
+            <span class="id-dots">{{ headerField(h.marque) }}</span>
           </div>
           <div>
             <span class="id-label">Type</span>
-            <span class="id-dots">{{ f.typeMachine || '……………………' }}</span>
+            <span class="id-dots">{{ headerField(h.typeMachine) }}</span>
+          </div>
+        </div>
+        <div class="id-row id-row--split">
+          <div>
+            <span class="id-label">N° de socle</span>
+            <span class="id-dots">{{ headerField(h.numeroSocle) }}</span>
+          </div>
+          <div>
+            <span class="id-label">Taux de redistribution</span>
+            <span class="id-dots">{{ formatTaux(h.tauxRedistribution) || '……………………' }}</span>
           </div>
         </div>
         <div class="id-row">
           <span class="id-label">N° de série machine</span>
-          <span class="id-dots">{{ f.numeroSerieMachine || '……………………' }}</span>
+          <span class="id-dots">{{ headerField(h.numeroSerieMachine) }}</span>
         </div>
-        <div class="id-row">
-          <span class="id-label">N° de série du lecteur de carte de paiement</span>
-          <span class="id-dots">{{ f.numeroSerieLecteur || '……………………' }}</span>
+        <div class="id-row id-row--split">
+          <div>
+            <span class="id-label">N° de série du lecteur de carte de paiement</span>
+            <span class="id-dots">{{ headerField(h.numeroSerieLecteur) }}</span>
+          </div>
+          <div>
+            <span class="id-label">Dénomination</span>
+            <span class="id-dots">{{ headerField(h.denoLabel) }}</span>
+          </div>
         </div>
         <div class="id-row">
           <span class="id-label">Date de cessation</span>
-          <span class="id-dots">{{ formatDate(f.dateCessation) || '……………………' }}</span>
+          <span class="id-dots">{{ formatDate(h.dateCessation) || '……………………' }}</span>
         </div>
         <div class="id-row">
           <span class="id-label">Destination de la machine usagée</span>
-          <span class="id-dots">{{ f.destinationMachineUsagee || '……………………' }}</span>
+          <span class="id-dots">{{ headerField(h.destinationMachineUsagee) }}</span>
         </div>
       </div>
 
@@ -139,38 +156,48 @@
             </tr>
           </thead>
           <tbody>
-            @for (ligne of chronologicalLignes(); track trackLigne($index, ligne)) {
+            @for (row of ligneDisplays(); track trackLigne($index, row)) {
               <tr>
-                <td class="col-date">{{ formatDate(ligne.dateOperation) }}</td>
-                <td class="col-stack">
-                  <div class="stack-line">{{ ligne.numeroSocle || '—' }}</div>
-                  <div class="stack-line">{{ ligne.numeroEmplacement || '—' }}</div>
-                  <div class="stack-line">{{ ligne.numeroSerieLecteur || '—' }}</div>
+                <td class="col-date">
+                  @if (formatDateParts(row.ligne.dateOperation); as dateParts) {
+                    <div class="date-cell">
+                      <span class="date-day-month">{{ dateParts.dayMonth }}</span>
+                      <span class="date-year">{{ dateParts.year }}</span>
+                    </div>
+                  }
                 </td>
-                <td class="col-taux">{{ formatTaux(ligne.tauxRedistribution) }}</td>
+                <td class="col-stack">
+                  <div class="stack-line">{{ displayCellValue(row.numeroSocle) }}</div>
+                  <div class="stack-line">{{ displayCellValue(row.numeroEmplacement) }}</div>
+                  <div class="stack-line">{{ displayCellValue(row.numeroSerieLecteur) }}</div>
+                </td>
+                <td class="col-taux">{{ formatTaux(row.tauxRedistribution) || '—' }}</td>
                 <td class="col-valeur">
-                  <span class="valeur-num">{{ formatMoney(ligne.valeurUnitaireMises) }}</span>
+                  <span class="valeur-num">{{ formatMoney(row.valeurUnitaireMises) }}</span>
+                  @if (row.denoLabel) {
+                    <div class="valeur-deno">{{ row.denoLabel }}</div>
+                  }
                   <span class="euro">€</span>
                 </td>
                 <td class="col-motif">
-                  <div class="motif-text">{{ ligne.motifNatureOperations }}</div>
-                  @if (ligne.interventionNumero) {
-                    <div class="motif-meta">Bon {{ ligne.interventionNumero }}</div>
+                  <div class="motif-text">{{ row.ligne.motifNatureOperations }}</div>
+                  @if (row.ligne.interventionNumero) {
+                    <div class="motif-meta">Bon {{ row.ligne.interventionNumero }}</div>
                   }
                 </td>
                 <td class="col-sig">
                   <div class="sig-cell">
-                    @if (ligne.signatureAdmin) {
-                      <img [src]="ligne.signatureAdmin" alt="Signature" class="sig-img" />
+                    @if (row.ligne.signatureAdmin) {
+                      <img [src]="row.ligne.signatureAdmin" alt="Signature" class="sig-img" />
                     }
-                    @if (ligne.signataireAdminNom) {
-                      <div class="sig-name">{{ ligne.signataireAdminNom }}</div>
+                    @if (row.ligne.signataireAdminNom) {
+                      <div class="sig-name">{{ row.ligne.signataireAdminNom }}</div>
                     }
-                    @if (ligne.signatureTechnicien) {
-                      <img [src]="ligne.signatureTechnicien" alt="Signature tech" class="sig-img sig-img--tech" />
+                    @if (row.ligne.signatureTechnicien) {
+                      <img [src]="row.ligne.signatureTechnicien" alt="Signature tech" class="sig-img sig-img--tech" />
                     }
-                    @if (ligne.signataireTechnicienNom) {
-                      <div class="sig-name sig-name--tech">Tech. {{ ligne.signataireTechnicienNom }}</div>
+                    @if (row.ligne.signataireTechnicienNom) {
+                      <div class="sig-name sig-name--tech">Tech. {{ row.ligne.signataireTechnicienNom }}</div>
                     }
                   </div>
                 </td>

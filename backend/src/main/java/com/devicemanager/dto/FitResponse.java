@@ -3,6 +3,7 @@ package com.devicemanager.dto;
 import lombok.Builder;
 import lombok.Data;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -24,6 +25,13 @@ public class FitResponse {
     private String typeMachine;
     private String numeroSerieMachine;
     private String numeroSerieLecteur;
+    /** N° socle figé à la création FIT. */
+    private String numeroSocle;
+    /** Taux figé à la création FIT. */
+    private BigDecimal tauxRedistribution;
+    private Long denoId;
+    private String denoLabel;
+    private boolean multiDeno;
     private LocalDate dateCessation;
     private String destinationMachineUsagee;
     private String modeleNumero;

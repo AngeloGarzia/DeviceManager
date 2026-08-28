@@ -54,6 +54,33 @@
               <dt class="text-xs uppercase tracking-wide text-ink-faint">Destination machine usagée</dt>
               <dd class="mt-1 m-0 text-base">{{ mas.destinationMachineUsagee || '—' }}</dd>
             </div>
+            <div class="sm:col-span-2">
+              <dt class="text-xs uppercase tracking-wide text-ink-faint">Règles de jeux</dt>
+              <dd class="mt-1 m-0 text-base">
+                @if (mas.reglesJeux?.length) {
+                  <ul class="m-0 list-none space-y-2 p-0">
+                    @for (r of mas.reglesJeux; track r.id) {
+                      <li>
+                        <a
+                          class="inline-flex items-center gap-1 text-sm text-brand underline-offset-2 hover:underline"
+                          [href]="regleJeuxUrl(r)"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          <mat-icon class="!text-base">picture_as_pdf</mat-icon>
+                          {{ r.label }}
+                        </a>
+                        @if (r.originalName) {
+                          <span class="ml-1 text-xs text-ink-soft">({{ r.originalName }})</span>
+                        }
+                      </li>
+                    }
+                  </ul>
+                } @else {
+                  —
+                }
+              </dd>
+            </div>
           </dl>
         </mat-card-content>
       </mat-card>

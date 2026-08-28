@@ -1,0 +1,144 @@
+<section class="grid gap-4">
+  <header>
+    <h1 class="page-title">Arrêts maintenance MAS</h1>
+    <p class="page-subtitle">
+      Statut temporaire « arrêté pour maintenance » — signatures obligatoires si le registre technique est à jour.
+    </p>
+  </header>
+
+  @if (loading()) {
+    <div class="flex justify-center py-10"><mat-spinner diameter="36"></mat-spinner></div>
+  } @else {
+    @if (error()) {
+      <p class="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{{ error() }}</p>
+    }
+    @if (success()) {
+      <p class="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800">{{ success() }}</p>
+    }
+
+    <mat-card class="panel-card">
+      <mat-card-header>
+        <mat-card-title>Déclarer un arrêt</mat-card-title>
+      </mat-card-header>
+      <mat-card-content>
+        <form class="grid gap-3" [formGroup]="arretForm" (ngSubmit)="submitArret()">
+          <mat-form-field appearance="outline">
+            <mat-label>MAS</mat-label>
+            <mat-select formControlName="masId">
+              @for (mas of masses(); track mas.id) {
+                <mat-option [value]="mas.id">{{ masLabel(mas) }}</mat-option>
+              }
+            </mat-select>
+            @if (masses().length === 0) {
+              <mat-hint>Toutes les MAS disponibles sont déjà en arrêt maintenance.</mat-hint>
+            }
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>Date / heure d’arrêt</mat-label>
+            <input matInput type="datetime-local" formControlName="dateHeureArret" />
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>Motif d’arrêt</mat-label>
+            <textarea matInput rows="3" formControlName="motifArret"></textarea>
+          </mat-form-field>
+
+          <mat-checkbox formControlName="registreTechniqueAJour" color="primary">
+            Registre technique à jour
+          </mat-checkbox>
+
+          @if (arretForm.controls.registreTechniqueAJour.value) {
+            <app-signature-pad label="Signature d’arrêt" formControlName="signatureArret" />
+            <mat-form-field appearance="outline">
+              <mat-label>Signataire</mat-label>
+              <input matInput formControlName="signataireArretNom" />
+            </mat-form-field>
+          }
+
+          <button mat-flat-button color="warn" type="submit" [disabled]="saving() || masses().length === 0">
+            {{ saving() ? 'Enregistrement…' : 'Enregistrer l’arrêt' }}
+          </button>
+        </form>
+      </mat-card-content>
+    </mat-card>
+
+    <mat-card class="panel-card">
+      <mat-card-header>
+        <mat-card-title>MAS actuellement arrêtées ({{ active().length }})</mat-card-title>
+      </mat-card-header>
+      <mat-card-content class="grid gap-3">
+        @if (!active().length) {
+          <p class="text-sm text-ink-soft">Aucune MAS en arrêt maintenance.</p>
+        } @else {
+          @for (item of active(); track item.id) {
+            <article class="arret-card">
+              <div class="arret-card__head">
+                <div>
+                  <div class="font-semibold text-ink">
+                    MAS {{ item.masNumero }}
+                    @if (item.masMarque) {
+                      <span class="text-ink-soft"> — {{ item.masMarque }}</span>
+                    }
+                  </div>
+                  <div class="text-sm text-ink-soft">
+                    Arrêt depuis {{ formatDateTime(item.dateHeureArret) }}
+                    · Admin {{ item.adminDisplayName || item.adminUsername }}
+                  </div>
+                  <div class="mt-1 text-sm">{{ item.motifArret }}</div>
+                  @if (item.registreTechniqueAJour) {
+                    <div class="mt-1 text-xs font-semibold text-amber-700">Registre technique à jour — signature reprise requise</div>
+                  }
+                </div>
+                @if (repriseId() !== item.id) {
+                  <button mat-stroked-button color="primary" type="button" (click)="openReprise(item)">
+                    Reprise
+                  </button>
+                }
+              </div>
+
+              @if (repriseId() === item.id) {
+                <form class="mt-3 grid gap-3 border-t border-line pt-3" [formGroup]="repriseForm" (ngSubmit)="submitReprise(item)">
+                  <mat-form-field appearance="outline">
+                    <mat-label>Date / heure de reprise</mat-label>
+                    <input matInput type="datetime-local" formControlName="dateHeureReprise" />
+                  </mat-form-field>
+                  @if (item.registreTechniqueAJour) {
+                    <app-signature-pad label="Signature de redémarrage" formControlName="signatureRedemarrage" />
+                    <mat-form-field appearance="outline">
+                      <mat-label>Signataire reprise</mat-label>
+                      <input matInput formControlName="signataireRedemarrageNom" />
+                    </mat-form-field>
+                  }
+                  <div class="flex flex-wrap gap-2">
+                    <button mat-stroked-button type="button" (click)="cancelReprise()">Annuler</button>
+                    <button mat-flat-button color="primary" type="submit" [disabled]="saving()">
+                      {{ saving() ? 'Enregistrement…' : 'Valider la reprise' }}
+                    </button>
+                  </div>
+                </form>
+              }
+            </article>
+          }
+        }
+      </mat-card-content>
+    </mat-card>
+
+    @if (history().length) {
+      <mat-card class="panel-card">
+        <mat-card-header>
+          <mat-card-title>Historique récent</mat-card-title>
+        </mat-card-header>
+        <mat-card-content class="grid gap-2">
+          @for (item of history(); track item.id) {
+            <div class="history-row text-sm">
+              <span class="font-semibold">MAS {{ item.masNumero }}</span>
+              · {{ formatDateTime(item.dateHeureArret) }} → {{ formatDateTime(item.dateHeureReprise) }}
+              · {{ item.motifArret }}
+            </div>
+          }
+        </mat-card-content>
+      </mat-card>
+    }
+  }
+</section>

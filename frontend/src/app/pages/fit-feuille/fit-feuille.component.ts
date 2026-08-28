@@ -14,6 +14,11 @@ import { FitService } from '../../services/fit.service';
 import { MasService } from '../../services/mas.service';
 import { TimelineService } from '../../services/timeline.service';
 import { apiErrorMessage } from '../../shared/api-error';
+import {
+  buildFitFeuilleHeaderDisplay,
+  buildFitFeuilleLigneDisplays,
+  displayCellValue
+} from './fit-feuille-display';
 
 /** Nombre de lignes vides affichées sous l'historique (aspect formulaire papier). */
 const EMPTY_ROW_COUNT = 8;
@@ -71,6 +76,20 @@ export class FitFeuilleComponent implements OnInit {
     return Array.from({ length: need }, (_, i) => i);
   });
 
+  readonly headerDisplay = computed(() => {
+    const fit = this.fit();
+    if (!fit) {
+      return null;
+    }
+    return buildFitFeuilleHeaderDisplay(fit);
+  });
+
+  readonly ligneDisplays = computed(() =>
+    buildFitFeuilleLigneDisplays(this.chronologicalLignes(), this.fit())
+  );
+
+  readonly displayCellValue = displayCellValue;
+
   ngOnInit(): void {
     this.loadingMas.set(true);
     forkJoin({
@@ -108,6 +127,10 @@ export class FitFeuilleComponent implements OnInit {
     });
   }
 
+  headerField(value?: string | null): string {
+    return value?.trim() || '……………………';
+  }
+
   hasSuivi(masId: number): boolean {
     return this.masIdsWithSuivi().has(masId);
   }
@@ -117,15 +140,28 @@ export class FitFeuilleComponent implements OnInit {
   }
 
   formatDate(value?: string | null): string {
+    const parts = this.parseDateParts(value);
+    if (!parts) {
+      return value ?? '';
+    }
+    return `${parts.dayMonth}/${parts.year}`;
+  }
+
+  /** Jour/mois et année séparés pour la colonne DATE du tableau FIT. */
+  formatDateParts(value?: string | null): { dayMonth: string; year: string } | null {
+    return this.parseDateParts(value);
+  }
+
+  private parseDateParts(value?: string | null): { dayMonth: string; year: string } | null {
     if (!value) {
-      return '';
+      return null;
     }
     const d = value.length >= 10 ? value.slice(0, 10) : value;
     const [y, m, day] = d.split('-');
     if (y && m && day) {
-      return `${day}/${m}/${y}`;
+      return { dayMonth: `${day}/${m}`, year: y };
     }
-    return value;
+    return null;
   }
 
   formatMoney(value?: number | null): string {
@@ -174,10 +210,10 @@ export class FitFeuilleComponent implements OnInit {
     this.fitService.get(fitId).subscribe({
       next: (fit) => {
         this.fit.set(fit);
-        this.loading.set(false);
         if (fit.masId != null) {
           this.masCtrl.setValue(fit.masId, { emitEvent: false });
         }
+        this.loading.set(false);
       },
       error: (err) => {
         this.loading.set(false);
@@ -195,7 +231,7 @@ export class FitFeuilleComponent implements OnInit {
     ];
   }
 
-  trackLigne(_index: number, ligne: FitLigne): number {
-    return ligne.id;
+  trackLigne(_index: number, row: { ligne: FitLigne }): number {
+    return row.ligne.id;
   }
 }

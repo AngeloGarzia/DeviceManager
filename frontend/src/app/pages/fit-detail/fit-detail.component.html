@@ -19,7 +19,7 @@
         </p>
       }
     </div>
-    <button mat-flat-button color="primary" type="button" (click)="showForm.set(!showForm())">
+    <button mat-flat-button color="primary" type="button" (click)="openForm()">
       <mat-icon>{{ showForm() ? 'close' : 'draw' }}</mat-icon>
       {{ showForm() ? 'Fermer' : 'Ajouter une intervention' }}
     </button>
@@ -50,8 +50,8 @@
     <form class="ligne-form grid gap-3" [formGroup]="form" (ngSubmit)="submitLigne()">
       <h2 class="m-0 text-base font-semibold text-ink">Nouvelle ligne d’intervention</h2>
       <p class="m-0 text-sm text-ink-soft">
-        Socle, taux et deno sont hérités de la MAS si non saisis. Les deux signatures dessinées sont
-        obligatoires.
+        N° socle et N° emplacement sont pré-remplis depuis la MAS (dernier emplacement connu si besoin).
+        Le bon d’intervention reste optionnel. Les deux signatures dessinées sont obligatoires.
       </p>
 
       <div class="bon-grid">

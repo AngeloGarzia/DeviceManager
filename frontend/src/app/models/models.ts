@@ -147,6 +147,28 @@ export interface DenoOption {
   value?: number;
 }
 
+export interface RegleJeuxMasSummary {
+  id: number;
+  numero: string;
+  marqueLabel?: string | null;
+}
+
+export interface RegleJeuxOption {
+  id: number;
+  code?: string;
+  label: string;
+  description?: string | null;
+  fileUrl?: string | null;
+  originalName?: string | null;
+  contentType?: string | null;
+  fileSize?: number | null;
+  uploadedAt?: string | null;
+  value?: number;
+  masCount?: number;
+  masIds?: number[];
+  masses?: RegleJeuxMasSummary[];
+}
+
 export interface Sfm {
   id: number;
   nom: string;
@@ -193,6 +215,8 @@ export interface Mas {
   statutLabel?: string;
   /** true si statut = UTILISEE */
   utilise: boolean;
+  regleJeuxIds?: number[];
+  reglesJeux?: RegleJeuxOption[];
 }
 
 export interface MasForm {
@@ -209,6 +233,7 @@ export interface MasForm {
   multiDeno?: boolean;
   statut: MasStatut | string;
   utilise?: boolean;
+  regleJeuxIds: number[];
 }
 
 export interface DevicePhoto {
@@ -447,6 +472,12 @@ export interface Fit {
   typeMachine?: string | null;
   numeroSerieMachine?: string | null;
   numeroSerieLecteur?: string | null;
+  /** Snapshot figé à la création FIT. */
+  numeroSocle?: string | null;
+  tauxRedistribution?: number | null;
+  denoId?: number | null;
+  denoLabel?: string | null;
+  multiDeno?: boolean;
   dateCessation?: string | null;
   destinationMachineUsagee?: string | null;
   modeleNumero?: string | null;
@@ -589,5 +620,47 @@ export interface VisiteQuadriForm {
   marqueId: number;
   dateVisite: string;
   notes?: string | null;
+}
+
+export interface ArretMaintenance {
+  id: number;
+  masId: number;
+  masNumero: string;
+  masMarque?: string | null;
+  adminUsername: string;
+  adminDisplayName?: string | null;
+  dateHeureArret: string;
+  dateHeureReprise?: string | null;
+  motifArret: string;
+  registreTechniqueAJour: boolean;
+  actif: boolean;
+  createdAt?: string | null;
+}
+
+export interface ArretMaintenanceAlertItem {
+  id: number;
+  masId: number;
+  masNumero: string;
+  dateHeureArret: string;
+}
+
+export interface ArretMaintenanceAlert {
+  count: number;
+  items: ArretMaintenanceAlertItem[];
+}
+
+export interface ArretMaintenanceForm {
+  masId: number | null;
+  motifArret: string;
+  dateHeureArret?: string | null;
+  registreTechniqueAJour: boolean;
+  signatureArret?: string | null;
+  signataireArretNom?: string | null;
+}
+
+export interface ArretMaintenanceRepriseForm {
+  dateHeureReprise?: string | null;
+  signatureRedemarrage?: string | null;
+  signataireRedemarrageNom?: string | null;
 }
 

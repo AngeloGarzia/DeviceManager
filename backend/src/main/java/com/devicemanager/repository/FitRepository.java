@@ -17,6 +17,7 @@ public interface FitRepository extends JpaRepository<Fit, Long> {
             select distinct f from Fit f
             left join fetch f.lignes
             left join fetch f.mas
+            left join fetch f.deno
             where f.atelier.id = :atelierId
             order by f.numeroMachineCasino
             """)
@@ -27,6 +28,7 @@ public interface FitRepository extends JpaRepository<Fit, Long> {
             left join fetch f.lignes
             left join fetch f.mas m
             left join fetch m.marque
+            left join fetch f.deno
             where f.id = :id and f.atelier.id = :atelierId
             """)
     Optional<Fit> findByIdAndAtelierId(@Param("id") Long id, @Param("atelierId") Long atelierId);
@@ -49,6 +51,7 @@ public interface FitRepository extends JpaRepository<Fit, Long> {
             select distinct f from Fit f
             left join fetch f.lignes
             left join fetch f.mas
+            left join fetch f.deno
             where f.atelier.id = :atelierId and f.mas.id = :masId
             """)
     Optional<Fit> findByAtelierIdAndMasIdWithLignes(

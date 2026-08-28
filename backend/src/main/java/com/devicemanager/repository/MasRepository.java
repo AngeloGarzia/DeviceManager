@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -14,9 +15,10 @@ import java.util.Optional;
 public interface MasRepository extends JpaRepository<Mas, Long> {
 
     @Query("""
-            SELECT m FROM Mas m
+            SELECT DISTINCT m FROM Mas m
             JOIN FETCH m.marque
             LEFT JOIN FETCH m.deno
+            LEFT JOIN FETCH m.reglesJeux
             WHERE m.atelier.id = :atelierId
               AND (
                    LOWER(m.numero) LIKE LOWER(CONCAT('%', :q, '%'))
@@ -31,18 +33,20 @@ public interface MasRepository extends JpaRepository<Mas, Long> {
     List<Mas> search(@Param("atelierId") Long atelierId, @Param("q") String q);
 
     @Query("""
-            SELECT m FROM Mas m
+            SELECT DISTINCT m FROM Mas m
             JOIN FETCH m.marque
             LEFT JOIN FETCH m.deno
+            LEFT JOIN FETCH m.reglesJeux
             WHERE m.atelier.id = :atelierId
             ORDER BY m.numero
             """)
     List<Mas> findAllByAtelierId(@Param("atelierId") Long atelierId);
 
     @Query("""
-            SELECT m FROM Mas m
+            SELECT DISTINCT m FROM Mas m
             JOIN FETCH m.marque
             LEFT JOIN FETCH m.deno
+            LEFT JOIN FETCH m.reglesJeux
             WHERE m.id = :id AND m.atelier.id = :atelierId
             """)
     Optional<Mas> findByIdAndAtelierId(@Param("id") Long id, @Param("atelierId") Long atelierId);
@@ -52,4 +56,22 @@ public interface MasRepository extends JpaRepository<Mas, Long> {
     boolean existsByNumeroIgnoreCaseAndAtelierIdAndIdNot(String numero, Long atelierId, Long id);
 
     long countByAtelierId(Long atelierId);
+
+    @Query("""
+            SELECT DISTINCT m FROM Mas m
+            JOIN FETCH m.marque
+            JOIN FETCH m.reglesJeux
+            WHERE m.atelier.id = :atelierId AND m.id IN :ids
+            """)
+    List<Mas> findAllByIdInAndAtelierId(@Param("ids") Collection<Long> ids, @Param("atelierId") Long atelierId);
+
+    @Query("""
+            SELECT DISTINCT m FROM Mas m
+            JOIN FETCH m.marque
+            JOIN FETCH m.reglesJeux
+            JOIN m.reglesJeux r
+            WHERE r.id = :regleId AND m.atelier.id = :atelierId
+            ORDER BY m.numero
+            """)
+    List<Mas> findAllByRegleJeuxIdAndAtelierId(@Param("regleId") Long regleId, @Param("atelierId") Long atelierId);
 }

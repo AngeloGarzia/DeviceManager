@@ -129,6 +129,30 @@ public class FitService {
     }
 
     /**
+     * À la création d'une MAS : crée ou rattache la FIT et fige l'en-tête initial.
+     */
+    public void ensureFitSnapshotForMas(Mas mas) {
+        if (mas == null || mas.getAtelier() == null) {
+            return;
+        }
+        ensureFitEntity(mas.getAtelier(), mas);
+    }
+
+    /**
+     * Lors d'une modification MAS : met à jour uniquement cessation et destination sur la FIT liée.
+     */
+    public void syncEvolvingFieldsOnMasUpdate(Mas mas) {
+        if (mas == null || mas.getAtelier() == null) {
+            return;
+        }
+        fitRepository.findByAtelierIdAndMasId(mas.getAtelier().getId(), mas.getId())
+                .ifPresent(fit -> {
+                    syncEvolvingHeaderFromMas(fit, mas);
+                    fitRepository.save(fit);
+                });
+    }
+
+    /**
      * Crée la FIT de la MAS si elle n'existe pas encore (héritage des infos machine).
      */
     public FitResponse ensureForMas(FitFromMasRequest request) {
@@ -257,32 +281,66 @@ public class FitService {
         return fitRepository.findByAtelierIdAndMasId(atelier.getId(), mas.getId())
                 .or(() -> fitRepository.findByAtelierIdAndNumeroMachineCasinoIgnoreCase(
                         atelier.getId(), mas.getNumero()))
-                .map(existing -> {
-                    if (existing.getMas() == null) {
-                        existing.setMas(mas);
-                        return fitRepository.save(existing);
-                    }
-                    return existing;
-                })
+                .map(existing -> finalizeFitForMas(existing, atelier, mas))
                 .orElseGet(() -> {
                     Fit created = Fit.builder()
                             .atelier(atelier)
-                            .mas(mas)
-                            .casinoNom(atelier.getCasino() != null ? atelier.getCasino().getNom() : null)
-                            .numeroMachineCasino(mas.getNumero())
-                            .dateMiseEnService(mas.getDateMiseEnService())
-                            .marque(mas.getMarque() != null ? mas.getMarque().getLabel() : null)
-                            .typeMachine(mas.getTypeMachine())
-                            .numeroSerieMachine(mas.getNumeroSerie())
-                            .dateCessation(mas.getDateCessation())
-                            .destinationMachineUsagee(mas.getDestinationMachineUsagee())
                             .lignes(new ArrayList<>())
                             .build();
+                    applyFrozenHeaderFromMas(created, mas);
                     Fit saved = fitRepository.saveAndFlush(created);
                     log.info("FIT créée — id={} mas={} atelier={}",
                             saved.getId(), mas.getNumero(), atelier.getId());
                     return saved;
                 });
+    }
+
+    private Fit finalizeFitForMas(Fit fit, Atelier atelier, Mas mas) {
+        if (fit.getAtelier() == null) {
+            fit.setAtelier(atelier);
+        }
+        if (!fit.isHeaderFrozen()) {
+            applyFrozenHeaderFromMas(fit, mas);
+        } else {
+            fit.setMas(mas);
+            syncEvolvingHeaderFromMas(fit, mas);
+        }
+        return fitRepository.save(fit);
+    }
+
+    /**
+     * Figera l'en-tête FIT avec l'état courant de la MAS (une seule fois).
+     * Seuls {@link Fit#getDateCessation()} et {@link Fit#getDestinationMachineUsagee()}
+     * continueront d'évoluer via {@link #syncEvolvingHeaderFromMas(Fit, Mas)}.
+     */
+    private void applyFrozenHeaderFromMas(Fit fit, Mas mas) {
+        fit.setMas(mas);
+        Atelier atelier = mas.getAtelier();
+        fit.setCasinoNom(atelier.getCasino() != null ? atelier.getCasino().getNom() : null);
+        fit.setNumeroMachineCasino(mas.getNumero());
+        fit.setDateMiseEnService(mas.getDateMiseEnService());
+        fit.setMarque(mas.getMarque() != null ? mas.getMarque().getLabel() : null);
+        fit.setTypeMachine(mas.getTypeMachine());
+        fit.setNumeroSerieMachine(mas.getNumeroSerie());
+        fit.setNumeroSocle(trimToNull(mas.getNumeroSocle()));
+        fit.setTauxRedistribution(mas.getTauxRedistribution());
+        fit.setDeno(mas.getDeno());
+        fit.setMultiDeno(mas.isMultiDeno());
+        syncEvolvingHeaderFromMas(fit, mas);
+        fit.setHeaderFrozen(true);
+    }
+
+    private void syncEvolvingHeaderFromMas(Fit fit, Mas mas) {
+        fit.setDateCessation(mas.getDateCessation());
+        fit.setDestinationMachineUsagee(mas.getDestinationMachineUsagee());
+    }
+
+    private static String fitDenoLabel(Fit fit) {
+        if (fit.isMultiDeno()) {
+            return MasService.MULTI_DENO_LABEL;
+        }
+        Deno deno = fit.getDeno();
+        return deno != null ? deno.getLabel() : null;
     }
 
     private FitLigne buildLigneBase(FitLigneRequest request) {
@@ -406,6 +464,9 @@ public class FitService {
         if (fit.getMas() != null) {
             Hibernate.initialize(fit.getMas());
         }
+        if (fit.getDeno() != null) {
+            Hibernate.initialize(fit.getDeno());
+        }
         List<FitLigneResponse> lignes = fit.getLignes().stream()
                 .map(this::toLigneResponse)
                 .toList();
@@ -421,6 +482,11 @@ public class FitService {
                 .typeMachine(fit.getTypeMachine())
                 .numeroSerieMachine(fit.getNumeroSerieMachine())
                 .numeroSerieLecteur(fit.getNumeroSerieLecteur())
+                .numeroSocle(fit.getNumeroSocle())
+                .tauxRedistribution(fit.getTauxRedistribution())
+                .denoId(fit.getDeno() != null ? fit.getDeno().getId() : null)
+                .denoLabel(fitDenoLabel(fit))
+                .multiDeno(fit.isMultiDeno())
                 .dateCessation(fit.getDateCessation())
                 .destinationMachineUsagee(fit.getDestinationMachineUsagee())
                 .modeleNumero(fit.getModeleNumero())

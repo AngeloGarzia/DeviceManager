@@ -31,6 +31,23 @@ class DocumentUploadValidatorTest {
     }
 
     @Test
+    void acceptsPdfOnly() {
+        MockMultipartFile file = new MockMultipartFile(
+                "file", "regle.pdf", "application/pdf", PDF);
+        DocumentUploadValidator.validatePdf(file, "règle de jeux");
+    }
+
+    @Test
+    void rejectsNonPdfForPdfOnlyValidator() {
+        MockMultipartFile file = new MockMultipartFile(
+                "file", "scan.jpg", "image/jpeg", JPEG);
+        assertThatThrownBy(() -> DocumentUploadValidator.validatePdf(file, "règle de jeux"))
+                .isInstanceOf(ResponseStatusException.class)
+                .satisfies(ex -> assertThat(((ResponseStatusException) ex).getStatusCode())
+                        .isEqualTo(HttpStatus.BAD_REQUEST));
+    }
+
+    @Test
     void rejectsOtherTypes() {
         MockMultipartFile file = new MockMultipartFile(
                 "file", "notes.txt", "text/plain", "hello".getBytes());

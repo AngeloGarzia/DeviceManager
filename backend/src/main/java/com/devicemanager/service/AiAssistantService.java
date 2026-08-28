@@ -12,6 +12,7 @@ import com.devicemanager.dto.AiDevisSuggestion;
 import com.devicemanager.dto.AiDevisUnmatchedPart;
 import com.devicemanager.dto.AiLabelScanResponse;
 import com.devicemanager.dto.AiPdfScanResponse;
+import com.devicemanager.dto.AiRegleJeuxScanResponse;
 import com.devicemanager.dto.AiPrixDeviceContext;
 import com.devicemanager.dto.AiPrixHistoryPoint;
 import com.devicemanager.dto.AiPrixIncoherenceResult;
@@ -322,6 +323,76 @@ public class AiAssistantService {
             throw ex;
         } catch (Exception ex) {
             log.error("Échec analyse PDF IA: {}", ex.getMessage(), ex);
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
+                    friendlyAiError(provider, ex));
+        }
+    }
+
+    /**
+     * Analyse un PDF de règle de jeux et propose un libellé + description pour le catalogue.
+     */
+    public AiRegleJeuxScanResponse analyzeRegleJeuxPdf(MultipartFile pdf) {
+        requireEnabled();
+        if (pdf == null || pdf.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Fichier PDF obligatoire");
+        }
+        byte[] bytes;
+        try {
+            bytes = pdf.getBytes();
+        } catch (Exception ex) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "PDF illisible");
+        }
+        FileMagicBytesValidator.validatePdfMagicBytes(bytes);
+
+        String extractedText = extractPdfText(bytes);
+        if (extractedText == null || extractedText.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Aucun texte extractible dans ce PDF (scan image ou PDF protégé). "
+                            + "Saisissez le libellé et la description manuellement.");
+        }
+        if (extractedText.length() > 14_000) {
+            extractedText = extractedText.substring(0, 14_000) + "\n…";
+        }
+
+        String provider = resolveProviderId();
+        String apiKey = requireApiKey(provider);
+        String model = resolveChatModelForProvider(provider);
+
+        String prompt = """
+                %s
+                Texte PDF :
+                ---
+                %s
+                ---
+                """.formatted(regleJeuxExtractPrompt(), extractedText);
+
+        try {
+            ChatClient chatClient = buildChatClient(apiKey, provider, model, 0.2);
+            String reply = chatClient.prompt()
+                    .system(systemPrompt())
+                    .user(prompt)
+                    .call()
+                    .content();
+            JsonNode node = parseJsonObject(reply);
+            String label = truncate(textOrNull(node, "label"), 200);
+            String description = truncate(textOrNull(node, "description"), 500);
+            if (label == null || label.isBlank()) {
+                label = truncate(blankToNull(extractedText), 200);
+            }
+            if (label == null || label.isBlank()) {
+                throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
+                        "L'IA n'a pas pu proposer de libellé pour cette règle de jeux.");
+            }
+            return AiRegleJeuxScanResponse.builder()
+                    .enabled(true)
+                    .label(label)
+                    .description(description)
+                    .notes(textOrNull(node, "notes"))
+                    .build();
+        } catch (ResponseStatusException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            log.error("Échec analyse règle de jeux IA: {}", ex.getMessage(), ex);
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
                     friendlyAiError(provider, ex));
         }
@@ -946,6 +1017,18 @@ public class AiAssistantService {
         return firstNonBlank(
                 appSettingsService.get(AppSettingsService.AI_LABEL_EXTRACT_PROMPT, ""),
                 AiPromptDefaults.LABEL_EXTRACT);
+    }
+
+    private String regleJeuxExtractPrompt() {
+        return AiPromptDefaults.REGLE_JEUX_EXTRACT;
+    }
+
+    private static String truncate(String value, int maxLen) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.length() > maxLen ? trimmed.substring(0, maxLen) : trimmed;
     }
 
     private String usagePromptTemplate() {

@@ -3,6 +3,7 @@ package com.devicemanager.entity;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -60,6 +61,32 @@ public class Fit {
 
     @Column(name = "numero_serie_machine", length = 120)
     private String numeroSerieMachine;
+
+    /** N° de socle figé à la création / liaison MAS (en-tête FIT). */
+    @Column(name = "numero_socle", length = 80)
+    private String numeroSocle;
+
+    /** Taux figé à la création / liaison MAS (en-tête FIT). */
+    @Column(name = "taux_redistribution", precision = 6, scale = 2)
+    private BigDecimal tauxRedistribution;
+
+    /** Dénomination figée à la création / liaison MAS (en-tête FIT). */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "deno_id", foreignKey = @ForeignKey(name = "fk_fit_deno"))
+    private Deno deno;
+
+    /** Multi-déno figé à la création / liaison MAS. */
+    @Column(name = "multi_deno", nullable = false)
+    @Builder.Default
+    private boolean multiDeno = false;
+
+    /**
+     * true une fois l'en-tête figé depuis la MAS : les champs d'identité ne suivent
+     * plus les modifications ultérieures de la MAS (sauf cessation / destination).
+     */
+    @Column(name = "header_frozen", nullable = false)
+    @Builder.Default
+    private boolean headerFrozen = false;
 
     /** N° de série du lecteur de carte de paiement (état courant / d'origine). */
     @Column(name = "numero_serie_lecteur", length = 120)

@@ -45,6 +45,16 @@
               />
             }
           </mat-form-field>
+          @if (arrets.alert().count > 0) {
+            <a
+              routerLink="/mas/arrets-maintenance"
+              class="arret-maintenance-alert pending-label-blink"
+              [matTooltip]="arrets.alertTooltip()"
+              matTooltipClass="arret-maintenance-tooltip"
+            >
+              {{ arrets.alertLabel() }}
+            </a>
+          }
         }
       </div>
 
@@ -212,6 +222,17 @@
         <a mat-menu-item routerLink="/mas/suivi" routerLinkActive="devices-menu-active">
           <mat-icon>timeline</mat-icon>
           <span>Suivi</span>
+        </a>
+        <a mat-menu-item routerLink="/mas/arrets-maintenance" routerLinkActive="devices-menu-active">
+          <mat-icon>pause_circle</mat-icon>
+          <span>Arrêts maintenance</span>
+          @if (arrets.alert().count > 0) {
+            <span class="orders-menu-count">{{ arrets.alert().count > 99 ? '99+' : arrets.alert().count }}</span>
+          }
+        </a>
+        <a mat-menu-item routerLink="/mas/regles-jeux" routerLinkActive="devices-menu-active">
+          <mat-icon>menu_book</mat-icon>
+          <span>Règles de jeux</span>
         </a>
         <a
           mat-menu-item

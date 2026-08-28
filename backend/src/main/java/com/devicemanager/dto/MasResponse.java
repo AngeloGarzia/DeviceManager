@@ -6,6 +6,7 @@ import lombok.Data;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 
 /**
  * Représentation d'une référence MAS renvoyée par l'API.
@@ -45,4 +46,7 @@ public class MasResponse {
     private String statutLabel;
     /** true si statut = UTILISEE (compatibilité). */
     private boolean utilise;
+    /** Règles de jeux rattachées (catalogue global + PDF). */
+    private List<Long> regleJeuxIds;
+    private List<RegleJeuxResponse> reglesJeux;
 }

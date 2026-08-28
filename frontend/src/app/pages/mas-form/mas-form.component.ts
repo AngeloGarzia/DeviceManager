@@ -11,8 +11,13 @@ import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatCardModule } from '@angular/material/card';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MasService } from '../../services/mas.service';
-import { DenoOption, MarqueMasOption, MasForm, MasStatut } from '../../models/models';
+import { DenoOption, MarqueMasOption, MasForm, MasStatut, RegleJeuxOption } from '../../models/models';
 import { apiErrorMessage } from '../../shared/api-error';
+import { isPdfFile, PDF_ACCEPT } from '../../shared/document-upload';
+import {
+  RegleJeuxAiDialogComponent,
+  RegleJeuxAiDialogConfirm
+} from '../../shared/regle-jeux-ai-dialog.component';
 
 const MAS_STATUT_OPTIONS: { value: MasStatut; label: string }[] = [
   { value: 'UTILISEE', label: 'Machine utilisée' },
@@ -47,7 +52,8 @@ const MAS_TYPE_OPTIONS = [
     MatSelectModule,
     MatCheckboxModule,
     MatCardModule,
-    MatProgressSpinnerModule
+    MatProgressSpinnerModule,
+    RegleJeuxAiDialogComponent
   ],
   templateUrl: './mas-form.component.html',
   styleUrl: './mas-form.component.scss'
@@ -62,6 +68,7 @@ export class MasFormComponent implements OnInit {
   readonly saving = signal(false);
   readonly savingMarque = signal(false);
   readonly savingDeno = signal(false);
+  readonly savingRegleJeux = signal(false);
   readonly showNewMarque = signal(false);
   readonly showNewDeno = signal(false);
   readonly error = signal<string | null>(null);
@@ -69,8 +76,15 @@ export class MasFormComponent implements OnInit {
   readonly denoError = signal<string | null>(null);
   readonly marques = signal<MarqueMasOption[]>([]);
   readonly denos = signal<DenoOption[]>([]);
+  readonly reglesJeux = signal<RegleJeuxOption[]>([]);
   readonly statutOptions = MAS_STATUT_OPTIONS;
   readonly typeOptions = MAS_TYPE_OPTIONS;
+  readonly pdfAccept = PDF_ACCEPT;
+  readonly aiDialogOpen = signal(false);
+  readonly aiScanning = signal(false);
+  readonly aiScanNotes = signal<string | null>(null);
+  readonly aiSuggested = signal<{ label?: string | null; description?: string | null } | null>(null);
+  pendingRegleJeuxFile: File | null = null;
   id: number | null = null;
   returnDevice: string | null = null;
   private returnForOrderRequest = false;
@@ -87,7 +101,8 @@ export class MasFormComponent implements OnInit {
     marqueId: [null as number | null, Validators.required],
     denoId: [null as number | null],
     multiDeno: [false],
-    statut: ['UTILISEE' as string, Validators.required]
+    statut: ['UTILISEE' as string, Validators.required],
+    regleJeuxIds: [[] as number[], Validators.required]
   });
 
   readonly newMarqueForm = this.fb.nonNullable.group({
@@ -170,6 +185,7 @@ export class MasFormComponent implements OnInit {
     this.returnForOrderRequest = this.route.snapshot.queryParamMap.get('forOrderRequest') === '1';
     this.loadMarques();
     this.loadDenos();
+    this.loadReglesJeux();
     this.syncStatutDependentFields();
     this.syncMultiDenoFields();
     this.form.controls.statut.valueChanges.subscribe(() => this.syncStatutDependentFields());
@@ -193,7 +209,8 @@ export class MasFormComponent implements OnInit {
             marqueId: mas.marqueId,
             denoId: mas.multiDeno ? null : (mas.denoId ?? null),
             multiDeno: !!mas.multiDeno,
-            statut: mas.statut || (mas.utilise ? 'UTILISEE' : 'EN_RESERVE')
+            statut: mas.statut || (mas.utilise ? 'UTILISEE' : 'EN_RESERVE'),
+            regleJeuxIds: mas.regleJeuxIds ?? mas.reglesJeux?.map((r) => r.id) ?? []
           });
           this.syncStatutDependentFields();
           this.syncMultiDenoFields();
@@ -227,6 +244,25 @@ export class MasFormComponent implements OnInit {
         }
       }
     });
+  }
+
+  loadReglesJeux(selectIds?: number[]): void {
+    this.masService.listReglesJeux().subscribe({
+      next: (data) => {
+        this.reglesJeux.set(this.sortReglesJeux(data));
+        if (selectIds?.length) {
+          const current = this.form.controls.regleJeuxIds.value ?? [];
+          const merged = [...new Set([...current, ...selectIds])];
+          this.form.patchValue({ regleJeuxIds: merged });
+        }
+      }
+    });
+  }
+
+  private sortReglesJeux(data: RegleJeuxOption[]): RegleJeuxOption[] {
+    return [...data].sort((a, b) =>
+      (a.label || '').localeCompare(b.label || '', 'fr', { sensitivity: 'base' })
+    );
   }
 
   private sortMarques(data: MarqueMasOption[]): MarqueMasOption[] {
@@ -317,6 +353,97 @@ export class MasFormComponent implements OnInit {
     });
   }
 
+  openNewRegleJeux(): void {
+    document.getElementById('regle-jeux-pdf-input')?.click();
+  }
+
+  onRegleJeuxFileSelected(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0] ?? null;
+    input.value = '';
+    if (!file) {
+      return;
+    }
+    if (!isPdfFile(file)) {
+      this.error.set('La règle de jeux doit être un fichier PDF.');
+      return;
+    }
+    this.pendingRegleJeuxFile = file;
+    this.aiSuggested.set(null);
+    this.aiScanNotes.set(null);
+    this.aiDialogOpen.set(true);
+    this.aiScanning.set(true);
+    this.error.set(null);
+
+    this.masService.analyzeRegleJeuxPdf(file).subscribe({
+      next: (scan) => {
+        this.aiScanning.set(false);
+        this.aiSuggested.set({
+          label: scan.label,
+          description: scan.description
+        });
+        if (!scan.enabled) {
+          this.aiScanNotes.set(
+            scan.notes || 'IA indisponible — saisissez le libellé et la description manuellement.'
+          );
+        } else if (scan.notes?.trim()) {
+          this.aiScanNotes.set(scan.notes.trim());
+        }
+      },
+      error: (err) => {
+        this.aiScanning.set(false);
+        this.aiSuggested.set({ label: '', description: '' });
+        this.aiScanNotes.set(
+          apiErrorMessage(err, 'Analyse IA impossible — complétez les champs manuellement.')
+        );
+      }
+    });
+  }
+
+  cancelRegleJeuxDialog(): void {
+    if (this.savingRegleJeux()) {
+      return;
+    }
+    this.aiDialogOpen.set(false);
+    this.aiScanning.set(false);
+    this.pendingRegleJeuxFile = null;
+    this.aiSuggested.set(null);
+    this.aiScanNotes.set(null);
+  }
+
+  confirmRegleJeuxDialog(payload: RegleJeuxAiDialogConfirm): void {
+    if (!this.pendingRegleJeuxFile) {
+      this.error.set('Fichier PDF manquant.');
+      this.cancelRegleJeuxDialog();
+      return;
+    }
+    this.savingRegleJeux.set(true);
+    this.error.set(null);
+    this.masService
+      .createRegleJeux(payload.label, this.pendingRegleJeuxFile, payload.description)
+      .subscribe({
+        next: (created) => {
+          const id = created.id ?? created.value ?? null;
+          this.savingRegleJeux.set(false);
+          this.cancelRegleJeuxDialog();
+          if (id != null) {
+            this.reglesJeux.update((list) => {
+              const without = list.filter((r) => r.id !== id);
+              return this.sortReglesJeux([...without, created]);
+            });
+            const current = this.form.controls.regleJeuxIds.value ?? [];
+            this.form.patchValue({ regleJeuxIds: [...new Set([...current, id])] });
+          } else {
+            this.loadReglesJeux();
+          }
+        },
+        error: (err) => {
+          this.savingRegleJeux.set(false);
+          this.error.set(apiErrorMessage(err, 'Création de la règle de jeux impossible.'));
+        }
+      });
+  }
+
   submit(): void {
     if (this.form.invalid) {
       this.form.markAllAsTouched();
@@ -330,6 +457,11 @@ export class MasFormComponent implements OnInit {
       tauxRaw === null || tauxRaw === undefined || String(tauxRaw).trim() === ''
         ? null
         : Number(tauxRaw);
+    const regleJeuxIds = raw.regleJeuxIds ?? [];
+    if (regleJeuxIds.length === 0) {
+      this.error.set('Sélectionnez au moins une règle de jeux.');
+      return;
+    }
     const payload: MasForm = {
       numero: raw.numero!.trim(),
       numeroSocle: raw.numeroSocle?.trim() || null,
@@ -347,7 +479,8 @@ export class MasFormComponent implements OnInit {
       denoId: raw.multiDeno ? null : raw.denoId,
       multiDeno: !!raw.multiDeno,
       statut: raw.statut || 'UTILISEE',
-      utilise: (raw.statut || 'UTILISEE') === 'UTILISEE'
+      utilise: (raw.statut || 'UTILISEE') === 'UTILISEE',
+      regleJeuxIds: [...regleJeuxIds]
     };
     const req$ = this.id ? this.masService.update(this.id, payload) : this.masService.create(payload);
     req$.subscribe({

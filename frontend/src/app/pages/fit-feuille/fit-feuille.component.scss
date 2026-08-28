@@ -170,6 +170,31 @@ $fit-line: #7cbc8a;
   width: 6.5%;
   text-align: center;
   font-weight: 700;
+  vertical-align: middle;
+  padding-inline: 0.15rem !important;
+  overflow: hidden;
+}
+
+.date-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.05rem;
+  line-height: 1.1;
+  max-width: 100%;
+}
+
+.date-day-month {
+  font-weight: 700;
+  white-space: nowrap;
+  font-size: 0.68rem;
+}
+
+.date-year {
+  font-weight: 700;
+  white-space: nowrap;
+  font-size: 0.6rem;
 }
 
 .col-stack {
@@ -208,6 +233,20 @@ $fit-line: #7cbc8a;
 
 .stack-line:last-child {
   border-bottom: none;
+}
+
+.valeur-num {
+  display: block;
+  padding-right: 0.8rem;
+}
+
+.valeur-deno {
+  margin-top: 0.15rem;
+  font-size: 0.58rem;
+  font-weight: 600;
+  color: $fit-green;
+  line-height: 1.15;
+  padding-right: 0.8rem;
 }
 
 .euro {

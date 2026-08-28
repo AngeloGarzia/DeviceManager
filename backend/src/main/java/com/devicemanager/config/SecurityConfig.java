@@ -118,6 +118,8 @@ public class SecurityConfig {
                             .hasAnyRole(Roles.ADMIN, Roles.TECHNICIEN)
                         .requestMatchers("/api/visites-quadri", "/api/visites-quadri/**")
                             .hasAnyRole(Roles.ADMIN, Roles.TECHNICIEN)
+                        .requestMatchers("/api/arrets-maintenance", "/api/arrets-maintenance/**")
+                            .hasAnyRole(Roles.ADMIN, Roles.TECHNICIEN)
                         .requestMatchers("/api/order-requests", "/api/order-requests/**")
                             .hasAnyRole(Roles.ADMIN, Roles.TECHNICIEN)
                         .requestMatchers("/api/prix-alertes", "/api/prix-alertes/**").hasRole(Roles.ADMIN)

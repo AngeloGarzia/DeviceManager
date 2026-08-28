@@ -12,8 +12,10 @@ import { Fit, FitSignataire, Intervention } from '../../models/models';
 import { AuthService } from '../../services/auth.service';
 import { FitService } from '../../services/fit.service';
 import { InterventionService } from '../../services/intervention.service';
+import { MasService } from '../../services/mas.service';
 import { SignaturePadComponent } from '../../shared/signature-pad.component';
 import { apiErrorMessage } from '../../shared/api-error';
+import { fitLigneDefaultsFromMas } from '../fit/fit-ligne-defaults';
 
 /**
  * Détail d'une FIT : historique + ajout d'une ligne signée (admin + technicien).
@@ -42,6 +44,7 @@ export class FitDetailComponent implements OnInit {
   private readonly fb = inject(FormBuilder);
   private readonly fitService = inject(FitService);
   private readonly interventionService = inject(InterventionService);
+  private readonly masService = inject(MasService);
   private readonly auth = inject(AuthService);
 
   readonly fit = signal<Fit | null>(null);
@@ -53,6 +56,7 @@ export class FitDetailComponent implements OnInit {
   readonly error = signal<string | null>(null);
   readonly success = signal<string | null>(null);
   readonly showForm = signal(false);
+  private masDefaults = { numeroSocle: '', numeroEmplacement: '' };
 
   readonly form = this.fb.group({
     dateOperation: [this.today(), Validators.required],
@@ -74,6 +78,24 @@ export class FitDetailComponent implements OnInit {
     }
     this.loadSignataires();
     this.load(id);
+
+    this.form.controls.interventionId.valueChanges.subscribe((interventionId) => {
+      if (interventionId == null) {
+        return;
+      }
+      const item = this.interventions().find((i) => i.id === interventionId);
+      if (item?.emplacement?.trim()) {
+        this.form.patchValue({ numeroEmplacement: item.emplacement.trim() });
+      }
+    });
+  }
+
+  openForm(): void {
+    const next = !this.showForm();
+    this.showForm.set(next);
+    if (next) {
+      this.patchMasDefaults();
+    }
   }
 
   load(id: number): void {
@@ -84,11 +106,52 @@ export class FitDetailComponent implements OnInit {
         this.fit.set(fit);
         this.loading.set(false);
         this.loadInterventions(fit.masId ?? null);
+        this.loadMasDefaults(fit);
       },
       error: (err) => {
         this.loading.set(false);
         this.error.set(apiErrorMessage(err, 'FIT introuvable.'));
       }
+    });
+  }
+
+  private loadMasDefaults(fit: Fit): void {
+    const masId = fit.masId;
+    if (masId == null) {
+      this.masDefaults = { numeroSocle: '', numeroEmplacement: '' };
+      return;
+    }
+    this.masService.get(masId).subscribe({
+      next: (mas) => {
+        this.masDefaults = fitLigneDefaultsFromMas(mas, fit);
+        if (this.showForm()) {
+          this.patchMasDefaults();
+        }
+      },
+      error: () => {
+        this.masDefaults = { numeroSocle: '', numeroEmplacement: '' };
+      }
+    });
+  }
+
+  private patchMasDefaults(): void {
+    this.form.patchValue({
+      numeroSocle: this.masDefaults.numeroSocle,
+      numeroEmplacement: this.masDefaults.numeroEmplacement
+    });
+  }
+
+  private resetLigneForm(): void {
+    this.form.reset({
+      dateOperation: this.today(),
+      numeroSocle: this.masDefaults.numeroSocle,
+      numeroEmplacement: this.masDefaults.numeroEmplacement,
+      motifNatureOperations: '',
+      interventionId: null,
+      signatureAdmin: null,
+      signatureTechnicien: null,
+      signataireAdminId: null,
+      signataireTechnicienId: null
     });
   }
 
@@ -155,17 +218,7 @@ export class FitDetailComponent implements OnInit {
           this.fit.set(updated);
           this.success.set('Ligne FIT enregistrée avec signatures.');
           this.showForm.set(false);
-          this.form.reset({
-            dateOperation: this.today(),
-            numeroSocle: '',
-            numeroEmplacement: '',
-            motifNatureOperations: '',
-            interventionId: null,
-            signatureAdmin: null,
-            signatureTechnicien: null,
-            signataireAdminId: null,
-            signataireTechnicienId: null
-          });
+          this.resetLigneForm();
           this.preselectCurrentUser();
         },
         error: (err) => {

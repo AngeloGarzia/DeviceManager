@@ -1,0 +1,183 @@
+<section class="grid gap-4">
+  <header class="flex flex-wrap items-start justify-between gap-3">
+    <div>
+      <h1 class="page-title">Règles de jeux</h1>
+      <p class="page-subtitle">
+        Catalogue global des règles (PDF). À l’ajout, l’IA lit le document et propose libellé et description.
+      </p>
+    </div>
+    <button mat-stroked-button color="primary" type="button" (click)="openCreate()" [disabled]="saving()">
+      <mat-icon>add</mat-icon>
+      Nouvelle règle
+    </button>
+  </header>
+
+  <input
+    id="regle-jeux-create-file"
+    type="file"
+    class="sr-only"
+    [accept]="pdfAccept"
+    (change)="onCreateFileSelected($event)"
+  />
+
+  <app-regle-jeux-ai-dialog
+    [open]="aiDialogOpen()"
+    [scanning]="aiScanning()"
+    [saving]="saving()"
+    [fileName]="pendingCreateFile?.name ?? null"
+    [scanNotes]="aiScanNotes()"
+    [suggested]="aiSuggested()"
+    (dismissed)="cancelAiDialog()"
+    (confirmed)="confirmAiDialog($event)"
+  />
+
+  @if (success()) {
+    <p class="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800">{{ success() }}</p>
+  }
+  @if (error()) {
+    <p class="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{{ error() }}</p>
+  }
+
+  <div class="panel filter-bar">
+    <div class="filter-bar__row">
+      <mat-form-field appearance="outline" class="filter-bar__field" subscriptSizing="dynamic">
+        <mat-label>Rechercher une règle de jeux</mat-label>
+        <input
+          matInput
+          [ngModel]="searchQuery()"
+          (ngModelChange)="searchQuery.set($event)"
+          placeholder="Libellé, description, MAS, PDF…"
+        />
+        <mat-icon matSuffix>search</mat-icon>
+      </mat-form-field>
+    </div>
+  </div>
+
+  <input
+    id="regle-jeux-replace-file"
+    type="file"
+    class="sr-only"
+    [accept]="pdfAccept"
+    (change)="onReplaceFileSelected($event)"
+  />
+
+  @if (loading()) {
+    <div class="flex justify-center py-8"><mat-spinner diameter="36"></mat-spinner></div>
+  } @else if (items().length === 0) {
+    <p class="rounded-lg border border-dashed border-line px-3 py-6 text-sm text-ink-soft">
+      Aucune règle de jeux. Cliquez sur « Nouvelle règle » et choisissez un PDF.
+    </p>
+  } @else if (filteredItems().length === 0) {
+    <p class="rounded-lg border border-dashed border-line px-3 py-6 text-sm text-ink-soft">
+      Aucune règle ne correspond à « {{ searchQuery() }} ».
+    </p>
+  } @else {
+    <div class="grid gap-3">
+      @for (item of filteredItems(); track item.id) {
+        <mat-card class="!rounded-xl !border !border-line !shadow-soft regle-card">
+          <mat-card-content class="!pt-4">
+            @if (editingId() === item.id) {
+              <form class="grid gap-3" [formGroup]="editForm" (ngSubmit)="submitEdit(item.id)">
+                <mat-form-field appearance="outline" class="w-full">
+                  <mat-label>Libellé</mat-label>
+                  <input matInput formControlName="label" />
+                </mat-form-field>
+                <mat-form-field appearance="outline" class="w-full">
+                  <mat-label>Description</mat-label>
+                  <textarea matInput rows="3" formControlName="description"></textarea>
+                </mat-form-field>
+                <div class="flex flex-wrap gap-2">
+                  <button mat-button type="button" (click)="cancelEdit()">Annuler</button>
+                  <button mat-flat-button color="primary" type="submit" [disabled]="saving()">
+                    {{ saving() ? 'Enregistrement…' : 'Enregistrer' }}
+                  </button>
+                </div>
+              </form>
+            } @else if (linkingRegleId() === item.id) {
+              <div class="grid gap-3">
+                <p class="m-0 text-sm font-medium text-ink">Rattacher des MAS à cette règle</p>
+                @if (loadingMasLinks()) {
+                  <div class="flex justify-center py-4"><mat-spinner diameter="28"></mat-spinner></div>
+                } @else {
+                  <form class="grid gap-3" [formGroup]="masLinkForm" (ngSubmit)="submitLinkMas(item.id)">
+                    <mat-form-field appearance="outline" class="w-full">
+                      <mat-label>MAS de l'atelier</mat-label>
+                      <mat-select formControlName="masIds" multiple>
+                        @for (m of masses(); track m.id) {
+                          <mat-option [value]="m.id">{{ masOptionLabel(m) }}</mat-option>
+                        }
+                      </mat-select>
+                      <mat-hint>Sélectionnez une ou plusieurs MAS — aucune n'est obligatoire pour la règle</mat-hint>
+                    </mat-form-field>
+                    <div class="flex flex-wrap gap-2">
+                      <button mat-button type="button" (click)="cancelLinkMas()">Annuler</button>
+                      <button mat-flat-button color="primary" type="submit" [disabled]="saving()">
+                        {{ saving() ? 'Enregistrement…' : 'Enregistrer les rattachements' }}
+                      </button>
+                    </div>
+                  </form>
+                }
+              </div>
+            } @else {
+              <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div class="min-w-0 flex-1">
+                  <div class="text-base font-semibold text-ink">{{ item.label }}</div>
+                  @if (item.description) {
+                    <p class="m-0 mt-1 text-sm text-ink-soft">{{ item.description }}</p>
+                  }
+                  <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-soft">
+                    <span>{{ item.masCount ?? item.masses?.length ?? 0 }} MAS rattachée(s)</span>
+                    @if (item.uploadedAt) {
+                      <span>PDF du {{ item.uploadedAt | date: 'dd/MM/yyyy HH:mm' }}</span>
+                    }
+                  </div>
+                  @if (item.masses?.length) {
+                    <ul class="m-0 mt-2 list-none space-y-1 p-0 text-sm text-ink-soft">
+                      @for (m of item.masses; track m.id) {
+                        <li>{{ m.numero }}@if (m.marqueLabel) { — {{ m.marqueLabel }} }</li>
+                      }
+                    </ul>
+                  }
+                  <a
+                    class="mt-2 inline-flex items-center gap-1 text-sm text-brand underline-offset-2 hover:underline"
+                    [href]="fileUrl(item)"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <mat-icon class="!text-base">picture_as_pdf</mat-icon>
+                    {{ item.originalName || 'Ouvrir le PDF' }}
+                  </a>
+                </div>
+                <div class="flex flex-wrap gap-2 shrink-0">
+                  <button mat-stroked-button type="button" (click)="startLinkMas(item)" [disabled]="saving()">
+                    <mat-icon>link</mat-icon>
+                    Rattacher MAS
+                  </button>
+                  <button mat-stroked-button type="button" (click)="startEdit(item)" [disabled]="saving()">
+                    <mat-icon>edit</mat-icon>
+                    Modifier
+                  </button>
+                  <button mat-stroked-button type="button" (click)="pickReplaceFile(item.id)" [disabled]="saving()">
+                    <mat-icon>upload_file</mat-icon>
+                    Remplacer PDF
+                  </button>
+                  <button
+                    mat-stroked-button
+                    color="warn"
+                    type="button"
+                    (click)="deleteItem(item)"
+                    [disabled]="saving() || !canDelete(item)"
+                    [title]="canDelete(item) ? 'Supprimer' : 'Rattachée à une ou plusieurs MAS'"
+                  >
+                    <mat-icon>delete</mat-icon>
+                    Supprimer
+                  </button>
+                </div>
+              </div>
+            }
+          </mat-card-content>
+        </mat-card>
+      }
+    </div>
+  }
+</section>
