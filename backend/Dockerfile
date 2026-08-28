@@ -15,6 +15,7 @@ COPY --from=build /app/target/device-manager-*.jar app.jar
 USER appuser
 ENV APP_ENV=production
 ENV APP_S3_LOCAL_FALLBACK_DIR=/app/uploads
-ENV JAVA_OPTS="-XX:MaxRAMPercentage=75.0"
+# Render free = 512 Mo RAM : heap ~75 % dépasse la limite (exit 137 = OOM killer).
+ENV JAVA_OPTS="-Xms128m -Xmx256m -XX:+UseSerialGC -XX:MaxMetaspaceSize=96m -XX:ReservedCodeCacheSize=48m"
 EXPOSE 8080
 ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]

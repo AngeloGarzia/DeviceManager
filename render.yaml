@@ -79,6 +79,9 @@ services:
         value: /app/uploads
       - key: LOGGING_LEVEL_COM_DEVICEMANAGER
         value: INFO
+      # Plan free Render (512 Mo) — évite exit 137 (OOM) au démarrage
+      - key: JAVA_OPTS
+        value: "-Xms128m -Xmx256m -XX:+UseSerialGC -XX:MaxMetaspaceSize=96m -XX:ReservedCodeCacheSize=48m"
 
   # ---------- Frontend Angular (static free) ----------
   - type: web
