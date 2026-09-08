@@ -1,0 +1,277 @@
+.todo-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.65rem;
+}
+
+@media (min-width: 640px) {
+  .todo-stats {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}
+
+.todo-stat__label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #829ab1;
+}
+
+.todo-stat__value {
+  margin-top: 0.25rem;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #0f4c81;
+}
+
+.todo-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.todo-search {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex: 1 1 14rem;
+  min-width: 12rem;
+  max-width: 28rem;
+  height: 2.05rem;
+  box-sizing: border-box;
+  padding: 0 0.55rem 0 0.65rem;
+  border: 1px solid #d9e2ec;
+  border-radius: 999px;
+  background: #fff;
+  color: #52606d;
+}
+
+.todo-search:focus-within {
+  border-color: #0f4c81;
+  box-shadow: 0 0 0 2px color-mix(in srgb, #0f4c81 18%, transparent);
+}
+
+.todo-search__icon {
+  flex-shrink: 0;
+  width: 1.1rem;
+  height: 1.1rem;
+  font-size: 1.1rem;
+  color: #829ab1;
+}
+
+.todo-search input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 100%;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: #1f2933;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.todo-search input::placeholder {
+  color: #9aa5b1;
+  font-weight: 500;
+}
+
+.todo-search__clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 1.5rem;
+  height: 1.5rem;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: #829ab1;
+  cursor: pointer;
+}
+
+.todo-search__clear:hover {
+  background: #f1f5f9;
+  color: #52606d;
+}
+
+.todo-search__clear mat-icon {
+  width: 1rem;
+  height: 1rem;
+  font-size: 1rem;
+}
+
+.todo-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  height: 2.05rem;
+  box-sizing: border-box;
+  padding: 0 0.7rem;
+  border: 1px solid #d9e2ec;
+  border-radius: 999px;
+  background: #fff;
+  color: #52606d;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.todo-filter--active {
+  border-color: #0f4c81;
+  background: #e0f2fe;
+  color: #0f4c81;
+}
+
+.todo-filter__count {
+  min-width: 1.25rem;
+  padding: 0.05rem 0.35rem;
+  border-radius: 999px;
+  background: #f1f5f9;
+  font-size: 0.7rem;
+}
+
+.todo-filter--active .todo-filter__count {
+  background: #bae6fd;
+}
+
+.todo-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.65rem;
+}
+
+.todo-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid #d9e2ec;
+  border-radius: 0.75rem;
+  background: #fff;
+}
+
+.todo-item[data-severity='HIGH'] {
+  border-color: #fecaca;
+  background: #fff7f7;
+}
+
+.todo-item[data-statut='DONE'] {
+  border-color: #a7f3d0;
+  background: #f0fdf4;
+}
+
+.todo-item[data-statut='CANCELLED'] {
+  opacity: 0.85;
+  background: #f8fafc;
+}
+
+.todo-item__icon {
+  color: #52606d;
+  margin-top: 0.1rem;
+}
+
+.todo-item__title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #1f2933;
+}
+
+.todo-item__desc {
+  margin: 0.25rem 0 0;
+  font-size: 0.85rem;
+  color: #52606d;
+}
+
+.todo-item__meta {
+  margin: 0.35rem 0 0;
+  font-size: 0.75rem;
+  color: #829ab1;
+}
+
+.todo-item__meta--cloture {
+  color: #047857;
+}
+
+.todo-item__comment {
+  margin: 0.45rem 0 0;
+  padding: 0.55rem 0.75rem;
+  border-left: 3px solid #10b981;
+  border-radius: 0.35rem;
+  background: #ecfdf5;
+  font-size: 0.85rem;
+  color: #065f46;
+  white-space: pre-wrap;
+}
+
+.todo-signature {
+  margin-top: 0.5rem;
+  max-width: 14rem;
+
+  img {
+    display: block;
+    width: 100%;
+    height: auto;
+    border: 1px solid #cbd5e1;
+    border-radius: 0.5rem;
+    background: #fff;
+  }
+}
+
+.todo-statut {
+  display: inline-block;
+  border-radius: 999px;
+  padding: 0.1rem 0.5rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  background: #e0f2fe;
+  color: #075985;
+}
+
+.todo-statut[data-statut='IN_PROGRESS'] {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.todo-statut[data-statut='DONE'] {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.todo-statut[data-statut='CANCELLED'] {
+  background: #e2e8f0;
+  color: #475569;
+}
+
+.todo-sev {
+  display: inline-block;
+  border-radius: 999px;
+  padding: 0.1rem 0.5rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.todo-sev[data-severity='HIGH'] {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.todo-sev[data-severity='MEDIUM'] {
+  background: #e0f2fe;
+  color: #075985;
+}
+
+.todo-sev[data-severity='LOW'] {
+  background: #ecfdf5;
+  color: #047857;
+}

@@ -12,6 +12,7 @@ import { OrderRequestService } from '../services/order-request.service';
 import { VisiteQuadriService } from '../services/visite-quadri.service';
 import { ArretMaintenanceService } from '../services/arret-maintenance.service';
 import { AiService } from '../services/ai.service';
+import { TodoService } from '../services/todo.service';
 import { AppTourService } from '../services/app-tour.service';
 
 /**
@@ -42,6 +43,7 @@ export class ShellComponent implements OnInit {
   readonly orders = inject(OrderRequestService);
   readonly visites = inject(VisiteQuadriService);
   readonly arrets = inject(ArretMaintenanceService);
+  readonly todos = inject(TodoService);
   readonly ai = inject(AiService);
   readonly router = inject(Router);
   private readonly tour = inject(AppTourService);
@@ -55,6 +57,7 @@ export class ShellComponent implements OnInit {
         this.orders.refreshPendingCount();
         this.visites.refreshWarningCount();
         this.arrets.refreshAlert();
+        this.todos.refreshPendingCount();
       }
     });
   }
@@ -65,6 +68,7 @@ export class ShellComponent implements OnInit {
       this.orders.refreshPendingCount();
       this.visites.refreshWarningCount();
       this.arrets.refreshAlert();
+      this.todos.refreshPendingCount();
       this.ai.refreshStatus();
       // Premier login : lance le parcours après rendu du shell
       window.setTimeout(() => {

@@ -260,6 +260,24 @@
         </a>
       </mat-menu>
 
+      <a
+        routerLink="/todos"
+        routerLinkActive="active-nav"
+        class="nav-link nav-link--badge"
+        data-tour="nav-todo"
+        aria-label="Todo"
+      >
+        <span class="nav-icon-wrap">
+          <mat-icon>task_alt</mat-icon>
+          @if (todos.pendingCount() > 0) {
+            <span class="pending-badge" [attr.aria-label]="todos.pendingCount() + ' tâche(s) active(s)'">
+              {{ todos.pendingCount() > 99 ? '99+' : todos.pendingCount() }}
+            </span>
+          }
+        </span>
+        <span [class.pending-label-blink]="todos.pendingCount() > 0">Todo</span>
+      </a>
+
       <a routerLink="/sfm" routerLinkActive="active-nav" [routerLinkActiveOptions]="{ exact: false }" class="nav-link">
         <mat-icon>apartment</mat-icon>
         <span>SFM</span>

@@ -1,0 +1,348 @@
+<section class="grid gap-4">
+  <header class="flex flex-wrap items-start justify-between gap-3">
+    <div>
+      <h1 class="page-title" data-tour="page-todo">Todo</h1>
+      <p class="page-subtitle">Cycle de vie des tâches : ouvertes, en cours, clôturées et annulées</p>
+    </div>
+    <button
+      mat-flat-button
+      color="primary"
+      type="button"
+      (click)="openCreate()"
+      [disabled]="saving() || showCreate()"
+    >
+      <mat-icon>add_task</mat-icon>
+      Nouvelle tâche
+    </button>
+  </header>
+
+  <div class="todo-stats">
+    <div class="panel todo-stat">
+      <div class="todo-stat__label">Actives</div>
+      <div class="todo-stat__value">{{ counts().active }}</div>
+    </div>
+    <div class="panel todo-stat">
+      <div class="todo-stat__label">Ouvertes</div>
+      <div class="todo-stat__value">{{ counts().open }}</div>
+    </div>
+    <div class="panel todo-stat">
+      <div class="todo-stat__label">En cours</div>
+      <div class="todo-stat__value">{{ counts().inProgress }}</div>
+    </div>
+    <div class="panel todo-stat">
+      <div class="todo-stat__label">Clôturées</div>
+      <div class="todo-stat__value">{{ counts().done }}</div>
+    </div>
+    <div class="panel todo-stat">
+      <div class="todo-stat__label">Annulées</div>
+      <div class="todo-stat__value">{{ counts().cancelled }}</div>
+    </div>
+  </div>
+
+  <div class="todo-filters" role="tablist" aria-label="Filtrer les tâches">
+    <button
+      type="button"
+      class="todo-filter"
+      [class.todo-filter--active]="filter() === 'ACTIVE'"
+      (click)="setFilter('ACTIVE')"
+    >
+      Actives
+      <span class="todo-filter__count">{{ counts().active }}</span>
+    </button>
+    <button
+      type="button"
+      class="todo-filter"
+      [class.todo-filter--active]="filter() === 'OPEN'"
+      (click)="setFilter('OPEN')"
+    >
+      Ouvertes
+      <span class="todo-filter__count">{{ counts().open }}</span>
+    </button>
+    <button
+      type="button"
+      class="todo-filter"
+      [class.todo-filter--active]="filter() === 'IN_PROGRESS'"
+      (click)="setFilter('IN_PROGRESS')"
+    >
+      En cours
+      <span class="todo-filter__count">{{ counts().inProgress }}</span>
+    </button>
+    <button
+      type="button"
+      class="todo-filter"
+      [class.todo-filter--active]="filter() === 'DONE'"
+      (click)="setFilter('DONE')"
+    >
+      Clôturées
+      <span class="todo-filter__count">{{ counts().done }}</span>
+    </button>
+    <button
+      type="button"
+      class="todo-filter"
+      [class.todo-filter--active]="filter() === 'CANCELLED'"
+      (click)="setFilter('CANCELLED')"
+    >
+      Annulées
+      <span class="todo-filter__count">{{ counts().cancelled }}</span>
+    </button>
+    <button
+      type="button"
+      class="todo-filter"
+      [class.todo-filter--active]="filter() === 'ALL'"
+      (click)="setFilter('ALL')"
+    >
+      Toutes
+      <span class="todo-filter__count">{{ counts().all }}</span>
+    </button>
+    <label class="todo-search">
+      <mat-icon class="todo-search__icon" aria-hidden="true">search</mat-icon>
+      <input
+        type="search"
+        [ngModel]="query()"
+        (ngModelChange)="onQueryChange($event)"
+        placeholder="Rechercher…"
+        aria-label="Rechercher dans les tâches"
+      />
+      @if (query()) {
+        <button type="button" class="todo-search__clear" aria-label="Effacer" (click)="clearQuery()">
+          <mat-icon>close</mat-icon>
+        </button>
+      }
+    </label>
+  </div>
+
+  @if (error()) {
+    <p class="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{{ error() }}</p>
+  }
+
+  @if (showCreate()) {
+    <form class="panel grid gap-3" [formGroup]="todoForm" (ngSubmit)="submitCreate()">
+      <h2 class="m-0 text-base font-semibold">Nouvelle tâche</h2>
+      <mat-form-field appearance="outline" class="w-full">
+        <mat-label>Titre</mat-label>
+        <input matInput formControlName="titre" maxlength="200" />
+      </mat-form-field>
+      <mat-form-field appearance="outline" class="w-full">
+        <mat-label>Description</mat-label>
+        <textarea matInput rows="3" formControlName="description" maxlength="2000"></textarea>
+      </mat-form-field>
+      <div class="grid gap-3 sm:grid-cols-2">
+        <mat-form-field appearance="outline" class="w-full">
+          <mat-label>Priorité</mat-label>
+          <mat-select formControlName="severite">
+            <mat-option value="HIGH">Urgent</mat-option>
+            <mat-option value="MEDIUM">Normal</mat-option>
+            <mat-option value="LOW">Faible</mat-option>
+          </mat-select>
+        </mat-form-field>
+        <mat-form-field appearance="outline" class="w-full">
+          <mat-label>MAS de l'atelier</mat-label>
+          <mat-select formControlName="masId">
+            <mat-option [value]="null">Aucune</mat-option>
+            @if (massesLoading()) {
+              <mat-option disabled>Chargement des MAS…</mat-option>
+            } @else {
+              @for (m of masses(); track m.id) {
+                <mat-option [value]="m.id">{{ masOptionLabel(m) }}</mat-option>
+              }
+            }
+          </mat-select>
+        </mat-form-field>
+      </div>
+      <div class="flex flex-wrap gap-2">
+        <button mat-button type="button" (click)="cancelCreate()">Annuler</button>
+        <button mat-flat-button color="primary" type="submit" [disabled]="saving()">
+          {{ saving() ? 'Enregistrement…' : 'Créer' }}
+        </button>
+      </div>
+    </form>
+  }
+
+  @if (loading()) {
+    <div class="flex justify-center py-10">
+      <mat-spinner diameter="36"></mat-spinner>
+    </div>
+  } @else if (filteredItems().length === 0) {
+    <div class="panel">
+      <h2 class="m-0 text-lg font-semibold">Aucune tâche</h2>
+      <p class="mt-2 text-sm text-ink-soft">
+        @if (query()) {
+          Aucune tâche ne correspond à « {{ query() }} ».
+        } @else if (filter() === 'ACTIVE') {
+          Aucune tâche active. Créez-en une ou consultez les clôturées.
+        } @else {
+          Aucune tâche dans ce filtre.
+        }
+      </p>
+    </div>
+  } @else {
+    <ul class="todo-list">
+      @for (item of filteredItems(); track item.id) {
+        <li class="todo-item" [attr.data-severity]="item.severite || item.severity" [attr.data-statut]="item.statut">
+          <mat-icon class="todo-item__icon">task_alt</mat-icon>
+          <div class="todo-item__body min-w-0 flex-1">
+            <div class="flex flex-wrap items-center gap-2">
+              <span class="todo-item__title">{{ item.titre || item.title }}</span>
+              <span class="todo-sev" [attr.data-severity]="item.severite">{{
+                severityLabel(item.severite || item.severity || 'MEDIUM')
+              }}</span>
+              <span class="todo-statut" [attr.data-statut]="item.statut">{{ statutLabel(item.statut) }}</span>
+            </div>
+            @if (item.description) {
+              <p class="todo-item__desc">{{ item.description }}</p>
+            }
+            <p class="todo-item__meta">
+              Créée le {{ formatDateTime(item.dateCreation || item.createdAt) }}
+              · Resp. création :
+              {{ item.responsableCreation || item.createdByDisplayName || item.createdByUsername || '—' }}
+              @if (item.masNumero) {
+                · MAS {{ item.masNumero }}
+              }
+              @if (item.interventionTechniqueLabel) {
+                · {{ item.interventionTechniqueLabel }}
+              }
+              @if (item.interventionNumero) {
+                · Bon {{ item.interventionNumero }}
+              }
+            </p>
+            @if (item.statut === 'DONE') {
+              <p class="todo-item__meta todo-item__meta--cloture">
+                Clôturée le {{ formatDateTime(item.dateCloture || item.completedAt) }}
+                · Resp. clôture :
+                {{
+                  item.responsableCloture ||
+                    item.signataireClotureNom ||
+                    item.completedByDisplayName ||
+                    item.completedByUsername ||
+                    '—'
+                }}
+              </p>
+              @if (item.commentaireCloture) {
+                <p class="todo-item__comment">{{ item.commentaireCloture }}</p>
+              }
+              @if (item.signatureCloture) {
+                <div class="todo-signature">
+                  <img [src]="item.signatureCloture" alt="Signature de clôture" />
+                </div>
+              }
+            }
+            @if (item.statut === 'CANCELLED') {
+              <p class="todo-item__meta">
+                Annulée le {{ formatDateTime(item.dateCloture || item.completedAt) }}
+                · Par
+                {{ item.completedByDisplayName || item.completedByUsername || '—' }}
+              </p>
+            }
+
+            @if (closingId() === item.id) {
+              <form class="mt-3 grid gap-3" [formGroup]="closeForm" (ngSubmit)="submitClose(item.id)">
+                <mat-form-field appearance="outline" class="w-full">
+                  <mat-label>Responsable de clôture</mat-label>
+                  <input matInput formControlName="signataireClotureNom" maxlength="120" />
+                </mat-form-field>
+                <mat-form-field appearance="outline" class="w-full">
+                  <mat-label>Commentaire de clôture</mat-label>
+                  <textarea
+                    matInput
+                    rows="3"
+                    formControlName="commentaireCloture"
+                    maxlength="2000"
+                    placeholder="Optionnel — précision, suite donnée…"
+                  ></textarea>
+                </mat-form-field>
+                <app-signature-pad formControlName="signatureCloture" label="Signature de clôture"></app-signature-pad>
+                <div class="flex flex-wrap gap-2">
+                  <button mat-button type="button" (click)="cancelClose()">Annuler</button>
+                  <button mat-flat-button color="primary" type="submit" [disabled]="saving()">
+                    Signer et clôturer
+                  </button>
+                </div>
+              </form>
+            } @else if (linkingId() === item.id) {
+              <form class="mt-3 grid gap-3" [formGroup]="linkForm" (ngSubmit)="submitLink(item.id)">
+                <mat-form-field appearance="outline" class="w-full">
+                  <mat-label>Intervention technique</mat-label>
+                  <mat-select formControlName="interventionTechniqueId">
+                    <mat-option [value]="null">Aucune</mat-option>
+                    @for (it of interventionsTech(); track it.id) {
+                      <mat-option [value]="it.id">{{ techOptionLabel(it) }}</mat-option>
+                    }
+                  </mat-select>
+                </mat-form-field>
+                <mat-form-field appearance="outline" class="w-full">
+                  <mat-label>Bon d'intervention</mat-label>
+                  <mat-select formControlName="interventionId">
+                    <mat-option [value]="null">Aucun</mat-option>
+                    @for (b of bonsIntervention(); track b.id) {
+                      <mat-option [value]="b.id">{{ bonOptionLabel(b) }}</mat-option>
+                    }
+                  </mat-select>
+                </mat-form-field>
+                <div class="flex flex-wrap gap-2">
+                  <button mat-button type="button" (click)="cancelLink()">Annuler</button>
+                  <button mat-flat-button color="primary" type="submit" [disabled]="saving()">
+                    Enregistrer le rattachement
+                  </button>
+                </div>
+              </form>
+            } @else if (item.statut !== 'DONE' && item.statut !== 'CANCELLED') {
+              <div class="mt-3 flex flex-wrap gap-2">
+                @if (item.statut === 'OPEN') {
+                  <button
+                    mat-stroked-button
+                    type="button"
+                    (click)="setStatus(item, 'IN_PROGRESS')"
+                    [disabled]="saving()"
+                  >
+                    Démarrer
+                  </button>
+                }
+                @if (item.statut === 'IN_PROGRESS') {
+                  <button
+                    mat-stroked-button
+                    type="button"
+                    (click)="setStatus(item, 'OPEN')"
+                    [disabled]="saving()"
+                  >
+                    Remettre ouverte
+                  </button>
+                }
+                <button
+                  mat-stroked-button
+                  color="primary"
+                  type="button"
+                  (click)="setStatus(item, 'DONE')"
+                  [disabled]="saving()"
+                >
+                  Terminer
+                </button>
+                <button mat-stroked-button type="button" (click)="startLink(item)" [disabled]="saving()">
+                  <mat-icon>link</mat-icon>
+                  Intervention
+                </button>
+                <button
+                  mat-button
+                  color="warn"
+                  type="button"
+                  (click)="setStatus(item, 'CANCELLED')"
+                  [disabled]="saving()"
+                >
+                  Annuler
+                </button>
+                <button mat-button color="warn" type="button" (click)="deleteTodo(item)" [disabled]="saving()">
+                  Suppr.
+                </button>
+              </div>
+            } @else {
+              <div class="mt-3 flex flex-wrap gap-2">
+                <button mat-button color="warn" type="button" (click)="deleteTodo(item)" [disabled]="saving()">
+                  Suppr.
+                </button>
+              </div>
+            }
+          </div>
+        </li>
+      }
+    </ul>
+  }
+</section>

@@ -664,3 +664,49 @@ export interface ArretMaintenanceRepriseForm {
   signataireRedemarrageNom?: string | null;
 }
 
+export interface TodoItem {
+  id: number;
+  titre: string;
+  description?: string | null;
+  statut: 'OPEN' | 'IN_PROGRESS' | 'DONE' | 'CANCELLED' | string;
+  severite: 'HIGH' | 'MEDIUM' | 'LOW' | string;
+  createdByUsername?: string;
+  createdByDisplayName?: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+  completedAt?: string | null;
+  completedByUsername?: string | null;
+  completedByDisplayName?: string | null;
+  signatureCloture?: string | null;
+  signataireClotureNom?: string | null;
+  commentaireCloture?: string | null;
+  dateCreation?: string | null;
+  responsableCreation?: string | null;
+  dateCloture?: string | null;
+  responsableCloture?: string | null;
+  masId?: number | null;
+  masNumero?: string | null;
+  interventionTechniqueId?: number | null;
+  interventionTechniqueLabel?: string | null;
+  interventionId?: number | null;
+  interventionNumero?: string | null;
+  type?: string;
+  severity?: string;
+  title?: string;
+  link?: string;
+  relatedId?: number | null;
+  since?: string | null;
+}
+
+export interface TodoList {
+  count: number;
+  items: TodoItem[];
+}
+
+export interface TodoTacheForm {
+  titre: string;
+  description?: string | null;
+  severite?: string | null;
+  masId?: number | null;
+}
+

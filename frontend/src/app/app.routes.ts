@@ -27,6 +27,11 @@ export const routes: Routes = [
     loadComponent: () => import('./layout/shell.component').then((m) => m.ShellComponent),
     children: [
       {
+        path: 'todos',
+        loadComponent: () =>
+          import('./pages/todo-list/todo-list.component').then((m) => m.TodoListComponent)
+      },
+      {
         path: 'devices',
         loadComponent: () =>
           import('./pages/device-list/device-list.component').then((m) => m.DeviceListComponent)

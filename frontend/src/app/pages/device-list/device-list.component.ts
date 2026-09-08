@@ -6,19 +6,17 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
-import { MatChipsModule } from '@angular/material/chips';
 import { MatCardModule } from '@angular/material/card';
-import { MatTableModule } from '@angular/material/table';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { Device } from '../../models/models';
+import { Device, TodoItem } from '../../models/models';
 import { DeviceService } from '../../services/device.service';
+import { TodoService } from '../../services/todo.service';
 import { AuthService } from '../../services/auth.service';
 import { ConfirmDialogComponent } from '../../shared/confirm-dialog.component';
 import { apiErrorMessage } from '../../shared/api-error';
 
 /**
- * Liste des pièces détachées de l'atelier courant.
- * Permet la recherche, la consultation et la suppression des pièces.
+ * Liste des pièces détachées + raccourci vers la page Todo.
  */
 @Component({
   selector: 'app-device-list',
@@ -31,9 +29,7 @@ import { apiErrorMessage } from '../../shared/api-error';
     MatIconModule,
     MatFormFieldModule,
     MatInputModule,
-    MatChipsModule,
     MatCardModule,
-    MatTableModule,
     MatProgressSpinnerModule,
     ConfirmDialogComponent
   ],
@@ -43,44 +39,51 @@ import { apiErrorMessage } from '../../shared/api-error';
 export class DeviceListComponent implements OnInit {
   readonly auth = inject(AuthService);
   private readonly deviceService = inject(DeviceService);
+  private readonly todoService = inject(TodoService);
+
   readonly items = signal<Device[]>([]);
   readonly loading = signal(false);
   readonly error = signal<string | null>(null);
   readonly confirmOpen = signal(false);
+  readonly tileOpen = signal(false);
+  readonly todos = signal<TodoItem[]>([]);
+  readonly todosLoading = signal(false);
   pendingDelete: Device | null = null;
   query = '';
-  readonly displayedColumns = ['nom', 'reference', 'sfm', 'mas', 'marque', 'date', 'statut', 'actions'];
 
-  /** URL absolue de la photo principale d'une pièce. */
   photoUrl(item: Device): string {
     return this.deviceService.resolvePhotoUrl(item.photoUrl);
   }
 
-  /** Relance le chargement si l'API Render est encore endormie. */
   onPhotoError(event: Event): void {
     this.deviceService.retryPhotoOnError(event);
   }
 
-  ngOnInit(): void {
-    this.load();
+  toggleTile(): void {
+    this.tileOpen.update((open) => !open);
   }
 
-  /** Nombre total de pièces affichées. */
+  ngOnInit(): void {
+    this.load();
+    this.loadTodos();
+  }
+
   get total(): number {
     return this.items().length;
   }
 
-  /** Nombre de pièces marquées comme obsolètes. */
   get obsoleteCount(): number {
     return this.items().filter((d) => d.obsolete).length;
   }
 
-  /** Nombre de pièces avec un stock à zéro. */
   get zeroStockCount(): number {
     return this.items().filter((d) => (d.stock ?? 0) <= 0).length;
   }
 
-  /** Charge les pièces selon le filtre de recherche courant. */
+  get todoCount(): number {
+    return this.todos().length;
+  }
+
   load(): void {
     this.loading.set(true);
     this.error.set(null);
@@ -96,19 +99,30 @@ export class DeviceListComponent implements OnInit {
     });
   }
 
-  /** Demande confirmation avant suppression d'une pièce. */
+  loadTodos(): void {
+    this.todosLoading.set(true);
+    this.todoService.list().subscribe({
+      next: (data) => {
+        this.todos.set(data.items ?? []);
+        this.todosLoading.set(false);
+      },
+      error: () => {
+        this.todos.set([]);
+        this.todosLoading.set(false);
+      }
+    });
+  }
+
   askDelete(item: Device): void {
     this.pendingDelete = item;
     this.confirmOpen.set(true);
   }
 
-  /** Annule la suppression en cours. */
   cancelDelete(): void {
     this.pendingDelete = null;
     this.confirmOpen.set(false);
   }
 
-  /** Supprime la pièce sélectionnée après confirmation. */
   confirmDelete(): void {
     if (!this.pendingDelete) {
       return;
