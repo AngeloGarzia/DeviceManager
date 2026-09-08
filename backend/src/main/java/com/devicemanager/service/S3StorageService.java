@@ -1,5 +1,6 @@
 package com.devicemanager.service;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
@@ -25,6 +26,7 @@ import java.util.UUID;
  */
 @Service
 @ConditionalOnProperty(name = "app.s3.enabled", havingValue = "true")
+@Slf4j
 public class S3StorageService implements StorageService {
 
     private final S3Client s3Client;
@@ -39,9 +41,13 @@ public class S3StorageService implements StorageService {
             @Value("${app.s3.bucket}") String bucket,
             @Value("${app.s3.presigned-url-expiration-minutes:15}") long mediaExpirationMinutes,
             @Value("${app.s3.presigned-document-expiration-minutes:60}") long documentExpirationMinutes) {
+        if (bucket == null || bucket.isBlank()) {
+            throw new IllegalStateException(
+                    "APP_S3_BUCKET est obligatoire lorsque APP_S3_ENABLED=true");
+        }
         this.s3Client = s3Client;
         this.s3Presigner = s3Presigner;
-        this.bucket = bucket;
+        this.bucket = bucket.trim();
         this.mediaExpiration = Duration.ofMinutes(Math.max(1, mediaExpirationMinutes));
         this.documentExpiration = Duration.ofMinutes(Math.max(1, documentExpirationMinutes));
     }
@@ -85,7 +91,13 @@ public class S3StorageService implements StorageService {
             return null;
         }
         Duration ttl = kind == AccessKind.DOCUMENT ? documentExpiration : mediaExpiration;
-        return generatePresignedUrl(key, ttl);
+        try {
+            return generatePresignedUrl(key, ttl);
+        } catch (RuntimeException ex) {
+            // Ne jamais faire échouer un GET métier (ex. /api/devices/{id}) pour une URL média.
+            log.error("Échec URL présignée R2 (bucket={}, key={}): {}", bucket, key, ex.getMessage());
+            return null;
+        }
     }
 
     /**
@@ -96,6 +108,9 @@ public class S3StorageService implements StorageService {
             throw new IllegalArgumentException("objectKey requis");
         }
         String key = StorageService.extractObjectKey(objectKey);
+        if (key == null || key.isBlank()) {
+            throw new IllegalArgumentException("objectKey invalide");
+        }
         Duration ttl = expiration == null || expiration.isNegative() || expiration.isZero()
                 ? mediaExpiration
                 : expiration;

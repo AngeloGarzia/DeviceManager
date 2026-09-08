@@ -62,6 +62,8 @@ services:
         value: ""
       - key: MAIL_PASSWORD
         value: ""
+      # R2 privé : passer à "true" SEULEMENT si APP_S3_BUCKET + AWS_* + AWS_S3_ENDPOINT sont renseignés.
+      # Sinon les GET /api/devices/{id} plantent au moment de générer les URLs photos.
       - key: APP_S3_ENABLED
         value: "false"
       - key: APP_S3_BUCKET

@@ -17,6 +17,9 @@ L’API Spring génère des **URLs présignées GET** à chaque réponse REST po
 
 ## Variables Render / `.env` API
 
+Toutes ces variables doivent être présentes **avant** de passer `APP_S3_ENABLED=true`.  
+Un bucket vide (`APP_S3_BUCKET` manquant) provoquait un **500** sur `/api/devices/{id}` dès qu’une pièce a des photos.
+
 ```env
 APP_S3_ENABLED=true
 APP_S3_BUCKET=devicemanager
@@ -29,7 +32,7 @@ APP_S3_PRESIGNED_URL_EXPIRATION_MINUTES=15
 APP_S3_PRESIGNED_DOCUMENT_EXPIRATION_MINUTES=60
 ```
 
-Redémarrer l’API.
+Redémarrer l’API (Render → Manual Deploy / Restart).
 
 | Durée | Usage |
 |-------|--------|

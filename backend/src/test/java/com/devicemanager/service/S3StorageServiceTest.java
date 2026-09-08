@@ -59,6 +59,15 @@ class S3StorageServiceTest {
     }
 
     @Test
+    void resolveAccessUrl_returnsNullWhenPresignFails() {
+        when(s3Presigner.presignGetObject(any(GetObjectPresignRequest.class)))
+                .thenThrow(new RuntimeException("Bucket cannot be empty"));
+
+        S3StorageService service = new S3StorageService(s3Client, s3Presigner, "devicemanager", 15, 60);
+        assertThat(service.resolveAccessUrl("spare-parts/a.jpg", StorageService.AccessKind.MEDIA)).isNull();
+    }
+
+    @Test
     void extractObjectKey_fromR2PathStyleUrl() {
         String key = StorageService.extractObjectKey(
                 "https://abc.r2.cloudflarestorage.com/devicemanager/spare-parts/photo.jpg");

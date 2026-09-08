@@ -48,9 +48,7 @@ public class S3Config {
 
         if (endpoint != null && !endpoint.isBlank()) {
             builder.endpointOverride(URI.create(trimTrailingSlash(endpoint)))
-                    .serviceConfiguration(S3Configuration.builder()
-                            .pathStyleAccessEnabled(true)
-                            .build());
+                    .serviceConfiguration(r2ServiceConfiguration());
         }
         return builder.build();
     }
@@ -73,11 +71,21 @@ public class S3Config {
 
         if (endpoint != null && !endpoint.isBlank()) {
             builder.endpointOverride(URI.create(trimTrailingSlash(endpoint)))
-                    .serviceConfiguration(S3Configuration.builder()
-                            .pathStyleAccessEnabled(true)
-                            .build());
+                    .serviceConfiguration(r2ServiceConfiguration());
         }
         return builder.build();
+    }
+
+    /**
+     * Path-style + checksums désactivés : requis pour R2 et pour des URLs GET
+     * exécutables par le navigateur (sans en-tête checksum signé).
+     */
+    private static S3Configuration r2ServiceConfiguration() {
+        return S3Configuration.builder()
+                .pathStyleAccessEnabled(true)
+                .checksumValidationEnabled(false)
+                .chunkedEncodingEnabled(false)
+                .build();
     }
 
     private static String blankToAuto(String region) {
