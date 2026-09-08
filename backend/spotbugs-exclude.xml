@@ -37,6 +37,10 @@
         <Class name="com.devicemanager.service.LocalStorageService"/>
         <Bug pattern="CT_CONSTRUCTOR_THROW"/>
     </Match>
+    <Match>
+        <Class name="com.devicemanager.service.S3StorageService"/>
+        <Bug pattern="CT_CONSTRUCTOR_THROW"/>
+    </Match>
 
     <!-- Fallbacks Docker/Render (/app/uploads, /tmp) volontairement absolus. -->
     <Match>
