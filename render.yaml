@@ -87,9 +87,9 @@ services:
         value: /app/uploads
       - key: LOGGING_LEVEL_COM_DEVICEMANAGER
         value: INFO
-      # Plan free Render (512 Mo) — heap modéré + metaspace min 128 Mo
+      # Plan free Render (512 Mo) — Metaspace 160m (128m → OOM sous upload/R2), heap 192m
       - key: JAVA_OPTS
-        value: "-Xms128m -Xmx240m -XX:+UseSerialGC -XX:MaxMetaspaceSize=128m -XX:ReservedCodeCacheSize=32m"
+        value: "-Xms96m -Xmx192m -XX:+UseSerialGC -XX:MaxMetaspaceSize=160m -XX:ReservedCodeCacheSize=40m"
 
   # ---------- Frontend Angular (static free) ----------
   - type: web

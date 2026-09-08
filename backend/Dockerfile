@@ -15,7 +15,8 @@ COPY --from=build /app/target/device-manager-*.jar app.jar
 USER appuser
 ENV APP_ENV=production
 ENV APP_S3_LOCAL_FALLBACK_DIR=/app/uploads
-# Render free = 512 Mo : heap bas + metaspace >= 128 Mo (96 Mo → OOM Metaspace au boot).
-ENV JAVA_OPTS="-Xms128m -Xmx240m -XX:+UseSerialGC -XX:MaxMetaspaceSize=128m -XX:ReservedCodeCacheSize=32m"
+# Render free = 512 Mo : privilégier Metaspace (Spring AI + AWS SDK) plutôt qu'un gros heap.
+# 128m Metaspace → OOM sous charge (upload image / R2). Heap abaissé pour rester sous 512 Mo.
+ENV JAVA_OPTS="-Xms96m -Xmx192m -XX:+UseSerialGC -XX:MaxMetaspaceSize=160m -XX:ReservedCodeCacheSize=40m"
 EXPOSE 8080
 ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]
