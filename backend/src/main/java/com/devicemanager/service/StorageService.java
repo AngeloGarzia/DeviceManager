@@ -73,7 +73,6 @@ public interface StorageService {
             // Path-style R2 : /bucket/key… → retirer le 1er segment si présent
             int slash = stripped.indexOf('/');
             if (slash > 0 && slash < stripped.length() - 1) {
-                String maybeBucket = stripped.substring(0, slash);
                 String rest = stripped.substring(slash + 1);
                 // Heuristique : clés DeviceManager commencent souvent par spare-parts/
                 if (rest.startsWith("spare-parts/") || value.contains(".r2.cloudflarestorage.com")) {

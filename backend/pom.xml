@@ -25,6 +25,8 @@
         <spring-ai.version>1.1.6</spring-ai.version>
         <!-- Trivy HIGH : Netty DoS CVEs (4.1.135 → 4.1.136). -->
         <netty.version>4.1.136.Final</netty.version>
+        <!-- Trivy CRITICAL : Tomcat CVE-2026-65182 / 65905 / 68525 (10.1.55 → 10.1.59). -->
+        <tomcat.version>10.1.59</tomcat.version>
         <spotbugs-maven-plugin.version>4.10.3.0</spotbugs-maven-plugin.version>
         <spotbugs.version>4.10.3</spotbugs.version>
         <jacoco.version>0.8.15</jacoco.version>
