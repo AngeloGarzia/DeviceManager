@@ -44,6 +44,7 @@ public class InterventionService {
     private final AtelierService atelierService;
     private final StockMouvementService stockMouvementService;
     private final FitService fitService;
+    private final StorageService storageService;
 
     /**
      * Archive un bon d'intervention et décrémente le stock des pièces consommées.
@@ -248,7 +249,12 @@ public class InterventionService {
                             .quantite(l.getQuantite())
                             .stockAvant(l.getStockAvant())
                             .stockApres(l.getStockApres())
-                            .photoUrl(d != null ? d.getPhotoUrl() : null)
+                            .photoUrl(d != null
+                                    ? storageService.resolveAccessUrl(
+                                            d.getPhotoKey(),
+                                            d.getPhotoUrl(),
+                                            StorageService.AccessKind.MEDIA)
+                                    : null)
                             .build();
                 })
                 .toList();

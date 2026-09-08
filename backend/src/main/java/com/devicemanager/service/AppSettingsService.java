@@ -146,9 +146,9 @@ public class AppSettingsService {
         ensure(MAIL_PASSWORD, defaultMailPassword, "Mot de passe SMTP", "Messagerie", true);
         ensure(JWT_EXPIRATION_MS, defaultJwtExpirationMs, "Durée du jeton JWT (ms)", "Sécurité", false);
         ensure(CORS_ALLOWED_ORIGINS, defaultCorsOrigins, "Origines CORS autorisées", "Sécurité", false);
-        ensure(S3_ENABLED, defaultS3Enabled, "Activer le stockage S3", "Stockage", false);
-        ensure(S3_BUCKET, defaultS3Bucket, "Bucket S3", "Stockage", false);
-        ensure(S3_REGION, defaultS3Region, "Région S3", "Stockage", false);
+        ensure(S3_ENABLED, defaultS3Enabled, "Activer le stockage objet (Cloudflare R2)", "Stockage", false);
+        ensure(S3_BUCKET, defaultS3Bucket, "Bucket R2 / S3", "Stockage", false);
+        ensure(S3_REGION, defaultS3Region, "Région (R2: auto)", "Stockage", false);
         ensure(LOCAL_UPLOAD_DIR, defaultLocalUploadDir, "Dossier local des uploads", "Stockage", false);
 
         String provider = AiProviders.normalizeProvider(defaultAiProvider);

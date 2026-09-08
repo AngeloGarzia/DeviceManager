@@ -103,12 +103,19 @@ app:
     from: ${APP_MAIL_FROM:noreply@devicemanager.local}
     admin-email: ${APP_MAIL_ADMIN_EMAIL:admin@devicemanager.local}
   s3:
+    # Object storage S3-compatible — Cloudflare R2 (bucket privé + URLs présignées)
     enabled: ${APP_S3_ENABLED:false}
     bucket: ${APP_S3_BUCKET:}
-    region: ${APP_S3_REGION:eu-west-3}
+    region: ${APP_S3_REGION:auto}
     access-key: ${AWS_ACCESS_KEY_ID:}
     secret-key: ${AWS_SECRET_ACCESS_KEY:}
+    # API R2 : https://<ACCOUNT_ID>.r2.cloudflarestorage.com
     endpoint: ${AWS_S3_ENDPOINT:}
+    # Optionnel (legacy bucket public) — non requis si URLs présignées
+    public-base-url: ${APP_S3_PUBLIC_BASE_URL:}
+    # TTL URLs présignées GET (bucket privé)
+    presigned-url-expiration-minutes: ${APP_S3_PRESIGNED_URL_EXPIRATION_MINUTES:15}
+    presigned-document-expiration-minutes: ${APP_S3_PRESIGNED_DOCUMENT_EXPIRATION_MINUTES:60}
     local-fallback-dir: ${APP_S3_LOCAL_FALLBACK_DIR:uploads}
   ai:
     enabled: ${APP_AI_ENABLED:false}

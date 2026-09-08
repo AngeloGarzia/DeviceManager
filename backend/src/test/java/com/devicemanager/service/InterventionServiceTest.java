@@ -42,6 +42,7 @@ class InterventionServiceTest {
     @Mock private AtelierService atelierService;
     @Mock private StockMouvementService stockMouvementService;
     @Mock private FitService fitService;
+    @Mock private StorageService storageService;
     @InjectMocks private InterventionService interventionService;
 
     @Test
@@ -62,6 +63,10 @@ class InterventionServiceTest {
         });
         when(stockMouvementService.record(any(), any(), anyInt(), anyInt(), anyString(), any(), anyString()))
                 .thenAnswer(inv -> null);
+        when(storageService.resolveAccessUrl(any(), any(), any())).thenAnswer(inv -> {
+            Object legacy = inv.getArgument(1);
+            return legacy != null ? legacy.toString() : null;
+        });
 
         InterventionRequest.InterventionLineDto line = new InterventionRequest.InterventionLineDto();
         line.setDeviceId(40L);

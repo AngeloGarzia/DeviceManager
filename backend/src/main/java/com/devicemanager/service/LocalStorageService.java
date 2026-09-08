@@ -102,6 +102,26 @@ public class LocalStorageService implements StorageService {
         }
     }
 
+    @Override
+    public String resolveAccessUrl(String objectKey, AccessKind kind) {
+        if (objectKey == null || objectKey.isBlank()) {
+            return null;
+        }
+        String value = objectKey.trim();
+        if (value.startsWith("/uploads/")) {
+            return value;
+        }
+        if (value.startsWith("http://") || value.startsWith("https://")) {
+            // Legacy absolue (ex. ancienne URL S3) — renvoyée telle quelle en mode local
+            return value;
+        }
+        String key = StorageService.extractObjectKey(value);
+        if (key == null || key.isBlank() || !isSafeKey(key)) {
+            return null;
+        }
+        return "/uploads/" + key;
+    }
+
     /**
      * Supprime un fichier du disque et de la table {@code upload_blob}.
      *
@@ -110,15 +130,16 @@ public class LocalStorageService implements StorageService {
     @Override
     @Transactional
     public void delete(String key) {
-        if (!isSafeKey(key)) {
+        String objectKey = StorageService.extractObjectKey(key);
+        if (!isSafeKey(objectKey)) {
             return;
         }
         try {
-            Files.deleteIfExists(root.resolve(key));
+            Files.deleteIfExists(root.resolve(objectKey));
         } catch (IOException e) {
             throw new IllegalStateException("Impossible de supprimer la photo.", e);
         }
-        jdbcTemplate.update("DELETE FROM upload_blob WHERE object_key = ?", key);
+        jdbcTemplate.update("DELETE FROM upload_blob WHERE object_key = ?", objectKey);
     }
 
     /**

@@ -65,16 +65,22 @@ services:
       - key: APP_S3_ENABLED
         value: "false"
       - key: APP_S3_BUCKET
-        value: ""
+        sync: false
       - key: APP_S3_REGION
-        value: eu-west-3
+        value: auto
       - key: AWS_ACCESS_KEY_ID
-        value: ""
+        sync: false
       - key: AWS_SECRET_ACCESS_KEY
-        value: ""
+        sync: false
       - key: AWS_S3_ENDPOINT
-        value: ""
-      # Disque éphémère sur free : les photos peuvent disparaître au redémarrage
+        sync: false
+      - key: APP_S3_PUBLIC_BASE_URL
+        sync: false
+      - key: APP_S3_PRESIGNED_URL_EXPIRATION_MINUTES
+        value: "15"
+      - key: APP_S3_PRESIGNED_DOCUMENT_EXPIRATION_MINUTES
+        value: "60"
+      # Disque éphémère sur free : avec R2 (APP_S3_ENABLED=true) ce dossier n'est plus la source de vérité
       - key: APP_S3_LOCAL_FALLBACK_DIR
         value: /app/uploads
       - key: LOGGING_LEVEL_COM_DEVICEMANAGER

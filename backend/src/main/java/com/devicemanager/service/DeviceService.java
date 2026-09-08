@@ -670,7 +670,8 @@ public class DeviceService {
                 : entity.getPhotos().stream()
                 .map(p -> DevicePhotoResponse.builder()
                         .id(p.getId())
-                        .photoUrl(p.getPhotoUrl())
+                        .photoUrl(storageService.resolveAccessUrl(
+                                p.getPhotoKey(), p.getPhotoUrl(), StorageService.AccessKind.MEDIA))
                         .contentType(p.getContentType())
                         .fileSize(p.getFileSize())
                         .position(p.getPosition())
@@ -683,14 +684,16 @@ public class DeviceService {
                 .map(d -> DeviceDocumentResponse.builder()
                         .id(d.getId())
                         .docType(d.getDocType())
-                        .fileUrl(d.getFileUrl())
+                        .fileUrl(storageService.resolveAccessUrl(
+                                d.getFileKey(), d.getFileUrl(), StorageService.AccessKind.DOCUMENT))
                         .originalName(d.getOriginalName())
                         .contentType(d.getContentType())
                         .fileSize(d.getFileSize())
                         .build())
                 .toList();
 
-        String primaryUrl = entity.getPhotoUrl();
+        String primaryUrl = storageService.resolveAccessUrl(
+                entity.getPhotoKey(), entity.getPhotoUrl(), StorageService.AccessKind.MEDIA);
         if ((primaryUrl == null || primaryUrl.isBlank()) && !photos.isEmpty()) {
             primaryUrl = photos.getFirst().getPhotoUrl();
         }

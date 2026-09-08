@@ -520,7 +520,10 @@ public class MasService {
                 .numeroSerie(entity.getNumeroSerie())
                 .dateCessation(entity.getDateCessation())
                 .destinationMachineUsagee(entity.getDestinationMachineUsagee())
-                .destructionFileUrl(entity.getDestructionFileUrl())
+                .destructionFileUrl(storageService.resolveAccessUrl(
+                        entity.getDestructionFileKey(),
+                        entity.getDestructionFileUrl(),
+                        StorageService.AccessKind.DOCUMENT))
                 .destructionOriginalName(entity.getDestructionOriginalName())
                 .destructionContentType(entity.getDestructionContentType())
                 .destructionFileSize(entity.getDestructionFileSize())
@@ -628,7 +631,8 @@ public class MasService {
                 .code(regle.getCode())
                 .label(regle.getLabel())
                 .description(regle.getDescription())
-                .fileUrl(regle.getFileUrl())
+                .fileUrl(storageService.resolveAccessUrl(
+                        regle.getFileKey(), regle.getFileUrl(), StorageService.AccessKind.DOCUMENT))
                 .originalName(regle.getOriginalName())
                 .contentType(regle.getContentType())
                 .fileSize(regle.getFileSize())
@@ -653,7 +657,8 @@ public class MasService {
                 .code(regle.getCode())
                 .label(regle.getLabel())
                 .description(regle.getDescription())
-                .fileUrl(regle.getFileUrl())
+                .fileUrl(storageService.resolveAccessUrl(
+                        regle.getFileKey(), regle.getFileUrl(), StorageService.AccessKind.DOCUMENT))
                 .originalName(regle.getOriginalName())
                 .contentType(regle.getContentType())
                 .fileSize(regle.getFileSize())

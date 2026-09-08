@@ -863,7 +863,10 @@ public class OrderRequestService {
                 .quantite(totalQty)
                 .deviceId(first != null ? first.getDeviceId() : null)
                 .photoUrl(first != null ? first.getPhotoUrl() : null)
-                .devisFileUrl(entity.getDevisFileUrl())
+                .devisFileUrl(storageService.resolveAccessUrl(
+                        entity.getDevisFileKey(),
+                        entity.getDevisFileUrl(),
+                        StorageService.AccessKind.DOCUMENT))
                 .devisOriginalName(entity.getDevisOriginalName())
                 .devisContentType(entity.getDevisContentType())
                 .devisFileSize(entity.getDevisFileSize())
@@ -880,7 +883,12 @@ public class OrderRequestService {
                 .pieceNom(device != null ? device.getNom() : null)
                 .reference(device != null ? device.getReference() : null)
                 .quantite(ligne.getQuantite())
-                .photoUrl(device != null ? device.getPhotoUrl() : null)
+                .photoUrl(device != null
+                        ? storageService.resolveAccessUrl(
+                                device.getPhotoKey(),
+                                device.getPhotoUrl(),
+                                StorageService.AccessKind.MEDIA)
+                        : null)
                 .sfmId(sfm != null ? sfm.getId() : null)
                 .sfmNom(sfm != null ? sfm.getNom() : null)
                 .build();

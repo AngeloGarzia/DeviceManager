@@ -49,6 +49,14 @@ class OrderRequestServiceTest {
     @BeforeEach
     void setUp() {
         lenient().when(atelierService.requireCurrentAtelier()).thenReturn(TestFixtures.atelier());
+        lenient().when(storageService.resolveAccessUrl(any(), any(), any())).thenAnswer(inv -> {
+            Object legacy = inv.getArgument(1);
+            if (legacy != null && !legacy.toString().isBlank()) {
+                return legacy.toString();
+            }
+            Object key = inv.getArgument(0);
+            return key != null ? key.toString() : null;
+        });
     }
 
     @Test
