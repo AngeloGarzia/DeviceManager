@@ -65,7 +65,10 @@ public class S3StorageService implements StorageService {
             // url = clé stable uniquement (pas d'URL présignée / publique permanente)
             return new StoredObject(key, key, file.getContentType(), file.getSize());
         } catch (IOException e) {
-            throw new IllegalStateException("Échec d'enregistrement de la photo. Réessayez.", e);
+            throw new IllegalStateException("Échec d'enregistrement du fichier. Réessayez.", e);
+        } catch (RuntimeException e) {
+            log.error("Échec PutObject R2 (bucket={}, key={}): {}", bucket, key, e.getMessage());
+            throw new IllegalStateException("Échec d'enregistrement vers le stockage cloud. Vérifiez la config R2.", e);
         }
     }
 

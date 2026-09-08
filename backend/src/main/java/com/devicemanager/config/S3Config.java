@@ -48,7 +48,7 @@ public class S3Config {
 
         if (endpoint != null && !endpoint.isBlank()) {
             builder.endpointOverride(URI.create(trimTrailingSlash(endpoint)))
-                    .serviceConfiguration(r2ServiceConfiguration());
+                    .serviceConfiguration(r2ClientConfiguration());
         }
         return builder.build();
     }
@@ -71,16 +71,30 @@ public class S3Config {
 
         if (endpoint != null && !endpoint.isBlank()) {
             builder.endpointOverride(URI.create(trimTrailingSlash(endpoint)))
-                    .serviceConfiguration(r2ServiceConfiguration());
+                    .serviceConfiguration(r2PresignerConfiguration());
         }
         return builder.build();
     }
 
     /**
-     * Path-style + checksums désactivés : requis pour R2 et pour des URLs GET
-     * exécutables par le navigateur (sans en-tête checksum signé).
+     * Path-style + pas de chunked encoding (R2).
+     * <p>
+     * Ne pas y mettre {@code checksumValidationEnabled} : le client configure déjà
+     * {@code RequestChecksumCalculation.WHEN_REQUIRED} — les deux ensemble provoquent
+     * {@code IllegalStateException} au PutObject.
      */
-    private static S3Configuration r2ServiceConfiguration() {
+    private static S3Configuration r2ClientConfiguration() {
+        return S3Configuration.builder()
+                .pathStyleAccessEnabled(true)
+                .chunkedEncodingEnabled(false)
+                .build();
+    }
+
+    /**
+     * Path-style + checksums désactivés : URLs GET exécutables par le navigateur
+     * (sans en-tête checksum signé). Le présigneur n'utilise pas WHEN_REQUIRED.
+     */
+    private static S3Configuration r2PresignerConfiguration() {
         return S3Configuration.builder()
                 .pathStyleAccessEnabled(true)
                 .checksumValidationEnabled(false)
