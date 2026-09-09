@@ -36,8 +36,8 @@ jobs:
       - name: SpotBugs
         run: mvn -B -DskipTests spotbugs:check
 
-      # OWASP Dependency-Check : feed JSON NVD (pas l'API REST) — pas besoin de NVD_API_KEY.
-      # Cache mensuel ; préfixe v2 pour invalider d’anciennes bases corrompues (échec API).
+      # OWASP Dependency-Check : miroir NVD (pas l'API REST) — pas besoin de NVD_API_KEY.
+      # Cache mensuel ; préfixe v3 = ODC 13 + schéma URL 4000 (fix CVE Mozilla trop longues).
       - name: Dependency-Check cache month
         id: dc-date
         run: echo "month=$(date -u +%Y-%m)" >> "$GITHUB_OUTPUT"
@@ -46,9 +46,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/dependency-check
-          key: dependency-check-v2-${{ runner.os }}-${{ steps.dc-date.outputs.month }}
+          key: dependency-check-v3-${{ runner.os }}-${{ steps.dc-date.outputs.month }}
           restore-keys: |
-            dependency-check-v2-${{ runner.os }}-
+            dependency-check-v3-${{ runner.os }}-
 
       - name: OWASP Dependency-Check
         run: mvn -B -DskipTests dependency-check:check
