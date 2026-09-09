@@ -10,6 +10,7 @@ import com.devicemanager.repository.UserRepository;
 import com.devicemanager.security.OrderStatuses;
 import com.devicemanager.security.Roles;
 import com.devicemanager.support.TestFixtures;
+import com.devicemanager.support.TestFiles;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -33,7 +34,7 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class OrderRequestServiceTest {
 
-    private static final byte[] PDF_BYTES = "%PDF-1.4 minimal".getBytes();
+    private static final byte[] PDF_BYTES = TestFiles.minimalPdf();
 
     @Mock private CommandeRepository commandeRepository;
     @Mock private DeviceRepository deviceRepository;

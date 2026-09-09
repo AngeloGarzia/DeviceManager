@@ -23,8 +23,8 @@
         <jjwt.version>0.12.7</jjwt.version>
         <aws.sdk.version>2.31.78</aws.sdk.version>
         <spring-ai.version>1.1.6</spring-ai.version>
-        <!-- Trivy HIGH : Netty DoS CVEs (4.1.135 → 4.1.136). -->
-        <netty.version>4.1.136.Final</netty.version>
+        <!-- Trivy CRITICAL CVE-2026-75595 (mTLS SNI) 4.1.136 → 4.1.137. -->
+        <netty.version>4.1.137.Final</netty.version>
         <!-- Trivy CRITICAL : Tomcat CVE-2026-65182 / 65905 / 68525 (10.1.55 → 10.1.59). -->
         <tomcat.version>10.1.59</tomcat.version>
         <spotbugs-maven-plugin.version>4.10.3.0</spotbugs-maven-plugin.version>
@@ -146,7 +146,7 @@
         <dependency>
             <groupId>org.apache.tika</groupId>
             <artifactId>tika-core</artifactId>
-            <version>3.1.0</version>
+            <version>3.2.2</version>
         </dependency>
         <dependency>
             <groupId>org.projectlombok</groupId>
