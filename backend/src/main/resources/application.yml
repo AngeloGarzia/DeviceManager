@@ -16,6 +16,14 @@ management:
     health:
       probes:
         enabled: true
+  info:
+    # Évite le fingerprinting (versions Java/OS/env) via /actuator/info
+    env:
+      enabled: false
+    java:
+      enabled: false
+    os:
+      enabled: false
   health:
     # Render free : éviter 503 sur /actuator/health si MySQL est lent/indispo
     # (sinon redémarrages en boucle / page « almost online »)
