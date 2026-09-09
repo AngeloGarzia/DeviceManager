@@ -1,5 +1,6 @@
 package com.devicemanager.security;
 
+import com.devicemanager.security.ratelimit.RateLimitStore;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -11,26 +12,25 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
-import java.time.Instant;
-import java.util.ArrayDeque;
-import java.util.Deque;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import java.time.Duration;
 
 /**
- * Limite le débit des tentatives {@code POST /api/auth/login} par adresse IP (fenêtre glissante 1 min).
+ * Limite le débit des tentatives {@code POST /api/auth/login} par adresse IP
+ * (fenêtre glissante 1 min), via {@link RateLimitStore}.
  */
 @Component
 public class LoginRateLimitFilter extends OncePerRequestFilter {
 
     private static final String LOGIN_PATH = "/api/auth/login";
-    private static final long WINDOW_MS = 60_000L;
+    private static final Duration WINDOW = Duration.ofMinutes(1);
 
     private final int limitPerMinute;
-    private final Map<String, Deque<Long>> attemptsByIp = new ConcurrentHashMap<>();
+    private final RateLimitStore rateLimitStore;
 
     public LoginRateLimitFilter(
+            RateLimitStore rateLimitStore,
             @Value("${app.security.login-rate-limit-per-minute:20}") int limitPerMinute) {
+        this.rateLimitStore = rateLimitStore;
         this.limitPerMinute = Math.max(1, limitPerMinute);
     }
 
@@ -45,19 +45,11 @@ public class LoginRateLimitFilter extends OncePerRequestFilter {
             HttpServletResponse response,
             FilterChain filterChain) throws ServletException, IOException {
         String ip = clientIp(request);
-        long now = Instant.now().toEpochMilli();
-        Deque<Long> timestamps = attemptsByIp.computeIfAbsent(ip, key -> new ArrayDeque<>());
-        synchronized (timestamps) {
-            while (!timestamps.isEmpty() && now - timestamps.peekFirst() > WINDOW_MS) {
-                timestamps.pollFirst();
-            }
-            if (timestamps.size() >= limitPerMinute) {
-                response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
-                response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-                response.getWriter().write("{\"message\":\"Trop de tentatives de connexion. Réessayez plus tard.\"}");
-                return;
-            }
-            timestamps.addLast(now);
+        if (!rateLimitStore.tryAcquire(ip, limitPerMinute, WINDOW)) {
+            response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
+            response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+            response.getWriter().write("{\"message\":\"Trop de tentatives de connexion. Réessayez plus tard.\"}");
+            return;
         }
         filterChain.doFilter(request, response);
     }
