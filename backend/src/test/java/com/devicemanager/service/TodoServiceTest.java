@@ -39,6 +39,7 @@ class TodoServiceTest {
     @Mock private InterventionRepository interventionRepository;
     @Mock private UserRepository userRepository;
     @Mock private AtelierService atelierService;
+    @Mock private AtelierMemoirePublisher atelierMemoirePublisher;
     @InjectMocks private TodoService todoService;
 
     @Test

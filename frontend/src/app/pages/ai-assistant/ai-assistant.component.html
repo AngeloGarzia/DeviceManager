@@ -1,12 +1,86 @@
 <section class="grid gap-4">
   <header>
     <h1 class="page-title" data-tour="page-ai">Assistant IA</h1>
-    <p class="page-subtitle">Spring AI · aide rédaction demandes, pièces, MAS / SFM</p>
+    <p class="page-subtitle">Spring AI · aide rédaction demandes, pièces, MAS / SFM · mémoire synaptique atelier</p>
   </header>
 
   @if (loadingStatus()) {
     <div class="flex justify-center py-10"><mat-spinner diameter="36"></mat-spinner></div>
   } @else {
+    <mat-card class="memory-card !rounded-xl !border !border-line !shadow-soft">
+      <mat-card-content class="!pt-4">
+        <div class="memory-header">
+          <button type="button" class="memory-toggle" (click)="toggleMemory()">
+            <mat-icon>{{ memoryExpanded() ? 'expand_less' : 'expand_more' }}</mat-icon>
+            <span>Mémoire synaptique</span>
+            @if (memory()?.atelierNom) {
+              <span class="memory-atelier">{{ memory()!.atelierNom }}</span>
+            }
+          </button>
+          <div class="memory-actions">
+            <button
+              mat-stroked-button
+              type="button"
+              (click)="loadMemory()"
+              [disabled]="memoryLoading() || memoryRebuilding()"
+            >
+              <mat-icon>refresh</mat-icon>
+              Actualiser
+            </button>
+            <button
+              mat-stroked-button
+              type="button"
+              (click)="rebuildMemory()"
+              [disabled]="memoryLoading() || memoryRebuilding()"
+            >
+              <mat-icon>psychology</mat-icon>
+              Recalculer
+            </button>
+          </div>
+        </div>
+
+        @if (memoryExpanded()) {
+          @if (memoryLoading() && !memory()) {
+            <div class="flex items-center gap-2 py-3 text-sm text-ink-soft">
+              <mat-spinner diameter="18"></mat-spinner>
+              Chargement de la mémoire…
+            </div>
+          } @else if (memoryError()) {
+            <p class="mb-0 mt-2 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{{ memoryError() }}</p>
+          } @else if (memory()) {
+            <pre class="memory-overview">{{ memory()!.overview }}</pre>
+            @if (memory()!.recentFacts?.length) {
+              <p class="memory-facts-title">Faits récents</p>
+              <ul class="memory-facts">
+                @for (fact of memory()!.recentFacts!; track $index) {
+                  <li>{{ fact }}</li>
+                }
+              </ul>
+            } @else {
+              <p class="m-0 mt-2 text-sm text-ink-soft">
+                Aucun fait encore — la mémoire se remplit à chaque événement (pièces, commandes, interventions…).
+              </p>
+            }
+            @if (memory()!.updatedAt) {
+              <p class="memory-meta">
+                Mis à jour
+                {{ memory()!.updatedAt | date: 'dd/MM/yyyy HH:mm' }}
+                @if (memory()!.lastEventType) {
+                  · dernier événement {{ memory()!.lastEventType }}
+                }
+              </p>
+            }
+          }
+          @if (memoryRebuilding()) {
+            <div class="flex items-center gap-2 pt-2 text-sm text-ink-soft">
+              <mat-spinner diameter="16"></mat-spinner>
+              Recalcul du snapshot…
+            </div>
+          }
+        }
+      </mat-card-content>
+    </mat-card>
+
     <mat-card class="!rounded-xl !border !border-line !shadow-soft">
       <mat-card-content class="!pt-5">
         @if (error()) {
@@ -16,8 +90,8 @@
         <div class="chat-log mb-4 grid gap-3">
           @if (turns().length === 0) {
             <p class="m-0 text-sm text-ink-soft">
-              Exemples : « Comment rédiger une demande de devis SFM ? »,
-              « Quelle est la différence entre PENDING et VALIDATED ? »
+              L’assistant consulte la mémoire synaptique de l’atelier pour répondre.
+              Exemples : « Combien de pièces en rupture ? », « Quelles tâches À faire sont ouvertes ? »
             </p>
           }
           @for (turn of turns(); track $index) {

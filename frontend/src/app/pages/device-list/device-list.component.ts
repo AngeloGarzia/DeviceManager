@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
@@ -8,6 +8,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatCardModule } from '@angular/material/card';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatTableModule } from '@angular/material/table';
 import { Device, TodoItem } from '../../models/models';
 import { DeviceService } from '../../services/device.service';
 import { TodoService } from '../../services/todo.service';
@@ -16,7 +17,8 @@ import { ConfirmDialogComponent } from '../../shared/confirm-dialog.component';
 import { apiErrorMessage } from '../../shared/api-error';
 
 /**
- * Liste des pièces détachées + raccourci vers la page Todo.
+ * Liste des pièces détachées (tableau) + vignette de la pièce sélectionnée,
+ * et raccourci vers la page Todo.
  */
 @Component({
   selector: 'app-device-list',
@@ -31,6 +33,7 @@ import { apiErrorMessage } from '../../shared/api-error';
     MatInputModule,
     MatCardModule,
     MatProgressSpinnerModule,
+    MatTableModule,
     ConfirmDialogComponent
   ],
   templateUrl: './device-list.component.html',
@@ -42,6 +45,7 @@ export class DeviceListComponent implements OnInit {
   private readonly todoService = inject(TodoService);
 
   readonly items = signal<Device[]>([]);
+  readonly selectedId = signal<number | null>(null);
   readonly loading = signal(false);
   readonly error = signal<string | null>(null);
   readonly confirmOpen = signal(false);
@@ -50,6 +54,16 @@ export class DeviceListComponent implements OnInit {
   readonly todosLoading = signal(false);
   pendingDelete: Device | null = null;
   query = '';
+
+  readonly displayedColumns: string[] = ['nom', 'reference', 'stock', 'statut', 'sfm', 'mas'];
+
+  readonly selected = computed(() => {
+    const id = this.selectedId();
+    if (id == null) {
+      return null;
+    }
+    return this.items().find((d) => d.id === id) ?? null;
+  });
 
   photoUrl(item: Device): string {
     return this.deviceService.resolvePhotoUrl(item.photoUrl);
@@ -61,6 +75,14 @@ export class DeviceListComponent implements OnInit {
 
   toggleTile(): void {
     this.tileOpen.update((open) => !open);
+  }
+
+  select(item: Device): void {
+    this.selectedId.set(item.id);
+  }
+
+  isSelected(item: Device): boolean {
+    return this.selectedId() === item.id;
   }
 
   ngOnInit(): void {
@@ -90,6 +112,7 @@ export class DeviceListComponent implements OnInit {
     this.deviceService.list(this.query).subscribe({
       next: (data) => {
         this.items.set(data);
+        this.syncSelection(data);
         this.loading.set(false);
       },
       error: () => {
@@ -132,6 +155,9 @@ export class DeviceListComponent implements OnInit {
     this.deviceService.delete(id).subscribe({
       next: () => {
         this.pendingDelete = null;
+        if (this.selectedId() === id) {
+          this.selectedId.set(null);
+        }
         this.load();
       },
       error: (err) => {
@@ -139,5 +165,17 @@ export class DeviceListComponent implements OnInit {
         this.pendingDelete = null;
       }
     });
+  }
+
+  private syncSelection(data: Device[]): void {
+    if (data.length === 0) {
+      this.selectedId.set(null);
+      return;
+    }
+    const current = this.selectedId();
+    if (current != null && data.some((d) => d.id === current)) {
+      return;
+    }
+    this.selectedId.set(data[0].id);
   }
 }

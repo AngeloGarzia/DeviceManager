@@ -55,4 +55,10 @@ public class InterventionTechniqueRequest {
 
     /** Bon d'intervention pièces (optionnel). */
     private Long bonInterventionId;
+
+    /**
+     * Tâche À faire ouverte ({@code OPEN}/{@code IN_PROGRESS}) à rattacher à l'intervention.
+     * La clôture (signature) reste côté UI après enregistrement.
+     */
+    private Long todoTacheId;
 }

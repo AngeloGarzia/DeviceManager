@@ -66,6 +66,7 @@ public class AiAssistantService {
     private final ImageOptimizationService imageOptimizationService;
     private final WebEnrichmentService webEnrichmentService;
     private final VisiteQuadriService visiteQuadriService;
+    private final MemoireSynaptiqueService memoireSynaptiqueService;
     private final ObjectMapper objectMapper;
 
     /**
@@ -144,7 +145,7 @@ public class AiAssistantService {
         try {
             ChatClient chatClient = buildChatClient(apiKey, provider, model, 0.3);
             String reply = chatClient.prompt()
-                    .system(systemPrompt())
+                    .system(systemPromptForChat(message))
                     .user(message.trim())
                     .call()
                     .content();
@@ -1009,6 +1010,21 @@ public class AiAssistantService {
             }
         } catch (Exception ex) {
             log.debug("Résumé visites quadri indisponible pour le contexte IA: {}", ex.getMessage());
+        }
+        return base;
+    }
+
+    /** Prompt chat : contexte quadri + mémoire synaptique (faits pertinents pour la question). */
+    private String systemPromptForChat(String userMessage) {
+        String base = systemPrompt();
+        try {
+            String memory = memoireSynaptiqueService.contextForAiChat(userMessage);
+            if (memory != null && !memory.isBlank()) {
+                return base + "\n\nMémoire synaptique atelier —\n" + memory
+                        + "\n(Appuie-toi sur cette mémoire pour répondre précisément à la situation de l'atelier.)";
+            }
+        } catch (Exception ex) {
+            log.debug("Mémoire synaptique indisponible pour le chat IA: {}", ex.getMessage());
         }
         return base;
     }

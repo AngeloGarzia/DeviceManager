@@ -44,6 +44,7 @@ class DeviceServiceTest {
     @Mock private AtelierService atelierService;
     @Mock private StockMouvementService stockMouvementService;
     @Mock private UserRepository userRepository;
+    @Mock private AtelierMemoirePublisher atelierMemoirePublisher;
     @InjectMocks private DeviceService deviceService;
 
     private MockMultipartFile photo;

@@ -44,6 +44,7 @@ class OrderRequestServiceTest {
     @Mock private StorageService storageService;
     @Mock private AiAssistantService aiAssistantService;
     @Mock private DeviceService deviceService;
+    @Mock private AtelierMemoirePublisher atelierMemoirePublisher;
     @InjectMocks private OrderRequestService orderRequestService;
 
     @BeforeEach

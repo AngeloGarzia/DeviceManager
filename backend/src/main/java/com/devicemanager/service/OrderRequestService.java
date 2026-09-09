@@ -62,6 +62,7 @@ public class OrderRequestService {
     private final StorageService storageService;
     private final AiAssistantService aiAssistantService;
     private final DeviceService deviceService;
+    private final AtelierMemoirePublisher atelierMemoirePublisher;
 
     /**
      * Crée une demande {@code PENDING} et notifie l'administrateur par e-mail.
@@ -121,6 +122,8 @@ public class OrderRequestService {
         }
         log.info("Création en base — Demande commande id={} par={} pièces={} atelier={}",
                 saved.getId(), technicien.getUsername(), quantities.size(), atelier.getId());
+        atelierMemoirePublisher.publish("ORDER_CREATED",
+                "Demande de commande #" + saved.getId() + " créée (" + quantities.size() + " pièce(s))");
         return toResponse(saved);
     }
 
@@ -187,6 +190,8 @@ public class OrderRequestService {
         if (!warnings.isEmpty()) {
             log.warn("Demande #{} validation — alertes: {}", id, String.join(" ; ", warnings));
         }
+        atelierMemoirePublisher.publish("ORDER_VALIDATED",
+                "Demande de commande #" + id + " validée (e-mails SFM=" + mailsSent + ")");
         return toResponse(saved);
     }
 
@@ -298,6 +303,8 @@ public class OrderRequestService {
 
         log.info("Réception en base — Demande commande id={} par={} pièces={}",
                 id, adminUsername, toStock.getLignes().size());
+        atelierMemoirePublisher.publish("ORDER_RECEIVED",
+                "Réception commande #" + id + " (" + toStock.getLignes().size() + " ligne(s), stock mis à jour)");
         return toResponse(toStock);
     }
 

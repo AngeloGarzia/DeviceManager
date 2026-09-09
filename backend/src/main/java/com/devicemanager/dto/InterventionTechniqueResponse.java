@@ -29,5 +29,7 @@ public class InterventionTechniqueResponse {
     private Long commandeId;
     private Long bonInterventionId;
     private String bonInterventionNumero;
+    /** Tâche À faire rattachée à cette ligne (si fournie à la création). */
+    private Long todoTacheId;
     private LocalDateTime createdAt;
 }

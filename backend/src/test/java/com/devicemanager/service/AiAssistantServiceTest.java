@@ -31,6 +31,8 @@ class AiAssistantServiceTest {
     @Mock
     private VisiteQuadriService visiteQuadriService;
     @Mock
+    private MemoireSynaptiqueService memoireSynaptiqueService;
+    @Mock
     private ObjectMapper objectMapper;
 
     @InjectMocks

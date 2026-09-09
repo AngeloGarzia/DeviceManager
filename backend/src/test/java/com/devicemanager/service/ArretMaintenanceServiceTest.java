@@ -33,6 +33,7 @@ class ArretMaintenanceServiceTest {
     @Mock private MasRepository masRepository;
     @Mock private UserRepository userRepository;
     @Mock private AtelierService atelierService;
+    @Mock private AtelierMemoirePublisher atelierMemoirePublisher;
     @InjectMocks private ArretMaintenanceService arretMaintenanceService;
 
     @Test

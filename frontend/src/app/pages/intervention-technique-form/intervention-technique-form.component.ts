@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
@@ -15,7 +15,8 @@ import {
   Intervention,
   InterventionTechnique,
   Mas,
-  OrderRequest
+  OrderRequest,
+  TodoItem
 } from '../../models/models';
 import { AuthService } from '../../services/auth.service';
 import { FitService } from '../../services/fit.service';
@@ -23,6 +24,7 @@ import { InterventionService } from '../../services/intervention.service';
 import { InterventionTechniqueService } from '../../services/intervention-technique.service';
 import { MasService } from '../../services/mas.service';
 import { OrderRequestService } from '../../services/order-request.service';
+import { TodoService } from '../../services/todo.service';
 import { SignaturePadComponent } from '../../shared/signature-pad.component';
 import { apiErrorMessage } from '../../shared/api-error';
 
@@ -30,6 +32,7 @@ type FollowUpAction = 'bon' | 'fit' | 'done';
 
 /**
  * Création d'intervention(s) technique(s) : une ligne DB par MAS sélectionnée.
+ * Peut rattacher une tâche À faire ouverte ; à l'enregistrement, une modale permet de la clôturer.
  */
 @Component({
   selector: 'app-intervention-technique-form',
@@ -58,22 +61,30 @@ export class InterventionTechniqueFormComponent implements OnInit {
   private readonly interventionService = inject(InterventionService);
   private readonly orderService = inject(OrderRequestService);
   private readonly techniqueService = inject(InterventionTechniqueService);
+  private readonly todoService = inject(TodoService);
   private readonly auth = inject(AuthService);
 
   readonly masses = signal<Mas[]>([]);
   readonly bons = signal<Intervention[]>([]);
   readonly commandes = signal<OrderRequest[]>([]);
+  readonly openTodos = signal<TodoItem[]>([]);
+  readonly selectedMasIds = signal<number[]>([]);
   readonly admins = signal<FitSignataire[]>([]);
   readonly techniciens = signal<FitSignataire[]>([]);
   readonly loading = signal(false);
   readonly loadingLinks = signal(false);
   readonly saving = signal(false);
+  readonly closingTodo = signal(false);
   readonly error = signal<string | null>(null);
+  readonly closeError = signal<string | null>(null);
 
-  /** Modale post-enregistrement. */
+  /** Modale post-enregistrement suite bon/FIT. */
   readonly followUpOpen = signal(false);
+  /** Modale clôture de la tâche associée. */
+  readonly closeTodoOpen = signal(false);
   readonly createdItems = signal<InterventionTechnique[]>([]);
   readonly followUpMasId = signal<number | null>(null);
+  readonly linkedTodo = signal<TodoItem | null>(null);
 
   readonly form = this.fb.group({
     dateIntervention: [this.defaultDateTimeLocal(), Validators.required],
@@ -89,7 +100,24 @@ export class InterventionTechniqueFormComponent implements OnInit {
     signataireAdminId: [null as number | null],
     signataireTechnicienId: [null as number | null],
     commandeId: [null as number | null],
-    bonInterventionId: [null as number | null]
+    bonInterventionId: [null as number | null],
+    todoTacheId: [null as number | null]
+  });
+
+  readonly closeForm = this.fb.group({
+    signataireClotureNom: [''],
+    commentaireCloture: ['', Validators.maxLength(2000)],
+    signatureCloture: [null as string | null, Validators.required]
+  });
+
+  readonly selectableTodos = computed(() => {
+    const masIds = new Set(this.selectedMasIds());
+    return this.openTodos().filter((t) => {
+      if (t.masId == null) {
+        return true;
+      }
+      return masIds.size === 0 || masIds.has(t.masId);
+    });
   });
 
   requiresFitSignatures(): boolean {
@@ -100,14 +128,16 @@ export class InterventionTechniqueFormComponent implements OnInit {
     this.loading.set(true);
     forkJoin({
       masses: this.masService.list(),
-      signataires: this.fitService.listSignataires()
+      signataires: this.fitService.listSignataires(),
+      todos: this.todoService.list(false)
     }).subscribe({
-      next: ({ masses, signataires }) => {
+      next: ({ masses, signataires, todos }) => {
         this.masses.set(
           [...masses].sort((a, b) => a.numero.localeCompare(b.numero, 'fr', { numeric: true }))
         );
         this.admins.set(signataires.admins || []);
         this.techniciens.set(signataires.techniciens || []);
+        this.openTodos.set(todos.items ?? []);
         this.loading.set(false);
         this.preselectCurrentUser();
       },
@@ -118,8 +148,17 @@ export class InterventionTechniqueFormComponent implements OnInit {
     });
 
     this.form.controls.masIds.valueChanges.subscribe((ids) => {
-      this.refreshLinkedRecords((ids || []).filter((id): id is number => id != null));
+      const masIds = (ids || []).filter((id): id is number => id != null);
+      this.selectedMasIds.set(masIds);
+      this.refreshLinkedRecords(masIds);
+      this.clearTodoIfNotSelectable(masIds);
     });
+  }
+
+  todoLabel(todo: TodoItem): string {
+    const sev = todo.severite || 'MEDIUM';
+    const mas = todo.masNumero ? ` · ${todo.masNumero}` : '';
+    return `[${sev}] ${todo.titre}${mas}`;
   }
 
   masLabel(mas: Mas): string {
@@ -174,6 +213,10 @@ export class InterventionTechniqueFormComponent implements OnInit {
       return;
     }
 
+    const todoTacheId = v.todoTacheId;
+    const linkedTodo =
+      todoTacheId != null ? this.openTodos().find((t) => t.id === todoTacheId) ?? null : null;
+
     this.saving.set(true);
     this.techniqueService
       .create({
@@ -190,20 +233,72 @@ export class InterventionTechniqueFormComponent implements OnInit {
         signataireAdminNom: adminNom,
         signataireTechnicienNom: techNom,
         commandeId: v.commandeId,
-        bonInterventionId: v.bonInterventionId
+        bonInterventionId: v.bonInterventionId,
+        todoTacheId: todoTacheId ?? null
       })
       .subscribe({
         next: (created) => {
           this.saving.set(false);
           this.createdItems.set(created);
           this.followUpMasId.set(created[0]?.masId ?? masIds[0] ?? null);
-          this.followUpOpen.set(true);
+          if (linkedTodo) {
+            this.linkedTodo.set(linkedTodo);
+            this.closeForm.reset({
+              signataireClotureNom: this.auth.displayName() || this.auth.username() || '',
+              commentaireCloture: '',
+              signatureCloture: null
+            });
+            this.closeError.set(null);
+            this.closeTodoOpen.set(true);
+          } else {
+            this.followUpOpen.set(true);
+          }
         },
         error: (err) => {
           this.saving.set(false);
           this.error.set(apiErrorMessage(err, 'Enregistrement impossible.'));
         }
       });
+  }
+
+  submitCloseTodo(): void {
+    const todo = this.linkedTodo();
+    if (!todo) {
+      this.afterTodoCloseFlow();
+      return;
+    }
+    this.closeError.set(null);
+    if (this.closeForm.invalid || !this.closeForm.controls.signatureCloture.value) {
+      this.closeForm.markAllAsTouched();
+      this.closeError.set('La signature de clôture est obligatoire.');
+      return;
+    }
+    const v = this.closeForm.getRawValue();
+    this.closingTodo.set(true);
+    this.todoService
+      .updateStatus(todo.id, 'DONE', {
+        signatureCloture: v.signatureCloture,
+        signataireClotureNom: v.signataireClotureNom?.trim() || null,
+        commentaireCloture: v.commentaireCloture?.trim() || null
+      })
+      .subscribe({
+        next: () => {
+          this.closingTodo.set(false);
+          this.closeTodoOpen.set(false);
+          this.linkedTodo.set(null);
+          this.afterTodoCloseFlow();
+        },
+        error: (err) => {
+          this.closingTodo.set(false);
+          this.closeError.set(apiErrorMessage(err, 'Clôture de la tâche impossible.'));
+        }
+      });
+  }
+
+  skipCloseTodo(): void {
+    this.closeTodoOpen.set(false);
+    this.linkedTodo.set(null);
+    this.afterTodoCloseFlow();
   }
 
   chooseFollowUp(action: FollowUpAction): void {
@@ -253,6 +348,29 @@ export class InterventionTechniqueFormComponent implements OnInit {
     void this.router.navigate(['/mas/interventions'], {
       queryParams: { created: this.createdItems().length }
     });
+  }
+
+  private afterTodoCloseFlow(): void {
+    this.followUpOpen.set(true);
+  }
+
+  private clearTodoIfNotSelectable(masIds: number[]): void {
+    const current = this.form.controls.todoTacheId.value;
+    if (current == null) {
+      return;
+    }
+    const stillOk = this.openTodos().some((t) => {
+      if (t.id !== current) {
+        return false;
+      }
+      if (t.masId == null) {
+        return true;
+      }
+      return masIds.length === 0 || masIds.includes(t.masId);
+    });
+    if (!stillOk) {
+      this.form.patchValue({ todoTacheId: null }, { emitEvent: false });
+    }
   }
 
   private refreshLinkedRecords(masIds: number[]): void {

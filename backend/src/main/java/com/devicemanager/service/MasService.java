@@ -67,6 +67,7 @@ public class MasService {
     private final AtelierService atelierService;
     private final StorageService storageService;
     private final FitService fitService;
+    private final AtelierMemoirePublisher atelierMemoirePublisher;
 
     @Transactional(readOnly = true)
     public List<MasResponse> findAll(String q) {
@@ -355,6 +356,9 @@ public class MasService {
                 saved.getMarque() != null ? saved.getMarque().getLabel() : null,
                 atelier.getId());
         fitService.ensureFitSnapshotForMas(saved);
+        atelierMemoirePublisher.publish("MAS_CREATED",
+                "Nouvelle MAS « " + saved.getNumero() + " »"
+                        + (saved.getMarque() != null ? " (" + saved.getMarque().getLabel() + ")" : ""));
         return toResponse(saved);
     }
 

@@ -7,7 +7,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatIconModule } from '@angular/material/icon';
 import { MatCardModule } from '@angular/material/card';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { AiService } from '../../services/ai.service';
+import { AiService, MemoireSynaptiqueResponse } from '../../services/ai.service';
 import { apiErrorMessage } from '../../shared/api-error';
 
 interface ChatTurn {
@@ -44,6 +44,12 @@ export class AiAssistantComponent implements OnInit {
   readonly error = signal<string | null>(null);
   readonly turns = signal<ChatTurn[]>([]);
 
+  readonly memory = signal<MemoireSynaptiqueResponse | null>(null);
+  readonly memoryLoading = signal(false);
+  readonly memoryRebuilding = signal(false);
+  readonly memoryError = signal<string | null>(null);
+  readonly memoryExpanded = signal(true);
+
   readonly form = this.fb.group({
     message: [{ value: '', disabled: true }, [Validators.required, Validators.maxLength(4000)]]
   });
@@ -73,6 +79,44 @@ export class AiAssistantComponent implements OnInit {
         this.error.set('Impossible de contacter l’assistant IA.');
       }
     });
+    this.loadMemory();
+  }
+
+  loadMemory(): void {
+    this.memoryLoading.set(true);
+    this.memoryError.set(null);
+    this.ai.getMemory().subscribe({
+      next: (res) => {
+        this.memory.set(res);
+        this.memoryLoading.set(false);
+      },
+      error: (err) => {
+        this.memoryLoading.set(false);
+        this.memoryError.set(apiErrorMessage(err, 'Impossible de charger la mémoire synaptique.'));
+      }
+    });
+  }
+
+  rebuildMemory(): void {
+    if (this.memoryRebuilding()) {
+      return;
+    }
+    this.memoryRebuilding.set(true);
+    this.memoryError.set(null);
+    this.ai.rebuildMemory().subscribe({
+      next: (res) => {
+        this.memory.set(res);
+        this.memoryRebuilding.set(false);
+      },
+      error: (err) => {
+        this.memoryRebuilding.set(false);
+        this.memoryError.set(apiErrorMessage(err, 'Échec du recalcul de la mémoire.'));
+      }
+    });
+  }
+
+  toggleMemory(): void {
+    this.memoryExpanded.update((v) => !v);
   }
 
   /** Envoie le message saisi et affiche la réponse de l'assistant. */
@@ -90,6 +134,7 @@ export class AiAssistantComponent implements OnInit {
       next: (res) => {
         this.turns.update((list) => [...list, { role: 'assistant', text: res.reply }]);
         this.sending.set(false);
+        this.loadMemory();
       },
       error: (err) => {
         this.sending.set(false);

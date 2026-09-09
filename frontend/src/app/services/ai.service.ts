@@ -45,6 +45,16 @@ export interface AiModelsResponse {
   models: AiModelOption[];
 }
 
+export interface MemoireSynaptiqueResponse {
+  atelierId: number;
+  atelierNom?: string | null;
+  overview?: string | null;
+  recentFacts?: string[] | null;
+  lastEventType?: string | null;
+  lastEventAt?: string | null;
+  updatedAt?: string | null;
+}
+
 @Injectable({ providedIn: 'root' })
 export class AiService {
   private readonly base = `${environment.apiUrl}/api/ai`;
@@ -136,6 +146,16 @@ export class AiService {
     return this.http.get<AiModelsResponse>(`${this.base}/models`, {
       params: { provider }
     });
+  }
+
+  /** Mémoire synaptique de l'atelier courant. */
+  getMemory(): Observable<MemoireSynaptiqueResponse> {
+    return this.http.get<MemoireSynaptiqueResponse>(`${this.base}/memory`);
+  }
+
+  /** Recalcule le snapshot chiffré de la mémoire synaptique. */
+  rebuildMemory(): Observable<MemoireSynaptiqueResponse> {
+    return this.http.post<MemoireSynaptiqueResponse>(`${this.base}/memory/rebuild`, {});
   }
 
   private applyStatus(res: AiChatResponse): void {

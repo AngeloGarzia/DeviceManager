@@ -105,6 +105,23 @@
           </mat-hint>
         </mat-form-field>
 
+        <mat-form-field appearance="outline" class="w-full">
+          <mat-label>Tâche À faire (non clôturée)</mat-label>
+          <mat-select formControlName="todoTacheId">
+            <mat-option [value]="null">— Aucune —</mat-option>
+            @for (t of selectableTodos(); track t.id) {
+              <mat-option [value]="t.id">{{ todoLabel(t) }}</mat-option>
+            }
+          </mat-select>
+          <mat-hint>
+            @if (selectableTodos().length === 0) {
+              Aucune tâche ouverte disponible (filtre MAS éventuel)
+            } @else {
+              À l’enregistrement, une modale demandera la clôture (signature) de cette tâche
+            }
+          </mat-hint>
+        </mat-form-field>
+
         <mat-checkbox formControlName="associerFit">Associer à la FIT de chaque MAS</mat-checkbox>
       </div>
 
@@ -146,6 +163,61 @@
         </button>
       </div>
     </form>
+  }
+
+  @if (closeTodoOpen()) {
+    <div
+      class="fixed inset-0 z-[110] flex items-end justify-center bg-slate-900/40 p-4 sm:items-center"
+      role="presentation"
+    >
+      <div
+        class="w-full max-w-lg rounded-2xl border border-line bg-white p-5 shadow-soft"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="close-todo-title"
+      >
+        <h2 id="close-todo-title" class="m-0 text-lg font-semibold text-ink">
+          Clôturer la tâche associée
+        </h2>
+        @if (linkedTodo(); as todo) {
+          <p class="mt-2 text-sm leading-relaxed text-ink-soft">
+            L’intervention est enregistrée. La tâche
+            <strong class="text-ink">« {{ todo.titre }} »</strong>
+            a été retirée de la liste À faire. Signez pour la clôturer définitivement.
+          </p>
+        }
+
+        <form class="mt-4 grid gap-3" [formGroup]="closeForm" (ngSubmit)="submitCloseTodo()">
+          <mat-form-field appearance="outline" class="w-full">
+            <mat-label>Signataire</mat-label>
+            <input matInput formControlName="signataireClotureNom" />
+          </mat-form-field>
+          <mat-form-field appearance="outline" class="w-full">
+            <mat-label>Commentaire de clôture</mat-label>
+            <textarea matInput rows="3" formControlName="commentaireCloture"></textarea>
+          </mat-form-field>
+          <app-signature-pad formControlName="signatureCloture" label="Signature de clôture" />
+
+          @if (closeError()) {
+            <p class="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{{ closeError() }}</p>
+          }
+
+          <div class="mt-2 grid gap-2">
+            <button
+              mat-flat-button
+              color="primary"
+              type="submit"
+              [disabled]="closingTodo()"
+            >
+              {{ closingTodo() ? 'Clôture…' : 'Clôturer la tâche' }}
+            </button>
+            <button mat-button type="button" [disabled]="closingTodo()" (click)="skipCloseTodo()">
+              Plus tard
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
   }
 
   @if (followUpOpen()) {

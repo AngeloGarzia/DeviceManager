@@ -33,6 +33,7 @@ public class ArretMaintenanceService {
     private final MasRepository masRepository;
     private final UserRepository userRepository;
     private final AtelierService atelierService;
+    private final AtelierMemoirePublisher atelierMemoirePublisher;
 
     @Transactional(readOnly = true)
     public List<ArretMaintenanceResponse> listActive() {
@@ -96,6 +97,8 @@ public class ArretMaintenanceService {
                 .signataireArretNom(trimToNull(request.getSignataireArretNom()))
                 .build());
         log.info("Arrêt maintenance — mas={} id={} admin={}", mas.getNumero(), saved.getId(), username);
+        atelierMemoirePublisher.publish("ARRET_MAINTENANCE",
+                "Arrêt maintenance MAS « " + mas.getNumero() + " » — " + saved.getMotifArret());
         return toResponse(saved);
     }
 
@@ -123,6 +126,8 @@ public class ArretMaintenanceService {
         ArretMaintenance saved = arretMaintenanceRepository.save(arret);
         log.info("Reprise maintenance — mas={} arretId={} user={}",
                 saved.getMas().getNumero(), saved.getId(), username);
+        atelierMemoirePublisher.publish("REPRISE_MAINTENANCE",
+                "Reprise maintenance MAS « " + saved.getMas().getNumero() + " »");
         return toResponse(saved);
     }
 

@@ -8,11 +8,14 @@ import com.devicemanager.entity.FitLigne;
 import com.devicemanager.entity.Intervention;
 import com.devicemanager.entity.InterventionTechnique;
 import com.devicemanager.entity.Mas;
+import com.devicemanager.entity.TodoTache;
+import com.devicemanager.entity.TodoTacheStatut;
 import com.devicemanager.entity.User;
 import com.devicemanager.repository.CommandeRepository;
 import com.devicemanager.repository.InterventionRepository;
 import com.devicemanager.repository.InterventionTechniqueRepository;
 import com.devicemanager.repository.MasRepository;
+import com.devicemanager.repository.TodoTacheRepository;
 import com.devicemanager.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -45,8 +48,10 @@ public class InterventionTechniqueService {
     private final UserRepository userRepository;
     private final CommandeRepository commandeRepository;
     private final InterventionRepository interventionRepository;
+    private final TodoTacheRepository todoTacheRepository;
     private final AtelierService atelierService;
     private final FitService fitService;
+    private final AtelierMemoirePublisher atelierMemoirePublisher;
 
     /**
      * Crée une intervention technique par MAS sélectionnée (même visite_groupe_id).
@@ -142,16 +147,31 @@ public class InterventionTechniqueService {
             created.add(interventionTechniqueRepository.save(entity));
         }
 
-        log.info("Interventions techniques créées — visite={} count={} par={} atelier={}",
-                visiteGroupeId, created.size(), username, atelierId);
-        return created.stream().map(this::toResponse).toList();
+        Long linkedTodoId = null;
+        Long linkedInterventionId = null;
+        if (request.getTodoTacheId() != null) {
+            InterventionTechnique linked = linkOpenTodo(request.getTodoTacheId(), created, atelierId, username);
+            linkedTodoId = request.getTodoTacheId();
+            linkedInterventionId = linked.getId();
+        }
+
+        log.info("Interventions techniques créées — visite={} count={} todo={} par={} atelier={}",
+                visiteGroupeId, created.size(), linkedTodoId, username, atelierId);
+        atelierMemoirePublisher.publish("INTERVENTION_TECHNIQUE",
+                "Intervention technique créée (" + created.size() + " MAS)"
+                        + (linkedTodoId != null ? ", tâche #" + linkedTodoId + " associée" : ""));
+        final Long todoId = linkedTodoId;
+        final Long itId = linkedInterventionId;
+        return created.stream()
+                .map(e -> toResponse(e, itId != null && itId.equals(e.getId()) ? todoId : null))
+                .toList();
     }
 
     @Transactional(readOnly = true)
     public List<InterventionTechniqueResponse> findAll() {
         Long atelierId = atelierService.requireCurrentAtelier().getId();
         return interventionTechniqueRepository.findAllByAtelierId(atelierId).stream()
-                .map(this::toResponse)
+                .map(e -> toResponse(e, null))
                 .toList();
     }
 
@@ -161,7 +181,7 @@ public class InterventionTechniqueService {
         masRepository.findByIdAndAtelierId(masId, atelierId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "MAS introuvable"));
         return interventionTechniqueRepository.findByAtelierIdAndMasId(atelierId, masId).stream()
-                .map(this::toResponse)
+                .map(e -> toResponse(e, null))
                 .toList();
     }
 
@@ -171,7 +191,7 @@ public class InterventionTechniqueService {
         InterventionTechnique entity = interventionTechniqueRepository.findByIdAndAtelierId(id, atelierId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
                         "Intervention technique introuvable"));
-        return toResponse(entity);
+        return toResponse(entity, null);
     }
 
     private boolean bonLinkedToAnyMas(Intervention bon, Set<Long> masIds, Long atelierId) {
@@ -196,6 +216,52 @@ public class InterventionTechniqueService {
             }
         }
         return false;
+    }
+
+    /**
+     * Rattache une tâche ouverte à la ligne d'intervention dont la MAS correspond
+     * (ou la première ligne si la tâche n'a pas de MAS).
+     */
+    private InterventionTechnique linkOpenTodo(
+            Long todoTacheId,
+            List<InterventionTechnique> created,
+            Long atelierId,
+            String username) {
+        TodoTache todo = todoTacheRepository.findByIdAndAtelierId(todoTacheId, atelierId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Tâche À faire introuvable"));
+        if (!todo.getStatut().isOpen()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Seule une tâche non clôturée peut être associée à l'intervention.");
+        }
+
+        InterventionTechnique target = pickInterventionForTodo(todo, created);
+        todo.setInterventionTechnique(target);
+        if (todo.getMas() == null && target.getMas() != null) {
+            todo.setMas(target.getMas());
+        }
+        if (todo.getStatut() == TodoTacheStatut.OPEN) {
+            todo.setStatut(TodoTacheStatut.IN_PROGRESS);
+        }
+        todoTacheRepository.save(todo);
+        log.info("Tâche À faire id={} rattachée à intervention technique id={} par={}",
+                todoTacheId, target.getId(), username);
+        return target;
+    }
+
+    private static InterventionTechnique pickInterventionForTodo(
+            TodoTache todo, List<InterventionTechnique> created) {
+        if (created.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Aucune intervention à rattacher");
+        }
+        if (todo.getMas() != null) {
+            Long masId = todo.getMas().getId();
+            return created.stream()
+                    .filter(it -> it.getMas() != null && masId.equals(it.getMas().getId()))
+                    .findFirst()
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                            "La tâche est liée à une MAS absente de cette intervention."));
+        }
+        return created.getFirst();
     }
 
     private static boolean commandeLinkedToAnyMas(Commande commande, Set<Long> masIds) {
@@ -238,7 +304,7 @@ public class InterventionTechniqueService {
         return value.trim();
     }
 
-    private InterventionTechniqueResponse toResponse(InterventionTechnique entity) {
+    private InterventionTechniqueResponse toResponse(InterventionTechnique entity, Long todoTacheId) {
         Mas mas = entity.getMas();
         if (mas != null) {
             Hibernate.initialize(mas);
@@ -265,6 +331,7 @@ public class InterventionTechniqueService {
                 .commandeId(entity.getCommande() != null ? entity.getCommande().getId() : null)
                 .bonInterventionId(bon != null ? bon.getId() : null)
                 .bonInterventionNumero(bon != null ? bon.getNumero() : null)
+                .todoTacheId(todoTacheId)
                 .createdAt(entity.getCreatedAt())
                 .build();
     }

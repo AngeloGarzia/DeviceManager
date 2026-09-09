@@ -50,6 +50,7 @@ public class TodoService {
     private final InterventionRepository interventionRepository;
     private final UserRepository userRepository;
     private final AtelierService atelierService;
+    private final AtelierMemoirePublisher atelierMemoirePublisher;
 
     @Transactional(readOnly = true)
     public TodoListResponse listPending() {
@@ -57,6 +58,8 @@ public class TodoService {
         List<TodoTacheResponse> items = todoTacheRepository
                 .findByAtelierIdAndStatutIn(atelierId, ACTIVE)
                 .stream()
+                // Associée à une intervention = purgée de la liste active (clôture formelle ensuite)
+                .filter(t -> t.getInterventionTechnique() == null)
                 .map(this::toResponse)
                 .toList();
         return TodoListResponse.builder()
@@ -99,6 +102,8 @@ public class TodoService {
                 .build());
         log.info("Création en base — Tâche À faire id={} titre={} par={}",
                 saved.getId(), saved.getTitre(), username);
+        atelierMemoirePublisher.publish("TODO_CREATED",
+                "Tâche À faire créée : « " + saved.getTitre() + " » (" + saved.getSeverite() + ")");
         return toResponse(saved);
     }
 
@@ -160,6 +165,8 @@ public class TodoService {
         }
         TodoTache saved = todoTacheRepository.save(entity);
         log.info("Statut tâche À faire id={} {} → {} par={}", id, current, next, username);
+        atelierMemoirePublisher.publish("TODO_STATUS",
+                "Tâche « " + entity.getTitre() + " » : " + current + " → " + next);
         return toResponse(saved);
     }
 

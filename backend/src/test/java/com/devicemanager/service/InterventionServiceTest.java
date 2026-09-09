@@ -43,6 +43,7 @@ class InterventionServiceTest {
     @Mock private StockMouvementService stockMouvementService;
     @Mock private FitService fitService;
     @Mock private StorageService storageService;
+    @Mock private AtelierMemoirePublisher atelierMemoirePublisher;
     @InjectMocks private InterventionService interventionService;
 
     @Test

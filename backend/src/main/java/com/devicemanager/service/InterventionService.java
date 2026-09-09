@@ -45,6 +45,7 @@ public class InterventionService {
     private final StockMouvementService stockMouvementService;
     private final FitService fitService;
     private final StorageService storageService;
+    private final AtelierMemoirePublisher atelierMemoirePublisher;
 
     /**
      * Archive un bon d'intervention et décrémente le stock des pièces consommées.
@@ -145,6 +146,10 @@ public class InterventionService {
         }
         log.info("Archivage en base — Bon intervention id={} numero={} par={} pièces={} atelier={} fit={}",
                 saved.getId(), saved.getNumero(), username, saved.getLignes().size(), atelierId, associerFit);
+        atelierMemoirePublisher.publish("BON_INTERVENTION",
+                "Bon intervention " + saved.getNumero() + " — "
+                        + saved.getLignes().size() + " pièce(s) consommée(s)"
+                        + (machineMas != null ? " (MAS " + machineMas + ")" : ""));
         return toResponse(saved);
     }
 

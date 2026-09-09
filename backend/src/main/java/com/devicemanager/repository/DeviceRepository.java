@@ -119,4 +119,12 @@ public interface DeviceRepository extends JpaRepository<Device, Long> {
      * @return nombre de pièces
      */
     long countByAtelierId(Long atelierId);
+
+    long countByAtelierIdAndObsoleteTrue(Long atelierId);
+
+    @Query("""
+            SELECT COUNT(d) FROM Device d
+            WHERE d.atelier.id = :atelierId AND d.stock <= 0
+            """)
+    long countZeroStockByAtelierId(@Param("atelierId") Long atelierId);
 }

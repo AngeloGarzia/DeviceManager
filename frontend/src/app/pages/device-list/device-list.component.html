@@ -28,7 +28,7 @@
     <button
       type="button"
       class="devices-tile-toggle"
-      data-tour="page-devices"
+      data-testid="page-devices"
       (click)="toggleTile()"
       [attr.aria-expanded]="tileOpen()"
     >
@@ -46,7 +46,7 @@
             mat-flat-button
             color="primary"
             class="btn-nouvelle-piece"
-            data-tour="btn-new-device"
+            data-testid="btn-new-device"
             routerLink="/devices/new"
           >
             <mat-icon>add</mat-icon>
@@ -115,23 +115,23 @@
             <a mat-flat-button color="primary" class="mt-3" routerLink="/devices/new">Créer une pièce</a>
           </div>
         } @else {
-          <div class="device-tiles-grid">
-            @for (item of items(); track item.id) {
-              <article class="device-tile">
+          <div class="device-browser">
+            @if (selected(); as item) {
+              <article class="device-preview" aria-live="polite">
                 @if (item.photoUrl) {
                   <img
                     [src]="photoUrl(item)"
                     [alt]="item.nom"
-                    class="device-tile__photo"
+                    class="device-preview__photo"
                     loading="lazy"
                     (error)="onPhotoError($event)"
                   />
                 } @else {
-                  <div class="device-tile__photo device-tile__photo--empty" aria-hidden="true">
+                  <div class="device-preview__photo device-preview__photo--empty" aria-hidden="true">
                     <mat-icon>precision_manufacturing</mat-icon>
                   </div>
                 }
-                <div class="device-tile__body">
+                <div class="device-preview__body">
                   <div class="flex items-start justify-between gap-2">
                     <h2 class="m-0 text-base font-semibold text-ink">{{ item.nom }}</h2>
                     @if (item.obsolete) {
@@ -144,6 +144,9 @@
                     <p class="mt-2 text-sm font-medium text-brand">Réf. {{ item.reference }}</p>
                   }
                   <p class="mt-1 text-sm text-ink-soft">{{ item.usage }}</p>
+                  <p class="mt-1 text-sm text-ink-soft">
+                    Stock&nbsp;: <strong [class.text-rose-700]="item.stock <= 0">{{ item.stock }}</strong>
+                  </p>
                   <p class="mt-1 text-sm text-ink-soft">
                     @if (item.sfmNom) {
                       SFM {{ item.sfmNom }}
@@ -176,6 +179,61 @@
                 </div>
               </article>
             }
+
+            <div class="device-table-wrap panel !p-0 !shadow-none">
+              <table mat-table [dataSource]="items()" class="w-full device-table">
+                <ng-container matColumnDef="nom">
+                  <th mat-header-cell *matHeaderCellDef>Nom</th>
+                  <td mat-cell *matCellDef="let row">{{ row.nom }}</td>
+                </ng-container>
+                <ng-container matColumnDef="reference">
+                  <th mat-header-cell *matHeaderCellDef>Référence</th>
+                  <td mat-cell *matCellDef="let row">{{ row.reference || '—' }}</td>
+                </ng-container>
+                <ng-container matColumnDef="stock">
+                  <th mat-header-cell *matHeaderCellDef>Stock</th>
+                  <td mat-cell *matCellDef="let row">
+                    <span [class.stock-zero]="row.stock <= 0">{{ row.stock }}</span>
+                  </td>
+                </ng-container>
+                <ng-container matColumnDef="statut">
+                  <th mat-header-cell *matHeaderCellDef>Statut</th>
+                  <td mat-cell *matCellDef="let row">
+                    @if (row.obsolete) {
+                      <span class="status-pill status-pill--obsolete">Obsolète</span>
+                    } @else {
+                      <span class="status-pill status-pill--active">Active</span>
+                    }
+                  </td>
+                </ng-container>
+                <ng-container matColumnDef="sfm">
+                  <th mat-header-cell *matHeaderCellDef>SFM</th>
+                  <td mat-cell *matCellDef="let row">{{ row.sfmNom || '—' }}</td>
+                </ng-container>
+                <ng-container matColumnDef="mas">
+                  <th mat-header-cell *matHeaderCellDef>MAS</th>
+                  <td mat-cell *matCellDef="let row">
+                    {{ row.masNumero || '—' }}
+                    @if (row.marqueLabel || row.masMarque) {
+                      <span class="text-ink-faint"> · {{ row.marqueLabel || row.masMarque }}</span>
+                    }
+                  </td>
+                </ng-container>
+
+                <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+                <tr
+                  mat-row
+                  *matRowDef="let row; columns: displayedColumns"
+                  class="device-table__row"
+                  [class.device-table__row--selected]="isSelected(row)"
+                  (click)="select(row)"
+                  (keydown.enter)="select(row)"
+                  tabindex="0"
+                  role="button"
+                  [attr.aria-selected]="isSelected(row)"
+                ></tr>
+              </table>
+            </div>
           </div>
         }
       </mat-card-content>

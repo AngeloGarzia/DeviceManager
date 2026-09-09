@@ -5,8 +5,10 @@ import com.devicemanager.dto.AiChatResponse;
 import com.devicemanager.dto.AiLabelScanResponse;
 import com.devicemanager.dto.AiModelsResponse;
 import com.devicemanager.dto.AiPdfScanResponse;
+import com.devicemanager.dto.MemoireSynaptiqueResponse;
 import com.devicemanager.service.AiAssistantService;
 import com.devicemanager.service.AiModelDiscoveryService;
+import com.devicemanager.service.MemoireSynaptiqueService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
@@ -35,6 +37,7 @@ public class AiController {
 
     private final AiAssistantService aiAssistantService;
     private final AiModelDiscoveryService aiModelDiscoveryService;
+    private final MemoireSynaptiqueService memoireSynaptiqueService;
 
     /**
      * Retourne la disponibilité de l'assistant IA et la liste des fournisseurs configurés.
@@ -71,6 +74,24 @@ public class AiController {
     @PreAuthorize("hasAnyRole('ADMIN', 'TECHNICIEN')")
     public ResponseEntity<AiChatResponse> chat(@Valid @RequestBody AiChatRequest request) {
         return ResponseEntity.ok(aiAssistantService.chat(request.getMessage()));
+    }
+
+    /**
+     * Mémoire synaptique de l'atelier courant (situation + faits récents).
+     */
+    @GetMapping("/memory")
+    @PreAuthorize("hasAnyRole('ADMIN', 'TECHNICIEN')")
+    public ResponseEntity<MemoireSynaptiqueResponse> memory() {
+        return ResponseEntity.ok(memoireSynaptiqueService.currentForApi());
+    }
+
+    /**
+     * Recalcule le snapshot chiffré de la mémoire synaptique (admin / tech).
+     */
+    @PostMapping("/memory/rebuild")
+    @PreAuthorize("hasAnyRole('ADMIN', 'TECHNICIEN')")
+    public ResponseEntity<MemoireSynaptiqueResponse> rebuildMemory() {
+        return ResponseEntity.ok(memoireSynaptiqueService.rebuildCurrent());
     }
 
     /**

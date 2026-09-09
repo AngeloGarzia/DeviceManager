@@ -48,6 +48,7 @@ class MasServiceTest {
     @Mock private AtelierService atelierService;
     @Mock private StorageService storageService;
     @Mock private FitService fitService;
+    @Mock private AtelierMemoirePublisher atelierMemoirePublisher;
     @InjectMocks private MasService masService;
 
     @BeforeEach

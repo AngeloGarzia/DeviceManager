@@ -56,6 +56,7 @@ public class DeviceService {
     private final AtelierService atelierService;
     private final StockMouvementService stockMouvementService;
     private final UserRepository userRepository;
+    private final AtelierMemoirePublisher atelierMemoirePublisher;
 
     /**
      * Liste ou recherche les pièces de l'atelier courant.
@@ -180,6 +181,10 @@ public class DeviceService {
         log.info("Création en base — Pièce id={} nom={} référence={} photos={} docs={} atelier={}",
                 saved.getId(), saved.getNom(), saved.getReference(),
                 saved.getPhotos().size(), saved.getDocuments().size(), atelier.getId());
+        atelierMemoirePublisher.publish("DEVICE_CREATED",
+                "Pièce créée : " + saved.getNom()
+                        + (saved.getReference() != null ? " (réf. " + saved.getReference() + ")" : "")
+                        + ", stock=" + saved.getStock());
         return toResponse(saved);
     }
 
@@ -213,6 +218,10 @@ public class DeviceService {
         }
         log.info("Mise à jour stock — Pièce id={} stock={} (avant={}) par={}",
                 saved.getId(), saved.getStock(), stockAvant, username);
+        if (stockApres != stockAvant) {
+            atelierMemoirePublisher.publish("STOCK_ADJUSTED",
+                    "Stock pièce « " + saved.getNom() + " » : " + stockAvant + " → " + stockApres);
+        }
         return toResponse(saved);
     }
 

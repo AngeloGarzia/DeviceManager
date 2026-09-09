@@ -11,12 +11,15 @@ import com.devicemanager.entity.FitLigne;
 import com.devicemanager.entity.Intervention;
 import com.devicemanager.entity.InterventionTechnique;
 import com.devicemanager.entity.Mas;
+import com.devicemanager.entity.TodoTache;
+import com.devicemanager.entity.TodoTacheStatut;
 import com.devicemanager.entity.User;
 import com.devicemanager.repository.CommandeRepository;
 import com.devicemanager.repository.InterventionRepository;
 import com.devicemanager.repository.InterventionTechniqueRepository;
 import com.devicemanager.repository.MasRepository;
 import com.devicemanager.repository.UserRepository;
+import com.devicemanager.repository.TodoTacheRepository;
 import com.devicemanager.security.Roles;
 import com.devicemanager.support.TestFixtures;
 import org.junit.jupiter.api.BeforeEach;
@@ -54,8 +57,10 @@ class InterventionTechniqueServiceTest {
     @Mock private UserRepository userRepository;
     @Mock private CommandeRepository commandeRepository;
     @Mock private InterventionRepository interventionRepository;
+    @Mock private TodoTacheRepository todoTacheRepository;
     @Mock private AtelierService atelierService;
     @Mock private FitService fitService;
+    @Mock private AtelierMemoirePublisher atelierMemoirePublisher;
     @InjectMocks private InterventionTechniqueService service;
 
     private Atelier atelier;
@@ -273,6 +278,70 @@ class InterventionTechniqueServiceTest {
     void findAll_delegatesToRepository() {
         when(interventionTechniqueRepository.findAllByAtelierId(atelier.getId())).thenReturn(List.of());
         assertThat(service.findAll()).isEmpty();
+    }
+
+    @Test
+    void create_linksOpenTodoAndReturnsTodoId() {
+        when(userRepository.findByUsername("tech")).thenReturn(Optional.of(tech));
+        when(masRepository.findByIdAndAtelierId(mas.getId(), atelier.getId())).thenReturn(Optional.of(mas));
+        AtomicLong seq = new AtomicLong(30);
+        when(interventionTechniqueRepository.save(any(InterventionTechnique.class))).thenAnswer(inv -> {
+            InterventionTechnique e = inv.getArgument(0);
+            e.setId(seq.getAndIncrement());
+            return e;
+        });
+
+        TodoTache todo = TodoTache.builder()
+                .id(5L)
+                .atelier(atelier)
+                .titre("Réparer lecteur")
+                .statut(TodoTacheStatut.OPEN)
+                .severite("HIGH")
+                .createdByUsername("admin")
+                .mas(mas)
+                .build();
+        when(todoTacheRepository.findByIdAndAtelierId(5L, atelier.getId())).thenReturn(Optional.of(todo));
+        when(todoTacheRepository.save(any(TodoTache.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        InterventionTechniqueRequest request = baseRequest(List.of(mas.getId()));
+        request.setTodoTacheId(5L);
+
+        List<InterventionTechniqueResponse> created = service.create(request, "tech");
+
+        assertThat(created).hasSize(1);
+        assertThat(created.getFirst().getTodoTacheId()).isEqualTo(5L);
+        assertThat(todo.getInterventionTechnique()).isNotNull();
+        assertThat(todo.getStatut()).isEqualTo(TodoTacheStatut.IN_PROGRESS);
+        verify(todoTacheRepository).save(todo);
+    }
+
+    @Test
+    void create_rejectsClosedTodo() {
+        when(userRepository.findByUsername("tech")).thenReturn(Optional.of(tech));
+        when(masRepository.findByIdAndAtelierId(mas.getId(), atelier.getId())).thenReturn(Optional.of(mas));
+        when(interventionTechniqueRepository.save(any(InterventionTechnique.class))).thenAnswer(inv -> {
+            InterventionTechnique e = inv.getArgument(0);
+            e.setId(1L);
+            return e;
+        });
+        TodoTache todo = TodoTache.builder()
+                .id(5L)
+                .atelier(atelier)
+                .titre("Déjà faite")
+                .statut(TodoTacheStatut.DONE)
+                .severite("LOW")
+                .createdByUsername("admin")
+                .build();
+        when(todoTacheRepository.findByIdAndAtelierId(5L, atelier.getId())).thenReturn(Optional.of(todo));
+
+        InterventionTechniqueRequest request = baseRequest(List.of(mas.getId()));
+        request.setTodoTacheId(5L);
+
+        assertThatThrownBy(() -> service.create(request, "tech"))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getReason())
+                .asString()
+                .containsIgnoringCase("clôturée");
     }
 
     private static InterventionTechniqueRequest baseRequest(List<Long> masIds) {

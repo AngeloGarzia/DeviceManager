@@ -538,6 +538,8 @@ export interface InterventionTechniqueForm {
   signataireTechnicienNom?: string | null;
   commandeId?: number | null;
   bonInterventionId?: number | null;
+  /** Tâche À faire ouverte à rattacher (clôture après enregistrement). */
+  todoTacheId?: number | null;
 }
 
 export interface InterventionTechnique {
@@ -558,6 +560,7 @@ export interface InterventionTechnique {
   commandeId?: number | null;
   bonInterventionId?: number | null;
   bonInterventionNumero?: string | null;
+  todoTacheId?: number | null;
   createdAt?: string;
 }
 
