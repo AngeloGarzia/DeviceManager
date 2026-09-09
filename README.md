@@ -36,7 +36,7 @@ Migrations Flyway : `backend/src/main/resources/db/migration/` (**V1 → V22**).
 | Base | MySQL (Docker local ; Aiven Free en prod documenté) |
 | Fichiers | Disque `/uploads` et/ou S3 (paramétrable) |
 | Déploiement | Docker Compose, Blueprint Render (`RENDER.md`) |
-| CI | GitHub Actions (tests, Checkstyle, SpotBugs, JaCoCo, lint, build, CodeQL) |
+| CI | GitHub Actions (tests, Checkstyle, SpotBugs, OWASP Dependency-Check, JaCoCo, lint, build, CodeQL, Gitleaks, Dependabot) |
 
 ---
 
@@ -244,6 +244,8 @@ Toutes les configs sensibles sont dans les fichiers `.env` du **backend** unique
 | Production | `backend/.env.production` | `APP_ENV=production` |
 
 Le frontend n’a accès à aucun secret (JWT, BDD, mail, S3, clés IA, etc.).
+
+**CI — OWASP Dependency-Check :** créez une clé NVD ([demande d’API key](https://nvd.nist.gov/developers/request-an-api-key)) et ajoutez le secret GitHub `NVD_API_KEY` pour accélérer le scan. Sans clé, le job CI s’exécute quand même (rate-limit NVD plus strict).
 
 ---
 

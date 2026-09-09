@@ -305,6 +305,15 @@
                     <!-- Répertoire cacheable en CI (actions/cache → ~/.cache/dependency-check). -->
                     <dataDirectory>${user.home}/.cache/dependency-check</dataDirectory>
                 </configuration>
+                <executions>
+                    <execution>
+                        <id>dependency-check</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                    </execution>
+                </executions>
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>

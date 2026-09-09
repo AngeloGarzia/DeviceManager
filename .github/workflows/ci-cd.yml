@@ -36,6 +36,29 @@ jobs:
       - name: SpotBugs
         run: mvn -B -DskipTests spotbugs:check
 
+      # NVD API key : https://nvd.nist.gov/developers/request-an-api-key
+      # → secret repo NVD_API_KEY (scan plus rapide ; sans clé le plugin rate-limite seulement).
+      - name: Dependency-Check cache month
+        id: dc-date
+        run: echo "month=$(date -u +%Y-%m)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache OWASP Dependency-Check DB
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/dependency-check
+          key: dependency-check-${{ runner.os }}-${{ steps.dc-date.outputs.month }}
+          restore-keys: |
+            dependency-check-${{ runner.os }}-
+
+      - name: OWASP Dependency-Check
+        env:
+          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+        run: |
+          if [ -z "$NVD_API_KEY" ]; then
+            echo "::warning::Secret NVD_API_KEY absent — Dependency-Check tourne sans clé (rate-limit NVD). Créez une clé sur https://nvd.nist.gov/developers/request-an-api-key et ajoutez-la aux secrets du dépôt."
+          fi
+          mvn -B -DskipTests dependency-check:check
+
       - name: JaCoCo coverage gate
         run: mvn -B -DskipTests jacoco:check
 
