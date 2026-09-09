@@ -1,7 +1,7 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -43,6 +43,8 @@ export class DeviceListComponent implements OnInit {
   readonly auth = inject(AuthService);
   private readonly deviceService = inject(DeviceService);
   private readonly todoService = inject(TodoService);
+  private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
 
   readonly items = signal<Device[]>([]);
   readonly selectedId = signal<number | null>(null);
@@ -88,6 +90,17 @@ export class DeviceListComponent implements OnInit {
   ngOnInit(): void {
     this.load();
     this.loadTodos();
+    this.route.queryParamMap.subscribe((params) => {
+      if (params.get('open') === 'pieces') {
+        this.tileOpen.set(true);
+        void this.router.navigate([], {
+          relativeTo: this.route,
+          queryParams: { open: null },
+          queryParamsHandling: 'merge',
+          replaceUrl: true
+        });
+      }
+    });
   }
 
   get total(): number {

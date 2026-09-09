@@ -13,7 +13,7 @@ import java.util.List;
 @Builder
 public class TimelineEventResponse {
     private String type;
-    /** Colonne d'abscisse : COMMANDES | BONS | INTERVENTIONS | FIT | STOCK. */
+    /** Colonne d'abscisse : COMMANDES | BONS | INTERVENTIONS | FIT | TODOS | STOCK. */
     private String column;
     private LocalDateTime at;
     private String title;

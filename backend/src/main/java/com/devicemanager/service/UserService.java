@@ -235,12 +235,23 @@ public class UserService {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                         "Atelier préféré obligatoire pour un technicien");
             }
-            return atelierService.requireAtelierForUserGroupe(actor, preferredAtelierId);
+            Atelier atelier = atelierService.requireAtelierForUserGroupe(actor, preferredAtelierId);
+            requireUtilise(atelier);
+            return atelier;
         }
         if (preferredAtelierId == null) {
             return null;
         }
-        return atelierService.requireAtelierForUserGroupe(actor, preferredAtelierId);
+        Atelier atelier = atelierService.requireAtelierForUserGroupe(actor, preferredAtelierId);
+        requireUtilise(atelier);
+        return atelier;
+    }
+
+    private static void requireUtilise(Atelier atelier) {
+        if (!atelier.isUtilise()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Cet atelier est marqué « non utilisé » et ne peut pas être affecté.");
+        }
     }
 
     private long countAdminsInGroupe(Long groupeId) {

@@ -78,19 +78,31 @@ public class AtelierService {
      * @throws org.springframework.web.server.ResponseStatusException {@code 401} si utilisateur introuvable
      */
     public List<AtelierSummary> listForUser(String username) {
+        return listForUser(username, false);
+    }
+
+    /**
+     * Liste les ateliers du groupe ; optionnellement les ateliers « non utilisés » (admin / Setup).
+     *
+     * @param username        utilisateur connecté
+     * @param includeInactive si {@code true} et admin, inclut les ateliers non proposés aux users
+     */
+    public List<AtelierSummary> listForUser(String username, boolean includeInactive) {
         User user = requireUser(username);
         if (user.getGroupe() == null) {
             return List.of();
         }
-        // Technicien : uniquement son atelier préféré (pas de bascule libre).
+        // Technicien : uniquement son atelier préféré s'il est encore utilisé.
         if (isTechnicien(user.getRole())) {
             Atelier preferred = user.getPreferredAtelier();
-            if (preferred == null) {
+            if (preferred == null || !preferred.isUtilise()) {
                 return List.of();
             }
             return List.of(toSummary(requireAtelierInUserGroupe(user, preferred.getId())));
         }
+        boolean showInactive = includeInactive && Roles.ADMIN.equals(user.getRole());
         return atelierRepository.findAllByGroupeId(user.getGroupe().getId()).stream()
+                .filter(a -> showInactive || a.isUtilise())
                 .map(this::toSummary)
                 .toList();
     }
@@ -243,6 +255,10 @@ public class AtelierService {
                     "Seuls les administrateurs peuvent changer d'atelier");
         }
         Atelier atelier = requireAtelierInUserGroupe(user, atelierId);
+        if (!atelier.isUtilise()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Cet atelier est marqué « non utilisé » et ne peut pas être sélectionné.");
+        }
         user.setPreferredAtelier(atelier);
         userRepository.saveAndFlush(user);
         return toSummary(atelier);
@@ -265,12 +281,14 @@ public class AtelierService {
         Atelier atelier = Atelier.builder()
                 .nom(nom)
                 .casino(casino)
+                .utilise(request.getUtilise() == null || request.getUtilise())
                 .responsables(new HashSet<>())
                 .build();
         applyCoordonnees(atelier, request);
         applyResponsables(atelier, user, request.getResponsableIds());
         Atelier saved = atelierRepository.saveAndFlush(atelier);
-        applyUtilisateursPreferes(saved, user, request.getUtilisateurPrefereIds());
+        List<Long> preferes = atelier.isUtilise() ? request.getUtilisateurPrefereIds() : List.of();
+        applyUtilisateursPreferes(saved, user, preferes);
         log.info("Création en base — Atelier id={} nom={} casino={} par={}",
                 saved.getId(), saved.getNom(), casino.getNom(), username);
         return toSummary(saved);
@@ -295,10 +313,14 @@ public class AtelierService {
         ensureUniqueNom(nom, casino.getId(), id);
         atelier.setNom(nom);
         atelier.setCasino(casino);
+        if (request.getUtilise() != null) {
+            atelier.setUtilise(request.getUtilise());
+        }
         applyCoordonnees(atelier, request);
         applyResponsables(atelier, user, request.getResponsableIds());
         Atelier saved = atelierRepository.saveAndFlush(atelier);
-        applyUtilisateursPreferes(saved, user, request.getUtilisateurPrefereIds());
+        List<Long> preferes = saved.isUtilise() ? request.getUtilisateurPrefereIds() : List.of();
+        applyUtilisateursPreferes(saved, user, preferes);
         log.info("Modification en base — Atelier id={} nom={} casino={} par={}",
                 saved.getId(), saved.getNom(), casino.getNom(), username);
         return toSummary(saved);
@@ -373,6 +395,7 @@ public class AtelierService {
                         : sortedUserDtos(userRepository.findAllByPreferredAtelierId(atelier.getId()).stream()
                                 .map(this::toResponsableDto)
                                 .toList()))
+                .utilise(atelier.isUtilise())
                 .build();
     }
 

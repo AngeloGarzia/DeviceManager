@@ -15,7 +15,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 /**
- * Timeline agrégée : commandes, bons, interventions techniques, FIT, stock.
+ * Timeline agrégée : commandes, bons, interventions techniques, FIT, todos, stock.
  * Chaque événement porte une {@code column} d'abscisse (swimlane).
  */
 @RestController
@@ -31,7 +31,7 @@ public class TimelineController {
      * @param from  borne basse inclusive (ISO-8601 local)
      * @param to    borne haute inclusive
      * @param types types à inclure (répétable ou CSV)
-     * @param masId si renseigné, timeline filtrée sur cette MAS (bons / interventions / FIT)
+     * @param masId si renseigné, timeline filtrée sur cette MAS (bons / interventions / FIT / todos)
      */
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'TECHNICIEN')")
@@ -48,7 +48,7 @@ public class TimelineController {
     }
 
     /**
-     * MAS de l'atelier courant ayant déjà un historique de suivi (bons, interventions, FIT).
+     * MAS de l'atelier courant ayant déjà un historique de suivi (bons, interventions, FIT, todos).
      */
     @GetMapping("/mas-with-suivi")
     @PreAuthorize("hasAnyRole('ADMIN', 'TECHNICIEN')")

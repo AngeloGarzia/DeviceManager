@@ -15,6 +15,8 @@ public final class TimelineEventTypes {
     /** Ligne FIT signée. */
     public static final String FIT = "FIT";
     public static final String STOCK_ADJUSTMENT = "STOCK_ADJUSTMENT";
+    /** Tâche « À faire » rattachée à une MAS. */
+    public static final String TODO_TACHE = "TODO_TACHE";
 
     /** Colonnes d'abscisse (swimlane). */
     public static final String COL_COMMANDES = "COMMANDES";
@@ -22,6 +24,7 @@ public final class TimelineEventTypes {
     public static final String COL_INTERVENTIONS = "INTERVENTIONS";
     public static final String COL_FIT = "FIT";
     public static final String COL_STOCK = "STOCK";
+    public static final String COL_TODOS = "TODOS";
 
     private TimelineEventTypes() {
     }
@@ -35,6 +38,7 @@ public final class TimelineEventTypes {
             case INTERVENTION -> COL_BONS;
             case INTERVENTION_TECHNIQUE -> COL_INTERVENTIONS;
             case FIT -> COL_FIT;
+            case TODO_TACHE -> COL_TODOS;
             case STOCK_ADJUSTMENT -> COL_STOCK;
             default -> COL_STOCK;
         };

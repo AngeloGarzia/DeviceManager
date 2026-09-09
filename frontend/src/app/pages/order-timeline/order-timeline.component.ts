@@ -49,6 +49,7 @@ export class OrderTimelineComponent implements OnInit {
       types: ['INTERVENTION_TECHNIQUE']
     },
     { id: 'FIT', label: 'FIT', icon: 'description', types: ['FIT'] },
+    { id: 'TODOS', label: 'À faire', icon: 'task_alt', types: ['TODO_TACHE'] },
     { id: 'STOCK', label: 'Stock', icon: 'tune', types: ['STOCK_ADJUSTMENT'] }
   ];
 
@@ -130,6 +131,8 @@ export class OrderTimelineComponent implements OnInit {
         return 'INTERVENTIONS';
       case 'FIT':
         return 'FIT';
+      case 'TODO_TACHE':
+        return 'TODOS';
       default:
         return 'STOCK';
     }
@@ -149,6 +152,8 @@ export class OrderTimelineComponent implements OnInit {
         return 'Intervention';
       case 'FIT':
         return 'FIT';
+      case 'TODO_TACHE':
+        return 'À faire';
       case 'STOCK_ADJUSTMENT':
         return 'Ajustement';
       default:
@@ -178,6 +183,8 @@ export class OrderTimelineComponent implements OnInit {
         return 'type-technique';
       case 'FIT':
         return 'type-fit';
+      case 'TODO_TACHE':
+        return 'type-todo';
       case 'STOCK_ADJUSTMENT':
         return 'type-stock';
       default:
@@ -195,6 +202,8 @@ export class OrderTimelineComponent implements OnInit {
         return 'col-interventions';
       case 'FIT':
         return 'col-fit';
+      case 'TODOS':
+        return 'col-todos';
       case 'STOCK':
         return 'col-stock';
       default:
@@ -214,6 +223,9 @@ export class OrderTimelineComponent implements OnInit {
     }
     if (event.refType === 'FIT' && event.refId != null) {
       return `/mas/fit/${event.refId}`;
+    }
+    if (event.refType === 'TODO') {
+      return '/todos';
     }
     if (event.refType === 'DEVICE' && event.refId != null) {
       return `/devices/${event.refId}`;

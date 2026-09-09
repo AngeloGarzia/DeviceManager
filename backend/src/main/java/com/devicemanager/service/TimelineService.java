@@ -12,12 +12,15 @@ import com.devicemanager.entity.InterventionLigne;
 import com.devicemanager.entity.InterventionTechnique;
 import com.devicemanager.entity.Mas;
 import com.devicemanager.entity.StockMouvement;
+import com.devicemanager.entity.TodoTache;
+import com.devicemanager.entity.TodoTacheStatut;
 import com.devicemanager.repository.CommandeRepository;
 import com.devicemanager.repository.FitRepository;
 import com.devicemanager.repository.InterventionRepository;
 import com.devicemanager.repository.InterventionTechniqueRepository;
 import com.devicemanager.repository.MasRepository;
 import com.devicemanager.repository.StockMouvementRepository;
+import com.devicemanager.repository.TodoTacheRepository;
 import com.devicemanager.security.StockMouvementSources;
 import com.devicemanager.security.TimelineEventTypes;
 import lombok.RequiredArgsConstructor;
@@ -37,7 +40,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
- * Agrège commandes, bons, interventions techniques, FIT et ajustements de stock.
+ * Agrège commandes, bons, interventions techniques, FIT, tâches À faire et ajustements de stock.
  */
 @Service
 @RequiredArgsConstructor
@@ -50,6 +53,7 @@ public class TimelineService {
     private final FitRepository fitRepository;
     private final MasRepository masRepository;
     private final StockMouvementRepository stockMouvementRepository;
+    private final TodoTacheRepository todoTacheRepository;
     private final AtelierService atelierService;
 
     /**
@@ -59,7 +63,7 @@ public class TimelineService {
      * @param to    borne haute inclusive (optionnelle)
      * @param types filtres de types (optionnel ; vide = tous)
      * @param masId si renseigné, ne conserve que les événements liés à cette MAS
-     *              (bons, interventions techniques, FIT) — exclut commandes / stock global
+     *              (bons, interventions techniques, FIT, todos) — exclut commandes / stock global
      */
     public List<TimelineEventResponse> findEvents(
             LocalDateTime from,
@@ -83,6 +87,7 @@ public class TimelineService {
         appendBonEvents(events, atelierId, from, to, typeFilter, masId, masNumero);
         appendTechniqueEvents(events, atelierId, from, to, typeFilter, masId);
         appendFitEvents(events, atelierId, from, to, typeFilter, masId);
+        appendTodoEvents(events, atelierId, from, to, typeFilter, masId);
 
         events.sort(Comparator
                 .comparing(TimelineEventResponse::getAt, Comparator.nullsLast(Comparator.reverseOrder()))
@@ -92,7 +97,7 @@ public class TimelineService {
 
     /**
      * Identifiants des MAS de l'atelier courant qui ont déjà des données de suivi
-     * (bons d'intervention, interventions techniques ou FIT).
+     * (bons d'intervention, interventions techniques, FIT ou tâches À faire).
      */
     public List<Long> findMasIdsWithSuivi() {
         Long atelierId = atelierService.requireCurrentAtelier().getId();
@@ -100,6 +105,7 @@ public class TimelineService {
         ids.addAll(interventionRepository.findDistinctMasIdsByAtelierId(atelierId));
         ids.addAll(interventionTechniqueRepository.findDistinctMasIdsByAtelierId(atelierId));
         ids.addAll(fitRepository.findDistinctMasIdsByAtelierId(atelierId));
+        ids.addAll(todoTacheRepository.findDistinctMasIdsByAtelierId(atelierId));
 
         List<String> orphanLabels = interventionRepository.findOrphanMachineMasLabelsByAtelierId(atelierId);
         if (!orphanLabels.isEmpty()) {
@@ -311,6 +317,85 @@ public class TimelineService {
                         List.of()));
             }
         }
+    }
+
+    private void appendTodoEvents(
+            List<TimelineEventResponse> events,
+            Long atelierId,
+            LocalDateTime from,
+            LocalDateTime to,
+            Set<String> typeFilter,
+            Long masId) {
+        if (!include(typeFilter, TimelineEventTypes.TODO_TACHE)) {
+            return;
+        }
+        List<TodoTache> list = masId != null
+                ? todoTacheRepository.findByAtelierIdAndMasId(atelierId, masId)
+                : todoTacheRepository.findAllWithMasByAtelierId(atelierId);
+        for (TodoTache todo : list) {
+            LocalDateTime at = todoEventAt(todo);
+            if (!inRange(at, from, to)) {
+                continue;
+            }
+            Mas mas = todo.getMas();
+            events.add(event(
+                    TimelineEventTypes.TODO_TACHE,
+                    at,
+                    "À faire — " + todo.getTitre(),
+                    todoSubtitle(todo),
+                    todo.getCreatedByDisplayName() != null
+                            ? todo.getCreatedByDisplayName()
+                            : todo.getCreatedByUsername(),
+                    "TODO",
+                    todo.getId(),
+                    mas != null ? mas.getId() : null,
+                    mas != null ? mas.getNumero() : null,
+                    null,
+                    List.of()));
+        }
+    }
+
+    private static LocalDateTime todoEventAt(TodoTache todo) {
+        if (todo.getStatut() == TodoTacheStatut.DONE || todo.getStatut() == TodoTacheStatut.CANCELLED) {
+            if (todo.getCompletedAt() != null) {
+                return todo.getCompletedAt();
+            }
+        }
+        return todo.getCreatedAt() != null ? todo.getCreatedAt() : todo.getUpdatedAt();
+    }
+
+    private static String todoSubtitle(TodoTache todo) {
+        List<String> parts = new ArrayList<>();
+        parts.add(statutLabel(todo.getStatut()));
+        if (todo.getSeverite() != null && !todo.getSeverite().isBlank()) {
+            parts.add("Sévérité " + todo.getSeverite());
+        }
+        if (todo.getDescription() != null && !todo.getDescription().isBlank()) {
+            String desc = todo.getDescription().trim();
+            if (desc.length() > 120) {
+                desc = desc.substring(0, 117) + "…";
+            }
+            parts.add(desc);
+        }
+        if (todo.getInterventionTechnique() != null) {
+            parts.add("liée à une IT");
+        }
+        if (todo.getIntervention() != null) {
+            parts.add("liée à un bon");
+        }
+        return String.join(" · ", parts);
+    }
+
+    private static String statutLabel(TodoTacheStatut statut) {
+        if (statut == null) {
+            return "Ouverte";
+        }
+        return switch (statut) {
+            case OPEN -> "Ouverte";
+            case IN_PROGRESS -> "En cours";
+            case DONE -> "Clôturée";
+            case CANCELLED -> "Annulée";
+        };
     }
 
     private void appendManualStockEvents(

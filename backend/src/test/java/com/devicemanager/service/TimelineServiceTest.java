@@ -13,6 +13,7 @@ import com.devicemanager.repository.InterventionRepository;
 import com.devicemanager.repository.InterventionTechniqueRepository;
 import com.devicemanager.repository.MasRepository;
 import com.devicemanager.repository.StockMouvementRepository;
+import com.devicemanager.repository.TodoTacheRepository;
 import com.devicemanager.security.Roles;
 import com.devicemanager.security.StockMouvementSources;
 import com.devicemanager.security.TimelineEventTypes;
@@ -41,6 +42,7 @@ class TimelineServiceTest {
     @Mock private FitRepository fitRepository;
     @Mock private MasRepository masRepository;
     @Mock private StockMouvementRepository stockMouvementRepository;
+    @Mock private TodoTacheRepository todoTacheRepository;
     @Mock private AtelierService atelierService;
     @InjectMocks private TimelineService timelineService;
 
@@ -110,6 +112,7 @@ class TimelineServiceTest {
         when(interventionRepository.findAllWithRelationsByAtelierId(100L)).thenReturn(List.of(intervention));
         when(interventionTechniqueRepository.findAllByAtelierId(100L)).thenReturn(List.of());
         when(fitRepository.findAllByAtelierId(100L)).thenReturn(List.of());
+        when(todoTacheRepository.findAllWithMasByAtelierId(100L)).thenReturn(List.of());
         when(stockMouvementRepository.findByAtelierAndSourceType(
                 eq(100L), eq(StockMouvementSources.MANUAL)))
                 .thenReturn(List.of(manual));

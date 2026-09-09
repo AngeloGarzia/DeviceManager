@@ -49,6 +49,12 @@
   color: #0e7490;
 }
 
+.filter-chip.active.col-todos {
+  background: #ecfdf5;
+  border-color: #6ee7b7;
+  color: #047857;
+}
+
 .filter-chip.active.col-stock {
   background: #f8fafc;
   border-color: #cbd5e1;
@@ -120,6 +126,12 @@
   color: #0e7490;
 }
 
+.swim-col-title.col-todos {
+  background: #ecfdf5;
+  border-color: #a7f3d0;
+  color: #047857;
+}
+
 .swim-col-title.col-stock {
   background: #f8fafc;
   border-color: #cbd5e1;
@@ -153,6 +165,10 @@
   border-left-color: #a5f3fc;
 }
 
+.swim-cell.col-todos {
+  border-left-color: #a7f3d0;
+}
+
 .swim-cell.col-stock {
   border-left-color: #cbd5e1;
 }
@@ -181,6 +197,10 @@
 
 .timeline-card.type-fit {
   border-color: #a5f3fc;
+}
+
+.timeline-card.type-todo {
+  border-color: #a7f3d0;
 }
 
 .timeline-card.type-stock {
@@ -240,6 +260,11 @@
 .type-badge.type-fit {
   background: #cffafe;
   color: #0e7490;
+}
+
+.type-badge.type-todo {
+  background: #d1fae5;
+  color: #047857;
 }
 
 .type-badge.type-stock {

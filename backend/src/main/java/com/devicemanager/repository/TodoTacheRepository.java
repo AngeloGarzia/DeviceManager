@@ -35,4 +35,34 @@ public interface TodoTacheRepository extends JpaRepository<TodoTache, Long> {
     Optional<TodoTache> findByIdAndAtelierId(@Param("id") Long id, @Param("atelierId") Long atelierId);
 
     long countByAtelierIdAndStatutIn(Long atelierId, Collection<TodoTacheStatut> statuts);
+
+    @Query("""
+            SELECT DISTINCT t FROM TodoTache t
+            LEFT JOIN FETCH t.mas
+            LEFT JOIN FETCH t.interventionTechnique
+            LEFT JOIN FETCH t.intervention
+            WHERE t.atelier.id = :atelierId
+              AND t.mas.id = :masId
+            ORDER BY t.createdAt DESC
+            """)
+    List<TodoTache> findByAtelierIdAndMasId(
+            @Param("atelierId") Long atelierId,
+            @Param("masId") Long masId);
+
+    @Query("""
+            SELECT DISTINCT t FROM TodoTache t
+            LEFT JOIN FETCH t.mas
+            LEFT JOIN FETCH t.interventionTechnique
+            LEFT JOIN FETCH t.intervention
+            WHERE t.atelier.id = :atelierId
+              AND t.mas IS NOT NULL
+            ORDER BY t.createdAt DESC
+            """)
+    List<TodoTache> findAllWithMasByAtelierId(@Param("atelierId") Long atelierId);
+
+    @Query("""
+            SELECT DISTINCT t.mas.id FROM TodoTache t
+            WHERE t.atelier.id = :atelierId AND t.mas IS NOT NULL
+            """)
+    List<Long> findDistinctMasIdsByAtelierId(@Param("atelierId") Long atelierId);
 }

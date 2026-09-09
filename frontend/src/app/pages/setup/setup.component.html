@@ -108,9 +108,19 @@
                     } @else {
                       <div class="grid gap-2">
                         @for (item of group.ateliers; track item.id) {
-                          <div class="flex flex-wrap items-start justify-between gap-2 rounded-lg border border-line px-3 py-2.5">
+                          <div
+                            class="flex flex-wrap items-start justify-between gap-2 rounded-lg border border-line px-3 py-2.5"
+                            [class.opacity-60]="item.utilise === false"
+                          >
                             <div class="min-w-0 flex-1">
-                              <div class="font-medium text-ink">{{ item.nom }}</div>
+                              <div class="flex flex-wrap items-center gap-2">
+                                <div class="font-medium text-ink">{{ item.nom }}</div>
+                                @if (item.utilise === false) {
+                                  <span class="rounded-full bg-slate-100 px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wide text-slate-600">
+                                    Non utilisé
+                                  </span>
+                                }
+                              </div>
                               <div class="mt-1.5 grid gap-0.5 text-xs text-ink-soft">
                                 <div>
                                   <span class="text-ink-faint">Responsables :</span>
@@ -188,6 +198,18 @@
               }
             </mat-select>
           </mat-form-field>
+
+          <div class="sm:col-span-2 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-line px-3 py-2.5">
+            <div class="min-w-0">
+              <div class="text-sm font-medium text-ink">Atelier utilisé</div>
+              <p class="m-0 mt-0.5 text-xs text-ink-soft">
+                Désactivez pour le garder en archive : il reste visible ici, mais n’est plus proposé aux utilisateurs.
+              </p>
+            </div>
+            <mat-slide-toggle color="primary" formControlName="utilise">
+              {{ atelierForm.controls.utilise.value ? 'Utilisé' : 'Non utilisé' }}
+            </mat-slide-toggle>
+          </div>
 
           <h3 class="sm:col-span-2 m-0 mt-1 text-sm font-semibold text-ink">Adresse</h3>
           <mat-form-field appearance="outline" class="sm:col-span-2">
@@ -297,13 +319,17 @@
 
           <mat-form-field appearance="outline" class="sm:col-span-2">
             <mat-label>Utilisateurs (atelier préféré)</mat-label>
-            <mat-select formControlName="utilisateurPrefereIds" multiple>
+            <mat-select formControlName="utilisateurPrefereIds" multiple [disabled]="!atelierForm.controls.utilise.value">
               @for (u of groupeUsers(); track u.id) {
                 <mat-option [value]="u.id">{{ responsableLabel(u) }}</mat-option>
               }
             </mat-select>
             <mat-hint>
-              Comptes pour lesquels cet atelier est l’atelier préféré (un seul préféré par utilisateur)
+              @if (atelierForm.controls.utilise.value) {
+                Comptes pour lesquels cet atelier est l’atelier préféré (un seul préféré par utilisateur)
+              } @else {
+                Indisponible tant que l’atelier est « non utilisé »
+              }
             </mat-hint>
           </mat-form-field>
         </form>

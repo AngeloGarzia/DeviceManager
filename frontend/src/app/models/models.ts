@@ -33,6 +33,8 @@ export interface AtelierSummary {
   responsables?: AtelierResponsable[];
   /** Utilisateurs ayant cet atelier comme atelier préféré. */
   utilisateursPreferes?: AtelierResponsable[];
+  /** Si false, atelier non proposé aux utilisateurs (visible en Setup). */
+  utilise?: boolean;
 }
 
 export interface CasinoSummary {
@@ -109,6 +111,8 @@ export interface AtelierRequest {
   reseauxSociaux?: ReseauSocial[];
   responsableIds?: number[];
   utilisateurPrefereIds?: number[];
+  /** false = atelier non proposé aux utilisateurs. */
+  utilise?: boolean;
 }
 
 export interface SfmContact {
@@ -351,6 +355,7 @@ export type TimelineEventType =
   | 'INTERVENTION'
   | 'INTERVENTION_TECHNIQUE'
   | 'FIT'
+  | 'TODO_TACHE'
   | 'STOCK_ADJUSTMENT';
 
 /** Colonnes d'abscisse (swimlanes). */
@@ -359,6 +364,7 @@ export type TimelineColumn =
   | 'BONS'
   | 'INTERVENTIONS'
   | 'FIT'
+  | 'TODOS'
   | 'STOCK';
 
 export interface TimelineLine {
@@ -373,7 +379,7 @@ export interface TimelineLine {
 
 export interface TimelineEvent {
   type: TimelineEventType | string;
-  /** Colonne d'abscisse : COMMANDES | BONS | INTERVENTIONS | FIT | STOCK. */
+  /** Colonne d'abscisse : COMMANDES | BONS | INTERVENTIONS | FIT | TODOS | STOCK. */
   column?: TimelineColumn | string | null;
   at: string;
   title: string;

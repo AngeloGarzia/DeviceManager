@@ -178,7 +178,8 @@ export class SetupComponent implements OnInit {
     telephones: this.fb.array([this.newTelephoneGroup()]),
     reseauxSociaux: this.fb.array([] as FormGroup[]),
     responsableIds: this.fb.nonNullable.control<number[]>([]),
-    utilisateurPrefereIds: this.fb.nonNullable.control<number[]>([])
+    utilisateurPrefereIds: this.fb.nonNullable.control<number[]>([]),
+    utilise: this.fb.nonNullable.control(true)
   });
 
   /** Fournisseurs issus du statut API (pas de catalogue modèles en dur). */
@@ -379,7 +380,7 @@ export class SetupComponent implements OnInit {
     this.atelierError.set(null);
     this.casinoError.set(null);
     forkJoin({
-      ateliers: this.atelierService.list(),
+      ateliers: this.atelierService.list({ includeInactive: true }),
       casinos: this.atelierService.listCasinos(),
       users: this.atelierService.listUsers()
     }).subscribe({
@@ -728,7 +729,8 @@ export class SetupComponent implements OnInit {
       ville: adresse?.ville || '',
       pays: adresse?.pays || 'France',
       responsableIds: (item.responsables ?? []).map((r) => r.id),
-      utilisateurPrefereIds: (item.utilisateursPreferes ?? []).map((u) => u.id)
+      utilisateurPrefereIds: (item.utilisateursPreferes ?? []).map((u) => u.id),
+      utilise: item.utilise !== false
     });
     this.atelierDialogOpen.set(true);
   }
@@ -774,7 +776,8 @@ export class SetupComponent implements OnInit {
         .filter((r) => (r.url || '').trim())
         .map((r) => ({ type: r.type || 'AUTRE', url: r.url.trim() })),
       responsableIds: raw.responsableIds || [],
-      utilisateurPrefereIds: raw.utilisateurPrefereIds || []
+      utilisateurPrefereIds: raw.utilise === false ? [] : raw.utilisateurPrefereIds || [],
+      utilise: raw.utilise !== false
     };
     this.atelierSaving.set(true);
     this.atelierError.set(null);
@@ -917,7 +920,8 @@ export class SetupComponent implements OnInit {
       ville: '',
       pays: 'France',
       responsableIds: [],
-      utilisateurPrefereIds: []
+      utilisateurPrefereIds: [],
+      utilise: true
     });
   }
 

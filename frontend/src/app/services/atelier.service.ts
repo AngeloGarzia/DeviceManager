@@ -15,8 +15,9 @@ export class AtelierService {
   private readonly http = inject(HttpClient);
   private readonly base = `${environment.apiUrl}/api/ateliers`;
 
-  list(): Observable<AtelierSummary[]> {
-    return this.http.get<AtelierSummary[]>(this.base);
+  list(options?: { includeInactive?: boolean }): Observable<AtelierSummary[]> {
+    const params = options?.includeInactive ? { includeInactive: 'true' } : undefined;
+    return this.http.get<AtelierSummary[]>(this.base, { params });
   }
 
   listCasinos(): Observable<CasinoSummary[]> {

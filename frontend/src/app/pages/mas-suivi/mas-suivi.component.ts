@@ -20,7 +20,7 @@ interface ColumnDef {
 }
 
 /**
- * Suivi MAS : timeline multi-colonnes (bons, interventions techniques, FIT).
+ * Suivi MAS : timeline multi-colonnes (bons, interventions techniques, FIT, À faire).
  */
 @Component({
   selector: 'app-mas-suivi',
@@ -46,11 +46,12 @@ export class MasSuiviComponent implements OnInit {
   readonly columns: ColumnDef[] = [
     { id: 'BONS', label: "Bons d'intervention", icon: 'receipt_long' },
     { id: 'INTERVENTIONS', label: 'Interventions techniques', icon: 'engineering' },
-    { id: 'FIT', label: 'FIT', icon: 'description' }
+    { id: 'FIT', label: 'FIT', icon: 'description' },
+    { id: 'TODOS', label: 'À faire', icon: 'task_alt' }
   ];
 
   readonly masses = signal<Mas[]>([]);
-  /** MAS ayant déjà des données de suivi (bons / interventions / FIT). */
+  /** MAS ayant déjà des données de suivi (bons / interventions / FIT / todos). */
   readonly masIdsWithSuivi = signal<Set<number>>(new Set());
   readonly items = signal<TimelineEvent[]>([]);
   readonly selectedMas = signal<Mas | null>(null);
@@ -131,7 +132,7 @@ export class MasSuiviComponent implements OnInit {
     this.timelineService
       .list({
         masId,
-        types: ['INTERVENTION', 'INTERVENTION_TECHNIQUE', 'FIT']
+        types: ['INTERVENTION', 'INTERVENTION_TECHNIQUE', 'FIT', 'TODO_TACHE']
       })
       .subscribe({
         next: (data) => {
@@ -183,6 +184,8 @@ export class MasSuiviComponent implements OnInit {
         return 'INTERVENTIONS';
       case 'FIT':
         return 'FIT';
+      case 'TODO_TACHE':
+        return 'TODOS';
       default:
         return 'BONS';
     }
@@ -196,6 +199,8 @@ export class MasSuiviComponent implements OnInit {
         return 'col-interventions';
       case 'FIT':
         return 'col-fit';
+      case 'TODOS':
+        return 'col-todos';
       default:
         return '';
     }
@@ -209,6 +214,8 @@ export class MasSuiviComponent implements OnInit {
         return 'type-technique';
       case 'FIT':
         return 'type-fit';
+      case 'TODO_TACHE':
+        return 'type-todo';
       default:
         return 'type-default';
     }
@@ -222,6 +229,8 @@ export class MasSuiviComponent implements OnInit {
         return 'Intervention';
       case 'FIT':
         return 'FIT';
+      case 'TODO_TACHE':
+        return 'À faire';
       default:
         return type;
     }
@@ -244,6 +253,9 @@ export class MasSuiviComponent implements OnInit {
     }
     if (event.refType === 'FIT' && event.refId != null) {
       return `/mas/fit/${event.refId}`;
+    }
+    if (event.refType === 'TODO') {
+      return '/todos';
     }
     return null;
   }

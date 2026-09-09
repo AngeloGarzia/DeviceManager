@@ -44,4 +44,10 @@ public class AtelierRequest {
 
     /** Identifiants des utilisateurs pour lesquels cet atelier est l'atelier préféré. */
     private List<Long> utilisateurPrefereIds = new ArrayList<>();
+
+    /**
+     * Si {@code false}, l'atelier n'est plus proposé aux utilisateurs.
+     * Défaut {@code true} à la création.
+     */
+    private Boolean utilise;
 }

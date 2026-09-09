@@ -23,7 +23,7 @@
             @if (auth.isAdmin()) {
               <mat-select
                 [value]="auth.atelierId()"
-                (selectionChange)="auth.switchAtelier($event.value)"
+                (selectionChange)="onAtelierSelected($event.value)"
               >
                 @for (group of auth.ateliersByCasino(); track group.casinoNom) {
                   <mat-optgroup [label]="group.casinoNom">
@@ -124,7 +124,11 @@
         <span>Pièces</span>
       </button>
       <mat-menu #devicesMenu="matMenu" class="devices-nav-menu">
-        <a mat-menu-item routerLink="/devices" routerLinkActive="devices-menu-active" [routerLinkActiveOptions]="{ exact: true }">
+        <a
+          mat-menu-item
+          data-tour="nav-liste-pieces"
+          (click)="navigateToDevicesList()"
+        >
           <mat-icon>list</mat-icon>
           <span>Liste des pièces</span>
         </a>
@@ -284,4 +288,13 @@
       </a>
     </div>
   </nav>
+
+  <app-atelier-situation-dialog
+    [open]="briefingOpen()"
+    [loading]="briefingLoading()"
+    [error]="briefingError()"
+    [memory]="briefingMemory()"
+    [report]="briefingReport()"
+    (dismissed)="closeSituationBriefing()"
+  />
 </div>

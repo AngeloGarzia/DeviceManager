@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -43,11 +44,14 @@ public class AtelierController {
      * Liste les ateliers accessibles à l'utilisateur connecté.
      *
      * @param authentication utilisateur authentifié
+     * @param includeInactive si {@code true} (admin), inclut les ateliers « non utilisés »
      * @return ateliers du groupe (un seul pour un technicien)
      */
     @GetMapping
-    public ResponseEntity<List<AtelierSummary>> list(Authentication authentication) {
-        return ResponseEntity.ok(atelierService.listForUser(authentication.getName()));
+    public ResponseEntity<List<AtelierSummary>> list(
+            Authentication authentication,
+            @RequestParam(value = "includeInactive", defaultValue = "false") boolean includeInactive) {
+        return ResponseEntity.ok(atelierService.listForUser(authentication.getName(), includeInactive));
     }
 
     /**

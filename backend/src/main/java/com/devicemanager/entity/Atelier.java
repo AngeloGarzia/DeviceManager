@@ -47,4 +47,12 @@ public class Atelier {
     )
     @Builder.Default
     private Set<User> responsables = new HashSet<>();
+
+    /**
+     * Si {@code false}, l'atelier reste en base (Setup) mais n'est plus proposé
+     * aux utilisateurs (sélecteur, atelier préféré, login).
+     */
+    @Column(nullable = false)
+    @Builder.Default
+    private boolean utilise = true;
 }

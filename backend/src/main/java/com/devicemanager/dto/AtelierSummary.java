@@ -27,4 +27,9 @@ public class AtelierSummary {
     /** Utilisateurs ayant cet atelier comme atelier préféré. */
     @Builder.Default
     private List<AtelierResponsableDto> utilisateursPreferes = new ArrayList<>();
+    /**
+     * Si {@code false}, atelier non proposé aux utilisateurs (toujours visible en Setup).
+     */
+    @Builder.Default
+    private boolean utilise = true;
 }

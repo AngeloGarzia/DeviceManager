@@ -1,0 +1,86 @@
+@if (open) {
+  <div
+    class="fixed inset-0 z-[100] flex items-end justify-center bg-slate-900/40 p-4 sm:items-center"
+    role="button"
+    tabindex="0"
+    aria-label="Fermer le rapport d'atelier"
+    (click)="!loading && dismissed.emit()"
+    (keydown.enter)="!loading && dismissed.emit()"
+    (keydown.space)="!loading && dismissed.emit()"
+  >
+    <div
+      class="situation-dialog w-full max-w-xl rounded-2xl border border-line bg-white p-5 shadow-soft"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="atelier-situation-title"
+      tabindex="-1"
+      (click)="$event.stopPropagation()"
+      (keydown)="$event.stopPropagation()"
+    >
+      <div class="mb-1 flex items-start gap-2">
+        <mat-icon class="text-brand">psychology</mat-icon>
+        <div class="min-w-0 flex-1">
+          <h2 id="atelier-situation-title" class="m-0 text-lg font-semibold text-ink">
+            Rapport de situation
+          </h2>
+          <p class="m-0 mt-1 text-sm text-ink-soft">
+            @if (memory?.atelierNom) {
+              Atelier « {{ memory!.atelierNom }} » — mémoire synaptique
+            } @else {
+              Mise à jour de la mémoire synaptique de l’atelier
+            }
+          </p>
+        </div>
+        <button
+          mat-icon-button
+          type="button"
+          aria-label="Fermer"
+          [disabled]="loading"
+          (click)="dismissed.emit()"
+        >
+          <mat-icon>close</mat-icon>
+        </button>
+      </div>
+
+      @if (loading) {
+        <div class="flex flex-col items-center gap-3 py-10 text-sm text-ink-soft">
+          <mat-spinner diameter="36"></mat-spinner>
+          Actualisation de la mémoire et rédaction du rapport…
+        </div>
+      } @else if (error) {
+        <p class="mt-4 mb-0 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{{ error }}</p>
+      } @else {
+        @if (report) {
+          <pre class="situation-report">{{ report }}</pre>
+        }
+
+        @if (memory?.overview) {
+          <details class="situation-details" [open]="!report">
+            <summary>Snapshot mémoire synaptique</summary>
+            <pre class="situation-overview">{{ memory!.overview }}</pre>
+            @if (memory!.recentFacts?.length) {
+              <p class="situation-facts-title">Faits récents</p>
+              <ul class="situation-facts">
+                @for (fact of memory!.recentFacts!; track $index) {
+                  <li>{{ fact }}</li>
+                }
+              </ul>
+            }
+          </details>
+        }
+
+        @if (memory?.updatedAt) {
+          <p class="situation-meta">
+            Mémoire mise à jour le {{ memory!.updatedAt | date: 'dd/MM/yyyy HH:mm' }}
+          </p>
+        }
+      }
+
+      <div class="mt-5 flex justify-end">
+        <button mat-flat-button color="primary" type="button" [disabled]="loading" (click)="dismissed.emit()">
+          Fermer
+        </button>
+      </div>
+    </div>
+  </div>
+}

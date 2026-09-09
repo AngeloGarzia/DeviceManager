@@ -3,7 +3,7 @@
     <div>
       <h1 class="page-title" data-tour="page-mas-suivi">Suivi MAS</h1>
       <p class="page-subtitle">
-        Timeline en colonnes : bons d’intervention, interventions techniques et FIT
+        Timeline en colonnes : bons d’intervention, interventions techniques, FIT et tâches À faire
       </p>
     </div>
     <div class="flex flex-wrap gap-2">
@@ -76,19 +76,20 @@
     <div class="panel">
       <h2 class="m-0 text-lg font-semibold">Aucune MAS sélectionnée</h2>
       <p class="mt-2 text-sm text-ink-soft">
-        Choisissez une MAS pour voir la timeline de ses bons, interventions et FIT.
+        Choisissez une MAS pour voir la timeline de ses bons, interventions, FIT et tâches À faire.
       </p>
     </div>
   } @else if (visibleItems().length === 0) {
     <div class="panel">
       <h2 class="m-0 text-lg font-semibold">Aucun événement</h2>
       <p class="mt-2 text-sm text-ink-soft">
-        Aucun bon, intervention technique ou ligne FIT n’est encore lié à
+        Aucun bon, intervention technique, ligne FIT ou tâche À faire n’est encore lié à
         {{ selectedMas()?.numero || 'cette MAS' }}.
       </p>
       <div class="mt-3 flex flex-wrap gap-2">
         <a mat-flat-button color="primary" routerLink="/devices/utiliser">Utiliser une pièce</a>
         <a mat-stroked-button routerLink="/mas/interventions/new">Nouvelle intervention</a>
+        <a mat-stroked-button routerLink="/todos">Tâches À faire</a>
         <a mat-stroked-button routerLink="/mas/fit">Fiches FIT</a>
         <a mat-stroked-button routerLink="/mas/fit/feuille">Suivi FIT</a>
       </div>
