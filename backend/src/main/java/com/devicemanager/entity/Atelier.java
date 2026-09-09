@@ -52,7 +52,7 @@ public class Atelier {
      * Si {@code false}, l'atelier reste en base (Setup) mais n'est plus proposé
      * aux utilisateurs (sélecteur, atelier préféré, login).
      */
-    @Column(nullable = false)
+    @Column(name = "utilise", nullable = false)
     @Builder.Default
     private boolean utilise = true;
 }

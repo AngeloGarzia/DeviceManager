@@ -2,6 +2,7 @@ package com.devicemanager.repository;
 
 import com.devicemanager.entity.Atelier;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -62,4 +63,8 @@ public interface AtelierRepository extends JpaRepository<Atelier, Long> {
     boolean existsByNomIgnoreCaseAndCasinoId(String nom, Long casinoId);
 
     boolean existsByNomIgnoreCaseAndCasinoIdAndIdNot(String nom, Long casinoId, Long id);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("UPDATE Atelier a SET a.utilise = :utilise WHERE a.id = :id")
+    int updateUtilise(@Param("id") Long id, @Param("utilise") boolean utilise);
 }

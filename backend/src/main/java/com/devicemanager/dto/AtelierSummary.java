@@ -1,6 +1,7 @@
 package com.devicemanager.dto;
 
 import com.devicemanager.dto.coordonnees.CoordonneesDto;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Builder;
 import lombok.Data;
 
@@ -31,5 +32,6 @@ public class AtelierSummary {
      * Si {@code false}, atelier non proposé aux utilisateurs (toujours visible en Setup).
      */
     @Builder.Default
+    @JsonProperty("utilise")
     private boolean utilise = true;
 }

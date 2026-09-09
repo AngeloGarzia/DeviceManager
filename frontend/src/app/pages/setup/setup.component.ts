@@ -745,6 +745,14 @@ export class SetupComponent implements OnInit {
     this.resetAtelierForm();
   }
 
+  /** Bascule utilisé / non utilisé (persiste à l'enregistrement). */
+  onUtiliseToggle(checked: boolean): void {
+    this.atelierForm.controls.utilise.setValue(checked);
+    if (!checked) {
+      this.atelierForm.controls.utilisateurPrefereIds.setValue([]);
+    }
+  }
+
   /** Enregistre un atelier (création ou mise à jour). */
   saveAtelier(): void {
     if (this.atelierForm.invalid) {
@@ -776,8 +784,10 @@ export class SetupComponent implements OnInit {
         .filter((r) => (r.url || '').trim())
         .map((r) => ({ type: r.type || 'AUTRE', url: r.url.trim() })),
       responsableIds: raw.responsableIds || [],
-      utilisateurPrefereIds: raw.utilise === false ? [] : raw.utilisateurPrefereIds || [],
-      utilise: raw.utilise !== false
+      utilisateurPrefereIds: this.atelierForm.controls.utilise.value
+        ? raw.utilisateurPrefereIds || []
+        : [],
+      utilise: this.atelierForm.controls.utilise.value === true
     };
     this.atelierSaving.set(true);
     this.atelierError.set(null);

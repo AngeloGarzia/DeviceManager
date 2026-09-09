@@ -264,6 +264,55 @@ class AtelierServiceTest {
     }
 
     @Test
+    void update_persistsUtiliseFalse() {
+        var user = TestFixtures.user("admin", Roles.ADMIN);
+        var atelier = TestFixtures.atelier();
+        atelier.setUtilise(true);
+        atelier.setResponsables(new HashSet<>());
+        var casino = atelier.getCasino();
+
+        when(userRepository.findByUsername("admin")).thenReturn(Optional.of(user));
+        when(atelierRepository.findByIdWithCasino(100L)).thenReturn(Optional.of(atelier));
+        when(casinoRepository.findByIdWithGroupe(casino.getId())).thenReturn(Optional.of(casino));
+        when(atelierRepository.findByNomIgnoreCaseAndCasinoId(atelier.getNom(), casino.getId()))
+                .thenReturn(Optional.of(atelier));
+        when(atelierRepository.saveAndFlush(any(Atelier.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(atelierRepository.updateUtilise(100L, false)).thenReturn(1);
+        when(userRepository.findAllByPreferredAtelierId(100L)).thenReturn(List.of());
+
+        AtelierRequest req = new AtelierRequest();
+        req.setNom(atelier.getNom());
+        req.setCasinoId(casino.getId());
+        req.setUtilise(false);
+        req.setUtilisateurPrefereIds(List.of());
+
+        AtelierSummary updated = atelierService.update("admin", 100L, req);
+
+        assertThat(updated.isUtilise()).isFalse();
+        assertThat(atelier.isUtilise()).isFalse();
+        verify(atelierRepository).updateUtilise(100L, false);
+    }
+
+    @Test
+    void listForUser_excludesUnusedUnlessIncludeInactive() {
+        var used = TestFixtures.atelier();
+        used.setUtilise(true);
+        var unused = Atelier.builder()
+                .id(101L)
+                .nom("Atelier archive")
+                .casino(used.getCasino())
+                .utilise(false)
+                .build();
+        when(userRepository.findByUsername("admin")).thenReturn(Optional.of(TestFixtures.user("admin", Roles.ADMIN)));
+        when(atelierRepository.findAllByGroupeId(1L)).thenReturn(List.of(used, unused));
+        when(userRepository.findAllByPreferredAtelierId(any())).thenReturn(List.of());
+
+        assertThat(atelierService.listForUser("admin")).extracting(AtelierSummary::getId).containsExactly(100L);
+        assertThat(atelierService.listForUser("admin", true)).extracting(AtelierSummary::getId)
+                .containsExactly(100L, 101L);
+    }
+
+    @Test
     void delete_rejectsWhenDataExists() {
         var user = TestFixtures.user("admin", Roles.ADMIN);
         var atelier = TestFixtures.atelier();

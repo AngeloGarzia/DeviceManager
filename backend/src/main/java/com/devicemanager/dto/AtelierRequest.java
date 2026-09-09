@@ -4,6 +4,7 @@ import com.devicemanager.dto.coordonnees.AdressePostaleDto;
 import com.devicemanager.dto.coordonnees.EmailCoordDto;
 import com.devicemanager.dto.coordonnees.ReseauSocialDto;
 import com.devicemanager.dto.coordonnees.TelephoneCoordDto;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -49,5 +50,6 @@ public class AtelierRequest {
      * Si {@code false}, l'atelier n'est plus proposé aux utilisateurs.
      * Défaut {@code true} à la création.
      */
+    @JsonProperty("utilise")
     private Boolean utilise;
 }

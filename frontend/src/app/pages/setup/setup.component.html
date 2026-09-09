@@ -206,7 +206,11 @@
                 Désactivez pour le garder en archive : il reste visible ici, mais n’est plus proposé aux utilisateurs.
               </p>
             </div>
-            <mat-slide-toggle color="primary" formControlName="utilise">
+            <mat-slide-toggle
+              color="primary"
+              [checked]="atelierForm.controls.utilise.value"
+              (change)="onUtiliseToggle($event.checked)"
+            >
               {{ atelierForm.controls.utilise.value ? 'Utilisé' : 'Non utilisé' }}
             </mat-slide-toggle>
           </div>

@@ -278,16 +278,19 @@ public class AtelierService {
         Casino casino = requireCasinoInUserGroupe(user, request.getCasinoId());
         String nom = normalizeNom(request.getNom());
         ensureUniqueNom(nom, casino.getId(), null);
+        boolean utilise = request.getUtilise() == null || Boolean.TRUE.equals(request.getUtilise());
         Atelier atelier = Atelier.builder()
                 .nom(nom)
                 .casino(casino)
-                .utilise(request.getUtilise() == null || request.getUtilise())
+                .utilise(utilise)
                 .responsables(new HashSet<>())
                 .build();
         applyCoordonnees(atelier, request);
         applyResponsables(atelier, user, request.getResponsableIds());
         Atelier saved = atelierRepository.saveAndFlush(atelier);
-        List<Long> preferes = atelier.isUtilise() ? request.getUtilisateurPrefereIds() : List.of();
+        atelierRepository.updateUtilise(saved.getId(), utilise);
+        saved.setUtilise(utilise);
+        List<Long> preferes = utilise ? request.getUtilisateurPrefereIds() : List.of();
         applyUtilisateursPreferes(saved, user, preferes);
         log.info("Création en base — Atelier id={} nom={} casino={} par={}",
                 saved.getId(), saved.getNom(), casino.getNom(), username);
@@ -313,16 +316,18 @@ public class AtelierService {
         ensureUniqueNom(nom, casino.getId(), id);
         atelier.setNom(nom);
         atelier.setCasino(casino);
-        if (request.getUtilise() != null) {
-            atelier.setUtilise(request.getUtilise());
-        }
+        boolean utilise = request.getUtilise() == null || Boolean.TRUE.equals(request.getUtilise());
+        atelier.setUtilise(utilise);
         applyCoordonnees(atelier, request);
         applyResponsables(atelier, user, request.getResponsableIds());
         Atelier saved = atelierRepository.saveAndFlush(atelier);
-        List<Long> preferes = saved.isUtilise() ? request.getUtilisateurPrefereIds() : List.of();
+        // Force SQL UPDATE du flag (évite les cas où le dirty-checking ignore le booléen).
+        atelierRepository.updateUtilise(saved.getId(), utilise);
+        saved.setUtilise(utilise);
+        List<Long> preferes = utilise ? request.getUtilisateurPrefereIds() : List.of();
         applyUtilisateursPreferes(saved, user, preferes);
-        log.info("Modification en base — Atelier id={} nom={} casino={} par={}",
-                saved.getId(), saved.getNom(), casino.getNom(), username);
+        log.info("Modification en base — Atelier id={} nom={} casino={} utilise={} par={}",
+                saved.getId(), saved.getNom(), casino.getNom(), utilise, username);
         return toSummary(saved);
     }
 
