@@ -20,8 +20,8 @@
 
     <properties>
         <java.version>21</java.version>
-        <jjwt.version>0.12.7</jjwt.version>
-        <aws.sdk.version>2.31.78</aws.sdk.version>
+        <jjwt.version>0.13.0</jjwt.version>
+        <aws.sdk.version>2.54.13</aws.sdk.version>
         <spring-ai.version>1.1.6</spring-ai.version>
         <!-- Trivy CRITICAL CVE-2026-75595 (mTLS SNI) 4.1.136 → 4.1.137. -->
         <netty.version>4.1.137.Final</netty.version>
@@ -29,8 +29,8 @@
         <tomcat.version>10.1.59</tomcat.version>
         <!-- OWASP : MySQL Connector/J 9.7.0-9.7.1 CVE-2026-60586 / 60623 → 26.7.0. -->
         <mysql.version>26.7.0</mysql.version>
-        <spotbugs-maven-plugin.version>4.10.3.0</spotbugs-maven-plugin.version>
-        <spotbugs.version>4.10.3</spotbugs.version>
+        <spotbugs-maven-plugin.version>4.10.4.1</spotbugs-maven-plugin.version>
+        <spotbugs.version>4.10.4</spotbugs.version>
         <jacoco.version>0.8.15</jacoco.version>
         <maven-checkstyle-plugin.version>3.6.0</maven-checkstyle-plugin.version>
         <checkstyle.version>13.8.0</checkstyle.version>
@@ -142,7 +142,7 @@
         <dependency>
             <groupId>org.apache.pdfbox</groupId>
             <artifactId>pdfbox</artifactId>
-            <version>3.0.3</version>
+            <version>3.0.8</version>
         </dependency>
         <!-- Détection MIME structurelle (2e passe upload) — tika-core seul, sans parsers lourds. -->
         <dependency>
