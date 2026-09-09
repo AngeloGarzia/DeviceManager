@@ -124,14 +124,15 @@
         <span>Pièces</span>
       </button>
       <mat-menu #devicesMenu="matMenu" class="devices-nav-menu">
-        <a
+        <button
           mat-menu-item
+          type="button"
           data-tour="nav-liste-pieces"
           (click)="navigateToDevicesList()"
         >
           <mat-icon>list</mat-icon>
           <span>Liste des pièces</span>
-        </a>
+        </button>
         <a mat-menu-item routerLink="/devices/new" routerLinkActive="devices-menu-active">
           <mat-icon>add_circle</mat-icon>
           <span>Créer une nouvelle pièce</span>
