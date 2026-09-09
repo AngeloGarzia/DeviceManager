@@ -31,7 +31,7 @@
         <spotbugs.version>4.10.3</spotbugs.version>
         <jacoco.version>0.8.15</jacoco.version>
         <maven-checkstyle-plugin.version>3.6.0</maven-checkstyle-plugin.version>
-        <checkstyle.version>13.8.0</checkstyle.version>
+        <checkstyle.version>14.1.0</checkstyle.version>
         <!-- Integration tests (*IT) via failsafe; off by default (needs Docker). -->
         <skipITs>true</skipITs>
     </properties>
