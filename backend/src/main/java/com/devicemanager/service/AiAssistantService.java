@@ -34,7 +34,6 @@ import org.springframework.ai.google.genai.GoogleGenAiChatModel;
 import org.springframework.ai.google.genai.GoogleGenAiChatOptions;
 import org.springframework.ai.openai.OpenAiChatModel;
 import org.springframework.ai.openai.OpenAiChatOptions;
-import org.springframework.ai.openai.api.OpenAiApi;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -1154,7 +1153,7 @@ public class AiAssistantService {
                     .build();
             GoogleGenAiChatModel geminiModel = GoogleGenAiChatModel.builder()
                     .genAiClient(genAiClient)
-                    .defaultOptions(GoogleGenAiChatOptions.builder()
+                    .options(GoogleGenAiChatOptions.builder()
                             .model(model)
                             .temperature(temperature)
                             .build())
@@ -1162,14 +1161,12 @@ public class AiAssistantService {
             return ChatClient.builder(geminiModel).build();
         }
 
+        // Spring AI 2 : OpenAiApi retiré — apiKey/baseUrl passent dans OpenAiChatOptions (SDK openai-java).
         AiProviders.Provider provider = AiProviders.require(providerId);
-        OpenAiApi openAiApi = OpenAiApi.builder()
-                .apiKey(apiKey)
-                .baseUrl(provider.baseUrl())
-                .build();
         OpenAiChatModel chatModel = OpenAiChatModel.builder()
-                .openAiApi(openAiApi)
-                .defaultOptions(OpenAiChatOptions.builder()
+                .options(OpenAiChatOptions.builder()
+                        .apiKey(apiKey)
+                        .baseUrl(provider.baseUrl())
                         .model(model)
                         .temperature(temperature)
                         .build())
