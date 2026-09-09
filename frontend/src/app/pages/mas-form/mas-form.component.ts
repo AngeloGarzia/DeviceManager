@@ -102,7 +102,7 @@ export class MasFormComponent implements OnInit {
     denoId: [null as number | null],
     multiDeno: [false],
     statut: ['UTILISEE' as string, Validators.required],
-    regleJeuxIds: [[] as number[], Validators.required]
+    regleJeuxIds: [[] as number[]]
   });
 
   readonly newMarqueForm = this.fb.nonNullable.group({
@@ -458,10 +458,6 @@ export class MasFormComponent implements OnInit {
         ? null
         : Number(tauxRaw);
     const regleJeuxIds = raw.regleJeuxIds ?? [];
-    if (regleJeuxIds.length === 0) {
-      this.error.set('Sélectionnez au moins une règle de jeux.');
-      return;
-    }
     const payload: MasForm = {
       numero: raw.numero!.trim(),
       numeroSocle: raw.numeroSocle?.trim() || null,

@@ -472,9 +472,10 @@ public class MasService {
      * Sinon : dénomination optionnelle du référentiel.
      */
     private void applyReglesJeux(Mas entity, List<Long> regleJeuxIds) {
+        // Optionnel : une MAS peut être créée sans règle (ex. import Excel), puis complétée plus tard.
         if (regleJeuxIds == null || regleJeuxIds.isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "Sélectionnez au moins une règle de jeux");
+            entity.getReglesJeux().clear();
+            return;
         }
         Set<Long> uniqueIds = new LinkedHashSet<>(regleJeuxIds);
         List<RegleJeux> regles = regleJeuxRepository.findAllById(uniqueIds);

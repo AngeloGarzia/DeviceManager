@@ -45,18 +45,9 @@
           }
         </mat-select>
       </mat-form-field>
-
-      <mat-form-field appearance="outline" class="w-full">
-        <mat-label>Règle de jeux (toutes les MAS)</mat-label>
-        <mat-select [ngModel]="regleJeuxId()" (ngModelChange)="regleJeuxId.set($event)">
-          @for (r of regles(); track r.id) {
-            <mat-option [value]="r.id">{{ r.label }}</mat-option>
-          }
-        </mat-select>
-        @if (regles().length === 0) {
-          <mat-hint>Créez d’abord une règle de jeux dans MAS.</mat-hint>
-        }
-      </mat-form-field>
+      <p class="m-0 self-center text-sm text-ink-soft">
+        Les règles de jeux ne sont pas importées — à rattacher ensuite sur chaque MAS.
+      </p>
     </div>
 
     <div class="rounded-lg border border-line p-3">

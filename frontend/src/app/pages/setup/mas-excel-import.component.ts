@@ -11,7 +11,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
 import { MatRadioModule } from '@angular/material/radio';
 import { firstValueFrom } from 'rxjs';
-import { AtelierSummary, DenoOption, Mas, MasForm, MarqueMasOption, RegleJeuxOption } from '../../models/models';
+import { AtelierSummary, DenoOption, Mas, MasForm, MarqueMasOption } from '../../models/models';
 import { AuthService } from '../../services/auth.service';
 import { MasService } from '../../services/mas.service';
 import { apiErrorMessage } from '../../shared/api-error';
@@ -66,12 +66,10 @@ export class MasExcelImportComponent implements OnInit {
   );
 
   readonly atelierId = signal<number | null>(null);
-  readonly regleJeuxId = signal<number | null>(null);
   readonly fileDupPolicy = signal<FileDupPolicy>('keep-first');
   readonly dbDupPolicy = signal<DbDupPolicy>('skip');
   readonly createMissingCatalog = signal(true);
 
-  readonly regles = signal<RegleJeuxOption[]>([]);
   readonly preview = signal<MasImportPreviewRow[]>([]);
   readonly loadingFile = signal(false);
   readonly analyzing = signal(false);
@@ -103,7 +101,6 @@ export class MasExcelImportComponent implements OnInit {
     const s = this.stats();
     return (
       this.atelierId() != null &&
-      this.regleJeuxId() != null &&
       !this.importing() &&
       (s.ready > 0 || s.update > 0)
     );
@@ -112,10 +109,6 @@ export class MasExcelImportComponent implements OnInit {
   ngOnInit(): void {
     const current = this.auth.atelierId();
     this.atelierId.set(current);
-    this.masService.listReglesJeux().subscribe({
-      next: (list) => this.regles.set(list),
-      error: () => this.regles.set([])
-    });
   }
 
   isFieldEnabled(key: MasImportFieldKey): boolean {
@@ -211,7 +204,6 @@ export class MasExcelImportComponent implements OnInit {
       return;
     }
     const atelierId = this.atelierId()!;
-    const regleId = this.regleJeuxId()!;
     const toProcess = this.preview().filter(
       (r) => r.status === 'ready' || r.status === 'dup-db-update'
     );
@@ -247,7 +239,7 @@ export class MasExcelImportComponent implements OnInit {
           const denoId = await this.resolveDenoId(row, denos, (list) => {
             denos = list;
           });
-          const payload = this.toMasForm(row, marqueId, denoId, regleId);
+          const payload = this.toMasForm(row, marqueId, denoId);
           if (row.status === 'dup-db-update' && row.existingMasId != null) {
             const existing = await firstValueFrom(this.masService.get(row.existingMasId));
             const merged = this.mergeUpdate(existing, payload);
@@ -300,8 +292,7 @@ export class MasExcelImportComponent implements OnInit {
   private toMasForm(
     row: MasImportPreviewRow,
     marqueId: number,
-    denoId: number | null,
-    regleId: number
+    denoId: number | null
   ): MasForm {
     const enabled = this.enabledFields();
     const statut: MasForm['statut'] = row.dateCessation ? 'VENDUE' : 'UTILISEE';
@@ -319,7 +310,8 @@ export class MasExcelImportComponent implements OnInit {
       multiDeno: false,
       statut,
       utilise: statut === 'UTILISEE',
-      regleJeuxIds: [regleId]
+      // Import Excel : règles ajoutées plus tard manuellement.
+      regleJeuxIds: []
     };
   }
 
@@ -344,8 +336,8 @@ export class MasExcelImportComponent implements OnInit {
       multiDeno: existing.multiDeno,
       statut: existing.statut,
       utilise: existing.utilise,
-      regleJeuxIds:
-        existing.regleJeuxIds?.length ? existing.regleJeuxIds : incoming.regleJeuxIds
+      // Ne pas écraser les règles déjà liées lors d'une mise à jour d'import.
+      regleJeuxIds: existing.regleJeuxIds ?? []
     };
   }
 

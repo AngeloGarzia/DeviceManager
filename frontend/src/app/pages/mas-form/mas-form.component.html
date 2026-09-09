@@ -159,10 +159,7 @@
                     <mat-option [value]="r.id">{{ r.label }}</mat-option>
                   }
                 </mat-select>
-                <mat-hint>Au moins une règle obligatoire — document PDF dans le catalogue</mat-hint>
-                @if (form.controls.regleJeuxIds.invalid && form.controls.regleJeuxIds.touched) {
-                  <mat-error>Sélectionnez au moins une règle de jeux</mat-error>
-                }
+                <mat-hint>Optionnel — peut être rattaché plus tard</mat-hint>
               </mat-form-field>
               <button
                 mat-stroked-button
@@ -175,6 +172,11 @@
                 Nouvelle règle
               </button>
             </div>
+            @if ((form.controls.regleJeuxIds.value?.length ?? 0) === 0) {
+              <p class="mt-2 mb-0 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900" role="status">
+                Règle de jeux manquante
+              </p>
+            }
           </div>
 
           <input

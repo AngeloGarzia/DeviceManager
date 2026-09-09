@@ -185,9 +185,14 @@ class MasServiceTest {
     }
 
     @Test
-    void create_rejectsMasWithoutRegleJeux() {
+    void create_allowsMasWithoutRegleJeux() {
         when(masRepository.existsByNumeroIgnoreCaseAndAtelierId("MAS-RJ", 100L)).thenReturn(false);
         when(marqueMasRepository.findById(5L)).thenReturn(Optional.of(TestFixtures.marque()));
+        when(masRepository.save(any(Mas.class))).thenAnswer(inv -> {
+            Mas m = inv.getArgument(0);
+            m.setId(102L);
+            return m;
+        });
 
         MasRequest request = new MasRequest();
         request.setNumero("MAS-RJ");
@@ -195,14 +200,13 @@ class MasServiceTest {
         request.setUtilise(true);
         request.setRegleJeuxIds(List.of());
 
-        assertThatThrownBy(() -> masService.create(request))
-                .isInstanceOf(ResponseStatusException.class)
-                .satisfies(ex -> {
-                    ResponseStatusException rse = (ResponseStatusException) ex;
-                    assertThat(rse.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-                    assertThat(rse.getReason()).containsIgnoringCase("règle de jeux");
-                });
-        verify(masRepository, never()).save(any(Mas.class));
+        MasResponse response = masService.create(request);
+
+        assertThat(response.getNumero()).isEqualTo("MAS-RJ");
+        assertThat(response.getRegleJeuxIds()).isEmpty();
+        ArgumentCaptor<Mas> captor = ArgumentCaptor.forClass(Mas.class);
+        verify(masRepository).save(captor.capture());
+        assertThat(captor.getValue().getReglesJeux()).isEmpty();
     }
 
     @Test
