@@ -245,7 +245,7 @@ Toutes les configs sensibles sont dans les fichiers `.env` du **backend** unique
 
 Le frontend n’a accès à aucun secret (JWT, BDD, mail, S3, clés IA, etc.).
 
-**CI — OWASP Dependency-Check :** créez une clé NVD ([demande d’API key](https://nvd.nist.gov/developers/request-an-api-key)) et ajoutez le secret GitHub `NVD_API_KEY` pour accélérer le scan. Sans clé, le job CI s’exécute quand même (rate-limit NVD plus strict).
+**CI — OWASP Dependency-Check :** utilise le feed JSON NVD officiel (pas l’API REST) — le secret `NVD_API_KEY` n’est plus requis. Une clé invalide provoquait auparavant un `UpdateException` / NPE cryptique.
 
 ---
 

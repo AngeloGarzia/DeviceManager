@@ -301,7 +301,12 @@
                 <version>12.1.3</version>
                 <configuration>
                     <failBuildOnCVSS>7</failBuildOnCVSS>
-                    <nvdApiKey>${env.NVD_API_KEY}</nvdApiKey>
+                    <!--
+                      Feed JSON NVD 2.0 (pas l'API REST) : évite UpdateException/NPE
+                      quand NVD_API_KEY est absente, invalide ou rate-limitéé.
+                      Voir https://dependency-check.github.io/DependencyCheck/data/mirrornvd.html
+                    -->
+                    <nvdDatafeedUrl>https://nvd.nist.gov/feeds/json/cve/2.0/nvdcve-2.0-{0}.json.gz</nvdDatafeedUrl>
                     <!-- Répertoire cacheable en CI (actions/cache → ~/.cache/dependency-check). -->
                     <dataDirectory>${user.home}/.cache/dependency-check</dataDirectory>
                 </configuration>
