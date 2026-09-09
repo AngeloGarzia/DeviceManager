@@ -15,6 +15,7 @@ import com.devicemanager.repository.MasRepository;
 import com.devicemanager.repository.SfmRepository;
 import com.devicemanager.repository.TodoTacheRepository;
 import com.devicemanager.security.OrderStatuses;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -262,7 +263,7 @@ public class MemoireSynaptiqueService {
             List<String> list = objectMapper.readValue(json, new TypeReference<>() {
             });
             return list == null ? new ArrayList<>() : new ArrayList<>(list);
-        } catch (Exception ex) {
+        } catch (JsonProcessingException ex) {
             return new ArrayList<>();
         }
     }
@@ -270,7 +271,7 @@ public class MemoireSynaptiqueService {
     private String writeFacts(List<String> facts) {
         try {
             return objectMapper.writeValueAsString(facts);
-        } catch (Exception ex) {
+        } catch (JsonProcessingException ex) {
             return "[]";
         }
     }
