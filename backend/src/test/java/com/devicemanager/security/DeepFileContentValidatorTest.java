@@ -3,6 +3,7 @@ package com.devicemanager.security;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.common.PDRectangle;
+import org.apache.pdfbox.pdmodel.interactive.action.PDActionJavaScript;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.mock.web.MockMultipartFile;
@@ -12,10 +13,12 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-class DocumentUploadValidatorTest {
+class DeepFileContentValidatorTest {
 
+    /** JPEG 1×1 minimal (Tika + magic bytes). */
     private static final byte[] JPEG = new byte[]{
             (byte) 0xFF, (byte) 0xD8, (byte) 0xFF, (byte) 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46, 0x00, 0x01,
             0x01, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00, (byte) 0xFF, (byte) 0xDB, 0x00, 0x43, 0x00,
@@ -33,52 +36,61 @@ class DocumentUploadValidatorTest {
     };
 
     @Test
-    void acceptsPdf() throws Exception {
-        MockMultipartFile file = new MockMultipartFile(
-                "file", "doc.pdf", "application/pdf", minimalPdf());
+    void acceptsLegitimateJpeg() {
+        FileMagicBytesValidator.validateImageMagicBytes(JPEG);
+        assertThatCode(() -> DeepFileContentValidator.validateImage(JPEG, "image/jpeg"))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    void acceptsLegitimatePdf() throws Exception {
+        byte[] pdf = minimalPdf(false);
+        FileMagicBytesValidator.validatePdfMagicBytes(pdf);
+        assertThatCode(() -> DeepFileContentValidator.validatePdf(pdf, "application/pdf"))
+                .doesNotThrowAnyException();
+        MockMultipartFile file = new MockMultipartFile("file", "doc.pdf", "application/pdf", pdf);
         assertThat(DocumentUploadValidator.validatePdfOrImage(file, "document"))
                 .isEqualTo(DocumentUploadValidator.Kind.PDF);
     }
 
     @Test
-    void acceptsJpegImage() {
-        MockMultipartFile file = new MockMultipartFile(
-                "file", "scan.jpg", "image/jpeg", JPEG);
-        assertThat(DocumentUploadValidator.validatePdfOrImage(file, "document"))
-                .isEqualTo(DocumentUploadValidator.Kind.IMAGE);
+    void rejectsPdfWithEmbeddedJavaScript() throws Exception {
+        byte[] pdf = minimalPdf(true);
+        FileMagicBytesValidator.validatePdfMagicBytes(pdf);
+        assertThatThrownBy(() -> DeepFileContentValidator.validatePdf(pdf, "application/pdf"))
+                .isInstanceOf(ResponseStatusException.class)
+                .satisfies(ex -> {
+                    ResponseStatusException rse = (ResponseStatusException) ex;
+                    assertThat(rse.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+                    assertThat(rse.getReason()).containsIgnoringCase("script");
+                });
     }
 
     @Test
-    void acceptsPdfOnly() throws Exception {
-        MockMultipartFile file = new MockMultipartFile(
-                "file", "regle.pdf", "application/pdf", minimalPdf());
-        DocumentUploadValidator.validatePdf(file, "règle de jeux");
-    }
+    void rejectsPolyglotMimeMismatch() {
+        // Contenu JPEG annoncé comme PDF : magic PDF échoue (fail-fast) via DocumentUploadValidator.
+        MockMultipartFile asPdf = new MockMultipartFile(
+                "file", "polyglot.pdf", "application/pdf", JPEG);
+        assertThatThrownBy(() -> DocumentUploadValidator.validatePdfOrImage(asPdf, "devis"))
+                .isInstanceOf(ResponseStatusException.class)
+                .satisfies(ex -> assertThat(((ResponseStatusException) ex).getStatusCode())
+                        .isEqualTo(HttpStatus.BAD_REQUEST));
 
-    @Test
-    void rejectsNonPdfForPdfOnlyValidator() {
-        MockMultipartFile file = new MockMultipartFile(
-                "file", "scan.jpg", "image/jpeg", JPEG);
-        assertThatThrownBy(() -> DocumentUploadValidator.validatePdf(file, "règle de jeux"))
+        // Contenu JPEG annoncé image/png : Tika détecte image/jpeg → mismatch déclaré.
+        FileMagicBytesValidator.validateImageMagicBytes(JPEG);
+        assertThatThrownBy(() -> DeepFileContentValidator.validateImage(JPEG, "image/png"))
                 .isInstanceOf(ResponseStatusException.class)
                 .satisfies(ex -> assertThat(((ResponseStatusException) ex).getStatusCode())
                         .isEqualTo(HttpStatus.BAD_REQUEST));
     }
 
-    @Test
-    void rejectsOtherTypes() {
-        MockMultipartFile file = new MockMultipartFile(
-                "file", "notes.txt", "text/plain", "hello".getBytes());
-        assertThatThrownBy(() -> DocumentUploadValidator.validatePdfOrImage(file, "devis"))
-                .isInstanceOf(ResponseStatusException.class)
-                .satisfies(ex -> assertThat(((ResponseStatusException) ex).getStatusCode())
-                        .isEqualTo(HttpStatus.BAD_REQUEST));
-    }
-
-    private static byte[] minimalPdf() throws IOException {
+    private static byte[] minimalPdf(boolean withJavaScript) throws IOException {
         try (PDDocument document = new PDDocument();
              ByteArrayOutputStream out = new ByteArrayOutputStream()) {
             document.addPage(new PDPage(PDRectangle.A4));
+            if (withJavaScript) {
+                document.getDocumentCatalog().setOpenAction(new PDActionJavaScript("app.alert('x');"));
+            }
             document.save(out);
             return out.toByteArray();
         }

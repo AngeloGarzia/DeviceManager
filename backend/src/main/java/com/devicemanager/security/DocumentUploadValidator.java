@@ -21,14 +21,10 @@ public final class DocumentUploadValidator {
     }
 
     /**
-     * Valide le fichier et renvoie son type (PDF ou image).
+     * Valide qu'un fichier est un PDF (contenu et extension).
      *
      * @param file    fichier uploadé
-     * @param labelFr libellé métier pour les messages d'erreur (ex. « devis », « document »)
-     * @return type détecté
-     */
-    /**
-     * Valide qu'un fichier est un PDF (contenu et extension).
+     * @param labelFr libellé métier pour les messages d'erreur (ex. « règle de jeux »)
      */
     public static void validatePdf(MultipartFile file, String labelFr) {
         if (file == null || file.isEmpty()) {
@@ -43,7 +39,9 @@ public final class DocumentUploadValidator {
                     "La " + labelFr + " doit être un fichier PDF");
         }
         try {
-            FileMagicBytesValidator.validatePdfMagicBytes(file.getBytes());
+            byte[] bytes = file.getBytes();
+            FileMagicBytesValidator.validatePdfMagicBytes(bytes);
+            DeepFileContentValidator.validatePdf(bytes, contentType.isBlank() ? "application/pdf" : contentType);
         } catch (ResponseStatusException ex) {
             throw ex;
         } catch (Exception ex) {
@@ -73,9 +71,12 @@ public final class DocumentUploadValidator {
             byte[] bytes = file.getBytes();
             if (pdf) {
                 FileMagicBytesValidator.validatePdfMagicBytes(bytes);
+                DeepFileContentValidator.validatePdf(bytes, contentType.isBlank() ? "application/pdf" : contentType);
                 return Kind.PDF;
             }
             FileMagicBytesValidator.validateImageMagicBytes(bytes);
+            String declared = contentType.startsWith("image/") ? contentType : null;
+            DeepFileContentValidator.validateImage(bytes, declared);
             return Kind.IMAGE;
         } catch (ResponseStatusException ex) {
             throw ex;

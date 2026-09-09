@@ -1,5 +1,6 @@
 package com.devicemanager.service;
 
+import com.devicemanager.security.DeepFileContentValidator;
 import com.devicemanager.security.FileMagicBytesValidator;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -22,6 +23,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.Arrays;
 import java.util.Iterator;
+import java.util.Locale;
 
 /**
  * Optimisation des photos de pièces détachées avant stockage.
@@ -51,6 +53,9 @@ public class ImageOptimizationService {
         try {
             byte[] rawBytes = file.getBytes();
             FileMagicBytesValidator.validateImageMagicBytes(rawBytes);
+            String declared = file.getContentType();
+            DeepFileContentValidator.validateImage(rawBytes,
+                    declared != null && declared.toLowerCase(Locale.ROOT).startsWith("image/") ? declared : null);
             BufferedImage source = ImageIO.read(new ByteArrayInputStream(rawBytes));
             if (source == null) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Photo illisible ou format non pris en charge");

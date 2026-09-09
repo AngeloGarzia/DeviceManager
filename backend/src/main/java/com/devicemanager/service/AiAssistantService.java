@@ -18,6 +18,7 @@ import com.devicemanager.dto.AiPrixHistoryPoint;
 import com.devicemanager.dto.AiPrixIncoherenceResult;
 import com.devicemanager.dto.AiProviderAvailability;
 import com.devicemanager.security.DeviceDocumentTypes;
+import com.devicemanager.security.DeepFileContentValidator;
 import com.devicemanager.security.FileMagicBytesValidator;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -255,6 +256,7 @@ public class AiAssistantService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "PDF illisible");
         }
         FileMagicBytesValidator.validatePdfMagicBytes(bytes);
+        DeepFileContentValidator.validatePdf(bytes, "application/pdf");
 
         String extractedText = extractPdfText(bytes);
         if (extractedText == null || extractedText.isBlank()) {
@@ -344,6 +346,7 @@ public class AiAssistantService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "PDF illisible");
         }
         FileMagicBytesValidator.validatePdfMagicBytes(bytes);
+        DeepFileContentValidator.validatePdf(bytes, "application/pdf");
 
         String extractedText = extractPdfText(bytes);
         if (extractedText == null || extractedText.isBlank()) {
@@ -412,6 +415,7 @@ public class AiAssistantService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Fichier PDF obligatoire");
         }
         FileMagicBytesValidator.validatePdfMagicBytes(pdfBytes);
+        DeepFileContentValidator.validatePdf(pdfBytes, "application/pdf");
 
         List<AiDevisOrderLineContext> safeLines = lines == null ? List.of() : lines.stream()
                 .filter(Objects::nonNull)
@@ -573,6 +577,7 @@ public class AiAssistantService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Fichier PDF obligatoire");
         }
         FileMagicBytesValidator.validatePdfMagicBytes(pdfBytes);
+        DeepFileContentValidator.validatePdf(pdfBytes, "application/pdf");
 
         List<AiDevisOrderLineContext> safeLines = lines == null ? List.of() : lines.stream()
                 .filter(Objects::nonNull)
