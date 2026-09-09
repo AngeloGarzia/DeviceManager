@@ -1,0 +1,209 @@
+<div class="mas-import grid gap-4">
+  @if (error()) {
+    <p class="m-0 whitespace-pre-wrap rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{{ error() }}</p>
+  }
+  @if (success()) {
+    <p class="m-0 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800">{{ success() }}</p>
+  }
+
+  <div class="flex flex-wrap items-end gap-3">
+    <div>
+      <label class="mb-1 block text-xs font-medium text-ink-soft" for="mas-xlsx-input">Fichier Excel (.xlsx)</label>
+      <input
+        id="mas-xlsx-input"
+        type="file"
+        accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        (change)="onFileSelected($event)"
+      />
+      @if (fileName()) {
+        <p class="mt-1 text-xs text-ink-soft">
+          {{ fileName() }}
+          @if (sheetName()) {
+            · feuille « {{ sheetName() }} »
+          }
+          · {{ rawRows().length }} ligne(s)
+        </p>
+      }
+    </div>
+    @if (loadingFile()) {
+      <mat-spinner diameter="28"></mat-spinner>
+    }
+  </div>
+
+  @if (columns().length > 0) {
+    <div class="grid gap-3 sm:grid-cols-2">
+      <mat-form-field appearance="outline" class="w-full">
+        <mat-label>Atelier cible</mat-label>
+        <mat-select
+          [ngModel]="atelierId()"
+          (ngModelChange)="atelierId.set($event); preview.set([])"
+        >
+          @for (a of ateliers(); track a.id) {
+            <mat-option [value]="a.id">
+              {{ a.casinoNom ? a.casinoNom + ' · ' : '' }}{{ a.nom }}
+            </mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="w-full">
+        <mat-label>Règle de jeux (toutes les MAS)</mat-label>
+        <mat-select [ngModel]="regleJeuxId()" (ngModelChange)="regleJeuxId.set($event)">
+          @for (r of regles(); track r.id) {
+            <mat-option [value]="r.id">{{ r.label }}</mat-option>
+          }
+        </mat-select>
+        @if (regles().length === 0) {
+          <mat-hint>Créez d’abord une règle de jeux dans MAS.</mat-hint>
+        }
+      </mat-form-field>
+    </div>
+
+    <div class="rounded-lg border border-line p-3">
+      <h3 class="m-0 mb-2 text-sm font-semibold text-ink">Champs à intégrer</h3>
+      <p class="mt-0 mb-3 text-xs text-ink-soft">
+        Cochez les champs, puis associez chaque champ à une colonne du fichier.
+      </p>
+      <div class="grid gap-2">
+        @for (field of fields; track field.key) {
+          <div class="grid items-center gap-2 sm:grid-cols-[minmax(0,11rem)_1fr_minmax(0,14rem)]">
+            <mat-checkbox
+              [checked]="isFieldEnabled(field.key)"
+              [disabled]="field.key === 'numero' || field.key === 'marque'"
+              (change)="toggleField(field.key, $event.checked)"
+            >
+              {{ field.label }}
+              @if (field.requiredForCreate) {
+                <span class="text-rose-600">*</span>
+              }
+            </mat-checkbox>
+            <mat-form-field appearance="outline" class="w-full !text-sm" subscriptSizing="dynamic">
+              <mat-label>Colonne Excel</mat-label>
+              <mat-select
+                [ngModel]="mapping()[field.key] ?? null"
+                [disabled]="!isFieldEnabled(field.key)"
+                (ngModelChange)="onMappingChange(field.key, $event)"
+              >
+                <mat-option [value]="null">— Ignorer —</mat-option>
+                @for (col of columns(); track col.index) {
+                  <mat-option [value]="col.index">{{ col.header }}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+            <span class="hidden text-xs text-ink-soft sm:block">
+              @if (mapping()[field.key] != null) {
+                Col. {{ mapping()[field.key] }}
+              }
+            </span>
+          </div>
+        }
+      </div>
+    </div>
+
+    <div class="grid gap-3 sm:grid-cols-2">
+      <div class="rounded-lg border border-line p-3">
+        <h3 class="m-0 mb-2 text-sm font-semibold text-ink">Doublons dans le fichier</h3>
+        <mat-radio-group
+          class="flex flex-col gap-1"
+          [ngModel]="fileDupPolicy()"
+          (ngModelChange)="fileDupPolicy.set($event); preview.set([])"
+        >
+          <mat-radio-button value="keep-first">Garder la première occurrence</mat-radio-button>
+          <mat-radio-button value="keep-last">Garder la dernière occurrence</mat-radio-button>
+          <mat-radio-button value="skip-all">Ignorer toutes les lignes en doublon</mat-radio-button>
+        </mat-radio-group>
+      </div>
+      <div class="rounded-lg border border-line p-3">
+        <h3 class="m-0 mb-2 text-sm font-semibold text-ink">Doublons déjà en base</h3>
+        <mat-radio-group
+          class="flex flex-col gap-1"
+          [ngModel]="dbDupPolicy()"
+          (ngModelChange)="dbDupPolicy.set($event); preview.set([])"
+        >
+          <mat-radio-button value="skip">Ignorer (ne pas importer)</mat-radio-button>
+          <mat-radio-button value="update">Mettre à jour la MAS existante</mat-radio-button>
+        </mat-radio-group>
+        <mat-checkbox
+          class="mt-3"
+          [checked]="createMissingCatalog()"
+          (change)="createMissingCatalog.set($event.checked)"
+        >
+          Créer automatiquement marques / dénominations manquantes
+        </mat-checkbox>
+      </div>
+    </div>
+
+    <div class="flex flex-wrap items-center gap-2">
+      <button
+        mat-stroked-button
+        type="button"
+        color="primary"
+        [disabled]="!canAnalyze() || analyzing()"
+        (click)="analyze()"
+      >
+        @if (analyzing()) {
+          <mat-spinner diameter="18" class="inline-spinner"></mat-spinner>
+        } @else {
+          <mat-icon>preview</mat-icon>
+        }
+        Analyser
+      </button>
+      <button
+        mat-flat-button
+        type="button"
+        color="primary"
+        [disabled]="!canImport()"
+        (click)="importRows()"
+      >
+        @if (importing()) {
+          <mat-spinner diameter="18" class="inline-spinner"></mat-spinner>
+        } @else {
+          <mat-icon>upload</mat-icon>
+        }
+        Intégrer
+        @if (stats().ready + stats().update > 0) {
+          ({{ stats().ready + stats().update }})
+        }
+      </button>
+      @if (progress(); as p) {
+        <span class="text-sm text-ink-soft">{{ p.done }} / {{ p.total }}</span>
+      }
+    </div>
+
+    @if (preview().length > 0) {
+      <div class="overflow-auto rounded-lg border border-line">
+        <div class="flex flex-wrap gap-3 border-b border-line bg-slate-50 px-3 py-2 text-xs text-ink-soft">
+          <span>{{ stats().total }} ligne(s)</span>
+          <span class="text-emerald-700">{{ stats().ready }} à créer</span>
+          <span class="text-sky-700">{{ stats().update }} à maj.</span>
+          <span>{{ stats().skipped }} ignorée(s)</span>
+          <span class="text-rose-700">{{ stats().invalid }} invalide(s)</span>
+        </div>
+        <table class="mas-import-table">
+          <thead>
+            <tr>
+              <th>Ligne</th>
+              <th>Machine</th>
+              <th>Marque</th>
+              <th>Socle</th>
+              <th>Type</th>
+              <th>Statut</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of preview(); track row.rowNumber) {
+              <tr [class]="'st-' + statusClass(row.status)">
+                <td>{{ row.rowNumber }}</td>
+                <td>{{ row.numero || '—' }}</td>
+                <td>{{ row.marque || '—' }}</td>
+                <td>{{ row.numeroSocle || '—' }}</td>
+                <td>{{ row.typeMachine || '—' }}</td>
+                <td>{{ row.message }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  }
+</div>

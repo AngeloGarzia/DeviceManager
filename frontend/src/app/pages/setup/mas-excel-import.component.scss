@@ -1,0 +1,42 @@
+.inline-spinner {
+  display: inline-block;
+  margin-right: 0.35rem;
+  vertical-align: middle;
+}
+
+.mas-import-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+}
+
+.mas-import-table th,
+.mas-import-table td {
+  padding: 0.4rem 0.65rem;
+  border-bottom: 1px solid #e2e8f0;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.mas-import-table th {
+  font-weight: 600;
+  background: #f8fafc;
+  position: sticky;
+  top: 0;
+}
+
+.mas-import-table tr.st-ok td:last-child {
+  color: #047857;
+}
+
+.mas-import-table tr.st-upd td:last-child {
+  color: #0369a1;
+}
+
+.mas-import-table tr.st-skip {
+  opacity: 0.65;
+}
+
+.mas-import-table tr.st-bad td:last-child {
+  color: #be123c;
+}

@@ -23,6 +23,28 @@
     </mat-card-content>
   </mat-card>
 
+  <mat-card class="setup-tile !rounded-xl !border !border-line !shadow-soft" data-tour="setup-integration">
+    <button
+      type="button"
+      class="setup-tile-toggle"
+      (click)="toggleTile('integration')"
+      [attr.aria-expanded]="isTileOpen('integration')"
+    >
+      <div class="min-w-0 text-left">
+        <h2 class="m-0 text-base font-semibold text-ink">Intégration</h2>
+        <p class="mt-0.5 text-sm text-ink-soft">
+          Importer un parc MAS depuis un fichier Excel local — atelier, champs et doublons.
+        </p>
+      </div>
+      <mat-icon>{{ isTileOpen('integration') ? 'expand_less' : 'expand_more' }}</mat-icon>
+    </button>
+    @if (isTileOpen('integration')) {
+      <mat-card-content class="!pt-0">
+        <app-mas-excel-import [ateliers]="ateliers()" />
+      </mat-card-content>
+    }
+  </mat-card>
+
   <mat-card class="setup-tile !rounded-xl !border !border-line !shadow-soft" data-tour="setup-ateliers">
     <button
       type="button"
@@ -208,6 +230,7 @@
             </div>
             <mat-slide-toggle
               color="primary"
+              data-tour="setup-atelier-utilise"
               [checked]="atelierForm.controls.utilise.value"
               (change)="onUtiliseToggle($event.checked)"
             >

@@ -36,6 +36,7 @@ import { AdminLogEntry, AdminLogService } from '../../services/admin-log.service
 import { AppTourService } from '../../services/app-tour.service';
 import { ConfirmDialogComponent } from '../../shared/confirm-dialog.component';
 import { apiErrorMessage } from '../../shared/api-error';
+import { MasExcelImportComponent } from './mas-excel-import.component';
 
 /**
  * Page d'administration initiale et des paramètres applicatifs.
@@ -59,7 +60,8 @@ import { apiErrorMessage } from '../../shared/api-error';
     MatSelectModule,
     MatIconModule,
     MatCheckboxModule,
-    ConfirmDialogComponent
+    ConfirmDialogComponent,
+    MasExcelImportComponent
   ],
   templateUrl: './setup.component.html',
   styleUrl: './setup.component.scss'
