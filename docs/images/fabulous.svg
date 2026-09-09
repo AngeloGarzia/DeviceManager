@@ -1,0 +1,43 @@
+<svg width="680" height="680" viewBox="0 0 680 680" xmlns="http://www.w3.org/2000/svg">
+<defs>
+<linearGradient id="bodyGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+<stop offset="0%" stop-color="#ff6b9d"/>
+<stop offset="45%" stop-color="#c05cff"/>
+<stop offset="100%" stop-color="#5b6bff"/>
+</linearGradient>
+<linearGradient id="cheekGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+<stop offset="0%" stop-color="#ffb86b"/>
+<stop offset="100%" stop-color="#ff6b9d"/>
+</linearGradient>
+<radialGradient id="glow" cx="50%" cy="35%" r="65%">
+<stop offset="0%" stop-color="#ffffff" stop-opacity="0.35"/>
+<stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+</radialGradient>
+</defs>
+<circle cx="340" cy="360" r="220" fill="url(#bodyGrad)"/>
+<circle cx="340" cy="360" r="220" fill="url(#glow)"/>
+<line x1="340" y1="140" x2="310" y2="80" stroke="#c05cff" stroke-width="8" stroke-linecap="round"/>
+<circle cx="305" cy="68" r="18" fill="#ffd76b"/>
+<circle cx="305" cy="68" r="8" fill="#fff3d0"/>
+<path d="M345 150 Q330 105 358 90 Q345 120 362 130 Q370 100 388 95 Q368 130 375 155 Z" fill="#20163c"/>
+<circle cx="260" cy="345" r="26" fill="#20163c"/>
+<circle cx="420" cy="345" r="26" fill="#20163c"/>
+<circle cx="268" cy="336" r="8" fill="#ffffff"/>
+<circle cx="428" cy="336" r="8" fill="#ffffff"/>
+<ellipse cx="238" cy="410" rx="26" ry="16" fill="url(#cheekGrad)" opacity="0.85"/>
+<ellipse cx="442" cy="410" rx="26" ry="16" fill="url(#cheekGrad)" opacity="0.85"/>
+<path d="M280 415 Q340 470 400 415" fill="none" stroke="#20163c" stroke-width="9" stroke-linecap="round"/>
+<path d="M320 470 Q340 520 360 470 Q345 500 340 495 Q335 500 320 470 Z" fill="#20163c"/>
+<g>
+<path d="M340 500 L288 478 Q278 500 288 522 Z" fill="#20163c"/>
+<path d="M340 500 L392 478 Q402 500 392 522 Z" fill="#20163c"/>
+<circle cx="340" cy="500" r="10" fill="#ffd76b"/>
+</g>
+<path d="M170 300 Q140 230 190 200" fill="none" stroke="#c05cff" stroke-width="14" stroke-linecap="round"/>
+<path d="M510 300 Q540 230 490 200" fill="none" stroke="#5b6bff" stroke-width="14" stroke-linecap="round"/>
+<g opacity="0.9">
+<path d="M540 190 l8 20 l20 8 l-20 8 l-8 20 l-8 -20 l-20 -8 l20 -8 z" fill="#ffd76b"/>
+<path d="M140 460 l6 15 l15 6 l-15 6 l-6 15 l-6 -15 l-15 -6 l15 -6 z" fill="#ffb86b"/>
+<circle cx="520" cy="480" r="7" fill="#ffffff" opacity="0.8"/>
+</g>
+</svg>
