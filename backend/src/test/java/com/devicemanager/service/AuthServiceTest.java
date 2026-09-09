@@ -7,6 +7,7 @@ import com.devicemanager.entity.RefreshToken;
 import com.devicemanager.repository.RefreshTokenRepository;
 import com.devicemanager.repository.UserRepository;
 import com.devicemanager.security.JwtService;
+import com.devicemanager.security.LoginAccountLockoutService;
 import com.devicemanager.security.Roles;
 import com.devicemanager.support.TestFixtures;
 import org.junit.jupiter.api.Test;
@@ -40,6 +41,7 @@ class AuthServiceTest {
     @Mock private PasswordEncoder passwordEncoder;
     @Mock private JwtService jwtService;
     @Mock private AtelierService atelierService;
+    @Mock private LoginAccountLockoutService accountLockoutService;
     @InjectMocks private AuthService authService;
 
     @Test
@@ -72,6 +74,9 @@ class AuthServiceTest {
         assertThat(response.getAtelierId()).isEqualTo(100L);
         assertThat(response.getGroupeNom()).isEqualTo("Circus");
         assertThat(response.getMustChangePassword()).isFalse();
+
+        verify(accountLockoutService).assertNotLocked("admin");
+        verify(accountLockoutService).reset("admin");
 
         ArgumentCaptor<RefreshToken> captor = ArgumentCaptor.forClass(RefreshToken.class);
         verify(refreshTokenRepository).save(captor.capture());
@@ -141,6 +146,7 @@ class AuthServiceTest {
                     assertThat(rse.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
                     assertThat(rse.getReason()).isEqualTo("Identifiants invalides");
                 });
+        verify(accountLockoutService).recordFailure("ghost");
     }
 
     @Test
@@ -156,6 +162,26 @@ class AuthServiceTest {
                 .isInstanceOf(ResponseStatusException.class)
                 .extracting(ex -> ((ResponseStatusException) ex).getReason())
                 .isEqualTo("Identifiants invalides");
+        verify(accountLockoutService).recordFailure("admin");
+    }
+
+    @Test
+    void login_rejectsWhenAccountLocked() {
+        org.mockito.Mockito.doThrow(new ResponseStatusException(
+                        HttpStatus.TOO_MANY_REQUESTS, LoginAccountLockoutService.LOCKED_MESSAGE))
+                .when(accountLockoutService).assertNotLocked("admin");
+
+        LoginRequest request = new LoginRequest();
+        request.setUsername("admin");
+        request.setPassword("admin123");
+
+        assertThatThrownBy(() -> authService.login(request))
+                .isInstanceOf(ResponseStatusException.class)
+                .satisfies(ex -> {
+                    ResponseStatusException rse = (ResponseStatusException) ex;
+                    assertThat(rse.getStatusCode()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
+                    assertThat(rse.getReason()).isEqualTo(LoginAccountLockoutService.LOCKED_MESSAGE);
+                });
     }
 
     private void stubTokenIssuance(String username, String role) {

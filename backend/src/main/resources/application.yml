@@ -98,6 +98,9 @@ app:
     allow-dev-localhost: ${APP_CORS_ALLOW_DEV_LOCALHOST:true}
   security:
     login-rate-limit-per-minute: ${APP_LOGIN_RATE_LIMIT_PER_MINUTE:20}
+    login-account-max-failures: ${APP_LOGIN_ACCOUNT_MAX_FAILURES:10}
+    login-account-failure-window-minutes: ${APP_LOGIN_ACCOUNT_FAILURE_WINDOW_MINUTES:15}
+    login-account-lock-minutes: ${APP_LOGIN_ACCOUNT_LOCK_MINUTES:15}
   mail:
     enabled: ${APP_MAIL_ENABLED:false}
     from: ${APP_MAIL_FROM:noreply@devicemanager.local}

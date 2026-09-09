@@ -9,6 +9,7 @@ import com.devicemanager.entity.User;
 import com.devicemanager.repository.RefreshTokenRepository;
 import com.devicemanager.repository.UserRepository;
 import com.devicemanager.security.JwtService;
+import com.devicemanager.security.LoginAccountLockoutService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -37,6 +38,7 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final AtelierService atelierService;
+    private final LoginAccountLockoutService accountLockoutService;
 
     /**
      * Résultat de login / refresh : corps API + valeur brute du refresh token (cookie).
@@ -54,18 +56,23 @@ public class AuthService {
     @Transactional
     public AuthSession login(LoginRequest request) {
         String attemptedUsername = request.getUsername() == null ? "" : request.getUsername().trim();
+        accountLockoutService.assertNotLocked(attemptedUsername);
+
         User user = userRepository.findByUsername(attemptedUsername).orElse(null);
         if (user == null) {
+            accountLockoutService.recordFailure(attemptedUsername);
             log.warn("Connexion refusée (utilisateur inconnu) username={}", attemptedUsername);
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Identifiants invalides");
         }
 
         if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
+            accountLockoutService.recordFailure(attemptedUsername);
             log.warn("Connexion refusée (mot de passe invalide) utilisateur={} rôle={}",
                     user.getUsername(), user.getRole());
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Identifiants invalides");
         }
 
+        accountLockoutService.reset(attemptedUsername);
         AuthSession session = issueSession(user);
         log.info("Connexion réussie utilisateur={} rôle={} atelier={} groupe={}",
                 user.getUsername(),
