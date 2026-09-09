@@ -3,7 +3,8 @@ import { Router } from '@angular/router';
 import { driver, type DriveStep, type Driver } from 'driver.js';
 import { AuthService } from './auth.service';
 
-const TOUR_KEY_PREFIX = 'dm_tour_done_';
+/** Nouvelle clé : force un passage du parcours v2 pour tous les comptes. */
+const TOUR_KEY_PREFIX = 'dm_tour_v2_done_';
 
 interface TourStepDef {
   /** Route à charger avant de surligner (optionnel). */
@@ -12,14 +13,19 @@ interface TourStepDef {
   element?: string;
   title: string;
   description: string;
+  /** Position du popover driver.js. */
+  side?: 'top' | 'right' | 'bottom' | 'left';
+  align?: 'start' | 'center' | 'end';
   /** Si true, étape réservée aux administrateurs. */
   adminOnly?: boolean;
-  /** Préparation DOM (ouvrir une tuile, etc.). */
+  /** Préparation DOM (ouvrir une tuile, un menu, etc.). */
   before?: () => void | Promise<void>;
 }
 
 /**
  * Parcours guidé multi-pages (driver.js) — 1er login + relance manuelle.
+ * Chapitres : orientation → organisation → référentiels → pièces →
+ * commandes → ops MAS / todo → IA.
  */
 @Injectable({ providedIn: 'root' })
 export class AppTourService {
@@ -84,8 +90,8 @@ export class AppTourService {
         popover: {
           title: def.title,
           description: def.description,
-          side: 'top',
-          align: 'start'
+          side: def.side ?? 'top',
+          align: def.align ?? 'start'
         }
       }));
 
@@ -132,6 +138,7 @@ export class AppTourService {
         onDestroyed: () => {
           this.markCompleted();
           this.active = null;
+          this.closeOpenMenus();
         }
       });
 
@@ -154,6 +161,7 @@ export class AppTourService {
   }
 
   private async prepareStep(def: TourStepDef): Promise<void> {
+    this.closeOpenMenus();
     if (def.route) {
       const target = def.route.split('?')[0];
       if (!this.router.url.startsWith(target)) {
@@ -167,33 +175,53 @@ export class AppTourService {
   }
 
   private buildSteps(): TourStepDef[] {
+    const isAdmin = this.auth.isAdmin();
+
     return [
+      // ── Orientation ──────────────────────────────────────────────
       {
         title: 'Bienvenue dans DeviceManager',
         description:
-          'Parcours complet : atelier, SFM et contacts, MAS, pièces, stock (export), commandes et assistant IA. Relançable depuis le pied de page.'
+          'Petit parcours métier : votre atelier, les référentiels (SFM / MAS), les pièces au quotidien, ' +
+          'les commandes, le suivi terrain, puis l’assistant IA et sa mémoire synaptique. ' +
+          'Vous pourrez le relancer à tout moment depuis le pied de page.'
       },
       {
         element: '[data-tour="shell-brand"]',
-        title: 'Bandeau',
+        title: 'Votre contexte',
         description:
-          'Identité, groupe (ex. Circus) et ville de l’atelier sélectionné.'
+          'Nom, rôle, groupe (ex. Circus) et ville de l’atelier actif. Tout ce que vous voyez ensuite est filtré par cet atelier.'
       },
       {
         element: '[data-tour="shell-atelier"]',
         title: 'Casino → Atelier',
+        description: isAdmin
+          ? 'Changez d’atelier ici. À chaque bascule, DeviceManager recalcule la mémoire synaptique et affiche un briefing de situation.'
+          : 'Votre atelier de travail. Les données (pièces, stock, MAS, commandes…) restent toujours dans ce périmètre.'
+      },
+      {
+        element: '[data-tour="nav-pieces"]',
+        side: 'top',
+        align: 'center',
+        title: 'Navigation du quotidien',
         description:
-          'Toutes les données sont filtrées par atelier. Les admins changent d’atelier ici.'
+          'La barre du bas : Pièces, Commandes, MAS, Todo et SFM. C’est le fil conducteur de votre journée terrain.'
       },
 
-      // --- Atelier (admin) ---
+      // ── Organisation (admin) ─────────────────────────────────────
+      {
+        adminOnly: true,
+        title: 'Organisation des ateliers',
+        description:
+          'Côté admin : casinos, ateliers, contacts et le flag « Utilisé / Non utilisé » pour archiver sans supprimer.'
+      },
       {
         adminOnly: true,
         route: '/setup',
         element: '[data-tour="setup-ateliers"]',
-        title: 'Ajouter un atelier',
+        title: 'Atelier par casino',
         description:
-          'Dans Paramètres, ouvrez « Atelier par Casino ». Créez d’abord un casino si besoin, puis un atelier rattaché.',
+          'Dans Paramètres, ouvrez cette tuile pour structurer le groupe : d’abord les casinos, puis les ateliers rattachés.',
         before: async () => {
           await this.expandToggle('[data-tour="setup-ateliers-toggle"]');
         }
@@ -203,8 +231,7 @@ export class AppTourService {
         route: '/setup',
         element: '[data-tour="setup-manage-casinos"]',
         title: 'Gérer les casinos',
-        description:
-          'Créez ou renommez les casinos du groupe. Chaque atelier appartient à un casino.',
+        description: 'Créez ou renommez les casinos. Chaque atelier appartient à un casino du groupe.',
         before: async () => {
           await this.expandToggle('[data-tour="setup-ateliers-toggle"]');
         }
@@ -213,151 +240,358 @@ export class AppTourService {
         adminOnly: true,
         route: '/setup',
         element: '[data-tour="setup-new-atelier"]',
-        title: 'Nouvel atelier',
-        description:
-          'Ouvrez un casino, puis « Nouvel atelier » : nom, adresse (ville), contacts et responsables.',
+        title: 'Créer un atelier',
+        description: 'Ouvrez un casino, puis « Nouvel atelier » : nom, adresse, contacts et responsables préférés.',
         before: async () => {
           await this.expandToggle('[data-tour="setup-ateliers-toggle"]');
           await this.expandToggle('[data-tour="setup-casino-toggle"]');
         }
       },
+      {
+        adminOnly: true,
+        route: '/setup',
+        element: '[data-tour="setup-atelier-utilise"]',
+        title: 'Utilisé / Non utilisé',
+        description:
+          'Désactivez un atelier pour l’archiver : il reste visible ici, mais n’est plus proposé aux techniciens ni comme atelier préféré.',
+        before: async () => {
+          await this.expandToggle('[data-tour="setup-ateliers-toggle"]');
+          await this.expandToggle('[data-tour="setup-casino-toggle"]');
+          await this.openAtelierFormForTour();
+        }
+      },
 
-      // --- SFM + contacts ---
+      // ── Référentiels ─────────────────────────────────────────────
+      {
+        title: 'Référentiels SFM & MAS',
+        description:
+          'Avant les pièces : les fournisseurs (SFM + contacts e-mail) et les machines (MAS) auxquelles rattacher le stock.'
+      },
+      {
+        element: '[data-tour="nav-sfm"]',
+        side: 'top',
+        align: 'end',
+        title: 'SFM',
+        description: 'Sites / services fournisseurs. Indispensables pour les e-mails de commande.'
+      },
       {
         route: '/sfm',
         element: '[data-tour="page-sfm"]',
-        title: 'SFM',
-        description:
-          'Référentiel des sites / services fournisseurs liés aux pièces et aux commandes.'
+        title: 'Liste des SFM',
+        description: 'Consultez les SFM de l’atelier et leurs marques couvertes.'
       },
       {
         route: '/sfm',
         element: '[data-tour="btn-new-sfm"]',
-        title: 'Ajouter un SFM',
-        description: 'Cliquez ici pour créer un SFM : nom, marques couvertes, puis contacts.'
-      },
-      {
-        route: '/sfm/new',
-        element: '[data-tour="page-sfm-form"]',
-        title: 'Formulaire SFM',
-        description:
-          'Renseignez le nom et les marques. Au moins un contact est requis pour les e-mails de commande.'
+        title: 'Nouveau SFM',
+        description: 'Créez un SFM : nom, marques, puis au moins un contact pour les validations.'
       },
       {
         route: '/sfm/new',
         element: '[data-tour="sfm-contacts"]',
-        title: 'Ajouter un contact',
+        title: 'Contacts & e-mails',
         description:
-          'Ajoutez nom, téléphone, e-mail. Cochez « reçoit les e-mails de commande » pour les validations. « Technicien SFM » permet de réutiliser le contact sur plusieurs SFM.'
+          'Ajoutez nom, téléphone, e-mail. Cochez « reçoit les e-mails de commande ». « Technicien SFM » permet de réutiliser un contact sur plusieurs SFM.'
       },
-
-      // --- MAS ---
       {
         route: '/mas',
         element: '[data-tour="page-mas"]',
         title: 'Machines à sous',
-        description: 'Référentiel MAS de l’atelier : numéros et marques.'
+        description: 'Référentiel MAS de l’atelier : numéros, marques, dénominations.'
       },
       {
         route: '/mas',
         element: '[data-tour="btn-new-mas"]',
-        title: 'Ajouter une MAS',
-        description: 'Créez une machine (numéro + marque) pour rattacher des pièces détachées.'
+        title: 'Nouvelle MAS',
+        description: 'Créez une machine pour rattacher pièces, interventions et suivi.'
       },
       {
         route: '/mas/new',
         element: '[data-tour="page-mas-form"]',
-        title: 'Formulaire MAS',
-        description: 'Saisissez le numéro et la marque (ou créez une nouvelle marque si besoin).'
+        title: 'Fiche MAS',
+        description:
+          'Numéro, marque, multi-dénominations si besoin. Une MAS bien renseignée alimente le suivi et la mémoire atelier.'
       },
 
-      // --- Pièces ---
+      // ── Pièces ───────────────────────────────────────────────────
       {
-        route: '/devices',
-        element: '[data-tour="page-devices"]',
-        title: 'Pièces détachées',
+        title: 'Pièces au quotidien',
         description:
-          'Inventaire de l’atelier. Les tuiles indiquent total, obsolètes et stock à zéro.'
+          'Inventaire, création, utilisation sur machine, bons d’intervention et édition du stock — le cœur opérationnel.'
       },
       {
-        route: '/devices',
+        element: '[data-tour="nav-pieces"]',
+        side: 'top',
+        align: 'start',
+        title: 'Menu Pièces',
+        description: 'Liste, création, utilisation, bons et stock : tout part de ce menu.',
+        before: async () => {
+          await this.openNavMenu('[data-tour="nav-pieces"]');
+        }
+      },
+      {
+        route: '/devices?open=pieces',
+        element: '[data-tour="page-devices"]',
+        title: 'Inventaire',
+        description:
+          'Tuile « Pièces détachées » : total, obsolètes, stock à zéro (raccourci vers une demande de commande).',
+        before: async () => {
+          await this.expandDevicesTile();
+        }
+      },
+      {
+        route: '/devices?open=pieces',
         element: '[data-tour="btn-new-device"]',
-        title: 'Ajouter une pièce',
-        description: 'Lance la création d’une fiche pièce (photos, SFM, MAS, stock…).'
+        title: 'Nouvelle pièce',
+        description: 'Ouvre la fiche : photos, SFM, MAS, stock, usage…',
+        before: async () => {
+          await this.expandDevicesTile();
+        }
       },
       {
         route: '/devices/new',
         element: '[data-tour="page-device-form"]',
-        title: 'Formulaire pièce',
+        title: 'Fiche pièce',
         description:
-          'Nom, référence, usage, stock, photos, liens SFM/MAS. Vous pouvez créer un SFM ou une MAS depuis ce formulaire.'
+          'Renseignez la pièce. Vous pouvez créer un SFM ou une MAS à la volée depuis ce formulaire.'
       },
-
-      // --- Stock + export ---
+      {
+        element: '[data-tour="nav-utiliser-piece"]',
+        side: 'top',
+        title: 'Utiliser une pièce',
+        description: 'Consommez du stock sur une MAS : bon d’intervention généré automatiquement.',
+        before: async () => {
+          await this.openNavMenu('[data-tour="nav-pieces"]');
+        }
+      },
+      {
+        route: '/devices/utiliser',
+        element: '[data-tour="page-device-use"]',
+        title: 'Consommation stock',
+        description: 'Choisissez la pièce, la MAS et la quantité. Le stock se met à jour immédiatement.'
+      },
+      {
+        route: '/devices/interventions',
+        element: '[data-tour="page-interventions"]',
+        title: 'Bons d’intervention',
+        description: 'Historique des utilisations de pièces — traçabilité atelier.'
+      },
       {
         route: '/devices/stock',
         element: '[data-tour="page-stock"]',
-        title: 'Stock',
-        description:
-          'Ajustez les quantités, regroupez par SFM ou marque, puis exportez.'
+        title: 'Éditer le stock',
+        description: 'Ajustez les quantités, regroupez par SFM ou marque, puis exportez.'
       },
       {
         route: '/devices/stock',
         element: '[data-tour="btn-stock-export"]',
-        title: 'Exporter le stock',
-        description: 'Export Excel (.xlsx) ou PDF de l’inventaire selon le regroupement choisi.'
+        title: 'Export stock',
+        description: 'Excel (.xlsx) ou PDF selon le regroupement choisi — idéal pour inventaire ou audit.'
       },
 
-      // --- Commandes ---
+      // ── Commandes ────────────────────────────────────────────────
+      {
+        title: 'Commandes & suivi',
+        description:
+          'Demande → validation (e-mails SFM) → réception (stock) → timeline. Côté admin : devis PDF/image analysé par l’IA.'
+      },
       {
         element: '[data-tour="nav-commandes"]',
-        title: 'Commandes',
-        description: 'Nouvelle demande ou suivi des demandes (validation / réception côté admin).'
+        side: 'top',
+        align: 'center',
+        title: 'Menu Commandes',
+        description: 'Nouvelle demande, liste (badge si en attente) et timeline d’activité.',
+        before: async () => {
+          await this.openNavMenu('[data-tour="nav-commandes"]');
+        }
       },
       {
         route: '/order-request',
         element: '[data-tour="page-order-request"]',
         title: 'Nouvelle demande',
-        description: 'Ajoutez des lignes (pièce × quantité) et envoyez la demande.'
+        description: 'Ajoutez des lignes (pièce × quantité) et envoyez. Les pièces en rupture sont pré-proposées.'
       },
       {
         route: '/order-requests',
         element: '[data-tour="page-order-requests"]',
-        title: 'Demandes en cours',
-        description: this.auth.isAdmin()
-          ? 'Validez (e-mails SFM), ajustez les quantités reçues, confirmez la réception → stock mis à jour.'
+        title: 'Liste des commandes',
+        description: isAdmin
+          ? 'Validez (e-mails contacts SFM), ajustez à la réception, confirmez → stock mis à jour.'
           : 'Suivez le statut (en attente, validée, reçue). Validation et réception : admin uniquement.'
       },
+      {
+        adminOnly: true,
+        route: '/order-requests',
+        element: '[data-tour="order-devis-ai"]',
+        title: 'Devis & IA',
+        description:
+          'Sur une commande, associez un devis (PDF ou image). L’IA propose des mises à jour de désignations / références et un passage des prix — à valider avant application.'
+      },
+      {
+        route: '/order-timeline',
+        element: '[data-tour="page-order-timeline"]',
+        title: 'Timeline',
+        description:
+          'Fil chronologique des événements commandes (et plus largement le suivi d’activité lié).'
+      },
 
-      // --- IA ---
+      // ── Ops MAS & Todo ───────────────────────────────────────────
+      {
+        title: 'Terrain MAS & tâches',
+        description:
+          'Suivi machine, arrêts maintenance, visites quadri, interventions techniques, FIT — et la todo pour ne rien perdre.'
+      },
+      {
+        element: '[data-tour="nav-mas"]',
+        side: 'top',
+        align: 'center',
+        title: 'Menu MAS',
+        description:
+          'Liste, suivi, arrêts, règles de jeux, visites, interventions techniques et fiches FIT. Le badge signale les visites à traiter.',
+        before: async () => {
+          await this.openNavMenu('[data-tour="nav-mas"]');
+        }
+      },
+      {
+        route: '/mas/suivi',
+        element: '[data-tour="page-mas-suivi"]',
+        title: 'Suivi MAS',
+        description:
+          'Timeline par machine : interventions, commandes, todos liées… Une vue synthétique de l’historique.'
+      },
+      {
+        route: '/mas/arrets-maintenance',
+        element: '[data-tour="page-arrets-maintenance"]',
+        title: 'Arrêts maintenance',
+        description:
+          'Déclarez et suivez les arrêts. Une alerte clignote aussi dans le bandeau quand des reprises sont attendues.'
+      },
+      {
+        route: '/mas/visites-quadri',
+        element: '[data-tour="page-visites-quadri"]',
+        title: 'Visites quadritrimestrielles',
+        description: 'Planifiez et validez les passages périodiques. Le badge MAS rappelle ce qu’il reste à faire.'
+      },
+      {
+        element: '[data-tour="nav-todo"]',
+        side: 'top',
+        align: 'end',
+        title: 'Todo',
+        description: 'Tâches à faire avec cycle de vie. Le badge indique les actives ; elles apparaissent aussi dans le suivi MAS.'
+      },
+      {
+        route: '/todos',
+        element: '[data-tour="page-todo"]',
+        title: 'Liste Todo',
+        description: 'Créez, assignez et clôturez vos tâches. Raccourci aussi depuis la tuile « À faire » sur l’accueil pièces.'
+      },
+
+      // ── IA ───────────────────────────────────────────────────────
+      {
+        title: 'Assistant IA & mémoire',
+        description:
+          'L’IA s’appuie sur la mémoire synaptique de l’atelier (événements pièces, stock, commandes, interventions…) pour répondre au contexte.'
+      },
       {
         element: '[data-tour="shell-ai"]',
-        title: 'Assistant IA',
+        side: 'bottom',
+        align: 'end',
+        title: 'Ouvrir l’assistant',
         description:
-          'Icône en haut à droite. Si le module est activé dans Paramètres, il aide à rédiger demandes, pièces, MAS/SFM.'
+          'Icône en haut à droite (activable dans Paramètres). Utile pour rédiger, questionner le stock ou le statut des commandes.'
+      },
+      {
+        route: '/ai',
+        element: '[data-tour="ai-memory"]',
+        title: 'Mémoire synaptique',
+        description:
+          'Snapshot de situation de l’atelier + faits récents. Actualisez ou recalculez ; un briefing s’ouvre aussi quand un admin change d’atelier.',
+        before: async () => {
+          await this.expandAiMemory();
+        }
       },
       {
         route: '/ai',
         element: '[data-tour="page-ai"]',
-        title: 'Écran Assistant IA',
+        title: 'Chat métier',
         description:
-          'Posez une question métier (devis SFM, statuts de commande, rédaction…). Désactivé si non configuré.'
+          'Posez une question (« pièces en rupture ? », « todos ouvertes ? »…). L’assistant lit la mémoire avant de répondre.'
       },
 
       {
         adminOnly: true,
         element: '[data-tour="shell-admin"]',
+        side: 'bottom',
+        align: 'end',
         title: 'Administration',
-        description: 'Comptes et Paramètres (mail, S3, IA, ateliers). Relancez aussi le tutoriel ici.'
+        description:
+          'Comptes utilisateurs et Paramètres (mail, stockage, IA, ateliers). Vous pouvez aussi relancer ce tutoriel depuis Setup.'
       },
       {
         element: '[data-tour="footer-tour"]',
+        side: 'top',
         title: 'Relancer le tutoriel',
         description:
-          '« Tutoriel » en bas de page' +
-          (this.auth.isAdmin() ? ' ou le bouton dans Paramètres.' : '.')
+          '« Tutoriel » reste toujours disponible en bas de page' +
+          (isAdmin ? ' — et le bouton dans Paramètres.' : '.')
       }
     ];
+  }
+
+  /** Ouvre le formulaire nouvel atelier pour exposer le toggle Utilisé. */
+  private async openAtelierFormForTour(): Promise<void> {
+    const utilise = document.querySelector('[data-tour="setup-atelier-utilise"]');
+    if (utilise) {
+      utilise.scrollIntoView({ block: 'center', behavior: 'instant' as ScrollBehavior });
+      await this.delay(120);
+      return;
+    }
+    const btn = document.querySelector('[data-tour="setup-new-atelier"]') as HTMLElement | null;
+    btn?.click();
+    await this.delay(280);
+    const target = document.querySelector('[data-tour="setup-atelier-utilise"]');
+    target?.scrollIntoView({ block: 'center', behavior: 'instant' as ScrollBehavior });
+    await this.delay(120);
+  }
+
+  /** Déplie la tuile inventaire pièces. */
+  private async expandDevicesTile(): Promise<void> {
+    const btn = document.querySelector('[data-tour="page-devices"]') as HTMLElement | null;
+    if (!btn) {
+      return;
+    }
+    if (btn.getAttribute('aria-expanded') !== 'true') {
+      btn.click();
+      await this.delay(220);
+    }
+  }
+
+  /** Assure l’ouverture du panneau mémoire IA. */
+  private async expandAiMemory(): Promise<void> {
+    const card = document.querySelector('[data-tour="ai-memory"]');
+    if (!card) {
+      return;
+    }
+    const overview = card.querySelector('.memory-overview, .memory-facts, .memory-actions');
+    if (!overview) {
+      const toggle = document.querySelector('[data-tour="ai-memory-toggle"]') as HTMLElement | null;
+      toggle?.click();
+      await this.delay(220);
+    }
+  }
+
+  /** Ouvre un mat-menu via son bouton déclencheur. */
+  private async openNavMenu(triggerSelector: string): Promise<void> {
+    const trigger = document.querySelector(triggerSelector) as HTMLElement | null;
+    if (!trigger) {
+      return;
+    }
+    trigger.click();
+    await this.delay(280);
+  }
+
+  private closeOpenMenus(): void {
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
   }
 
   private async expandToggle(selector: string): Promise<void> {

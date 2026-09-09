@@ -29,6 +29,7 @@
       type="button"
       class="devices-tile-toggle"
       data-testid="page-devices"
+      data-tour="page-devices"
       (click)="toggleTile()"
       [attr.aria-expanded]="tileOpen()"
     >
@@ -47,6 +48,7 @@
             color="primary"
             class="btn-nouvelle-piece"
             data-testid="btn-new-device"
+            data-tour="btn-new-device"
             routerLink="/devices/new"
           >
             <mat-icon>add</mat-icon>

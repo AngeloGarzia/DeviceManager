@@ -7,10 +7,10 @@
   @if (loadingStatus()) {
     <div class="flex justify-center py-10"><mat-spinner diameter="36"></mat-spinner></div>
   } @else {
-    <mat-card class="memory-card !rounded-xl !border !border-line !shadow-soft">
+    <mat-card class="memory-card !rounded-xl !border !border-line !shadow-soft" data-tour="ai-memory">
       <mat-card-content class="!pt-4">
         <div class="memory-header">
-          <button type="button" class="memory-toggle" (click)="toggleMemory()">
+          <button type="button" class="memory-toggle" data-tour="ai-memory-toggle" (click)="toggleMemory()">
             <mat-icon>{{ memoryExpanded() ? 'expand_less' : 'expand_more' }}</mat-icon>
             <span>Mémoire synaptique</span>
             @if (memory()?.atelierNom) {

@@ -2,9 +2,9 @@
   <header class="flex flex-wrap items-start justify-between gap-3">
     <div>
       <h1 class="page-title" data-tour="page-order-requests">Demandes de commande</h1>
-      <p class="page-subtitle">
+      <p class="page-subtitle" data-tour="order-devis-ai">
         @if (auth.isAdmin()) {
-          Validez, ajustez les quantités à la réception, puis confirmez pour mettre le stock à jour
+          Validez, ajustez les quantités à la réception, confirmez le stock — et associez un devis pour l’IA (noms / prix)
         } @else {
           Consultation uniquement — vous ne pouvez ni valider ni modifier une demande
         }

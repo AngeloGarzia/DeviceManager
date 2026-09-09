@@ -137,15 +137,30 @@
           <mat-icon>add_circle</mat-icon>
           <span>Créer une nouvelle pièce</span>
         </a>
-        <a mat-menu-item routerLink="/devices/utiliser" routerLinkActive="devices-menu-active">
+        <a
+          mat-menu-item
+          routerLink="/devices/utiliser"
+          routerLinkActive="devices-menu-active"
+          data-tour="nav-utiliser-piece"
+        >
           <mat-icon>handyman</mat-icon>
           <span>Utiliser une pièce détachée</span>
         </a>
-        <a mat-menu-item routerLink="/devices/interventions" routerLinkActive="devices-menu-active">
+        <a
+          mat-menu-item
+          routerLink="/devices/interventions"
+          routerLinkActive="devices-menu-active"
+          data-tour="nav-bons-intervention"
+        >
           <mat-icon>archive</mat-icon>
           <span>Bons d’intervention</span>
         </a>
-        <a mat-menu-item routerLink="/devices/stock" routerLinkActive="devices-menu-active">
+        <a
+          mat-menu-item
+          routerLink="/devices/stock"
+          routerLinkActive="devices-menu-active"
+          data-tour="nav-stock"
+        >
           <mat-icon>inventory_2</mat-icon>
           <span>Éditer le stock des pièces détachées</span>
         </a>
@@ -182,7 +197,12 @@
             <span class="orders-menu-count">{{ orders.pendingCount() > 99 ? '99+' : orders.pendingCount() }}</span>
           }
         </a>
-        <a mat-menu-item routerLink="/order-timeline" routerLinkActive="orders-menu-active">
+        <a
+          mat-menu-item
+          routerLink="/order-timeline"
+          routerLinkActive="orders-menu-active"
+          data-tour="nav-order-timeline"
+        >
           <mat-icon>timeline</mat-icon>
           <span>Timeline</span>
         </a>
@@ -224,11 +244,21 @@
           <mat-icon>add_circle</mat-icon>
           <span>Nouvelle MAS</span>
         </a>
-        <a mat-menu-item routerLink="/mas/suivi" routerLinkActive="devices-menu-active">
+        <a
+          mat-menu-item
+          routerLink="/mas/suivi"
+          routerLinkActive="devices-menu-active"
+          data-tour="nav-mas-suivi"
+        >
           <mat-icon>timeline</mat-icon>
           <span>Suivi</span>
         </a>
-        <a mat-menu-item routerLink="/mas/arrets-maintenance" routerLinkActive="devices-menu-active">
+        <a
+          mat-menu-item
+          routerLink="/mas/arrets-maintenance"
+          routerLinkActive="devices-menu-active"
+          data-tour="nav-arrets-maintenance"
+        >
           <mat-icon>pause_circle</mat-icon>
           <span>Arrêts maintenance</span>
           @if (arrets.alert().count > 0) {
@@ -283,7 +313,13 @@
         <span [class.pending-label-blink]="todos.pendingCount() > 0">Todo</span>
       </a>
 
-      <a routerLink="/sfm" routerLinkActive="active-nav" [routerLinkActiveOptions]="{ exact: false }" class="nav-link">
+      <a
+        routerLink="/sfm"
+        routerLinkActive="active-nav"
+        [routerLinkActiveOptions]="{ exact: false }"
+        class="nav-link"
+        data-tour="nav-sfm"
+      >
         <mat-icon>apartment</mat-icon>
         <span>SFM</span>
       </a>
