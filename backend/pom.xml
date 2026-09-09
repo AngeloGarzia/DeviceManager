@@ -24,6 +24,8 @@
         <aws.sdk.version>2.31.78</aws.sdk.version>
         <!-- Spring AI 2.0 GA — compatible Boot 4.1. -->
         <spring-ai.version>2.0.0</spring-ai.version>
+        <!-- Trivy CRITICAL : Tomcat CVE-2026-65182 / 65905 / 68525 (11.0.24 → 11.0.25). -->
+        <tomcat.version>11.0.25</tomcat.version>
         <!-- OWASP : MySQL Connector/J CVE-2026-60586 / 60623. -->
         <mysql.version>26.7.0</mysql.version>
         <springdoc.version>3.1.1</springdoc.version>
