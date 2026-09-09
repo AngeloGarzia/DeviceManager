@@ -38,7 +38,7 @@
   },
   "devDependencies": {
     "@angular-devkit/build-angular": "^19.2.27",
-    "@angular-eslint/builder": "^19.8.1",
+    "@angular-eslint/builder": "^22.2.0",
     "@angular/cli": "^19.2.27",
     "@angular/compiler-cli": "^19.2.0",
     "@eslint/js": "^9.39.5",
