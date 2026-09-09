@@ -22,8 +22,8 @@
         <java.version>21</java.version>
         <jjwt.version>0.12.7</jjwt.version>
         <aws.sdk.version>2.31.78</aws.sdk.version>
-        <!-- Spring AI 2.0 GA — compatible Boot 4.1. -->
-        <spring-ai.version>2.0.0</spring-ai.version>
+        <!-- Spring AI 2.0.1 — patch CVEs ONNX / model post-2.0.0. -->
+        <spring-ai.version>2.0.1</spring-ai.version>
         <!-- Trivy CRITICAL : Tomcat CVE-2026-65182 / 65905 / 68525 (11.0.24 → 11.0.25). -->
         <tomcat.version>11.0.25</tomcat.version>
         <!-- OWASP : MySQL Connector/J CVE-2026-60586 / 60623. -->
@@ -140,13 +140,13 @@
         <dependency>
             <groupId>org.apache.pdfbox</groupId>
             <artifactId>pdfbox</artifactId>
-            <version>3.0.3</version>
+            <version>3.0.8</version>
         </dependency>
         <!-- Détection MIME structurelle (2e passe upload) — tika-core seul, sans parsers lourds. -->
         <dependency>
             <groupId>org.apache.tika</groupId>
             <artifactId>tika-core</artifactId>
-            <version>3.2.2</version>
+            <version>3.3.2</version>
         </dependency>
         <dependency>
             <groupId>org.projectlombok</groupId>
@@ -303,15 +303,15 @@
             <plugin>
                 <groupId>org.owasp</groupId>
                 <artifactId>dependency-check-maven</artifactId>
-                <version>12.1.3</version>
+                <version>13.0.0</version>
                 <configuration>
                     <failBuildOnCVSS>7</failBuildOnCVSS>
                     <!--
-                      Feed JSON NVD 2.0 (pas l'API REST) : évite UpdateException/NPE
-                      quand NVD_API_KEY est absente, invalide ou rate-limitéé.
+                      Miroir DependencyCheck_Builder (évite 404 intermittents NVD
+                      sur nvdcve-2.0-modified.json.gz). Pattern {0} = année | modified.
                       Voir https://dependency-check.github.io/DependencyCheck/data/mirrornvd.html
                     -->
-                    <nvdDatafeedUrl>https://nvd.nist.gov/feeds/json/cve/2.0/nvdcve-2.0-{0}.json.gz</nvdDatafeedUrl>
+                    <nvdDatafeedUrl>https://dependency-check.github.io/DependencyCheck_Builder/nvd_cache/nvdcve-{0}.json.gz</nvdDatafeedUrl>
                     <suppressionFiles>
                         <suppressionFile>${project.basedir}/dependency-check-suppressions.xml</suppressionFile>
                     </suppressionFiles>

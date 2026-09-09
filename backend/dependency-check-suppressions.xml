@@ -7,14 +7,14 @@
       Revoir à chaque montée Boot / Spring AI.
     -->
 
-    <!-- CVE Kotlin build-cache (kotlin-gradle-plugin), pas le runtime kotlin-stdlib. -->
+    <!-- CVE Kotlin build-cache (kotlin-gradle-plugin), pas le runtime kotlin-stdlib/reflect. -->
     <suppress>
         <notes><![CDATA[
             CVE-2026-53914 : désérialisation unsafe du build cache Kotlin (kotlin-gradle-plugin).
-            DeviceManager n'utilise pas le plugin Kotlin Gradle ; kotlin-stdlib est une
-            dépendance transitive runtime (Spring AI / etc.). Faux positif CPE.
+            DeviceManager n'utilise pas le plugin Kotlin Gradle ; kotlin-stdlib / reflect sont des
+            dépendances transitives runtime (Spring AI / openai-java). Faux positif CPE.
         ]]></notes>
-        <packageUrl regex="true">^pkg:maven/org\.jetbrains\.kotlin/kotlin-stdlib@.*$</packageUrl>
+        <packageUrl regex="true">^pkg:maven/org\.jetbrains\.kotlin/kotlin-(stdlib.*|reflect)@.*$</packageUrl>
         <cve>CVE-2026-53914</cve>
     </suppress>
 
@@ -93,9 +93,9 @@
     <!-- Spring AI ONNX cache local — non utilisé (OpenAI / Gemini HTTP). -->
     <suppress>
         <notes><![CDATA[
-            CVE-2026-47852 / 47851 / 47835 : cache ONNX local multi-utilisateur.
+            CVE-2026-47852 / 47851 / 47835 / 59294 / 59319 : cache ONNX / modèles locaux.
             DeviceManager n'utilise pas de modèles ONNX locaux (chat OpenAI/Gemini via API).
-            Correctif 1.1.9 Enterprise only ; 2.0.1 OSS nécessite Boot 4.
+            Patch partiel en 2.0.1 ; conserver tant que CPE match encore.
         ]]></notes>
         <packageUrl regex="true">^pkg:maven/org\.springframework\.ai/spring-ai-.*@.*$</packageUrl>
         <cve>CVE-2026-47852</cve>
@@ -109,5 +109,15 @@
         <notes><![CDATA[Voir notes CVE-2026-47852 — pas d'ONNX local.]]></notes>
         <packageUrl regex="true">^pkg:maven/org\.springframework\.ai/spring-ai-.*@.*$</packageUrl>
         <cve>CVE-2026-47835</cve>
+    </suppress>
+    <suppress>
+        <notes><![CDATA[Voir notes CVE-2026-47852 — pas d'ONNX local.]]></notes>
+        <packageUrl regex="true">^pkg:maven/org\.springframework\.ai/spring-ai-.*@.*$</packageUrl>
+        <cve>CVE-2026-59294</cve>
+    </suppress>
+    <suppress>
+        <notes><![CDATA[Voir notes CVE-2026-47852 — pas d'ONNX local.]]></notes>
+        <packageUrl regex="true">^pkg:maven/org\.springframework\.ai/spring-ai-.*@.*$</packageUrl>
+        <cve>CVE-2026-59319</cve>
     </suppress>
 </suppressions>
