@@ -48,7 +48,7 @@ public class S3Config {
 
         if (endpoint != null && !endpoint.isBlank()) {
             builder.endpointOverride(URI.create(trimTrailingSlash(endpoint)))
-                    .serviceConfiguration(r2ClientConfiguration());
+                    .serviceConfiguration(r2CompatibleConfiguration());
         }
         return builder.build();
     }
@@ -71,7 +71,7 @@ public class S3Config {
 
         if (endpoint != null && !endpoint.isBlank()) {
             builder.endpointOverride(URI.create(trimTrailingSlash(endpoint)))
-                    .serviceConfiguration(r2PresignerConfiguration());
+                    .serviceConfiguration(r2CompatibleConfiguration());
         }
         return builder.build();
     }
@@ -79,25 +79,15 @@ public class S3Config {
     /**
      * Path-style + pas de chunked encoding (R2).
      * <p>
-     * Ne pas y mettre {@code checksumValidationEnabled} : le client configure déjà
-     * {@code RequestChecksumCalculation.WHEN_REQUIRED} — les deux ensemble provoquent
-     * {@code IllegalStateException} au PutObject.
+     * Les checksums se configurent sur le builder client
+     * ({@code requestChecksumCalculation}/{@code responseChecksumValidation}),
+     * pas via {@code S3Configuration.checksumValidationEnabled} (déprécié).
+     * Sur le présigneur, checksumValidationEnabled ne s'applique de toute façon pas
+     * aux requêtes pré-signées (doc AWS SDK).
      */
-    private static S3Configuration r2ClientConfiguration() {
+    private static S3Configuration r2CompatibleConfiguration() {
         return S3Configuration.builder()
                 .pathStyleAccessEnabled(true)
-                .chunkedEncodingEnabled(false)
-                .build();
-    }
-
-    /**
-     * Path-style + checksums désactivés : URLs GET exécutables par le navigateur
-     * (sans en-tête checksum signé). Le présigneur n'utilise pas WHEN_REQUIRED.
-     */
-    private static S3Configuration r2PresignerConfiguration() {
-        return S3Configuration.builder()
-                .pathStyleAccessEnabled(true)
-                .checksumValidationEnabled(false)
                 .chunkedEncodingEnabled(false)
                 .build();
     }
