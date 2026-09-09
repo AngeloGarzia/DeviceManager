@@ -190,7 +190,7 @@ export class MasExcelImportService {
       return this.cellToDisplay((value as { result?: unknown }).result);
     }
     if (typeof value === 'object' && value !== null && 'richText' in value) {
-      const parts = (value as { richText?: Array<{ text?: string }> }).richText ?? [];
+      const parts = (value as { richText?: { text?: string }[] }).richText ?? [];
       return parts.map((p) => p.text ?? '').join('');
     }
     return String(value);

@@ -91,7 +91,7 @@
               </mat-select>
             </mat-form-field>
             <span class="hidden text-xs text-ink-soft sm:block">
-              @if (mapping()[field.key] != null) {
+              @if (mapping()[field.key] !== null && mapping()[field.key] !== undefined) {
                 Col. {{ mapping()[field.key] }}
               }
             </span>
