@@ -7,6 +7,7 @@ import com.devicemanager.dto.MarqueMasRequest;
 import com.devicemanager.dto.MarqueMasResponse;
 import com.devicemanager.dto.MasRequest;
 import com.devicemanager.dto.MasResponse;
+import com.devicemanager.dto.RegleJeuxPdfCheckResponse;
 import com.devicemanager.dto.RegleJeuxMasLinkRequest;
 import com.devicemanager.dto.RegleJeuxMasSummary;
 import com.devicemanager.dto.RegleJeuxRequest;
@@ -22,9 +23,13 @@ import com.devicemanager.repository.MarqueMasRepository;
 import com.devicemanager.repository.MasRepository;
 import com.devicemanager.repository.RegleJeuxRepository;
 import com.devicemanager.security.DocumentUploadValidator;
+import com.devicemanager.security.PdfDocumentInspector;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -307,6 +312,98 @@ public class MasService {
         }
         log.info("PDF règle de jeux remplacé — id={} file={}", id, original);
         return toRegleJeuxResponse(saved);
+    }
+
+    /**
+     * Vérifie que le PDF stocké d'une règle de jeux est présent, valide et lisible.
+     */
+    @Transactional(readOnly = true)
+    public RegleJeuxPdfCheckResponse checkRegleJeuxPdf(Long id) {
+        RegleJeux entity = getRegleJeuxEntity(id);
+        String key = firstNonBlank(entity.getFileKey(), StorageService.extractObjectKey(entity.getFileUrl()));
+        if (key == null || key.isBlank()) {
+            return RegleJeuxPdfCheckResponse.builder()
+                    .regleJeuxId(id)
+                    .present(false)
+                    .valid(false)
+                    .readable(false)
+                    .pageCount(0)
+                    .message("Aucun fichier PDF associé à cette règle")
+                    .build();
+        }
+        var loaded = storageService.load(key);
+        if (loaded.isEmpty() && entity.getFileUrl() != null && !entity.getFileUrl().equals(key)) {
+            loaded = storageService.load(entity.getFileUrl());
+        }
+        if (loaded.isEmpty()) {
+            return RegleJeuxPdfCheckResponse.builder()
+                    .regleJeuxId(id)
+                    .present(false)
+                    .valid(false)
+                    .readable(false)
+                    .pageCount(0)
+                    .message("PDF introuvable dans le stockage")
+                    .build();
+        }
+        PdfDocumentInspector.Result result = PdfDocumentInspector.inspect(loaded.get().data());
+        return RegleJeuxPdfCheckResponse.builder()
+                .regleJeuxId(id)
+                .present(result.present())
+                .valid(result.valid())
+                .readable(result.readable())
+                .pageCount(result.pageCount())
+                .message(result.message())
+                .build();
+    }
+
+    /**
+     * Sert le PDF d'une règle de jeux (R2 ou repli upload_blob) pour ouverture authentifiée.
+     */
+    @Transactional(readOnly = true)
+    public ResponseEntity<byte[]> downloadRegleJeuxPdf(Long id) {
+        RegleJeux entity = getRegleJeuxEntity(id);
+        String key = firstNonBlank(entity.getFileKey(), StorageService.extractObjectKey(entity.getFileUrl()));
+        if (key == null || key.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Aucun fichier PDF associé à cette règle");
+        }
+        var loaded = storageService.load(key);
+        if (loaded.isEmpty() && entity.getFileUrl() != null && !entity.getFileUrl().equals(key)) {
+            loaded = storageService.load(entity.getFileUrl());
+        }
+        if (loaded.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND,
+                    "PDF introuvable dans le stockage — remplacez le document");
+        }
+        StorageService.StoredObjectBytes obj = loaded.get();
+        MediaType mediaType = MediaType.APPLICATION_PDF;
+        if (obj.contentType() != null && !obj.contentType().isBlank()) {
+            try {
+                mediaType = MediaType.parseMediaType(obj.contentType());
+            } catch (Exception ignored) {
+                // keep application/pdf
+            }
+        }
+        String filename = entity.getOriginalName() != null && !entity.getOriginalName().isBlank()
+                ? entity.getOriginalName()
+                : "regle-jeux.pdf";
+        String safeName = filename.replace("\"", "");
+        return ResponseEntity.ok()
+                .contentType(mediaType)
+                .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + safeName + "\"")
+                .header(HttpHeaders.CACHE_CONTROL, "private, max-age=300")
+                .body(obj.data());
+    }
+
+    private static String firstNonBlank(String... values) {
+        if (values == null) {
+            return null;
+        }
+        for (String v : values) {
+            if (v != null && !v.isBlank()) {
+                return v.trim();
+            }
+        }
+        return null;
     }
 
     public void deleteRegleJeux(Long id) {

@@ -53,12 +53,34 @@ export class MasDetailComponent implements OnInit {
     return ct.startsWith('image/') || /\.(png|jpe?g|webp|gif)$/.test(name);
   }
 
-  destructionUrl(mas: Mas): string {
-    return this.masService.resolveFileUrl(mas.destructionFileUrl);
+  openRegleJeuxPdf(regle: { id: number; originalName?: string | null }): void {
+    this.error.set(null);
+    this.masService.downloadRegleJeuxPdf(regle.id).subscribe({
+      next: (blob) => {
+        if (!blob || blob.size === 0 || (blob.type && blob.type.includes('json'))) {
+          this.error.set('PDF introuvable dans le stockage — remplacez le document sur Règles de jeux.');
+          return;
+        }
+        const url = URL.createObjectURL(blob);
+        const opened = window.open(url, '_blank', 'noopener');
+        if (!opened) {
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = regle.originalName || 'regle-jeux.pdf';
+          a.click();
+        }
+        setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      },
+      error: (err) => {
+        this.error.set(
+          apiErrorMessage(err, 'PDF introuvable dans le stockage — remplacez le document sur Règles de jeux.')
+        );
+      }
+    });
   }
 
-  regleJeuxUrl(regle: { fileUrl?: string | null }): string {
-    return this.masService.resolveFileUrl(regle.fileUrl);
+  destructionUrl(mas: Mas): string {
+    return this.masService.resolveFileUrl(mas.destructionFileUrl);
   }
 
   pickDestructionFile(): void {

@@ -8,7 +8,9 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
-import { Mas, RegleJeuxOption } from '../../models/models';
+import { forkJoin, of } from 'rxjs';
+import { catchError } from 'rxjs/operators';
+import { Mas, RegleJeuxOption, RegleJeuxPdfCheck } from '../../models/models';
 import { MasService } from '../../services/mas.service';
 import { apiErrorMessage } from '../../shared/api-error';
 import { isPdfFile, PDF_ACCEPT } from '../../shared/document-upload';
@@ -16,6 +18,8 @@ import {
   RegleJeuxAiDialogComponent,
   RegleJeuxAiDialogConfirm
 } from '../../shared/regle-jeux-ai-dialog.component';
+
+type PdfCheckState = RegleJeuxPdfCheck | { status: 'loading' } | { status: 'error'; message: string };
 
 /**
  * Catalogue global des règles de jeux (PDF) — gestion depuis le menu MAS.
@@ -62,6 +66,8 @@ export class ReglesJeuxComponent implements OnInit {
   readonly masses = signal<Mas[]>([]);
   readonly loadingMasLinks = signal(false);
   readonly pdfAccept = PDF_ACCEPT;
+  /** Contrôles PDF par id de règle. */
+  readonly pdfChecks = signal<Record<number, PdfCheckState>>({});
 
   readonly aiDialogOpen = signal(false);
   readonly aiScanning = signal(false);
@@ -103,12 +109,98 @@ export class ReglesJeuxComponent implements OnInit {
           (a.label || '').localeCompare(b.label || '', 'fr', { sensitivity: 'base' })
         ));
         this.loading.set(false);
+        this.checkAllPdfs(list);
       },
       error: (err) => {
         this.loading.set(false);
         this.error.set(apiErrorMessage(err, 'Impossible de charger les règles de jeux.'));
       }
     });
+  }
+
+  checkAllPdfs(list: RegleJeuxOption[]): void {
+    if (list.length === 0) {
+      this.pdfChecks.set({});
+      return;
+    }
+    const loadingMap: Record<number, PdfCheckState> = {};
+    for (const item of list) {
+      loadingMap[item.id] = { status: 'loading' };
+    }
+    this.pdfChecks.set(loadingMap);
+
+    forkJoin(
+      list.map((item) =>
+        this.masService.checkRegleJeuxPdf(item.id).pipe(
+          catchError((err) =>
+            of({
+              kind: 'error' as const,
+              id: item.id,
+              message: apiErrorMessage(err, 'Contrôle PDF impossible.')
+            })
+          )
+        )
+      )
+    ).subscribe((results) => {
+      const next: Record<number, PdfCheckState> = {};
+      for (let i = 0; i < list.length; i++) {
+        const item = list[i];
+        const result = results[i] as RegleJeuxPdfCheck | { kind: 'error'; id: number; message: string };
+        if (result && 'kind' in result && result.kind === 'error') {
+          next[item.id] = { status: 'error', message: result.message };
+        } else {
+          next[item.id] = result as RegleJeuxPdfCheck;
+        }
+      }
+      this.pdfChecks.set(next);
+    });
+  }
+
+  recheckPdf(id: number): void {
+    this.pdfChecks.update((map) => ({ ...map, [id]: { status: 'loading' } }));
+    this.masService.checkRegleJeuxPdf(id).subscribe({
+      next: (check) => {
+        this.pdfChecks.update((map) => ({ ...map, [id]: check }));
+      },
+      error: (err) => {
+        this.pdfChecks.update((map) => ({
+          ...map,
+          [id]: { status: 'error', message: apiErrorMessage(err, 'Contrôle PDF impossible.') }
+        }));
+      }
+    });
+  }
+
+  pdfCheck(item: RegleJeuxOption): PdfCheckState | undefined {
+    return this.pdfChecks()[item.id];
+  }
+
+  isPdfCheckLoading(state: PdfCheckState | undefined): boolean {
+    return !!state && 'status' in state && state.status === 'loading';
+  }
+
+  pdfCheckErrorMessage(state: PdfCheckState | undefined): string | null {
+    if (state && 'status' in state && state.status === 'error') {
+      return state.message;
+    }
+    return null;
+  }
+
+  asPdfCheckResult(state: PdfCheckState | undefined): RegleJeuxPdfCheck | null {
+    if (state && !('status' in state)) {
+      return state;
+    }
+    return null;
+  }
+
+  pdfCheckBadgeClass(check: RegleJeuxPdfCheck): string {
+    if (check.valid && check.readable) {
+      return 'bg-emerald-50 text-emerald-800';
+    }
+    if (check.valid) {
+      return 'bg-amber-50 text-amber-900';
+    }
+    return 'bg-rose-50 text-rose-800';
   }
 
   openCreate(): void {
@@ -152,10 +244,14 @@ export class ReglesJeuxComponent implements OnInit {
       },
       error: (err) => {
         this.aiScanning.set(false);
+        const message = apiErrorMessage(err, 'Analyse IA impossible — complétez les champs manuellement.');
+        if (err?.status === 400 && /pdf|illisible|script|valide|vide/i.test(message)) {
+          this.cancelAiDialog();
+          this.error.set(message);
+          return;
+        }
         this.aiSuggested.set({ label: '', description: '' });
-        this.aiScanNotes.set(
-          apiErrorMessage(err, 'Analyse IA impossible — complétez les champs manuellement.')
-        );
+        this.aiScanNotes.set(message);
       }
     });
   }
@@ -338,8 +434,32 @@ export class ReglesJeuxComponent implements OnInit {
     });
   }
 
-  fileUrl(item: RegleJeuxOption): string {
-    return this.masService.resolveFileUrl(item.fileUrl);
+  openPdf(item: RegleJeuxOption): void {
+    this.error.set(null);
+    this.masService.downloadRegleJeuxPdf(item.id).subscribe({
+      next: (blob) => {
+        if (!blob || blob.size === 0) {
+          this.error.set('PDF vide ou introuvable — remplacez le document.');
+          return;
+        }
+        if (blob.type && blob.type.includes('json')) {
+          this.error.set('PDF introuvable dans le stockage — remplacez le document.');
+          return;
+        }
+        const url = URL.createObjectURL(blob);
+        const opened = window.open(url, '_blank', 'noopener');
+        if (!opened) {
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = item.originalName || 'regle-jeux.pdf';
+          a.click();
+        }
+        setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      },
+      error: (err) => {
+        this.error.set(apiErrorMessage(err, 'PDF introuvable dans le stockage — remplacez le document.'));
+      }
+    });
   }
 
   canDelete(item: RegleJeuxOption): boolean {

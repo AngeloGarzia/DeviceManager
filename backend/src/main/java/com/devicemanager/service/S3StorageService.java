@@ -3,19 +3,26 @@ package com.devicemanager.service;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.dao.EmptyResultDataAccessException;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
+import software.amazon.awssdk.core.ResponseBytes;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
+import software.amazon.awssdk.services.s3.model.GetObjectResponse;
+import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
+import software.amazon.awssdk.services.s3.model.S3Exception;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
 import software.amazon.awssdk.services.s3.presigner.model.PresignedGetObjectRequest;
 
 import java.io.IOException;
 import java.time.Duration;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -31,6 +38,7 @@ public class S3StorageService implements StorageService {
 
     private final S3Client s3Client;
     private final S3Presigner s3Presigner;
+    private final JdbcTemplate jdbcTemplate;
     private final String bucket;
     private final Duration mediaExpiration;
     private final Duration documentExpiration;
@@ -38,6 +46,7 @@ public class S3StorageService implements StorageService {
     public S3StorageService(
             S3Client s3Client,
             S3Presigner s3Presigner,
+            JdbcTemplate jdbcTemplate,
             @Value("${app.s3.bucket}") String bucket,
             @Value("${app.s3.presigned-url-expiration-minutes:15}") long mediaExpirationMinutes,
             @Value("${app.s3.presigned-document-expiration-minutes:60}") long documentExpirationMinutes) {
@@ -47,6 +56,7 @@ public class S3StorageService implements StorageService {
         }
         this.s3Client = s3Client;
         this.s3Presigner = s3Presigner;
+        this.jdbcTemplate = jdbcTemplate;
         this.bucket = bucket.trim();
         this.mediaExpiration = Duration.ofMinutes(Math.max(1, mediaExpirationMinutes));
         this.documentExpiration = Duration.ofMinutes(Math.max(1, documentExpirationMinutes));
@@ -74,22 +84,45 @@ public class S3StorageService implements StorageService {
 
     @Override
     public void delete(String key) {
-        if (key == null || key.isBlank()) {
-            return;
-        }
-        String objectKey = StorageService.extractObjectKey(key);
+        String objectKey = normalizeObjectKey(key);
         if (objectKey == null || objectKey.isBlank()) {
             return;
         }
-        s3Client.deleteObject(DeleteObjectRequest.builder().bucket(bucket).key(objectKey).build());
+        try {
+            s3Client.deleteObject(DeleteObjectRequest.builder().bucket(bucket).key(objectKey).build());
+        } catch (RuntimeException ex) {
+            log.warn("Échec DeleteObject R2 (key={}): {}", objectKey, ex.getMessage());
+        }
+        try {
+            jdbcTemplate.update("DELETE FROM upload_blob WHERE object_key = ?", objectKey);
+        } catch (RuntimeException ignored) {
+            // table absente ou clé locale différente — non bloquant
+        }
+    }
+
+    @Override
+    public Optional<StoredObjectBytes> load(String key) {
+        String objectKey = normalizeObjectKey(key);
+        if (objectKey == null || objectKey.isBlank()) {
+            return Optional.empty();
+        }
+        Optional<StoredObjectBytes> fromR2 = loadFromR2(objectKey);
+        if (fromR2.isPresent()) {
+            return fromR2;
+        }
+        // Fichiers uploadés en mode local (avant R2) : repli MySQL upload_blob.
+        Optional<StoredObjectBytes> fromBlob = loadFromUploadBlob(objectKey);
+        if (fromBlob.isPresent()) {
+            log.info("Lecture R2 manquante — fichier servi depuis upload_blob: {}", objectKey);
+            return fromBlob;
+        }
+        log.warn("Objet introuvable (R2 + upload_blob): {}", objectKey);
+        return Optional.empty();
     }
 
     @Override
     public String resolveAccessUrl(String objectKey, AccessKind kind) {
-        if (objectKey == null || objectKey.isBlank()) {
-            return null;
-        }
-        String key = StorageService.extractObjectKey(objectKey);
+        String key = normalizeObjectKey(objectKey);
         if (key == null || key.isBlank()) {
             return null;
         }
@@ -107,10 +140,7 @@ public class S3StorageService implements StorageService {
      * Génère une URL présignée GET temporaire pour un objet du bucket.
      */
     public String generatePresignedUrl(String objectKey, Duration expiration) {
-        if (objectKey == null || objectKey.isBlank()) {
-            throw new IllegalArgumentException("objectKey requis");
-        }
-        String key = StorageService.extractObjectKey(objectKey);
+        String key = normalizeObjectKey(objectKey);
         if (key == null || key.isBlank()) {
             throw new IllegalArgumentException("objectKey invalide");
         }
@@ -128,6 +158,72 @@ public class S3StorageService implements StorageService {
                 .build();
         PresignedGetObjectRequest presigned = s3Presigner.presignGetObject(presignRequest);
         return presigned.url().toString();
+    }
+
+    /**
+     * Normalise une clé stockée (retire préfixe bucket /uploads, extrait depuis URL).
+     */
+    String normalizeObjectKey(String raw) {
+        String key = StorageService.extractObjectKey(raw);
+        if (key == null || key.isBlank()) {
+            return null;
+        }
+        String prefix = bucket + "/";
+        if (key.startsWith(prefix)) {
+            key = key.substring(prefix.length());
+        }
+        if (key.startsWith("uploads/")) {
+            key = key.substring("uploads/".length());
+        }
+        return key.isBlank() ? null : key;
+    }
+
+    private Optional<StoredObjectBytes> loadFromR2(String objectKey) {
+        try {
+            ResponseBytes<GetObjectResponse> response = s3Client.getObjectAsBytes(
+                    GetObjectRequest.builder().bucket(bucket).key(objectKey).build());
+            byte[] data = response.asByteArray();
+            if (data == null || data.length == 0) {
+                return Optional.empty();
+            }
+            GetObjectResponse meta = response.response();
+            String contentType = meta != null ? meta.contentType() : null;
+            Long size = meta != null && meta.contentLength() != null
+                    ? meta.contentLength()
+                    : (long) data.length;
+            return Optional.of(new StoredObjectBytes(data, contentType, size));
+        } catch (NoSuchKeyException ex) {
+            return Optional.empty();
+        } catch (S3Exception ex) {
+            log.warn("Échec lecture R2 (key={}): {}", objectKey, ex.getMessage());
+            return Optional.empty();
+        } catch (RuntimeException ex) {
+            log.warn("Échec lecture R2 (key={}): {}", objectKey, ex.getMessage());
+            return Optional.empty();
+        }
+    }
+
+    private Optional<StoredObjectBytes> loadFromUploadBlob(String objectKey) {
+        try {
+            return Optional.ofNullable(jdbcTemplate.queryForObject(
+                    "SELECT data, content_type, file_size FROM upload_blob WHERE object_key = ?",
+                    (rs, rowNum) -> {
+                        byte[] data = rs.getBytes("data");
+                        if (data == null || data.length == 0) {
+                            return null;
+                        }
+                        Long size = rs.getObject("file_size") == null
+                                ? (long) data.length
+                                : rs.getLong("file_size");
+                        return new StoredObjectBytes(data, rs.getString("content_type"), size);
+                    },
+                    objectKey));
+        } catch (EmptyResultDataAccessException ex) {
+            return Optional.empty();
+        } catch (RuntimeException ex) {
+            log.warn("Échec lecture upload_blob (key={}): {}", objectKey, ex.getMessage());
+            return Optional.empty();
+        }
     }
 
     private String sanitize(String name) {

@@ -26,6 +26,22 @@ describe('ReglesJeuxComponent', () => {
       { id: 2, label: 'Roulette live', description: 'Table', masCount: 0 }
     ]);
     http.expectOne('/api/mas').flush([]);
+    http.expectOne('/api/mas/regles-jeux/1/document-check').flush({
+      regleJeuxId: 1,
+      present: true,
+      valid: true,
+      readable: true,
+      pageCount: 2,
+      message: 'PDF valide et lisible (2 pages)'
+    });
+    http.expectOne('/api/mas/regles-jeux/2/document-check').flush({
+      regleJeuxId: 2,
+      present: true,
+      valid: true,
+      readable: false,
+      pageCount: 1,
+      message: 'PDF valide mais texte non extractible (scan image ou PDF protégé)'
+    });
 
     expect(component.items().length).toBe(2);
     component.searchQuery.set('book');

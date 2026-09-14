@@ -2,6 +2,9 @@ package com.devicemanager.service;
 
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.Arrays;
+import java.util.Optional;
+
 /**
  * Contrat de stockage des fichiers uploadés (photos, PDF, documents).
  * <p>
@@ -23,6 +26,14 @@ public interface StorageService {
      * Supprime un fichier par sa clé de stockage.
      */
     void delete(String key);
+
+    /**
+     * Charge le contenu binaire d'un objet (validation PDF, relecture serveur, etc.).
+     *
+     * @param key clé stockée en base ou localisateur legacy
+     * @return octets si trouvés, sinon vide
+     */
+    Optional<StoredObjectBytes> load(String key);
 
     /**
      * Produit une URL utilisable par le navigateur pour lire l'objet.
@@ -119,5 +130,23 @@ public interface StorageService {
      * @param size        taille en octets
      */
     record StoredObject(String key, String url, String contentType, long size) {
+    }
+
+    /**
+     * Contenu binaire d'un objet chargé depuis le stockage.
+     *
+     * @param data        octets du fichier
+     * @param contentType type MIME
+     * @param fileSize    taille en octets
+     */
+    record StoredObjectBytes(byte[] data, String contentType, Long fileSize) {
+        public StoredObjectBytes {
+            data = data == null ? null : Arrays.copyOf(data, data.length);
+        }
+
+        @Override
+        public byte[] data() {
+            return data == null ? null : Arrays.copyOf(data, data.length);
+        }
     }
 }

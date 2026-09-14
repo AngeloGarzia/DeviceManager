@@ -6,6 +6,7 @@ import com.devicemanager.dto.MarqueMasRequest;
 import com.devicemanager.dto.MarqueMasResponse;
 import com.devicemanager.dto.MasRequest;
 import com.devicemanager.dto.MasResponse;
+import com.devicemanager.dto.RegleJeuxPdfCheckResponse;
 import com.devicemanager.dto.RegleJeuxMasLinkRequest;
 import com.devicemanager.dto.RegleJeuxRequest;
 import com.devicemanager.dto.RegleJeuxResponse;
@@ -148,6 +149,22 @@ public class MasController {
             @PathVariable Long id,
             @RequestPart("file") MultipartFile file) {
         return ResponseEntity.ok(masService.replaceRegleJeuxDocument(id, file));
+    }
+
+    /**
+     * Vérifie que le PDF stocké d'une règle de jeux est présent, valide et lisible.
+     */
+    @GetMapping("/regles-jeux/{id}/document-check")
+    public ResponseEntity<RegleJeuxPdfCheckResponse> checkRegleJeuxDocument(@PathVariable Long id) {
+        return ResponseEntity.ok(masService.checkRegleJeuxPdf(id));
+    }
+
+    /**
+     * Télécharge / affiche le PDF d'une règle de jeux (évite les URL R2 cassées NoSuchKey).
+     */
+    @GetMapping("/regles-jeux/{id}/file")
+    public ResponseEntity<byte[]> downloadRegleJeuxFile(@PathVariable Long id) {
+        return masService.downloadRegleJeuxPdf(id);
     }
 
     /**

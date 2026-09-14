@@ -13,7 +13,6 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Arrays;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -148,12 +147,14 @@ public class LocalStorageService implements StorageService {
      * @param key clé du fichier
      * @return octets et type MIME, ou vide si introuvable ou clé non sûre
      */
+    @Override
     @Transactional(readOnly = true)
     public Optional<StoredObjectBytes> load(String key) {
-        if (!isSafeKey(key)) {
+        String objectKey = StorageService.extractObjectKey(key);
+        if (!isSafeKey(objectKey)) {
             return Optional.empty();
         }
-        Path file = root.resolve(key).normalize();
+        Path file = root.resolve(objectKey).normalize();
         if (!file.startsWith(root)) {
             return Optional.empty();
         }
@@ -166,10 +167,10 @@ public class LocalStorageService implements StorageService {
             // fallback MySQL
         }
 
-        Optional<StoredObjectBytes> fromDb = loadFromDatabase(key);
-        fromDb.ifPresent(obj -> rehydrateDisk(key, obj.data()));
+        Optional<StoredObjectBytes> fromDb = loadFromDatabase(objectKey);
+        fromDb.ifPresent(obj -> rehydrateDisk(objectKey, obj.data()));
         if (fromDb.isEmpty()) {
-            log.warn("Upload introuvable (disque + MySQL): {}", key);
+            log.warn("Upload introuvable (disque + MySQL): {}", objectKey);
         }
         return fromDb;
     }
@@ -226,23 +227,5 @@ public class LocalStorageService implements StorageService {
             return "photo.jpg";
         }
         return name.replaceAll("[^a-zA-Z0-9._-]", "_");
-    }
-
-    /**
-     * Contenu binaire d'un fichier chargé depuis le stockage local.
-     *
-     * @param data octets du fichier
-     * @param contentType type MIME
-     * @param fileSize taille en octets
-     */
-    public record StoredObjectBytes(byte[] data, String contentType, Long fileSize) {
-        public StoredObjectBytes {
-            data = data == null ? null : Arrays.copyOf(data, data.length);
-        }
-
-        @Override
-        public byte[] data() {
-            return data == null ? null : Arrays.copyOf(data, data.length);
-        }
     }
 }

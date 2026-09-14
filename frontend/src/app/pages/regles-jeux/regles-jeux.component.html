@@ -4,6 +4,7 @@
       <h1 class="page-title">Règles de jeux</h1>
       <p class="page-subtitle">
         Catalogue global des règles (PDF). À l’ajout, l’IA lit le document et propose libellé et description.
+        Chaque PDF existant est contrôlé (validité et lisibilité).
       </p>
     </div>
     <button mat-stroked-button color="primary" type="button" (click)="openCreate()" [disabled]="saving()">
@@ -138,15 +139,52 @@
                       }
                     </ul>
                   }
-                  <a
-                    class="mt-2 inline-flex items-center gap-1 text-sm text-brand underline-offset-2 hover:underline"
-                    [href]="fileUrl(item)"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    <mat-icon class="!text-base">picture_as_pdf</mat-icon>
-                    {{ item.originalName || 'Ouvrir le PDF' }}
-                  </a>
+                  <div class="mt-2 flex flex-wrap items-center gap-2">
+                    <button
+                      mat-button
+                      type="button"
+                      class="!min-w-0 inline-flex items-center gap-1 !px-2 text-sm text-brand"
+                      (click)="openPdf(item)"
+                      [disabled]="saving()"
+                    >
+                      <mat-icon class="!text-base">picture_as_pdf</mat-icon>
+                      {{ item.originalName || 'Ouvrir le PDF' }}
+                    </button>
+                    @if (isPdfCheckLoading(pdfCheck(item))) {
+                      <span class="inline-flex items-center gap-1 text-xs text-ink-soft">
+                        <mat-spinner diameter="14"></mat-spinner>
+                        Contrôle PDF…
+                      </span>
+                    } @else {
+                      @if (pdfCheckErrorMessage(pdfCheck(item)); as errMsg) {
+                        <span class="rounded-lg bg-rose-50 px-2 py-1 text-xs text-rose-800" role="status">
+                          {{ errMsg }}
+                        </span>
+                        <button mat-button type="button" class="!min-w-0 !px-2 !text-xs" (click)="recheckPdf(item.id)">
+                          Réessayer
+                        </button>
+                      } @else {
+                        @if (asPdfCheckResult(pdfCheck(item)); as check) {
+                          <span
+                            class="rounded-lg px-2 py-1 text-xs {{ pdfCheckBadgeClass(check) }}"
+                            role="status"
+                          >
+                            {{ check.message }}
+                          </span>
+                          <button
+                            mat-button
+                            type="button"
+                            class="!min-w-0 !px-2 !text-xs"
+                            (click)="recheckPdf(item.id)"
+                            [disabled]="saving()"
+                            title="Revérifier le PDF"
+                          >
+                            Vérifier
+                          </button>
+                        }
+                      }
+                    }
+                  </div>
                 </div>
                 <div class="flex flex-wrap gap-2 shrink-0">
                   <button mat-stroked-button type="button" (click)="startLinkMas(item)" [disabled]="saving()">

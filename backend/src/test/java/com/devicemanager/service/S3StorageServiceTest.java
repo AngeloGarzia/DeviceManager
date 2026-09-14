@@ -5,6 +5,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.jdbc.core.JdbcTemplate;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
@@ -26,14 +27,20 @@ class S3StorageServiceTest {
     @Mock
     private S3Presigner s3Presigner;
     @Mock
+    private JdbcTemplate jdbcTemplate;
+    @Mock
     private PresignedGetObjectRequest presignedGetObjectRequest;
+
+    private S3StorageService newService() {
+        return new S3StorageService(s3Client, s3Presigner, jdbcTemplate, "devicemanager", 15, 60);
+    }
 
     @Test
     void generatePresignedUrl_usesConfiguredTtlAndBucket() throws Exception {
         when(presignedGetObjectRequest.url()).thenReturn(new URL("https://example.r2.cloudflarestorage.com/devicemanager/spare-parts/a.jpg?X-Amz-Signature=abc"));
         when(s3Presigner.presignGetObject(any(GetObjectPresignRequest.class))).thenReturn(presignedGetObjectRequest);
 
-        S3StorageService service = new S3StorageService(s3Client, s3Presigner, "devicemanager", 15, 60);
+        S3StorageService service = newService();
         String url = service.generatePresignedUrl("spare-parts/a.jpg", Duration.ofMinutes(15));
 
         assertThat(url).contains("X-Amz-Signature=abc");
@@ -50,7 +57,7 @@ class S3StorageServiceTest {
         when(presignedGetObjectRequest.url()).thenReturn(URI_CREATE("https://r2.example/obj?sig=1"));
         when(s3Presigner.presignGetObject(any(GetObjectPresignRequest.class))).thenReturn(presignedGetObjectRequest);
 
-        S3StorageService service = new S3StorageService(s3Client, s3Presigner, "devicemanager", 15, 60);
+        S3StorageService service = newService();
         service.resolveAccessUrl("spare-parts/doc.pdf", StorageService.AccessKind.DOCUMENT);
 
         ArgumentCaptor<GetObjectPresignRequest> captor = ArgumentCaptor.forClass(GetObjectPresignRequest.class);
@@ -63,8 +70,17 @@ class S3StorageServiceTest {
         when(s3Presigner.presignGetObject(any(GetObjectPresignRequest.class)))
                 .thenThrow(new RuntimeException("Bucket cannot be empty"));
 
-        S3StorageService service = new S3StorageService(s3Client, s3Presigner, "devicemanager", 15, 60);
+        S3StorageService service = newService();
         assertThat(service.resolveAccessUrl("spare-parts/a.jpg", StorageService.AccessKind.MEDIA)).isNull();
+    }
+
+    @Test
+    void normalizeObjectKey_stripsBucketPrefix() {
+        S3StorageService service = newService();
+        assertThat(service.normalizeObjectKey("devicemanager/spare-parts/a.pdf"))
+                .isEqualTo("spare-parts/a.pdf");
+        assertThat(service.normalizeObjectKey("/uploads/old-local.pdf"))
+                .isEqualTo("old-local.pdf");
     }
 
     @Test
