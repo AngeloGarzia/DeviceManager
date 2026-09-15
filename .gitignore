@@ -31,3 +31,6 @@ Thumbs.db
 # Secrets divers
 *.pem
 .env
+
+# Rapports locaux (ne pas analyser avec CodeQL)
+run_logs/

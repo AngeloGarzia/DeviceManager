@@ -50,6 +50,13 @@ jobs:
           languages: ${{ matrix.language }}
           build-mode: ${{ matrix.build-mode }}
           queries: security-extended,security-and-quality
+          config: |
+            paths-ignore:
+              - run_logs/**
+              - '**/jacoco-report/**'
+              - backend/target/**
+              - frontend/dist/**
+              - frontend/node_modules/**
 
       - name: Build backend (Java)
         if: matrix.language == 'java-kotlin'
@@ -60,3 +67,6 @@ jobs:
         uses: github/codeql-action/analyze@v4
         with:
           category: "/language:${{ matrix.language }}"
+          # Évite les échecs intermittents pendant l'attente de traitement GitHub
+          # (upload SARIF OK, wait-for-processing flaky en parallèle Java/JS).
+          wait-for-processing: false

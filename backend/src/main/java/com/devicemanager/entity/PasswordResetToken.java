@@ -62,4 +62,9 @@ public class PasswordResetToken {
             createdAt = Instant.now();
         }
     }
+
+    @Override
+    public String toString() {
+        return "PasswordResetToken{id=" + id + ", used=" + used + "}";
+    }
 }

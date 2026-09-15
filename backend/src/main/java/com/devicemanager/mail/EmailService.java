@@ -46,7 +46,7 @@ public class EmailService {
     public EmailSendResult send(String to, String subject, String text, String html) {
         String from = resolveFrom();
         if (!isSmtpActive()) {
-            logSimulated(to, from, subject, text);
+            logSimulated(text);
             return EmailSendResult.simulated();
         }
         String configError = validateConfig(from, to);
@@ -73,16 +73,16 @@ public class EmailService {
                 }
             });
             sendFuture.get(SEND_TIMEOUT_SECONDS, TimeUnit.SECONDS);
-            log.info("Email envoyé à {} (sujet={})", to, subject);
+            log.info("Email envoyé avec succès");
             return EmailSendResult.success();
         } catch (TimeoutException ex) {
             invalidateSender();
-            log.error("Timeout SMTP ({} s) vers {}", SEND_TIMEOUT_SECONDS, to);
+            log.error("Timeout SMTP ({} s)", SEND_TIMEOUT_SECONDS);
             return EmailSendResult.failure("Timeout SMTP (" + SEND_TIMEOUT_SECONDS + " s)");
         } catch (Exception ex) {
             invalidateSender();
             String message = rootMessage(ex);
-            log.error("Échec envoi email à {}: {}", to, message);
+            log.error("Échec envoi email: {}", sanitizeForLog(message));
             return EmailSendResult.failure(message);
         }
     }
@@ -164,15 +164,18 @@ public class EmailService {
         dynamicSender = null;
     }
 
-    private void logSimulated(String to, String from, String subject, String text) {
-        log.info("""
-                ===== EMAIL SIMULÉ (messagerie inactive ou MAIL_HOST vide) =====
-                To: {}
-                From: {}
-                Subject: {}
-                {}
-                ================================================================
-                """, to, from, subject, text);
+    private void logSimulated(String text) {
+        // Ne pas journaliser destinataire / sujet / corps (PII + injection de logs).
+        log.info(
+                "EMAIL SIMULÉ (messagerie inactive ou MAIL_HOST vide) — envoi non effectué (bodyLength={})",
+                text != null ? text.length() : 0);
+    }
+
+    private static String sanitizeForLog(String value) {
+        if (value == null || value.isBlank()) {
+            return "";
+        }
+        return value.replace('\r', '_').replace('\n', '_');
     }
 
     private static String rootMessage(Throwable ex) {
