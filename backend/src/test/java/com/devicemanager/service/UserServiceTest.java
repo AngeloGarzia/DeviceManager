@@ -278,6 +278,7 @@ class UserServiceTest {
         assertThat(response.getMessage()).contains("tech@test.local");
         assertThat(user.isMustChangePassword()).isTrue();
         assertThat(user.getPassword()).isEqualTo("hashed");
+        assertThat(user.getPrivacyAcceptedAt()).isNull();
         verify(refreshTokenRepository).revokeAllByUserId(50L);
         verify(passwordResetTokenRepository).invalidateUnusedByUserId(50L);
 

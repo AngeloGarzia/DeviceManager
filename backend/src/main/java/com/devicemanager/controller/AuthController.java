@@ -115,6 +115,18 @@ public class AuthController {
     }
 
     /**
+     * Enregistre l'acceptation des mentions RGPD pour l'utilisateur authentifié.
+     *
+     * @param authentication principal Spring Security
+     * @return 204 No Content
+     */
+    @PostMapping("/accept-privacy")
+    public ResponseEntity<Void> acceptPrivacy(Authentication authentication) {
+        authService.acceptPrivacy(authentication.getName());
+        return ResponseEntity.noContent().build();
+    }
+
+    /**
      * Demande l'envoi d'un lien de réinitialisation (réponse toujours générique).
      *
      * @param request e-mail du compte

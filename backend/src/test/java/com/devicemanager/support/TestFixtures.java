@@ -89,6 +89,7 @@ public final class TestFixtures {
                 .password("encoded")
                 .role(role)
                 .groupe(groupe())
+                .privacyAcceptedAt(java.time.Instant.parse("2026-01-01T00:00:00Z"))
                 .build();
     }
 }

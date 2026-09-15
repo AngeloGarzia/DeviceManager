@@ -19,6 +19,7 @@ export interface AuthResponse {
   ateliers?: AtelierSummary[];
   /** Si true, l'utilisateur doit changer son mot de passe avant d'utiliser l'app. */
   mustChangePassword?: boolean;
+  mustAcceptPrivacy?: boolean;
 }
 
 export interface AtelierSummary {

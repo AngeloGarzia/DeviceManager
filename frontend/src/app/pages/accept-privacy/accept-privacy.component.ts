@@ -2,32 +2,31 @@ import { Component, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
-import { MatCardModule } from '@angular/material/card';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
 import { MatButtonModule } from '@angular/material/button';
+import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { AuthService } from '../../services/auth.service';
+import { PrivacyComponent } from '../privacy/privacy.component';
 import { apiErrorMessage } from '../../shared/api-error';
 
 /**
- * Changement de mot de passe obligatoire (comptes démo / premier login).
+ * Acceptation obligatoire des mentions RGPD à la première connexion.
  */
 @Component({
-  selector: 'app-change-password',
+  selector: 'app-accept-privacy',
   standalone: true,
   imports: [
     CommonModule,
     ReactiveFormsModule,
-    MatCardModule,
-    MatFormFieldModule,
-    MatInputModule,
     MatButtonModule,
-    MatProgressSpinnerModule
+    MatCheckboxModule,
+    MatProgressSpinnerModule,
+    PrivacyComponent
   ],
-  templateUrl: './change-password.component.html'
+  templateUrl: './accept-privacy.component.html',
+  styleUrl: './accept-privacy.component.scss'
 })
-export class ChangePasswordComponent {
+export class AcceptPrivacyComponent {
   private readonly fb = inject(FormBuilder);
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
@@ -36,31 +35,25 @@ export class ChangePasswordComponent {
   readonly loading = signal(false);
 
   readonly form = this.fb.nonNullable.group({
-    currentPassword: ['', Validators.required],
-    newPassword: ['', [Validators.required, Validators.minLength(8)]],
-    confirmPassword: ['', Validators.required]
+    accepted: [false, Validators.requiredTrue]
   });
 
   submit(): void {
     if (this.form.invalid) {
       this.form.markAllAsTouched();
-      return;
-    }
-    const { currentPassword, newPassword, confirmPassword } = this.form.getRawValue();
-    if (newPassword !== confirmPassword) {
-      this.error.set('La confirmation ne correspond pas au nouveau mot de passe.');
+      this.error.set('Vous devez lire et accepter les mentions pour continuer.');
       return;
     }
     this.loading.set(true);
     this.error.set(null);
-    this.auth.changePassword(currentPassword, newPassword).subscribe({
+    this.auth.acceptPrivacy().subscribe({
       next: () => {
         this.loading.set(false);
         void this.router.navigate([this.auth.postLoginTarget()]);
       },
       error: (err) => {
         this.loading.set(false);
-        this.error.set(apiErrorMessage(err, 'Impossible de changer le mot de passe.'));
+        this.error.set(apiErrorMessage(err, "Impossible d'enregistrer l'acceptation."));
       }
     });
   }

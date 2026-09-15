@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, Input, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
@@ -7,8 +7,9 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { PrivacyService } from '../../services/privacy.service';
 
 /**
- * Page publique Mentions légales + Politique de confidentialité (RGPD).
+ * Page Mentions légales + Politique de confidentialité (RGPD).
  * Les champs variables sont chargés depuis l'API (éditables dans Setup).
+ * Utilisable en page publique ou embarquée (acceptation première connexion).
  */
 @Component({
   selector: 'app-privacy',
@@ -19,6 +20,9 @@ import { PrivacyService } from '../../services/privacy.service';
 })
 export class PrivacyComponent implements OnInit {
   private readonly privacy = inject(PrivacyService);
+
+  /** Affiche le lien « Retour à la connexion » (page publique uniquement). */
+  @Input() showBackLink = true;
 
   readonly loading = signal(true);
   readonly error = signal<string | null>(null);

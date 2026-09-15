@@ -32,4 +32,6 @@ public class AuthResponse {
     private List<AtelierSummary> ateliers;
     /** Si {@code true}, le client doit forcer un changement de mot de passe. */
     private Boolean mustChangePassword;
+    /** Si {@code true}, le client doit forcer l'acceptation des mentions RGPD. */
+    private Boolean mustAcceptPrivacy;
 }

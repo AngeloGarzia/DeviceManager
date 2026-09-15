@@ -237,6 +237,7 @@ public class UserService {
         String temporaryPassword = generateTemporaryPassword();
         user.setPassword(passwordEncoder.encode(temporaryPassword));
         user.setMustChangePassword(true);
+        user.setPrivacyAcceptedAt(null);
         userRepository.save(user);
 
         passwordResetTokenRepository.invalidateUnusedByUserId(user.getId());

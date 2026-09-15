@@ -16,6 +16,7 @@ const ATELIER_KEY = 'dm_atelier_id';
 const ATELIERS_KEY = 'dm_ateliers';
 const GROUPE_KEY = 'dm_groupe_nom';
 const MUST_CHANGE_PASSWORD_KEY = 'dm_must_change_password';
+const MUST_ACCEPT_PRIVACY_KEY = 'dm_must_accept_privacy';
 /** Anciennes clés (mot de passe en clair) — purgées au démarrage. */
 const LEGACY_REMEMBER_USER_KEY = 'dm_remember_user';
 const LEGACY_REMEMBER_PASS_KEY = 'dm_remember_pass';
@@ -33,6 +34,7 @@ export class AuthService {
   readonly ateliers = signal<AtelierSummary[]>(this.readAteliers());
   readonly groupeNom = signal<string | null>(localStorage.getItem(GROUPE_KEY));
   readonly mustChangePassword = signal(localStorage.getItem(MUST_CHANGE_PASSWORD_KEY) === '1');
+  readonly mustAcceptPrivacy = signal(localStorage.getItem(MUST_ACCEPT_PRIVACY_KEY) === '1');
   /** Incrémenté à chaque changement d'atelier → remount du contenu (rechargement données). */
   readonly atelierRevision = signal(0);
 
@@ -190,6 +192,23 @@ export class AuthService {
       .pipe(tap(() => this.setMustChangePassword(false)));
   }
 
+  acceptPrivacy(): Observable<void> {
+    return this.http
+      .post<void>(`${environment.apiUrl}/api/auth/accept-privacy`, {}, { withCredentials: true })
+      .pipe(tap(() => this.setMustAcceptPrivacy(false)));
+  }
+
+  /** Cible de navigation après login / étape obligatoire (MDP puis RGPD). */
+  postLoginTarget(): string {
+    if (this.mustChangePassword()) {
+      return '/change-password';
+    }
+    if (this.mustAcceptPrivacy()) {
+      return '/accept-privacy';
+    }
+    return '/devices';
+  }
+
   forgotPassword(email: string): Observable<{ message: string }> {
     return this.http.post<{ message: string }>(
       `${environment.apiUrl}/api/auth/forgot-password`,
@@ -212,6 +231,15 @@ export class AuthService {
       localStorage.setItem(MUST_CHANGE_PASSWORD_KEY, '1');
     } else {
       localStorage.removeItem(MUST_CHANGE_PASSWORD_KEY);
+    }
+  }
+
+  setMustAcceptPrivacy(value: boolean): void {
+    this.mustAcceptPrivacy.set(value);
+    if (value) {
+      localStorage.setItem(MUST_ACCEPT_PRIVACY_KEY, '1');
+    } else {
+      localStorage.removeItem(MUST_ACCEPT_PRIVACY_KEY);
     }
   }
 
@@ -284,6 +312,7 @@ export class AuthService {
     this.username.set(res.username);
     this.role.set(res.role);
     this.setMustChangePassword(!!res.mustChangePassword);
+    this.setMustAcceptPrivacy(!!res.mustAcceptPrivacy);
 
     const nom = res.nom?.trim() || '';
     const prenom = res.prenom?.trim() || '';
@@ -352,6 +381,7 @@ export class AuthService {
     localStorage.removeItem(ATELIERS_KEY);
     localStorage.removeItem(GROUPE_KEY);
     localStorage.removeItem(MUST_CHANGE_PASSWORD_KEY);
+    localStorage.removeItem(MUST_ACCEPT_PRIVACY_KEY);
     this.purgeLegacyRememberedPasswords();
     this.username.set(null);
     this.nom.set(null);
@@ -361,6 +391,7 @@ export class AuthService {
     this.ateliers.set([]);
     this.groupeNom.set(null);
     this.mustChangePassword.set(false);
+    this.mustAcceptPrivacy.set(false);
     this.atelierRevision.set(0);
     this.refreshInFlight = null;
   }

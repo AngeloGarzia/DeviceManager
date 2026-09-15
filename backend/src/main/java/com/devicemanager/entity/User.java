@@ -59,6 +59,12 @@ public class User {
     @Builder.Default
     private boolean mustChangePassword = false;
 
+    /**
+     * Horodatage d'acceptation des mentions RGPD ; {@code null} = acceptation encore requise.
+     */
+    @Column(name = "privacy_accepted_at")
+    private Instant privacyAcceptedAt;
+
     @Column(nullable = false, updatable = false)
     private Instant createdAt;
 

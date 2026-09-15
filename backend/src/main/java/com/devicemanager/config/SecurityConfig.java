@@ -109,7 +109,7 @@ public class SecurityConfig {
                         .requestMatchers("/uploads/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/privacy").permitAll()
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                        .requestMatchers("/api/auth/change-password").authenticated()
+                        .requestMatchers("/api/auth/change-password", "/api/auth/accept-privacy").authenticated()
                         .requestMatchers("/api/users", "/api/users/**").hasRole(Roles.ADMIN)
                         .requestMatchers("/api/setup", "/api/setup/**").hasRole(Roles.ADMIN)
                         .requestMatchers("/api/logs", "/api/logs/**").hasRole(Roles.ADMIN)

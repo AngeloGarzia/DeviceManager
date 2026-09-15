@@ -61,7 +61,7 @@ export class LoginComponent {
     }
 
     if (this.auth.isLoggedIn()) {
-      void this.router.navigate([this.auth.mustChangePassword() ? '/change-password' : '/devices']);
+      void this.router.navigate([this.auth.postLoginTarget()]);
       return;
     }
     if (this.route.snapshot.queryParamMap.get('reason') === 'expired') {
@@ -75,7 +75,7 @@ export class LoginComponent {
     // Rechargement de /login avec cookie refresh encore valide → renvoyer vers l'app.
     this.auth.tryRestoreSession().subscribe((ok) => {
       if (ok) {
-        void this.router.navigate([this.auth.mustChangePassword() ? '/change-password' : '/devices']);
+        void this.router.navigate([this.auth.postLoginTarget()]);
       }
     });
   }
@@ -102,7 +102,7 @@ export class LoginComponent {
         } else {
           localStorage.removeItem(REMEMBER_USERNAME_KEY);
         }
-        void this.router.navigate([this.auth.mustChangePassword() ? '/change-password' : '/devices']);
+        void this.router.navigate([this.auth.postLoginTarget()]);
       },
       error: (err) => {
         this.loading.set(false);

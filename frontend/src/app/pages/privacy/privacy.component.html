@@ -1,9 +1,11 @@
 <section class="privacy-page mx-auto grid w-full max-w-5xl gap-4 px-3 pt-4 sm:px-4">
   <header class="grid gap-2">
-    <a mat-button routerLink="/login" class="!justify-self-start !pl-0">
-      <mat-icon>arrow_back</mat-icon>
-      Retour à la connexion
-    </a>
+    @if (showBackLink) {
+      <a mat-button routerLink="/login" class="!justify-self-start !pl-0">
+        <mat-icon>arrow_back</mat-icon>
+        Retour à la connexion
+      </a>
+    }
     <h1 class="page-title">Confidentialité &amp; mentions légales</h1>
     <p class="page-subtitle">
       Informations relatives au traitement des données personnelles dans DeviceManager

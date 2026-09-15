@@ -157,6 +157,23 @@ public class AuthService {
     }
 
     /**
+     * Enregistre l'acceptation des mentions RGPD pour l'utilisateur authentifié.
+     *
+     * @param username nom d'utilisateur authentifié
+     */
+    @Transactional
+    public void acceptPrivacy(String username) {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED,
+                        "Session expirée. Veuillez vous reconnecter."));
+        if (user.getPrivacyAcceptedAt() == null) {
+            user.setPrivacyAcceptedAt(Instant.now());
+            userRepository.save(user);
+            log.info("Acceptation RGPD enregistrée pour utilisateur={}", username);
+        }
+    }
+
+    /**
      * Demande un lien de réinitialisation. Réponse toujours générique (pas d'énumération d'e-mails).
      *
      * @param email adresse saisie par l'utilisateur
@@ -300,6 +317,7 @@ public class AuthService {
                 .atelierId(atelierId)
                 .ateliers(ateliers)
                 .mustChangePassword(user.isMustChangePassword())
+                .mustAcceptPrivacy(user.getPrivacyAcceptedAt() == null)
                 .build();
         return new AuthSession(response, refreshRaw);
     }

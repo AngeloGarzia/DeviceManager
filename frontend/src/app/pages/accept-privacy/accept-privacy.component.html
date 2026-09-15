@@ -1,0 +1,36 @@
+<section class="accept-privacy-page grid gap-4 px-3 py-4 sm:px-4">
+  <header class="mx-auto w-full max-w-5xl">
+    <div class="text-sm font-semibold uppercase tracking-[0.08em] text-brand">DeviceManager</div>
+    <h1 class="page-title mt-2">Acceptation des mentions RGPD</h1>
+    <p class="page-subtitle">
+      Avant d’accéder à l’application, veuillez lire les mentions légales et la politique de
+      confidentialité, puis confirmer votre acceptation.
+    </p>
+  </header>
+
+  <div class="accept-privacy-scroll mx-auto w-full max-w-5xl overflow-auto rounded-2xl border border-line bg-white">
+    <app-privacy [showBackLink]="false" />
+  </div>
+
+  <form
+    class="mx-auto grid w-full max-w-5xl gap-3 rounded-2xl border border-line bg-white p-4 shadow-soft"
+    [formGroup]="form"
+    (ngSubmit)="submit()"
+  >
+    <mat-checkbox formControlName="accepted" color="primary">
+      J’ai lu et j’accepte les mentions légales et la politique de confidentialité.
+    </mat-checkbox>
+
+    @if (error()) {
+      <p class="mb-0 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{{ error() }}</p>
+    }
+
+    <button mat-flat-button color="primary" class="!h-12 !max-w-xs !text-base" type="submit" [disabled]="loading()">
+      @if (loading()) {
+        <mat-spinner diameter="22" class="!inline-block"></mat-spinner>
+      } @else {
+        Valider et continuer
+      }
+    </button>
+  </form>
+</section>

@@ -23,6 +23,40 @@ export const requirePasswordChangeGuard: CanActivateFn = () => {
       return router.createUrlTree(['/login']);
     }
     if (!auth.mustChangePassword()) {
+      return router.createUrlTree([auth.postLoginTarget()]);
+    }
+    return true;
+  };
+
+  if (auth.isLoggedIn()) {
+    return decide();
+  }
+  return auth.tryRestoreSession().pipe(map(() => decide()));
+};
+
+/** Redirige vers /accept-privacy si RGPD non accepté (après le MDP). */
+export const privacyAcceptGuard: CanActivateFn = () => {
+  const auth = inject(AuthService);
+  const router = inject(Router);
+  if (auth.isLoggedIn() && !auth.mustChangePassword() && auth.mustAcceptPrivacy()) {
+    return router.createUrlTree(['/accept-privacy']);
+  }
+  return true;
+};
+
+/** Empêche d'accéder à /accept-privacy si l'acceptation n'est pas requise. */
+export const requirePrivacyAcceptGuard: CanActivateFn = () => {
+  const auth = inject(AuthService);
+  const router = inject(Router);
+
+  const decide = () => {
+    if (!auth.isLoggedIn()) {
+      return router.createUrlTree(['/login']);
+    }
+    if (auth.mustChangePassword()) {
+      return router.createUrlTree(['/change-password']);
+    }
+    if (!auth.mustAcceptPrivacy()) {
       return router.createUrlTree(['/devices']);
     }
     return true;

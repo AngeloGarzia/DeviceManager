@@ -1,7 +1,7 @@
 import { Routes } from '@angular/router';
 import { authGuard } from './guards/auth.guard';
 import { adminGuard } from './guards/admin.guard';
-import { passwordChangeGuard, requirePasswordChangeGuard } from './guards/password-change.guard';
+import { passwordChangeGuard, requirePasswordChangeGuard, privacyAcceptGuard, requirePrivacyAcceptGuard } from './guards/password-change.guard';
 
 export const routes: Routes = [
   { path: '', pathMatch: 'full', redirectTo: 'devices' },
@@ -31,8 +31,14 @@ export const routes: Routes = [
       import('./pages/change-password/change-password.component').then((m) => m.ChangePasswordComponent)
   },
   {
+    path: 'accept-privacy',
+    canActivate: [requirePrivacyAcceptGuard],
+    loadComponent: () =>
+      import('./pages/accept-privacy/accept-privacy.component').then((m) => m.AcceptPrivacyComponent)
+  },
+  {
     path: '',
-    canActivate: [authGuard, passwordChangeGuard],
+    canActivate: [authGuard, passwordChangeGuard, privacyAcceptGuard],
     runGuardsAndResolvers: 'always',
     loadComponent: () => import('./layout/shell.component').then((m) => m.ShellComponent),
     children: [

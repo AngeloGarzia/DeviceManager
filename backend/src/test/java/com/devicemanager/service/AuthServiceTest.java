@@ -95,6 +95,7 @@ class AuthServiceTest {
         assertThat(response.getAtelierId()).isEqualTo(100L);
         assertThat(response.getGroupeNom()).isEqualTo("Circus");
         assertThat(response.getMustChangePassword()).isFalse();
+        assertThat(response.getMustAcceptPrivacy()).isFalse();
 
         verify(accountLockoutService).assertNotLocked("admin");
         verify(accountLockoutService).reset("admin");
@@ -289,6 +290,37 @@ class AuthServiceTest {
         assertThat(user.isMustChangePassword()).isFalse();
         assertThat(token.isUsed()).isTrue();
         verify(refreshTokenRepository).revokeAllByUserId(50L);
+        verify(userRepository).save(user);
+    }
+
+    @Test
+    void login_requiresPrivacyWhenNotAccepted() {
+        var user = TestFixtures.user("admin", Roles.ADMIN);
+        user.setPrivacyAcceptedAt(null);
+        when(userRepository.findByUsername("admin")).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("admin123", "encoded")).thenReturn(true);
+        when(atelierService.listForUser("admin")).thenReturn(List.of(
+                AtelierSummary.builder().id(100L).nom("Atelier Balaruc").label("Atelier Balaruc").build()
+        ));
+        stubTokenIssuance("admin", Roles.ADMIN);
+
+        LoginRequest request = new LoginRequest();
+        request.setUsername("admin");
+        request.setPassword("admin123");
+
+        AuthResponse response = authService.login(request).response();
+        assertThat(response.getMustAcceptPrivacy()).isTrue();
+    }
+
+    @Test
+    void acceptPrivacy_setsTimestamp() {
+        var user = TestFixtures.user("admin", Roles.ADMIN);
+        user.setPrivacyAcceptedAt(null);
+        when(userRepository.findByUsername("admin")).thenReturn(Optional.of(user));
+
+        authService.acceptPrivacy("admin");
+
+        assertThat(user.getPrivacyAcceptedAt()).isNotNull();
         verify(userRepository).save(user);
     }
 

@@ -69,7 +69,7 @@ export class AppTourService {
     if (this.starting || this.active) {
       return;
     }
-    if (!this.auth.getToken() || this.auth.mustChangePassword()) {
+    if (!this.auth.getToken() || this.auth.mustChangePassword() || this.auth.mustAcceptPrivacy()) {
       return;
     }
     if (!force && this.hasCompletedTour()) {
