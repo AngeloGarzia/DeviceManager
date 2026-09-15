@@ -50,7 +50,7 @@
         @if (!tileOpen() && zeroStockCount > 0) {
           <span
             class="stock-zero-count-badge"
-            aria-label="{{ zeroStockCount }} pièce(s) en stock à zéro"
+            [attr.aria-label]="zeroStockCount + ' pièce(s) en stock à zéro'"
           >{{ zeroStockCount }}</span>
         }
         <mat-icon>{{ tileOpen() ? 'expand_less' : 'expand_more' }}</mat-icon>
