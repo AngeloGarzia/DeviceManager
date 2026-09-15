@@ -24,7 +24,10 @@
     </mat-card>
   </a>
 
-  <mat-card class="devices-tile !rounded-xl !border !border-line !shadow-soft">
+  <mat-card
+    class="devices-tile !rounded-xl !border !border-line !shadow-soft"
+    [class.devices-tile--stock-alert]="!tileOpen() && zeroStockCount > 0"
+  >
     <button
       type="button"
       class="devices-tile-toggle"
@@ -35,9 +38,23 @@
     >
       <div class="min-w-0 text-left">
         <h1 class="page-title">Pièces détachées</h1>
-        <p class="page-subtitle">Inventaire des pièces détachées liées à l'atelier sélectionné</p>
+        <p class="page-subtitle">
+          @if (zeroStockCount > 0) {
+            {{ zeroStockCount }} pièce{{ zeroStockCount > 1 ? 's' : '' }} en stock à zéro — ouvrir pour commander
+          } @else {
+            Inventaire des pièces détachées liées à l'atelier sélectionné
+          }
+        </p>
       </div>
-      <mat-icon>{{ tileOpen() ? 'expand_less' : 'expand_more' }}</mat-icon>
+      <div class="devices-tile-toggle-end">
+        @if (!tileOpen() && zeroStockCount > 0) {
+          <span
+            class="stock-zero-count-badge"
+            aria-label="{{ zeroStockCount }} pièce(s) en stock à zéro"
+          >{{ zeroStockCount }}</span>
+        }
+        <mat-icon>{{ tileOpen() ? 'expand_less' : 'expand_more' }}</mat-icon>
+      </div>
     </button>
 
     @if (tileOpen()) {

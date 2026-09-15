@@ -385,6 +385,11 @@ a.stock-zero-tile--alert:hover {
   background: #ffe4e6 !important;
 }
 
+.stock-zero-count-badge,
+.devices-tile--stock-alert {
+  animation: stock-zero-blink 1.1s ease-in-out infinite;
+}
+
 @keyframes stock-zero-blink {
   0%,
   100% {

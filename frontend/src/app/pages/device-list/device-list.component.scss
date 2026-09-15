@@ -41,6 +41,13 @@
   flex-shrink: 0;
 }
 
+.devices-tile-toggle-end {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-shrink: 0;
+}
+
 .todo-count-badge {
   display: inline-flex;
   min-width: 1.5rem;
@@ -53,6 +60,30 @@
   font-weight: 700;
   background: #fee2e2;
   color: #b91c1c;
+}
+
+.stock-zero-count-badge {
+  display: inline-flex;
+  min-width: 1.5rem;
+  height: 1.5rem;
+  align-items: center;
+  justify-content: center;
+  padding: 0 0.4rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  background: #fee2e2;
+  color: #be123c;
+  border: 1px solid #fecaca;
+}
+
+.devices-tile--stock-alert {
+  border-color: #fecaca !important;
+}
+
+.devices-tile--stock-alert .page-subtitle {
+  color: #be123c;
+  font-weight: 600;
 }
 
 .device-browser {
