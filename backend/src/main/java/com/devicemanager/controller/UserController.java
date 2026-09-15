@@ -1,5 +1,6 @@
 package com.devicemanager.controller;
 
+import com.devicemanager.dto.MessageResponse;
 import com.devicemanager.dto.UserRequest;
 import com.devicemanager.dto.UserResponse;
 import com.devicemanager.service.UserService;
@@ -86,5 +87,16 @@ public class UserController {
     public ResponseEntity<Void> delete(@PathVariable Long id, Authentication authentication) {
         userService.delete(id, authentication.getName());
         return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * Envoie un e-mail de bienvenue (identifiant, mot de passe temporaire, lien reset).
+     *
+     * @param id identifiant du compte destinataire
+     * @return message de confirmation
+     */
+    @PostMapping("/{id}/welcome-mail")
+    public ResponseEntity<MessageResponse> sendWelcomeMail(@PathVariable Long id) {
+        return ResponseEntity.ok(userService.sendWelcomeMail(id));
     }
 }

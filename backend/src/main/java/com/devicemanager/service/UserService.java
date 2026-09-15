@@ -1,14 +1,22 @@
 package com.devicemanager.service;
 
+import com.devicemanager.dto.MessageResponse;
 import com.devicemanager.dto.UserRequest;
 import com.devicemanager.dto.UserResponse;
 import com.devicemanager.entity.Atelier;
 import com.devicemanager.entity.Groupe;
+import com.devicemanager.entity.PasswordResetToken;
 import com.devicemanager.entity.User;
+import com.devicemanager.mail.TransactionalMail;
+import com.devicemanager.mail.templates.PasswordWelcomeEmail;
+import com.devicemanager.repository.PasswordResetTokenRepository;
+import com.devicemanager.repository.RefreshTokenRepository;
 import com.devicemanager.repository.UserRepository;
+import com.devicemanager.security.JwtService;
 import com.devicemanager.security.Roles;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -17,6 +25,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.security.SecureRandom;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -35,10 +46,25 @@ import java.util.Set;
 public class UserService {
 
     private static final Set<String> ALLOWED_ROLES = Set.of(Roles.ADMIN, Roles.TECHNICIEN);
+    private static final Duration PASSWORD_RESET_TTL = Duration.ofMinutes(30);
+    private static final String TEMP_PASSWORD_CHARS =
+            "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
+    private static final int TEMP_PASSWORD_LENGTH = 12;
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final AtelierService atelierService;
+    private final PasswordResetTokenRepository passwordResetTokenRepository;
+    private final RefreshTokenRepository refreshTokenRepository;
+    private final JwtService jwtService;
+    private final TransactionalMail transactionalMail;
+
+    @Value("${app.frontend-base-url:}")
+    private String frontendBaseUrl;
+
+    @Value("${app.cors.allowed-origins:}")
+    private String corsAllowedOrigins;
 
     /**
      * Liste les utilisateurs du groupe de l'administrateur connecté.
@@ -186,6 +212,96 @@ public class UserService {
         userRepository.delete(user);
         log.info("Suppression en base — Utilisateur id={} username={} rôle={} par={} groupe={}",
                 id, username, role, currentUsername, groupeId);
+    }
+
+    /**
+     * Envoie un e-mail de bienvenue : identifiant, mot de passe temporaire et lien de reset.
+     *
+     * @param id identifiant du compte cible
+     * @return message de confirmation
+     */
+    public MessageResponse sendWelcomeMail(Long id) {
+        User user = getInActorGroupe(id);
+        String email = user.getEmail() == null ? "" : user.getEmail().trim();
+        if (email.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Cet utilisateur n'a pas d'adresse e-mail.");
+        }
+
+        String baseUrl = resolveFrontendBaseUrl();
+        if (baseUrl == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "URL frontend manquante (APP_FRONTEND_BASE_URL ou CORS). Impossible d'envoyer le lien.");
+        }
+
+        String temporaryPassword = generateTemporaryPassword();
+        user.setPassword(passwordEncoder.encode(temporaryPassword));
+        user.setMustChangePassword(true);
+        userRepository.save(user);
+
+        passwordResetTokenRepository.invalidateUnusedByUserId(user.getId());
+        refreshTokenRepository.revokeAllByUserId(user.getId());
+
+        String rawToken = jwtService.generateRefreshTokenValue();
+        passwordResetTokenRepository.save(PasswordResetToken.builder()
+                .user(user)
+                .tokenHash(jwtService.hashToken(rawToken))
+                .expiresAt(Instant.now().plus(PASSWORD_RESET_TTL))
+                .used(false)
+                .build());
+
+        String resetUrl = baseUrl + "/reset-password?token=" + rawToken;
+        transactionalMail.sendUserWelcome(
+                email,
+                new PasswordWelcomeEmail.Context(
+                        user.getPrenom(),
+                        user.getUsername(),
+                        temporaryPassword,
+                        resetUrl));
+
+        log.info("E-mail de bienvenue envoyé à utilisateur={} <{}>", user.getUsername(), email);
+        return MessageResponse.builder()
+                .message("E-mail de bienvenue envoyé à " + email)
+                .build();
+    }
+
+    private String generateTemporaryPassword() {
+        StringBuilder sb = new StringBuilder(TEMP_PASSWORD_LENGTH);
+        for (int i = 0; i < TEMP_PASSWORD_LENGTH; i++) {
+            sb.append(TEMP_PASSWORD_CHARS.charAt(SECURE_RANDOM.nextInt(TEMP_PASSWORD_CHARS.length())));
+        }
+        return sb.toString();
+    }
+
+    private String resolveFrontendBaseUrl() {
+        String configured = trimTrailingSlash(frontendBaseUrl);
+        if (configured != null) {
+            return configured;
+        }
+        if (corsAllowedOrigins == null || corsAllowedOrigins.isBlank()) {
+            return null;
+        }
+        for (String part : corsAllowedOrigins.split(",")) {
+            String origin = trimTrailingSlash(part);
+            if (origin != null) {
+                return origin;
+            }
+        }
+        return null;
+    }
+
+    private static String trimTrailingSlash(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        if (trimmed.isBlank()) {
+            return null;
+        }
+        while (trimmed.endsWith("/")) {
+            trimmed = trimmed.substring(0, trimmed.length() - 1);
+        }
+        return trimmed.isBlank() ? null : trimmed;
     }
 
     private User requireActor() {

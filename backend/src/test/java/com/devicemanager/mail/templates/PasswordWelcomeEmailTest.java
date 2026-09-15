@@ -1,0 +1,27 @@
+package com.devicemanager.mail.templates;
+
+import com.devicemanager.mail.RenderedEmail;
+import org.junit.jupiter.api.Test;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+class PasswordWelcomeEmailTest {
+
+    @Test
+    void render_includesCredentialsAndResetLink() {
+        RenderedEmail email = PasswordWelcomeEmail.render(
+                new PasswordWelcomeEmail.Context(
+                        "Angelo",
+                        "agarzia",
+                        "TmpPass1234",
+                        "https://app.example/reset-password?token=abc"));
+
+        assertThat(email.subject()).contains("bienvenue");
+        assertThat(email.text()).contains("agarzia");
+        assertThat(email.text()).contains("TmpPass1234");
+        assertThat(email.text()).contains("https://app.example/reset-password?token=abc");
+        assertThat(email.html()).contains("agarzia");
+        assertThat(email.html()).contains("TmpPass1234");
+        assertThat(email.html()).contains("Réinitialiser mon mot de passe");
+    }
+}

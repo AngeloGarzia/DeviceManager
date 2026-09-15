@@ -1,15 +1,23 @@
 package com.devicemanager.service;
 
+import com.devicemanager.dto.MessageResponse;
 import com.devicemanager.dto.UserRequest;
 import com.devicemanager.dto.UserResponse;
+import com.devicemanager.entity.PasswordResetToken;
 import com.devicemanager.entity.User;
+import com.devicemanager.mail.TransactionalMail;
+import com.devicemanager.mail.templates.PasswordWelcomeEmail;
+import com.devicemanager.repository.PasswordResetTokenRepository;
+import com.devicemanager.repository.RefreshTokenRepository;
 import com.devicemanager.repository.UserRepository;
+import com.devicemanager.security.JwtService;
 import com.devicemanager.security.Roles;
 import com.devicemanager.support.TestFixtures;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -19,6 +27,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
@@ -27,6 +36,8 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -37,6 +48,10 @@ class UserServiceTest {
     @Mock private UserRepository userRepository;
     @Mock private PasswordEncoder passwordEncoder;
     @Mock private AtelierService atelierService;
+    @Mock private PasswordResetTokenRepository passwordResetTokenRepository;
+    @Mock private RefreshTokenRepository refreshTokenRepository;
+    @Mock private JwtService jwtService;
+    @Mock private TransactionalMail transactionalMail;
     @InjectMocks private UserService userService;
 
     @BeforeEach
@@ -49,6 +64,8 @@ class UserServiceTest {
         lenient().when(atelierService.requireAtelierForUserGroupe(any(User.class), eq(100L)))
                 .thenReturn(TestFixtures.atelier());
         lenient().when(passwordEncoder.encode(anyString())).thenReturn("hashed");
+        ReflectionTestUtils.setField(userService, "frontendBaseUrl", "http://localhost:4200");
+        ReflectionTestUtils.setField(userService, "corsAllowedOrigins", "");
     }
 
     @AfterEach
@@ -228,5 +245,48 @@ class UserServiceTest {
                 .isInstanceOf(ResponseStatusException.class)
                 .extracting(ex -> ((ResponseStatusException) ex).getReason())
                 .isEqualTo("Rôle invalide. Choisissez Administrateur ou Technicien.");
+    }
+
+    @Test
+    void sendWelcomeMail_rejectsMissingEmail() {
+        User user = TestFixtures.user("tech", Roles.TECHNICIEN);
+        user.setEmail("  ");
+        when(userRepository.findById(50L)).thenReturn(Optional.of(user));
+
+        assertThatThrownBy(() -> userService.sendWelcomeMail(50L))
+                .isInstanceOf(ResponseStatusException.class)
+                .satisfies(ex -> {
+                    ResponseStatusException rse = (ResponseStatusException) ex;
+                    assertThat(rse.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+                    assertThat(rse.getReason()).contains("e-mail");
+                });
+        verify(transactionalMail, never()).sendUserWelcome(anyString(), any());
+    }
+
+    @Test
+    void sendWelcomeMail_sendsCredentialsAndResetLink() {
+        User user = TestFixtures.user("tech", Roles.TECHNICIEN);
+        when(userRepository.findById(50L)).thenReturn(Optional.of(user));
+        when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(jwtService.generateRefreshTokenValue()).thenReturn("welcome-token");
+        when(jwtService.hashToken("welcome-token")).thenReturn("welcome-hash");
+        when(passwordResetTokenRepository.save(any(PasswordResetToken.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+
+        MessageResponse response = userService.sendWelcomeMail(50L);
+
+        assertThat(response.getMessage()).contains("tech@test.local");
+        assertThat(user.isMustChangePassword()).isTrue();
+        assertThat(user.getPassword()).isEqualTo("hashed");
+        verify(refreshTokenRepository).revokeAllByUserId(50L);
+        verify(passwordResetTokenRepository).invalidateUnusedByUserId(50L);
+
+        ArgumentCaptor<PasswordWelcomeEmail.Context> ctx =
+                ArgumentCaptor.forClass(PasswordWelcomeEmail.Context.class);
+        verify(transactionalMail).sendUserWelcome(eq("tech@test.local"), ctx.capture());
+        assertThat(ctx.getValue().username()).isEqualTo("tech");
+        assertThat(ctx.getValue().temporaryPassword()).hasSize(12);
+        assertThat(ctx.getValue().resetUrl())
+                .isEqualTo("http://localhost:4200/reset-password?token=welcome-token");
     }
 }

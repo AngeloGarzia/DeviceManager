@@ -4,6 +4,7 @@ import com.devicemanager.dto.MailTestResponse;
 import com.devicemanager.mail.templates.OrderRequestAdminEmail;
 import com.devicemanager.mail.templates.OrderRequestSfmEmail;
 import com.devicemanager.mail.templates.PasswordResetEmail;
+import com.devicemanager.mail.templates.PasswordWelcomeEmail;
 import com.devicemanager.mail.templates.SmtpTestEmail;
 import com.devicemanager.service.AppSettingsService;
 import lombok.RequiredArgsConstructor;
@@ -66,6 +67,22 @@ public class TransactionalMail {
             log.warn("E-mail reset mot de passe non envoyé à {}: {}", to, result.error());
         }
         return result;
+    }
+
+    /**
+     * Bienvenue admin → utilisateur (identifiant + MDP temporaire + lien reset).
+     * Remonte une erreur HTTP si messagerie inactive ou échec SMTP.
+     */
+    public void sendUserWelcome(String to, PasswordWelcomeEmail.Context context) {
+        RenderedEmail email = PasswordWelcomeEmail.render(context);
+        EmailSendResult result = emailService.send(to, email.subject(), email.text(), email.html());
+        if (result.skipped()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Messagerie désactivée ou MAIL_HOST vide. Activez-la dans Paramètres avant d'envoyer.");
+        }
+        if (!result.ok()) {
+            throw mapSendFailure(result.error());
+        }
     }
 
     /**

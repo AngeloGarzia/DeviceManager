@@ -73,6 +73,10 @@
         <Class name="com.devicemanager.mail.templates.PasswordResetEmail"/>
         <Bug pattern="VA_FORMAT_STRING_USES_NEWLINE"/>
     </Match>
+    <Match>
+        <Class name="com.devicemanager.mail.templates.PasswordWelcomeEmail"/>
+        <Bug pattern="VA_FORMAT_STRING_USES_NEWLINE"/>
+    </Match>
 
     <!-- Records Context des templates mail : List.copyOf dans le constructeur compact. -->
     <Match>
