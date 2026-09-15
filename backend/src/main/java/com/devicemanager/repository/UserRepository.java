@@ -38,6 +38,14 @@ public interface UserRepository extends JpaRepository<User, Long> {
     boolean existsByUsername(String username);
 
     /**
+     * Charge un utilisateur par adresse e-mail (insensible à la casse).
+     *
+     * @param email e-mail du compte
+     * @return utilisateur trouvé ou vide
+     */
+    Optional<User> findByEmailIgnoreCase(String email);
+
+    /**
      * Vérifie l'existence d'une adresse e-mail (insensible à la casse).
      *
      * @param email e-mail à vérifier

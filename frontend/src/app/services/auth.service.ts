@@ -190,6 +190,22 @@ export class AuthService {
       .pipe(tap(() => this.setMustChangePassword(false)));
   }
 
+  forgotPassword(email: string): Observable<{ message: string }> {
+    return this.http.post<{ message: string }>(
+      `${environment.apiUrl}/api/auth/forgot-password`,
+      { email },
+      { withCredentials: true }
+    );
+  }
+
+  resetPassword(token: string, newPassword: string): Observable<void> {
+    return this.http.post<void>(
+      `${environment.apiUrl}/api/auth/reset-password`,
+      { token, newPassword },
+      { withCredentials: true }
+    );
+  }
+
   setMustChangePassword(value: boolean): void {
     this.mustChangePassword.set(value);
     if (value) {

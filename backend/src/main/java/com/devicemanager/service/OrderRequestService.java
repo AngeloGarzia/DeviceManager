@@ -8,6 +8,11 @@ import com.devicemanager.dto.MailPreviewItem;
 import com.devicemanager.dto.OrderRequestDto;
 import com.devicemanager.dto.OrderRequestLineResponse;
 import com.devicemanager.dto.OrderRequestResponse;
+import com.devicemanager.mail.EmailSendResult;
+import com.devicemanager.mail.RenderedEmail;
+import com.devicemanager.mail.TransactionalMail;
+import com.devicemanager.mail.templates.OrderRequestAdminEmail;
+import com.devicemanager.mail.templates.OrderRequestSfmEmail;
 import com.devicemanager.entity.Atelier;
 import com.devicemanager.entity.Commande;
 import com.devicemanager.entity.CommandeLigne;
@@ -56,7 +61,7 @@ public class OrderRequestService {
     private final CommandeRepository commandeRepository;
     private final DeviceRepository deviceRepository;
     private final UserRepository userRepository;
-    private final MailService mailService;
+    private final TransactionalMail transactionalMail;
     private final AtelierService atelierService;
     private final StockMouvementService stockMouvementService;
     private final StorageService storageService;
@@ -113,12 +118,11 @@ public class OrderRequestService {
 
         Commande saved = commandeRepository.save(commande);
 
-        try {
-            mailService.sendOrderRequestToAdmin(
-                    "Demande de commande #" + saved.getId() + " — " + quantities.size() + " pièce(s)",
-                    buildAdminNotificationBody(saved, atelier, quantities, devices));
-        } catch (Exception ex) {
-            log.error("Demande #{} enregistrée mais e-mail admin non envoyé: {}", saved.getId(), ex.getMessage());
+        EmailSendResult adminMail = transactionalMail.notifyAdminNewOrderRequest(
+                buildAdminEmailContext(saved, atelier, quantities, devices));
+        if (!adminMail.ok()) {
+            log.error("Demande #{} enregistrée mais e-mail admin non envoyé: {}",
+                    saved.getId(), adminMail.error());
         }
         log.info("Création en base — Demande commande id={} par={} pièces={} atelier={}",
                 saved.getId(), technicien.getUsername(), quantities.size(), atelier.getId());
@@ -169,14 +173,13 @@ public class OrderRequestService {
                 warnings.add("SFM « " + sfm.getNom() + " » sans e-mail — non notifié");
                 continue;
             }
-            String subject = buildSfmOrderMailSubject(commande);
-            String body = buildSfmOrderMailBody(commande, entry.getValue(), admin);
+            OrderRequestSfmEmail.Context sfmCtx = buildSfmEmailContext(commande, entry.getValue(), admin);
             for (String to : recipients) {
-                try {
-                    mailService.send(to, subject, body);
+                EmailSendResult result = transactionalMail.notifySfmOrderValidated(to, sfmCtx);
+                if (result.ok() && !result.skipped()) {
                     mailsSent++;
-                } catch (Exception ex) {
-                    log.error("Échec e-mail SFM {} ({}): {}", sfm.getNom(), to, ex.getMessage());
+                } else if (!result.ok()) {
+                    log.error("Échec e-mail SFM {} ({}): {}", sfm.getNom(), to, result.error());
                     warnings.add("Échec envoi à " + to + " (" + sfm.getNom() + ")");
                 }
             }
@@ -624,14 +627,13 @@ public class OrderRequestService {
         }
 
         List<MailPreviewItem> previews = new ArrayList<>();
-        String adminSubject = "Demande de commande (aperçu) — " + quantities.size() + " pièce(s)";
-        String adminBody = buildAdminNotificationBody(draft, atelier, quantities, devices)
-                .replace("Demande n°null", "Demande n°(sera attribuée à l'envoi)");
+        RenderedEmail adminEmail = OrderRequestAdminEmail.render(
+                buildAdminEmailContext(draft, atelier, quantities, devices));
         previews.add(MailPreviewItem.builder()
                 .kind("ADMIN")
-                .to(mailService.getAdminEmail())
-                .subject(adminSubject)
-                .body(adminBody)
+                .to(transactionalMail.getAdminEmail())
+                .subject(adminEmail.subject())
+                .body(adminEmail.text())
                 .sfmNom(null)
                 .build());
         // Aperçu SFM : si l'auteur est admin, on montre sa signature ; sinon placeholders admin
@@ -675,14 +677,15 @@ public class OrderRequestService {
             Sfm sfm = entry.getValue().getFirst().getDevice().getSfm();
             Hibernate.initialize(sfm.getContacts());
             Set<String> recipients = resolveSfmRecipients(sfm);
-            String subject = buildSfmOrderMailSubject(commande);
-            String body = buildSfmOrderMailBody(commande, entry.getValue(), validator);
+            RenderedEmail sfmEmail = OrderRequestSfmEmail.render(
+                    buildSfmEmailContext(commande, entry.getValue(), validator));
             if (recipients.isEmpty()) {
                 previews.add(MailPreviewItem.builder()
                         .kind("WARNING")
                         .to("—")
-                        .subject(subject)
-                        .body("SFM « " + sfm.getNom() + " » sans adresse e-mail — non notifié.\n\n" + body)
+                        .subject(sfmEmail.subject())
+                        .body("SFM « " + sfm.getNom() + " » sans adresse e-mail — non notifié.\n\n"
+                                + sfmEmail.text())
                         .sfmNom(sfm.getNom())
                         .build());
                 continue;
@@ -691,8 +694,8 @@ public class OrderRequestService {
                 previews.add(MailPreviewItem.builder()
                         .kind("SFM")
                         .to(to)
-                        .subject(subject)
-                        .body(body)
+                        .subject(sfmEmail.subject())
+                        .body(sfmEmail.text())
                         .sfmNom(sfm.getNom())
                         .build());
             }
@@ -700,108 +703,56 @@ public class OrderRequestService {
         return previews;
     }
 
-    private String buildAdminNotificationBody(
+    private OrderRequestAdminEmail.Context buildAdminEmailContext(
             Commande commande,
             Atelier atelier,
             Map<Long, Integer> quantities,
             List<Device> devices) {
-        StringBuilder linesBody = new StringBuilder();
+        List<OrderRequestAdminEmail.LineItem> lines = new ArrayList<>();
         Set<String> sfmLabels = new LinkedHashSet<>();
         for (Device device : devices) {
             int qty = quantities.getOrDefault(device.getId(), 1);
-            linesBody.append("- ").append(device.getNom());
-            if (device.getReference() != null && !device.getReference().isBlank()) {
-                linesBody.append(" (réf. ").append(device.getReference()).append(")");
-            }
-            linesBody.append(" × ").append(qty);
+            String sfmNom = device.getSfm() != null ? device.getSfm().getNom() : null;
+            lines.add(new OrderRequestAdminEmail.LineItem(
+                    device.getNom(),
+                    device.getReference(),
+                    qty,
+                    sfmNom));
             if (device.getSfm() != null) {
-                linesBody.append(" — SFM: ").append(device.getSfm().getNom());
                 sfmLabels.add(device.getSfm().getNom() + " <" + nullToEmpty(device.getSfm().getEmail()) + ">");
-            } else {
-                linesBody.append(" — SFM: (non renseigné)");
             }
-            linesBody.append('\n');
         }
-
-        String sfmBlock = sfmLabels.isEmpty()
-                ? "(aucun SFM associé aux pièces)"
-                : sfmLabels.stream().map(s -> "- " + s).collect(Collectors.joining("\n"));
-
-        return """
-                Bonjour Administrateur,
-
-                Une nouvelle demande de commande nécessite votre validation dans DeviceManager.
-
-                Demande n°%s
-                Atelier : %s
-                Technicien : %s
-                Date/heure : %s
-
-                Pièces détachées :
-                %s
-                SFM concernés :
-                %s
-
-                Message du technicien :
-                %s
-
-                Connectez-vous à l'application puis validez la demande pour envoyer la commande aux SFM.
-
-                — DeviceManager
-                """.formatted(
+        return new OrderRequestAdminEmail.Context(
                 commande.getId(),
                 atelier.getNom(),
                 commande.getTechnicienNom(),
                 commande.getDateDemande(),
-                linesBody,
-                sfmBlock,
-                commande.getMessage()
-        );
+                lines,
+                new ArrayList<>(sfmLabels),
+                commande.getMessage());
     }
 
-    private String buildSfmOrderMailSubject(Commande commande) {
-        if (commande.getId() == null) {
-            return "Demande de devis #(n° à l'envoi)";
-        }
-        return "Demande de devis #" + commande.getId();
-    }
-
-    /**
-     * Corps e-mail SFM — signature :
-     * <pre>
-     * Merci, bien à vous.
-     * {Prénom Nom de l'admin validant}
-     * {e-mail admin}
-     * {e-mail demandeur}
-     * </pre>
-     */
-    private String buildSfmOrderMailBody(Commande commande, List<CommandeLigne> lignes, User validator) {
-        StringBuilder linesBody = new StringBuilder();
+    private OrderRequestSfmEmail.Context buildSfmEmailContext(
+            Commande commande,
+            List<CommandeLigne> lignes,
+            User validator) {
+        List<OrderRequestSfmEmail.LineItem> items = new ArrayList<>();
         for (CommandeLigne ligne : lignes) {
             Device device = ligne.getDevice();
-            linesBody.append("- ").append(device.getNom());
-            if (device.getReference() != null && !device.getReference().isBlank()) {
-                linesBody.append(" (réf. ").append(device.getReference()).append(")");
-            }
-            linesBody.append(" × ").append(ligne.getQuantite()).append('\n');
+            items.add(new OrderRequestSfmEmail.LineItem(
+                    device.getNom(),
+                    device.getReference(),
+                    ligne.getQuantite()));
         }
-
         String adminName = validator != null
                 ? displayUserName(validator)
                 : "(Prénom Nom de l'administrateur)";
-        String adminEmail = resolveUserEmail(validator, "(e-mail de l'administrateur)");
-        String requesterEmail = resolveUserEmail(commande.getTechnicien(), "(e-mail du demandeur)");
-
-        StringBuilder body = new StringBuilder();
-        body.append("Bonjour,\n\n");
-        body.append("Pouvez-vous nous faire un devis pour les pièces détachées suivantes :\n\n");
-        body.append(linesBody);
-        body.append('\n');
-        body.append("Merci, bien à vous.\n");
-        body.append(adminName).append('\n');
-        body.append(adminEmail).append('\n');
-        body.append(requesterEmail).append('\n');
-        return body.toString();
+        return new OrderRequestSfmEmail.Context(
+                commande.getId(),
+                items,
+                adminName,
+                resolveUserEmail(validator, "(e-mail de l'administrateur)"),
+                resolveUserEmail(commande.getTechnicien(), "(e-mail du demandeur)"));
     }
 
     private static String resolveUserEmail(User user, String fallback) {

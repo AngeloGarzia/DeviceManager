@@ -44,6 +44,7 @@ export class LoginComponent {
   private readonly route = inject(ActivatedRoute);
 
   readonly error = signal<string | null>(null);
+  readonly notice = signal<string | null>(null);
   readonly loading = signal(false);
   readonly showPassword = signal(false);
 
@@ -65,6 +66,10 @@ export class LoginComponent {
     }
     if (this.route.snapshot.queryParamMap.get('reason') === 'expired') {
       this.error.set('Session expirée. Veuillez vous reconnecter.');
+      return;
+    }
+    if (this.route.snapshot.queryParamMap.get('reason') === 'password-reset') {
+      this.notice.set('Mot de passe mis à jour. Vous pouvez vous connecter.');
       return;
     }
     // Rechargement de /login avec cookie refresh encore valide → renvoyer vers l'app.

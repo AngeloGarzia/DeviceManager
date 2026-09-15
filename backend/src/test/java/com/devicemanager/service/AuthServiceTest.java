@@ -3,13 +3,21 @@ package com.devicemanager.service;
 import com.devicemanager.dto.AuthResponse;
 import com.devicemanager.dto.AtelierSummary;
 import com.devicemanager.dto.LoginRequest;
+import com.devicemanager.dto.MessageResponse;
+import com.devicemanager.entity.PasswordResetToken;
 import com.devicemanager.entity.RefreshToken;
+import com.devicemanager.entity.User;
+import com.devicemanager.mail.EmailSendResult;
+import com.devicemanager.mail.TransactionalMail;
+import com.devicemanager.mail.templates.PasswordResetEmail;
+import com.devicemanager.repository.PasswordResetTokenRepository;
 import com.devicemanager.repository.RefreshTokenRepository;
 import com.devicemanager.repository.UserRepository;
 import com.devicemanager.security.JwtService;
 import com.devicemanager.security.LoginAccountLockoutService;
 import com.devicemanager.security.Roles;
 import com.devicemanager.support.TestFixtures;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -20,14 +28,19 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -38,11 +51,19 @@ class AuthServiceTest {
 
     @Mock private UserRepository userRepository;
     @Mock private RefreshTokenRepository refreshTokenRepository;
+    @Mock private PasswordResetTokenRepository passwordResetTokenRepository;
     @Mock private PasswordEncoder passwordEncoder;
     @Mock private JwtService jwtService;
     @Mock private AtelierService atelierService;
     @Mock private LoginAccountLockoutService accountLockoutService;
+    @Mock private TransactionalMail transactionalMail;
     @InjectMocks private AuthService authService;
+
+    @BeforeEach
+    void setFrontendUrl() {
+        ReflectionTestUtils.setField(authService, "frontendBaseUrl", "http://localhost:4200");
+        ReflectionTestUtils.setField(authService, "corsAllowedOrigins", "");
+    }
 
     @Test
     void login_success() {
@@ -87,7 +108,7 @@ class AuthServiceTest {
     void login_usesPreferredAtelierWhenStillAllowed() {
         var preferred = TestFixtures.atelier();
         preferred.setId(200L);
-        preferred.setNom("Atelier Préféré");
+        preferred.setNom("Atelier Prefere");
         var user = TestFixtures.user("admin", Roles.ADMIN);
         user.setPreferredAtelier(preferred);
 
@@ -95,7 +116,7 @@ class AuthServiceTest {
         when(passwordEncoder.matches("admin123", "encoded")).thenReturn(true);
         when(atelierService.listForUser("admin")).thenReturn(List.of(
                 AtelierSummary.builder().id(100L).nom("Autre").label("Autre").build(),
-                AtelierSummary.builder().id(200L).nom("Atelier Préféré").label("Atelier Préféré").build()
+                AtelierSummary.builder().id(200L).nom("Atelier Prefere").label("Atelier Prefere").build()
         ));
         stubTokenIssuance("admin", Roles.ADMIN);
 
@@ -182,6 +203,93 @@ class AuthServiceTest {
                     assertThat(rse.getStatusCode()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
                     assertThat(rse.getReason()).isEqualTo(LoginAccountLockoutService.LOCKED_MESSAGE);
                 });
+    }
+
+    @Test
+    void requestPasswordReset_unknownEmailStillReturnsGenericSuccess() {
+        when(userRepository.findByEmailIgnoreCase("ghost@test.local")).thenReturn(Optional.empty());
+
+        MessageResponse response = authService.requestPasswordReset("ghost@test.local");
+
+        assertThat(response.getMessage()).isEqualTo(AuthService.FORGOT_PASSWORD_MESSAGE);
+        verify(passwordResetTokenRepository, never()).save(any());
+        verify(transactionalMail, never()).sendPasswordReset(anyString(), any());
+    }
+
+    @Test
+    void requestPasswordReset_sendsMailWhenUserExists() {
+        User user = TestFixtures.user("tech", Roles.TECHNICIEN);
+        when(userRepository.findByEmailIgnoreCase("tech@test.local")).thenReturn(Optional.of(user));
+        when(jwtService.generateRefreshTokenValue()).thenReturn("reset-raw");
+        when(jwtService.hashToken("reset-raw")).thenReturn("reset-hash");
+        when(passwordResetTokenRepository.save(any(PasswordResetToken.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(transactionalMail.sendPasswordReset(anyString(), any())).thenReturn(EmailSendResult.success());
+
+        MessageResponse response = authService.requestPasswordReset("tech@test.local");
+
+        assertThat(response.getMessage()).isEqualTo(AuthService.FORGOT_PASSWORD_MESSAGE);
+        verify(passwordResetTokenRepository).invalidateUnusedByUserId(50L);
+        ArgumentCaptor<PasswordResetEmail.Context> ctx =
+                ArgumentCaptor.forClass(PasswordResetEmail.Context.class);
+        verify(transactionalMail).sendPasswordReset(eq("tech@test.local"), ctx.capture());
+        assertThat(ctx.getValue().resetUrl())
+                .isEqualTo("http://localhost:4200/reset-password?token=reset-raw");
+    }
+
+    @Test
+    void resetPassword_rejectsInvalidToken() {
+        when(jwtService.hashToken("bad")).thenReturn("bad-hash");
+        when(passwordResetTokenRepository.findActiveByTokenHash("bad-hash")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> authService.resetPassword("bad", "newpass12"))
+                .isInstanceOf(ResponseStatusException.class)
+                .satisfies(ex -> {
+                    ResponseStatusException rse = (ResponseStatusException) ex;
+                    assertThat(rse.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+                    assertThat(rse.getReason()).contains("invalide ou expiré");
+                });
+    }
+
+    @Test
+    void resetPassword_rejectsExpiredToken() {
+        User user = TestFixtures.user("tech", Roles.TECHNICIEN);
+        PasswordResetToken token = PasswordResetToken.builder()
+                .user(user)
+                .tokenHash("hash")
+                .expiresAt(Instant.now().minusSeconds(60))
+                .used(false)
+                .build();
+        when(jwtService.hashToken("raw")).thenReturn("hash");
+        when(passwordResetTokenRepository.findActiveByTokenHash("hash")).thenReturn(Optional.of(token));
+
+        assertThatThrownBy(() -> authService.resetPassword("raw", "newpass12"))
+                .isInstanceOf(ResponseStatusException.class)
+                .satisfies(ex -> assertThat(((ResponseStatusException) ex).getStatusCode())
+                        .isEqualTo(HttpStatus.BAD_REQUEST));
+        assertThat(token.isUsed()).isTrue();
+    }
+
+    @Test
+    void resetPassword_updatesPasswordAndRevokesSessions() {
+        User user = TestFixtures.user("tech", Roles.TECHNICIEN);
+        PasswordResetToken token = PasswordResetToken.builder()
+                .user(user)
+                .tokenHash("hash")
+                .expiresAt(Instant.now().plusSeconds(600))
+                .used(false)
+                .build();
+        when(jwtService.hashToken("raw")).thenReturn("hash");
+        when(passwordResetTokenRepository.findActiveByTokenHash("hash")).thenReturn(Optional.of(token));
+        when(passwordEncoder.matches("newpass12", "encoded")).thenReturn(false);
+        when(passwordEncoder.encode("newpass12")).thenReturn("encoded-new");
+
+        authService.resetPassword("raw", "newpass12");
+
+        assertThat(user.getPassword()).isEqualTo("encoded-new");
+        assertThat(user.isMustChangePassword()).isFalse();
+        assertThat(token.isUsed()).isTrue();
+        verify(refreshTokenRepository).revokeAllByUserId(50L);
+        verify(userRepository).save(user);
     }
 
     private void stubTokenIssuance(String username, String role) {

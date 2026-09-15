@@ -8,7 +8,9 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
   const isAuthPublic =
     req.url.includes('/api/auth/login') ||
     req.url.includes('/api/auth/refresh') ||
-    req.url.includes('/api/auth/logout');
+    req.url.includes('/api/auth/logout') ||
+    req.url.includes('/api/auth/forgot-password') ||
+    req.url.includes('/api/auth/reset-password');
 
   const buildHeaders = (): Record<string, string> => {
     const headers: Record<string, string> = {};

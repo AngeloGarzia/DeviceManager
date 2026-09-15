@@ -2,6 +2,10 @@ package com.devicemanager.service;
 
 import com.devicemanager.dto.OrderRequestDto;
 import com.devicemanager.dto.OrderRequestResponse;
+import com.devicemanager.mail.EmailSendResult;
+import com.devicemanager.mail.TransactionalMail;
+import com.devicemanager.mail.templates.OrderRequestAdminEmail;
+import com.devicemanager.mail.templates.OrderRequestSfmEmail;
 import com.devicemanager.entity.Commande;
 import com.devicemanager.entity.CommandeLigne;
 import com.devicemanager.repository.CommandeRepository;
@@ -39,7 +43,7 @@ class OrderRequestServiceTest {
     @Mock private CommandeRepository commandeRepository;
     @Mock private DeviceRepository deviceRepository;
     @Mock private UserRepository userRepository;
-    @Mock private MailService mailService;
+    @Mock private TransactionalMail transactionalMail;
     @Mock private AtelierService atelierService;
     @Mock private StockMouvementService stockMouvementService;
     @Mock private StorageService storageService;
@@ -50,6 +54,9 @@ class OrderRequestServiceTest {
 
     @BeforeEach
     void setUp() {
+        lenient().when(transactionalMail.notifyAdminNewOrderRequest(any(OrderRequestAdminEmail.Context.class)))
+                .thenReturn(EmailSendResult.success());
+        lenient().when(transactionalMail.getAdminEmail()).thenReturn("admin@test.local");
         lenient().when(atelierService.requireCurrentAtelier()).thenReturn(TestFixtures.atelier());
         lenient().when(storageService.resolveAccessUrl(any(), any(), any())).thenAnswer(inv -> {
             Object legacy = inv.getArgument(1);
@@ -87,9 +94,12 @@ class OrderRequestServiceTest {
         assertThat(response.getTotalPieces()).isEqualTo(1);
         assertThat(response.getTotalQuantite()).isEqualTo(5);
         assertThat(response.getStatus()).isEqualTo(OrderStatuses.PENDING);
-        ArgumentCaptor<String> bodyCaptor = ArgumentCaptor.forClass(String.class);
-        verify(mailService).sendOrderRequestToAdmin(contains("1 pièce"), bodyCaptor.capture());
-        assertThat(bodyCaptor.getValue()).contains("SFM Nord").contains("Urgent").contains("validation");
+        ArgumentCaptor<OrderRequestAdminEmail.Context> ctxCaptor =
+                ArgumentCaptor.forClass(OrderRequestAdminEmail.Context.class);
+        verify(transactionalMail).notifyAdminNewOrderRequest(ctxCaptor.capture());
+        assertThat(ctxCaptor.getValue().message()).contains("Urgent");
+        assertThat(ctxCaptor.getValue().lines()).hasSize(1);
+        assertThat(ctxCaptor.getValue().lines().getFirst().sfmLabel()).isEqualTo("SFM Nord");
     }
 
     @Test
@@ -156,22 +166,22 @@ class OrderRequestServiceTest {
                         .email("sophie.martin@casino.local")
                         .build()));
 
+        when(transactionalMail.notifySfmOrderValidated(eq("jean@example.com"), any(OrderRequestSfmEmail.Context.class)))
+                .thenReturn(EmailSendResult.success());
+
         OrderRequestResponse response = orderRequestService.validate(70L, "admin");
 
         assertThat(response.getStatus()).isEqualTo(OrderStatuses.VALIDATED);
         assertThat(response.getDateValidation()).isNotNull();
-        ArgumentCaptor<String> subjectCaptor = ArgumentCaptor.forClass(String.class);
-        ArgumentCaptor<String> bodyCaptor = ArgumentCaptor.forClass(String.class);
-        verify(mailService).send(eq("jean@example.com"), subjectCaptor.capture(), bodyCaptor.capture());
-        assertThat(subjectCaptor.getValue()).isEqualTo("Demande de devis #70");
-        assertThat(bodyCaptor.getValue())
-                .contains("Pouvez-vous nous faire un devis pour les pièces détachées suivantes")
-                .contains("Carte mère")
-                .contains("Merci, bien à vous.")
-                .contains("Sophie Martin")
-                .contains("sophie.martin@casino.local")
-                .contains("tech@test.local")
-                .doesNotContain("Merci de traiter cette commande");
+        ArgumentCaptor<OrderRequestSfmEmail.Context> ctxCaptor =
+                ArgumentCaptor.forClass(OrderRequestSfmEmail.Context.class);
+        verify(transactionalMail).notifySfmOrderValidated(eq("jean@example.com"), ctxCaptor.capture());
+        OrderRequestSfmEmail.Context ctx = ctxCaptor.getValue();
+        assertThat(ctx.orderId()).isEqualTo(70L);
+        assertThat(ctx.adminName()).isEqualTo("Sophie Martin");
+        assertThat(ctx.adminEmail()).isEqualTo("sophie.martin@casino.local");
+        assertThat(ctx.requesterEmail()).isEqualTo("tech@test.local");
+        assertThat(ctx.lines()).extracting(OrderRequestSfmEmail.LineItem::name).contains("Carte mère");
     }
 
     @Test

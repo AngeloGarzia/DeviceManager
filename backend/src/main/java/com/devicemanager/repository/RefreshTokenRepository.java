@@ -2,6 +2,7 @@ package com.devicemanager.repository;
 
 import com.devicemanager.entity.RefreshToken;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -26,4 +27,14 @@ public interface RefreshTokenRepository extends JpaRepository<RefreshToken, Long
             WHERE r.tokenHash = :tokenHash AND r.revoked = false
             """)
     Optional<RefreshToken> findActiveByTokenHash(@Param("tokenHash") String tokenHash);
+
+    /**
+     * Révoque tous les refresh tokens actifs d'un utilisateur.
+     *
+     * @param userId identifiant utilisateur
+     * @return nombre de jetons révoqués
+     */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("UPDATE RefreshToken r SET r.revoked = true WHERE r.user.id = :userId AND r.revoked = false")
+    int revokeAllByUserId(@Param("userId") Long userId);
 }

@@ -57,4 +57,30 @@
         <Class name="com.devicemanager.service.OrderRequestService"/>
         <Bug pattern="VA_FORMAT_STRING_USES_NEWLINE"/>
     </Match>
+    <Match>
+        <Class name="com.devicemanager.mail.templates.EmailHtml"/>
+        <Bug pattern="VA_FORMAT_STRING_USES_NEWLINE"/>
+    </Match>
+    <Match>
+        <Class name="com.devicemanager.mail.templates.OrderRequestAdminEmail"/>
+        <Bug pattern="VA_FORMAT_STRING_USES_NEWLINE"/>
+    </Match>
+    <Match>
+        <Class name="com.devicemanager.mail.templates.OrderRequestSfmEmail"/>
+        <Bug pattern="VA_FORMAT_STRING_USES_NEWLINE"/>
+    </Match>
+    <Match>
+        <Class name="com.devicemanager.mail.templates.PasswordResetEmail"/>
+        <Bug pattern="VA_FORMAT_STRING_USES_NEWLINE"/>
+    </Match>
+
+    <!-- Records Context des templates mail : List.copyOf dans le constructeur compact. -->
+    <Match>
+        <Class name="com.devicemanager.mail.templates.OrderRequestAdminEmail$Context"/>
+        <Bug code="EI"/>
+    </Match>
+    <Match>
+        <Class name="com.devicemanager.mail.templates.OrderRequestSfmEmail$Context"/>
+        <Bug code="EI"/>
+    </Match>
 </FindBugsFilter>

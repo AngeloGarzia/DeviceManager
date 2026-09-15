@@ -4,7 +4,7 @@ import com.devicemanager.dto.AppSettingResponse;
 import com.devicemanager.dto.AppSettingsUpdateRequest;
 import com.devicemanager.dto.MailTestResponse;
 import com.devicemanager.service.AppSettingsService;
-import com.devicemanager.service.MailService;
+import com.devicemanager.mail.TransactionalMail;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -24,7 +24,7 @@ import java.util.List;
 public class SetupController {
 
     private final AppSettingsService appSettingsService;
-    private final MailService mailService;
+    private final TransactionalMail transactionalMail;
 
     /**
      * Liste tous les paramètres applicatifs (secrets masqués).
@@ -56,6 +56,6 @@ public class SetupController {
      */
     @PostMapping("/mail/test")
     public ResponseEntity<MailTestResponse> testMail() {
-        return ResponseEntity.ok(mailService.sendTestEmail());
+        return ResponseEntity.ok(transactionalMail.sendSmtpTest());
     }
 }

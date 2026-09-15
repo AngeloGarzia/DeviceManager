@@ -2,7 +2,10 @@ package com.devicemanager.controller;
 
 import com.devicemanager.dto.AuthResponse;
 import com.devicemanager.dto.ChangePasswordRequest;
+import com.devicemanager.dto.ForgotPasswordRequest;
 import com.devicemanager.dto.LoginRequest;
+import com.devicemanager.dto.MessageResponse;
+import com.devicemanager.dto.ResetPasswordRequest;
 import com.devicemanager.security.JwtService;
 import com.devicemanager.service.AuthService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -24,7 +27,7 @@ import java.time.Duration;
  * Contrôleur REST d'authentification pour DeviceManager.
  * <p>
  * Gère la connexion JWT (access token dans le corps, refresh token en cookie HttpOnly),
- * le rafraîchissement, la déconnexion et le changement de mot de passe.
+ * le rafraîchissement, la déconnexion, le changement et la réinitialisation de mot de passe.
  */
 @RestController
 @RequestMapping("/api/auth")
@@ -108,6 +111,29 @@ public class AuthController {
             Authentication authentication,
             @Valid @RequestBody ChangePasswordRequest request) {
         authService.changePassword(authentication.getName(), request);
+        return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * Demande l'envoi d'un lien de réinitialisation (réponse toujours générique).
+     *
+     * @param request e-mail du compte
+     * @return message informatif
+     */
+    @PostMapping("/forgot-password")
+    public ResponseEntity<MessageResponse> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
+        return ResponseEntity.ok(authService.requestPasswordReset(request.getEmail()));
+    }
+
+    /**
+     * Définit un nouveau mot de passe à partir du jeton reçu par e-mail.
+     *
+     * @param request jeton + nouveau mot de passe
+     * @return 204 No Content
+     */
+    @PostMapping("/reset-password")
+    public ResponseEntity<Void> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
+        authService.resetPassword(request.getToken(), request.getNewPassword());
         return ResponseEntity.noContent().build();
     }
 

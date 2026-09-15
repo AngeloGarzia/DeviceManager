@@ -13,15 +13,19 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.time.Duration;
+import java.util.Set;
 
 /**
- * Limite le débit des tentatives {@code POST /api/auth/login} par adresse IP
- * (fenêtre glissante 1 min), via {@link RateLimitStore}.
+ * Limite le débit des tentatives d'auth publiques par adresse IP
+ * ({@code login}, {@code forgot-password}, {@code reset-password}), via {@link RateLimitStore}.
  */
 @Component
 public class LoginRateLimitFilter extends OncePerRequestFilter {
 
-    private static final String LOGIN_PATH = "/api/auth/login";
+    private static final Set<String> LIMITED_PATHS = Set.of(
+            "/api/auth/login",
+            "/api/auth/forgot-password",
+            "/api/auth/reset-password");
     private static final Duration WINDOW = Duration.ofMinutes(1);
 
     private final int limitPerMinute;
@@ -36,7 +40,11 @@ public class LoginRateLimitFilter extends OncePerRequestFilter {
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
-        return !(LOGIN_PATH.equals(request.getRequestURI()) && "POST".equalsIgnoreCase(request.getMethod()));
+        if (!"POST".equalsIgnoreCase(request.getMethod())) {
+            return true;
+        }
+        String uri = request.getRequestURI();
+        return uri == null || !LIMITED_PATHS.contains(uri);
     }
 
     @Override
@@ -48,7 +56,8 @@ public class LoginRateLimitFilter extends OncePerRequestFilter {
         if (!rateLimitStore.tryAcquire(ip, limitPerMinute, WINDOW)) {
             response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
             response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-            response.getWriter().write("{\"message\":\"Trop de tentatives de connexion. Réessayez plus tard.\"}");
+            response.getWriter().write(
+                    "{\"message\":\"Trop de tentatives. Réessayez plus tard.\"}");
             return;
         }
         filterChain.doFilter(request, response);

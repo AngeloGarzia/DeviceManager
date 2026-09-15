@@ -113,6 +113,7 @@ app:
     enabled: ${APP_MAIL_ENABLED:false}
     from: ${APP_MAIL_FROM:noreply@devicemanager.local}
     admin-email: ${APP_MAIL_ADMIN_EMAIL:admin@devicemanager.local}
+  frontend-base-url: ${APP_FRONTEND_BASE_URL:}
   s3:
     # Object storage S3-compatible — Cloudflare R2 (bucket privé + URLs présignées)
     enabled: ${APP_S3_ENABLED:false}

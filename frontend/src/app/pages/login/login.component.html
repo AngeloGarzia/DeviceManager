@@ -42,6 +42,16 @@
           Mémorise l’identifiant et conserve la session après fermeture du navigateur.
         </p>
 
+        <p class="m-0 text-right text-sm">
+          <a routerLink="/forgot-password" class="text-brand underline-offset-2 hover:underline">
+            Mot de passe oublié ?
+          </a>
+        </p>
+
+        @if (notice()) {
+          <p class="mb-3 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800">{{ notice() }}</p>
+        }
+
         @if (error()) {
           <p class="mb-3 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{{ error() }}</p>
         }
