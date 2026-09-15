@@ -9,6 +9,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatCardModule } from '@angular/material/card';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatTableModule } from '@angular/material/table';
+import { MatCheckboxModule } from '@angular/material/checkbox';
 import { Device, TodoItem } from '../../models/models';
 import { DeviceService } from '../../services/device.service';
 import { TodoService } from '../../services/todo.service';
@@ -34,6 +35,7 @@ import { apiErrorMessage } from '../../shared/api-error';
     MatCardModule,
     MatProgressSpinnerModule,
     MatTableModule,
+    MatCheckboxModule,
     ConfirmDialogComponent
   ],
   templateUrl: './device-list.component.html',
@@ -46,7 +48,8 @@ export class DeviceListComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
 
-  readonly items = signal<Device[]>([]);
+  readonly allItems = signal<Device[]>([]);
+  readonly showObsolete = signal(false);
   readonly selectedId = signal<number | null>(null);
   readonly loading = signal(false);
   readonly error = signal<string | null>(null);
@@ -58,6 +61,15 @@ export class DeviceListComponent implements OnInit {
   query = '';
 
   readonly displayedColumns: string[] = ['nom', 'reference', 'stock', 'statut', 'sfm', 'mas'];
+
+  /** Liste affichée : obsolètes masquées sauf si la case est cochée. */
+  readonly items = computed(() => {
+    const all = this.allItems();
+    if (this.showObsolete()) {
+      return all;
+    }
+    return all.filter((d) => !d.obsolete);
+  });
 
   readonly selected = computed(() => {
     const id = this.selectedId();
@@ -108,15 +120,21 @@ export class DeviceListComponent implements OnInit {
   }
 
   get obsoleteCount(): number {
-    return this.items().filter((d) => d.obsolete).length;
+    return this.allItems().filter((d) => d.obsolete).length;
   }
 
+  /** Alerte commande : stocks à zéro hors pièces obsolètes. */
   get zeroStockCount(): number {
-    return this.items().filter((d) => (d.stock ?? 0) <= 0).length;
+    return this.allItems().filter((d) => !d.obsolete && (d.stock ?? 0) <= 0).length;
   }
 
   get todoCount(): number {
     return this.todos().length;
+  }
+
+  onShowObsoleteChange(checked: boolean): void {
+    this.showObsolete.set(checked);
+    this.syncSelection(this.items());
   }
 
   load(): void {
@@ -124,8 +142,8 @@ export class DeviceListComponent implements OnInit {
     this.error.set(null);
     this.deviceService.list(this.query).subscribe({
       next: (data) => {
-        this.items.set(data);
-        this.syncSelection(data);
+        this.allItems.set(data);
+        this.syncSelection(this.items());
         this.loading.set(false);
       },
       error: () => {

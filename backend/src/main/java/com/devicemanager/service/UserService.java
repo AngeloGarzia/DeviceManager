@@ -45,8 +45,8 @@ import java.util.Set;
 @Slf4j
 public class UserService {
 
-    private static final Set<String> ALLOWED_ROLES = Set.of(Roles.ADMIN, Roles.TECHNICIEN);
-    private static final Duration PASSWORD_RESET_TTL = Duration.ofMinutes(30);
+    private static final Set<String> ALLOWED_ROLES = Set.of(Roles.ADMIN, Roles.SUPER_ADMIN, Roles.TECHNICIEN);
+    private static final Duration PASSWORD_RESET_TTL = Duration.ofHours(24);
     private static final String TEMP_PASSWORD_CHARS =
             "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
     private static final int TEMP_PASSWORD_LENGTH = 12;
@@ -114,6 +114,7 @@ public class UserService {
         }
         String role = normalizeRole(request.getRole());
         User actor = requireActor();
+        ensureActorCanAssignRole(actor, role);
         Groupe groupe = atelierService.requireCurrentAtelier().getCasino().getGroupe();
         ensureActorOwnsGroupe(actor, groupe.getId());
         Atelier preferred = resolvePreferredAtelier(actor, role, request.getPreferredAtelierId());
@@ -162,11 +163,13 @@ public class UserService {
 
         String newRole = normalizeRole(request.getRole());
         Long groupeId = requireGroupeId(user);
-        if (Roles.ADMIN.equals(user.getRole()) && !Roles.ADMIN.equals(newRole) && countAdminsInGroupe(groupeId) <= 1) {
+        User actor = requireActor();
+        ensureActorCanAssignRole(actor, newRole);
+        ensureActorCanManageTarget(actor, user);
+        if (Roles.isAdminLike(user.getRole()) && !Roles.isAdminLike(newRole) && countAdminsInGroupe(groupeId) <= 1) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Impossible de retirer le dernier administrateur");
         }
 
-        User actor = requireActor();
         Atelier preferred = resolvePreferredAtelier(actor, newRole, request.getPreferredAtelierId());
 
         user.setUsername(username);
@@ -203,8 +206,10 @@ public class UserService {
         if (user.getUsername().equals(currentUsername)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Vous ne pouvez pas supprimer votre propre compte");
         }
+        User actor = requireActor();
+        ensureActorCanManageTarget(actor, user);
         Long groupeId = requireGroupeId(user);
-        if (Roles.ADMIN.equals(user.getRole()) && countAdminsInGroupe(groupeId) <= 1) {
+        if (Roles.isAdminLike(user.getRole()) && countAdminsInGroupe(groupeId) <= 1) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Impossible de supprimer le dernier administrateur");
         }
         String username = user.getUsername();
@@ -258,6 +263,7 @@ public class UserService {
                         user.getPrenom(),
                         user.getUsername(),
                         temporaryPassword,
+                        baseUrl,
                         resetUrl));
 
         log.info("E-mail de bienvenue envoyé à utilisateur={} <{}>", user.getUsername(), email);
@@ -373,8 +379,30 @@ public class UserService {
 
     private long countAdminsInGroupe(Long groupeId) {
         return userRepository.findAllByGroupeId(groupeId).stream()
-                .filter(u -> Roles.ADMIN.equals(u.getRole()))
+                .filter(u -> Roles.isAdminLike(u.getRole()))
                 .count();
+    }
+
+    /**
+     * Seul un super-admin peut créer / assigner les rôles ADMIN et SUPER_ADMIN.
+     * Un administrateur classique ne peut gérer que des techniciens.
+     */
+    private void ensureActorCanAssignRole(User actor, String targetRole) {
+        if (Roles.TECHNICIEN.equals(targetRole)) {
+            return;
+        }
+        if (!Roles.isSuperAdmin(actor.getRole())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "Seul un super-administrateur peut créer ou promouvoir un administrateur.");
+        }
+    }
+
+    /** Un admin classique ne peut pas modifier / supprimer un admin ou super-admin. */
+    private void ensureActorCanManageTarget(User actor, User target) {
+        if (Roles.isAdminLike(target.getRole()) && !Roles.isSuperAdmin(actor.getRole())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "Seul un super-administrateur peut gérer un compte administrateur.");
+        }
     }
 
     private String requireName(String value, String label) {
@@ -398,7 +426,7 @@ public class UserService {
         }
         if (!ALLOWED_ROLES.contains(normalized)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "Rôle invalide. Choisissez Administrateur ou Technicien.");
+                    "Rôle invalide. Choisissez Super-administrateur, Administrateur ou Technicien.");
         }
         return normalized;
     }

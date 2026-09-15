@@ -15,8 +15,10 @@ class PasswordResetEmailTest {
         assertThat(email.subject()).contains("réinitialisation");
         assertThat(email.text()).contains("https://app.example/reset-password?token=abc");
         assertThat(email.text()).contains("Marie <admin>");
+        assertThat(email.text()).contains("24 heures");
         assertThat(email.html()).contains("Réinitialiser");
         assertThat(email.html()).contains("https://app.example/reset-password?token=abc");
+        assertThat(email.html()).contains("24 heures");
         assertThat(email.html()).contains("Marie &lt;admin&gt;");
         assertThat(email.html()).doesNotContain("Marie <admin>");
     }

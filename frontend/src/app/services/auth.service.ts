@@ -38,7 +38,8 @@ export class AuthService {
   /** Incrémenté à chaque changement d'atelier → remount du contenu (rechargement données). */
   readonly atelierRevision = signal(0);
 
-  readonly isAdmin = computed(() => this.role() === 'ADMIN');
+  readonly isAdmin = computed(() => this.role() === 'ADMIN' || this.role() === 'SUPER_ADMIN');
+  readonly isSuperAdmin = computed(() => this.role() === 'SUPER_ADMIN');
   readonly isTechnicien = computed(() => this.role() === 'TECHNICIEN' || this.role() === 'TECH');
 
   readonly displayName = computed(() => {
@@ -293,7 +294,10 @@ export class AuthService {
   }
 
   roleLabel(): string {
-    if (this.isAdmin()) {
+    if (this.isSuperAdmin()) {
+      return 'Super-administrateur';
+    }
+    if (this.role() === 'ADMIN') {
       return 'Administrateur';
     }
     if (this.isTechnicien()) {

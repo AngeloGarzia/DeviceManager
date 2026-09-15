@@ -74,6 +74,13 @@
             {{ display('PRIVACY_HOSTING') }}
           </span>
         </p>
+        <p>
+          En configuration typique de production, l’application et l’API peuvent être hébergées chez un
+          prestataire cloud (ex. Render), la base de données chez un hébergeur MySQL managé, et les fichiers
+          (photos, PDF) dans un stockage objet compatible S3 (ex. Cloudflare R2), avec un relais SMTP pour
+          les e-mails transactionnels (ex. Brevo). Le détail nominal est renseigné ci-dessus et dans la
+          liste des sous-traitants.
+        </p>
       </section>
 
       <section id="responsable" class="privacy-section">
@@ -86,7 +93,7 @@
         </p>
         <p>
           DeviceManager est un outil professionnel destiné à l’inventaire des pièces détachées des machines à sous,
-          à la gestion des SFM / MAS, des comptes utilisateurs et des demandes de commande.
+          à la gestion des SFM / MAS, des comptes utilisateurs, des demandes de commande et des tâches associées.
         </p>
       </section>
 
@@ -115,6 +122,24 @@
                 </td>
               </tr>
               <tr>
+                <td>
+                  E-mails d’accès (bienvenue avec mot de passe temporaire, réinitialisation du mot de passe)
+                </td>
+                <td>Art. 6.1.b / 6.1.f</td>
+                <td>
+                  Nécessaire pour activer ou récupérer l’accès au compte ; intérêt légitime de sécuriser
+                  les flux d’authentification.
+                </td>
+              </tr>
+              <tr>
+                <td>Enregistrement de l’acceptation des mentions RGPD (première connexion)</td>
+                <td>Art. 6.1.c / 6.1.b</td>
+                <td>
+                  Obligation d’information et traçabilité de la prise de connaissance des mentions ;
+                  condition d’accès à l’outil professionnel.
+                </td>
+              </tr>
+              <tr>
                 <td>Gestion de l’inventaire (pièces, photos, stock, obsolescence)</td>
                 <td>Art. 6.1.f</td>
                 <td>
@@ -130,7 +155,9 @@
                 </td>
               </tr>
               <tr>
-                <td>Demandes de commande et envoi d’e-mails associés</td>
+                <td>
+                  Demandes de commande et e-mails associés (notification administrateur, envoi au SFM / fournisseur)
+                </td>
                 <td>Art. 6.1.b / 6.1.f</td>
                 <td>
                   Mesures liées à l’activité professionnelle (approvisionnement) et intérêt légitime
@@ -146,7 +173,7 @@
                 </td>
               </tr>
               <tr>
-                <td>Module IA (chat / analyse d’étiquette), lorsqu’il est activé</td>
+                <td>Module IA (assistance saisie / analyse), lorsqu’il est activé</td>
                 <td>Art. 6.1.f</td>
                 <td>
                   Intérêt légitime d’assister les utilisateurs dans la saisie et la rédaction ;
@@ -165,6 +192,11 @@
             </tbody>
           </table>
         </div>
+        <p>
+          <strong>Parcours de première connexion :</strong> après authentification, l’utilisateur peut être
+          invité à changer son mot de passe temporaire, puis à lire et accepter les présentes mentions
+          avant d’accéder aux écrans métier.
+        </p>
       </section>
 
       <section id="donnees" class="privacy-section">
@@ -173,7 +205,14 @@
         <ul>
           <li>
             <strong>Comptes utilisateurs :</strong> identifiant, mot de passe (hashé), nom, prénom, email,
-            rôle, atelier(s) préféré(s), indicateur de changement de mot de passe obligatoire ;
+            rôle, atelier(s) préféré(s), indicateur de changement de mot de passe obligatoire,
+            horodatage d’acceptation des mentions RGPD ;
+          </li>
+          <li>
+            <strong>Accès et réinitialisation :</strong> jetons de réinitialisation stockés sous forme
+            de hash (expiration typiquement <strong>24 heures</strong>, usage unique) ; contenu des
+            e-mails de bienvenue (identifiant, mot de passe temporaire transmis uniquement par e-mail,
+            lien de réinitialisation, lien vers l’application) ;
           </li>
           <li>
             <strong>Contacts SFM / coordonnées :</strong> nom, téléphone, email, et le cas échéant adresse
@@ -181,15 +220,18 @@
           </li>
           <li>
             <strong>Données métier :</strong> fiches pièces (nom, référence, usage, dates, photos, stock),
-            machines à sous, fournisseurs, demandes de commande ;
+            machines à sous, fournisseurs, demandes de commande, tâches « À faire », documents PDF
+            (ex. règles de jeux) ;
           </li>
           <li>
-            <strong>Données techniques :</strong> jetons d’accès (JWT), cookie de rafraîchissement de session,
-            journaux applicatifs, métadonnées de fichiers uploadés ;
+            <strong>Données techniques :</strong> jeton d’accès JWT (mémoire navigateur uniquement),
+            cookie de rafraîchissement de session, journaux applicatifs consultables par les administrateurs,
+            métadonnées de fichiers uploadés ; accès fichiers via URL présignées à durée limitée lorsque
+            le stockage objet est utilisé ;
           </li>
           <li>
-            <strong>Module IA (si activé) :</strong> texte des prompts, extraits / images d’étiquettes
-            transmis au prestataire IA pour analyse.
+            <strong>Module IA (si activé) :</strong> texte des prompts, extraits / images d’étiquettes,
+            documents ou devis transmis au prestataire IA pour analyse.
           </li>
         </ul>
         <p>
@@ -206,15 +248,19 @@
         </p>
         <ul>
           <li>identifiant (username) ;</li>
-          <li>mot de passe initial ;</li>
           <li>nom ;</li>
           <li>prénom ;</li>
-          <li>adresse e-mail.</li>
+          <li>adresse e-mail ;</li>
+          <li>
+            mot de passe initial <strong>ou</strong> mot de passe temporaire généré et transmis par
+            e-mail de bienvenue.
+          </li>
         </ul>
         <p>
           <strong>Conséquence d’un défaut de fourniture :</strong> le compte ne peut pas être créé ni
-          utilisé ; l’accès à DeviceManager est impossible sans ces informations. Les autres éléments
-          (atelier préféré, etc.) peuvent être renseignés ultérieurement selon les besoins métier.
+          utilisé. L’accès aux écrans métier peut en outre être conditionné au changement du mot de passe
+          temporaire et à l’acceptation des présentes mentions. Les autres éléments (atelier préféré, etc.)
+          peuvent être renseignés ultérieurement selon les besoins métier.
         </p>
         <p>
           Pour les fiches métier (pièces, SFM, MAS), les champs indiqués comme requis dans les formulaires
@@ -229,8 +275,11 @@
           <li>aux utilisateurs habilités (administrateurs et techniciens) selon leur rôle et atelier ;</li>
           <li>
             aux sous-traitants techniques nécessaires au fonctionnement du service
-            (hébergement, base de données, messagerie, fournisseur d’API d’intelligence artificielle
-            si le module IA est activé) ;
+            (hébergement applicatif, base de données, stockage fichiers, messagerie transactionnelle,
+            fournisseur d’API d’intelligence artificielle si le module IA est activé) ;
+          </li>
+          <li>
+            aux destinataires métier des e-mails de commande (contacts SFM / fournisseurs concernés) ;
           </li>
           <li>à toute autorité lorsque la loi l’exige.</li>
         </ul>
@@ -239,6 +288,10 @@
           <span [class.privacy-placeholder]="display('PRIVACY_PROCESSORS') === '[À COMPLÉTER]'">
             {{ display('PRIVACY_PROCESSORS') }}
           </span>.
+        </p>
+        <p>
+          Exemples usuels à renseigner : hébergeur applicatif (ex. Render), base MySQL managée,
+          stockage objet (ex. Cloudflare R2), relais SMTP (ex. Brevo), fournisseur IA le cas échéant.
         </p>
       </section>
 
@@ -254,17 +307,29 @@
             <strong>3 ans après désactivation</strong> (ou départ), sauf obligation légale contraire ;
           </li>
           <li>
-            <strong>Données métier</strong> (pièces, SFM, MAS, commandes, photos) : pendant la durée
+            <strong>Acceptation RGPD :</strong> horodatage conservé pendant la durée de vie du compte ;
+            un nouvel envoi d’e-mail de bienvenue peut exiger une nouvelle acceptation ;
+          </li>
+          <li>
+            <strong>Jetons de réinitialisation de mot de passe :</strong>
+            <strong>24 heures</strong> maximum, ou jusqu’à utilisation / invalidation (ex. nouveau lien,
+            changement de mot de passe) ;
+          </li>
+          <li>
+            <strong>Données métier</strong> (pièces, SFM, MAS, commandes, photos, documents) : pendant la durée
             d’utilité opérationnelle, puis <strong>5 ans après la dernière utilisation / modification</strong> ;
           </li>
           <li>
-            <strong>Logs techniques :</strong> <strong>90 jours</strong>, pouvant être portés jusqu’à
-            <strong>1 an maximum</strong> en cas d’investigation sécurité ou d’exigence documentée ;
+            <strong>Logs techniques / admin :</strong> conservation principalement par volume (purge des
+            entrées les plus anciennes au-delà d’un plafond configuré), pouvant être limitée dans le temps
+            selon la politique du responsable (ordre de grandeur usuel : quelques semaines à
+            <strong>1 an maximum</strong> en cas d’investigation sécurité) ;
           </li>
           <li>
             <strong>Sessions :</strong> jeton d’accès JWT jusqu’à son expiration (typiquement 15 minutes),
             cookie / jeton de rafraîchissement jusqu’à expiration (typiquement <strong>7 jours</strong>,
-            configurable jusqu’à <strong>30 jours</strong>), déconnexion ou révocation.
+            configurable jusqu’à <strong>30 jours</strong>), déconnexion ou révocation (notamment après
+            réinitialisation du mot de passe, qui révoque les sessions actives).
           </li>
         </ul>
       </section>
@@ -272,17 +337,20 @@
       <section id="ia" class="privacy-section">
         <h2>8. Module d’assistance par intelligence artificielle</h2>
         <p>
-          Lorsque le module IA est activé dans les paramètres, DeviceManager peut :
+          Lorsque le module IA est activé dans les paramètres, DeviceManager peut notamment :
         </p>
         <ul>
           <li>
-            analyser une image d’étiquette via un <strong>réseau de neurones</strong> (modèle de vision /
-            reconnaissance de texte) afin d’extraire des informations (nom, référence, marque, texte brut)
-            pour préremplir une fiche pièce ;
+            analyser une image d’étiquette via un modèle de vision / reconnaissance de texte afin
+            d’extraire des informations (nom, référence, marque, texte brut) pour préremplir une fiche pièce ;
           </li>
           <li>
             proposer des réponses textuelles d’aide à la rédaction (chat) à partir du contexte fourni
-            par l’utilisateur.
+            par l’utilisateur ;
+          </li>
+          <li>
+            assister l’analyse de documents (ex. PDF, devis), de prix ou d’incohérences, et le contrôle
+            de documents métier (ex. règles de jeux), selon les fonctions activées.
           </li>
         </ul>
         <p>
@@ -298,7 +366,8 @@
         <h2>9. Transferts hors Union européenne</h2>
         <p>
           Selon la configuration de production, des données peuvent être hébergées ou traitées
-          en dehors de l’Espace économique européen (EEE) par des sous-traitants cloud.
+          en dehors de l’Espace économique européen (EEE) par des sous-traitants cloud
+          (hébergement, stockage fichiers, messagerie, API IA).
         </p>
         <p>
           Lorsque des prestataires situés hors EEE sont utilisés, le responsable du traitement
@@ -306,7 +375,7 @@
           la Commission européenne, complétées le cas échéant par des
           <strong>mesures additionnelles</strong> (chiffrement des données en transit via HTTPS/TLS,
           chiffrement au repos chez l’hébergeur, contrôle d’accès, minimisation des données transmises
-          au module IA).
+          au module IA ou dans les e-mails).
         </p>
         <p>
           Détail de localisation et garanties applicables :
@@ -345,7 +414,15 @@
         <p>Des mesures techniques et organisationnelles sont mises en œuvre, notamment :</p>
         <ul>
           <li>authentification par mot de passe et jetons à durée limitée ;</li>
-          <li>cookie de rafraîchissement HttpOnly ;</li>
+          <li>cookie de rafraîchissement HttpOnly ; jeton d’accès conservé uniquement en mémoire navigateur ;</li>
+          <li>hash des jetons de rafraîchissement et des jetons de réinitialisation de mot de passe ;</li>
+          <li>rotation du jeton de rafraîchissement et révocation des sessions lors d’un reset de mot de passe ;</li>
+          <li>limitation du débit (rate limiting) sur les endpoints de connexion et de réinitialisation ;</li>
+          <li>
+            verrouillage temporaire du compte après un nombre élevé d’échecs de connexion
+            (seuils configurables, typiquement de l’ordre de 10 tentatives sur une fenêtre de 15 minutes) ;
+          </li>
+          <li>mot de passe temporaire soumis à changement obligatoire à la première connexion ;</li>
           <li>contrôle d’accès par rôles (administrateur / technicien) et contexte atelier ;</li>
           <li>communications HTTPS en production ;</li>
           <li>en-têtes de sécurité HTTP (CSP, etc.) ;</li>
@@ -360,13 +437,21 @@
         </p>
         <ul>
           <li>
-            <strong>Cookie de rafraîchissement de session</strong> (HttpOnly) : maintien de la connexion
-            de manière sécurisée ;
+            <strong>Cookie <code>dm_refresh</code></strong> (HttpOnly) : maintien sécurisé de la session
+            via le jeton de rafraîchissement ;
           </li>
           <li>
-            <strong>Stockage local du navigateur</strong> : jeton d’accès, informations de session
-            (identité affichée, rôle, atelier sélectionné, état du tutoriel) pour le bon fonctionnement
-            de l’interface.
+            <strong>Cookie <code>dm_persist</code></strong> (HttpOnly) : marqueur « Se souvenir de moi »
+            indiquant une session persistante ;
+          </li>
+          <li>
+            <strong>Jeton d’accès JWT</strong> : conservé uniquement en mémoire du processus navigateur
+            (onglet), jamais dans le stockage local ;
+          </li>
+          <li>
+            <strong>Stockage local du navigateur</strong> : informations d’interface (identité affichée,
+            rôle, atelier sélectionné, indicateurs de changement de mot de passe / acceptation RGPD,
+            état du tutoriel) pour le bon fonctionnement de l’UI.
           </li>
         </ul>
         <p>

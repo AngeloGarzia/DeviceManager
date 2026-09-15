@@ -100,7 +100,7 @@ public class AtelierService {
             }
             return List.of(toSummary(requireAtelierInUserGroupe(user, preferred.getId())));
         }
-        boolean showInactive = includeInactive && Roles.ADMIN.equals(user.getRole());
+        boolean showInactive = includeInactive && Roles.isAdminLike(user.getRole());
         return atelierRepository.findAllByGroupeId(user.getGroupe().getId()).stream()
                 .filter(a -> showInactive || a.isUtilise())
                 .map(this::toSummary)
@@ -250,7 +250,7 @@ public class AtelierService {
     @Transactional
     public AtelierSummary setPreferredAtelier(String username, Long atelierId) {
         User user = requireUser(username);
-        if (!Roles.ADMIN.equals(user.getRole())) {
+        if (!Roles.isAdminLike(user.getRole())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN,
                     "Seuls les administrateurs peuvent changer d'atelier");
         }

@@ -471,11 +471,12 @@
     </div>
   }
 
-  @if (loading()) {
-    <div class="flex justify-center py-10"><mat-spinner diameter="36"></mat-spinner></div>
-  } @else {
-    <form class="grid gap-4" [formGroup]="form" (ngSubmit)="submit()">
-      @for (entry of categories(); track entry[0]) {
+  @if (auth.isSuperAdmin()) {
+    @if (loading()) {
+      <div class="flex justify-center py-10"><mat-spinner diameter="36"></mat-spinner></div>
+    } @else {
+      <form class="grid gap-4" [formGroup]="form" (ngSubmit)="submit()">
+        @for (entry of categories(); track entry[0]) {
         <mat-card class="setup-tile !rounded-xl !border !border-line !shadow-soft">
           <button
             type="button"
@@ -637,18 +638,18 @@
         </button>
       </div>
     </form>
-  }
+    }
 
-  <mat-card class="setup-tile !rounded-xl !border !border-line !shadow-soft">
-    <button type="button" class="setup-tile-toggle" (click)="toggleTile('logs')" [attr.aria-expanded]="isTileOpen('logs')">
-      <div class="min-w-0 text-left">
-        <h2 class="m-0 text-base font-semibold text-ink">Logs applicatifs</h2>
-        <p class="mt-0.5 text-sm text-ink-soft">
-          Journal SLF4J en base ({{ logTotal() }} / {{ logRetention() }}) — admins uniquement
-        </p>
-      </div>
-      <mat-icon>{{ isTileOpen('logs') ? 'expand_less' : 'expand_more' }}</mat-icon>
-    </button>
+    <mat-card class="setup-tile !rounded-xl !border !border-line !shadow-soft">
+      <button type="button" class="setup-tile-toggle" (click)="toggleTile('logs')" [attr.aria-expanded]="isTileOpen('logs')">
+        <div class="min-w-0 text-left">
+          <h2 class="m-0 text-base font-semibold text-ink">Logs applicatifs</h2>
+          <p class="mt-0.5 text-sm text-ink-soft">
+            Journal SLF4J en base ({{ logTotal() }} / {{ logRetention() }}) — super-administrateurs uniquement
+          </p>
+        </div>
+        <mat-icon>{{ isTileOpen('logs') ? 'expand_less' : 'expand_more' }}</mat-icon>
+      </button>
     @if (isTileOpen('logs')) {
       <mat-card-content class="!pt-0">
         <div class="mb-3 flex flex-wrap gap-2">
@@ -711,6 +712,7 @@
       </mat-card-content>
     }
   </mat-card>
+  }
 
   <app-confirm-dialog
     [open]="confirmDeleteOpen()"

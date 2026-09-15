@@ -73,32 +73,42 @@
           </a>
         </div>
 
-        <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:max-w-2xl">
-          <div class="panel !p-3 !shadow-none">
-            <div class="text-xs uppercase tracking-wide text-ink-faint">Total</div>
-            <div class="mt-1 text-2xl font-semibold text-brand">{{ total }}</div>
-          </div>
-          <div class="panel !p-3 !shadow-none">
-            <div class="text-xs uppercase tracking-wide text-ink-faint">Obsolètes</div>
-            <div class="mt-1 text-2xl font-semibold text-ink">{{ obsoleteCount }}</div>
-          </div>
-          @if (zeroStockCount > 0) {
-            <a
-              class="panel stock-zero-tile stock-zero-tile--alert !p-3 !shadow-none col-span-2 sm:col-span-1"
-              routerLink="/order-request"
-              [queryParams]="{ zeroStock: '1' }"
-              aria-label="Ouvrir une demande de commande pour les pièces en stock à zéro"
-            >
-              <div class="text-xs uppercase tracking-wide text-ink-faint">Stock à zéro</div>
-              <div class="mt-1 text-2xl font-semibold text-rose-700">{{ zeroStockCount }}</div>
-              <div class="mt-1 text-xs font-medium text-rose-700">Cliquer pour commander</div>
-            </a>
-          } @else {
-            <div class="panel stock-zero-tile !p-3 !shadow-none col-span-2 sm:col-span-1">
-              <div class="text-xs uppercase tracking-wide text-ink-faint">Stock à zéro</div>
-              <div class="mt-1 text-2xl font-semibold text-rose-700">{{ zeroStockCount }}</div>
+        <div class="stats-and-obsolete-filter">
+          <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:max-w-2xl stats-and-obsolete-filter__tiles">
+            <div class="panel !p-3 !shadow-none">
+              <div class="text-xs uppercase tracking-wide text-ink-faint">Total</div>
+              <div class="mt-1 text-2xl font-semibold text-brand">{{ total }}</div>
             </div>
-          }
+            <div class="panel !p-3 !shadow-none">
+              <div class="text-xs uppercase tracking-wide text-ink-faint">Obsolètes</div>
+              <div class="mt-1 text-2xl font-semibold text-ink">{{ obsoleteCount }}</div>
+            </div>
+            @if (zeroStockCount > 0) {
+              <a
+                class="panel stock-zero-tile stock-zero-tile--alert !p-3 !shadow-none col-span-2 sm:col-span-1"
+                routerLink="/order-request"
+                [queryParams]="{ zeroStock: '1' }"
+                aria-label="Ouvrir une demande de commande pour les pièces en stock à zéro"
+              >
+                <div class="text-xs uppercase tracking-wide text-ink-faint">Stock à zéro</div>
+                <div class="mt-1 text-2xl font-semibold text-rose-700">{{ zeroStockCount }}</div>
+                <div class="mt-1 text-xs font-medium text-rose-700">Cliquer pour commander</div>
+              </a>
+            } @else {
+              <div class="panel stock-zero-tile !p-3 !shadow-none col-span-2 sm:col-span-1">
+                <div class="text-xs uppercase tracking-wide text-ink-faint">Stock à zéro</div>
+                <div class="mt-1 text-2xl font-semibold text-rose-700">{{ zeroStockCount }}</div>
+              </div>
+            }
+          </div>
+          <mat-checkbox
+            color="primary"
+            class="obsolete-filter-checkbox"
+            [checked]="showObsolete()"
+            (change)="onShowObsoleteChange($event.checked)"
+          >
+            Afficher les obsolètes
+          </mat-checkbox>
         </div>
 
         <div class="panel filter-bar !shadow-none">
@@ -130,8 +140,15 @@
         } @else if (items().length === 0) {
           <div class="rounded-xl border border-dashed border-line px-4 py-6 text-center sm:text-left">
             <h2 class="m-0 text-lg font-semibold">Aucune pièce</h2>
-            <p class="mt-2 text-sm text-ink-soft">Créez une fiche pour démarrer l'inventaire.</p>
-            <a mat-flat-button color="primary" class="mt-3" routerLink="/devices/new">Créer une pièce</a>
+            @if (!showObsolete() && obsoleteCount > 0) {
+              <p class="mt-2 text-sm text-ink-soft">
+                {{ obsoleteCount }} pièce{{ obsoleteCount > 1 ? 's' : '' }} obsolète{{ obsoleteCount > 1 ? 's' : '' }}
+                masquée{{ obsoleteCount > 1 ? 's' : '' }} — cochez « Afficher les obsolètes » pour les voir.
+              </p>
+            } @else {
+              <p class="mt-2 text-sm text-ink-soft">Créez une fiche pour démarrer l'inventaire.</p>
+              <a mat-flat-button color="primary" class="mt-3" routerLink="/devices/new">Créer une pièce</a>
+            }
           </div>
         } @else {
           <div class="device-browser">

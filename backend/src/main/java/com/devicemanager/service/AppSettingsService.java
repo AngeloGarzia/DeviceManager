@@ -183,14 +183,14 @@ public class AppSettingsService {
         ensure(PRIVACY_CONTROLLER, "",
                 "Responsable du traitement", PRIVACY_CATEGORY, false);
         ensure(PRIVACY_PROCESSORS, "",
-                "Sous-traitants (ex. Render, Aiven, SMTP, fournisseur IA)", PRIVACY_CATEGORY, false);
+                "Sous-traitants (ex. Render, MySQL managé, Cloudflare R2, Brevo/SMTP, fournisseur IA)", PRIVACY_CATEGORY, false);
         ensure(PRIVACY_TRANSFER, "",
                 "Transferts hors UE — localisation et garanties (CCT, etc.)", PRIVACY_CATEGORY, false);
         ensure(PRIVACY_RIGHTS_EMAIL, "",
                 "Email DPO / privacy (exercice des droits)", PRIVACY_CATEGORY, false);
         ensure(PRIVACY_POSTAL_ADDRESS, "",
                 "Adresse postale (contact RGPD)", PRIVACY_CATEGORY, false);
-        ensure(PRIVACY_LAST_UPDATED, "10 août 2026",
+        ensure(PRIVACY_LAST_UPDATED, "15 septembre 2026",
                 "Date de dernière mise à jour de la politique", PRIVACY_CATEGORY, false);
     }
 

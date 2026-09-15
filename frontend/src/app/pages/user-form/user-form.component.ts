@@ -12,6 +12,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { AppUserForm, AtelierSummary } from '../../models/models';
 import { UserService } from '../../services/user.service';
 import { AtelierService } from '../../services/atelier.service';
+import { AuthService } from '../../services/auth.service';
 import { apiErrorMessage } from '../../shared/api-error';
 
 /**
@@ -42,6 +43,7 @@ export class UserFormComponent implements OnInit {
   private readonly router = inject(Router);
   private readonly userService = inject(UserService);
   private readonly atelierService = inject(AtelierService);
+  private readonly auth = inject(AuthService);
 
   readonly loading = signal(false);
   readonly saving = signal(false);
@@ -68,6 +70,11 @@ export class UserFormComponent implements OnInit {
   get isTechnicien(): boolean {
     const role = this.form.controls.role.value;
     return role === 'TECHNICIEN' || role === 'TECH';
+  }
+
+  /** Seul un super-admin peut assigner ADMIN / SUPER_ADMIN. */
+  get canAssignAdminRoles(): boolean {
+    return this.auth.isSuperAdmin();
   }
 
   ngOnInit(): void {

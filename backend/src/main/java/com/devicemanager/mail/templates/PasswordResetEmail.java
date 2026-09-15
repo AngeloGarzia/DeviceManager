@@ -23,7 +23,7 @@ public final class PasswordResetEmail {
                 %s
 
                 Vous avez demandé la réinitialisation de votre mot de passe DeviceManager.
-                Ce lien est valable 30 minutes et ne peut être utilisé qu'une seule fois :
+                Ce lien est valable 24 heures et ne peut être utilisé qu'une seule fois :
 
                 %s
 
@@ -35,7 +35,7 @@ public final class PasswordResetEmail {
         String bodyHtml = """
                 <p style="margin:0 0 12px;">%s</p>
                 <p style="margin:0 0 12px;">Vous avez demandé la réinitialisation de votre mot de passe DeviceManager.
-                Ce lien est valable <strong>30 minutes</strong> et ne peut être utilisé qu'une seule fois.</p>
+                Ce lien est valable <strong>24 heures</strong> et ne peut être utilisé qu'une seule fois.</p>
                 <p style="margin:16px 0 0;font-size:13px;color:#6b7280;">Si vous n'êtes pas à l'origine de cette demande,
                 ignorez cet e-mail.</p>
                 """.formatted(EmailHtml.escapeHtml(greeting));

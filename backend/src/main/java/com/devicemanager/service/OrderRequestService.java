@@ -637,7 +637,7 @@ public class OrderRequestService {
                 .sfmNom(null)
                 .build());
         // Aperçu SFM : si l'auteur est admin, on montre sa signature ; sinon placeholders admin
-        User validatorPreview = Roles.ADMIN.equalsIgnoreCase(technicien.getRole()) ? technicien : null;
+        User validatorPreview = Roles.isAdminLike(technicien.getRole()) ? technicien : null;
         previews.addAll(buildSfmMailPreviews(draft, validatorPreview));
         return previews;
     }

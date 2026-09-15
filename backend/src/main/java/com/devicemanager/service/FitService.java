@@ -66,12 +66,12 @@ public class FitService {
         }
         List<User> users = userRepository.findAllByGroupeId(actor.getGroupe().getId());
         List<FitSignataireDto> admins = users.stream()
-                .filter(u -> Roles.ADMIN.equals(u.getRole()))
+                .filter(u -> Roles.isAdminLike(u.getRole()))
                 .map(this::toSignataireDto)
                 .sorted(Comparator.comparing(FitSignataireDto::getDisplayName, String.CASE_INSENSITIVE_ORDER))
                 .toList();
         List<FitSignataireDto> techniciens = users.stream()
-                .filter(u -> Roles.TECHNICIEN.equals(u.getRole()) || "TECH".equals(u.getRole()))
+                .filter(u -> Roles.isTechnicien(u.getRole()))
                 .map(this::toSignataireDto)
                 .sorted(Comparator.comparing(FitSignataireDto::getDisplayName, String.CASE_INSENSITIVE_ORDER))
                 .toList();

@@ -68,6 +68,7 @@ export class UserListComponent implements OnInit {
 
   /** Libellé français du rôle utilisateur. */
   roleLabel(role: string): string {
+    if (role === 'SUPER_ADMIN') return 'Super-administrateur';
     if (role === 'ADMIN') return 'Administrateur';
     if (role === 'TECHNICIEN' || role === 'TECH') return 'Technicien';
     return role;

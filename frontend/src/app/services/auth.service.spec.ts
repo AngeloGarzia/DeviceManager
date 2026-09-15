@@ -62,6 +62,25 @@ describe('AuthService', () => {
     req.flush(response);
   });
 
+  it('should treat SUPER_ADMIN as admin with super label', () => {
+    const token = validJwt(3600);
+    service.login({ username: 'root', password: 'x' }).subscribe(() => {
+      expect(service.isAdmin()).toBeTrue();
+      expect(service.isSuperAdmin()).toBeTrue();
+      expect(service.roleLabel()).toBe('Super-administrateur');
+    });
+    const req = http.expectOne('/api/auth/login');
+    req.flush({
+      token,
+      tokenType: 'Bearer',
+      expiresInMs: 1000,
+      username: 'root',
+      role: 'SUPER_ADMIN',
+      atelierId: 100,
+      ateliers: []
+    } as AuthResponse);
+  });
+
   it('should logout and clear memory token', () => {
     service.login({ username: 'admin', password: 'x' }).subscribe();
     const loginReq = http.expectOne('/api/auth/login');

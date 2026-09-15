@@ -86,6 +86,22 @@
   font-weight: 600;
 }
 
+.stats-and-obsolete-filter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.75rem 1.25rem;
+}
+
+.stats-and-obsolete-filter__tiles {
+  flex: 1 1 16rem;
+}
+
+.obsolete-filter-checkbox {
+  flex: 0 0 auto;
+  margin-bottom: 0.35rem;
+}
+
 .device-browser {
   display: grid;
   gap: 1rem;

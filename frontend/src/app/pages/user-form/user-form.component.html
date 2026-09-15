@@ -46,7 +46,10 @@
           <mat-form-field appearance="outline" class="sm:col-span-2">
             <mat-label>Rôle</mat-label>
             <mat-select formControlName="role">
-              <mat-option value="ADMIN">Administrateur</mat-option>
+              @if (canAssignAdminRoles) {
+                <mat-option value="SUPER_ADMIN">Super-administrateur</mat-option>
+                <mat-option value="ADMIN">Administrateur</mat-option>
+              }
               <mat-option value="TECHNICIEN">Technicien</mat-option>
             </mat-select>
           </mat-form-field>

@@ -40,7 +40,7 @@ import java.util.List;
 @Slf4j
 public class AuthService {
 
-    static final Duration PASSWORD_RESET_TTL = Duration.ofMinutes(30);
+    static final Duration PASSWORD_RESET_TTL = Duration.ofHours(24);
 
     static final String FORGOT_PASSWORD_MESSAGE =
             "Si un compte est associé à cette adresse, un e-mail de réinitialisation a été envoyé.";

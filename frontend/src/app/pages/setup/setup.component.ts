@@ -251,18 +251,22 @@ export class SetupComponent implements OnInit {
     return this.atelierForm.get('reseauxSociaux') as FormArray;
   }
 
-  /** Charge les paramètres applicatifs et initialise les ateliers. */
+  /** Charge les paramètres applicatifs (super-admin) et les ateliers (tout admin). */
   ngOnInit(): void {
-    this.aiService.status().subscribe({
-      next: () => {
-        const provider = (this.form.get('AI_PROVIDER')?.value || this.selectedAiProvider() || 'openai').toString();
-        this.loadOnlineAiModels(provider, false);
-      },
-      error: () => {
-        /* statut déjà géré dans AiService */
-      }
-    });
-    this.load();
+    if (this.auth.isSuperAdmin()) {
+      this.aiService.status().subscribe({
+        next: () => {
+          const provider = (this.form.get('AI_PROVIDER')?.value || this.selectedAiProvider() || 'openai').toString();
+          this.loadOnlineAiModels(provider, false);
+        },
+        error: () => {
+          /* statut déjà géré dans AiService */
+        }
+      });
+      this.load();
+    } else {
+      this.loading.set(false);
+    }
     this.loadAteliers();
   }
 

@@ -59,7 +59,7 @@ class UserServiceTest {
         SecurityContextHolder.getContext().setAuthentication(
                 new UsernamePasswordAuthenticationToken("admin", null, List.of()));
         lenient().when(userRepository.findByUsername("admin"))
-                .thenReturn(Optional.of(TestFixtures.user("admin", Roles.ADMIN)));
+                .thenReturn(Optional.of(TestFixtures.user("admin", Roles.SUPER_ADMIN)));
         lenient().when(atelierService.requireCurrentAtelier()).thenReturn(TestFixtures.atelier());
         lenient().when(atelierService.requireAtelierForUserGroupe(any(User.class), eq(100L)))
                 .thenReturn(TestFixtures.atelier());
@@ -119,6 +119,30 @@ class UserServiceTest {
                 .isInstanceOf(ResponseStatusException.class)
                 .extracting(ex -> ((ResponseStatusException) ex).getReason())
                 .isEqualTo("Atelier préféré obligatoire pour un technicien");
+    }
+
+    @Test
+    void create_adminCannotAssignAdminRole() {
+        when(userRepository.findByUsername("admin"))
+                .thenReturn(Optional.of(TestFixtures.user("admin", Roles.ADMIN)));
+        when(userRepository.existsByUsername("boss")).thenReturn(false);
+        when(userRepository.existsByEmailIgnoreCase("boss@test.local")).thenReturn(false);
+
+        UserRequest request = new UserRequest();
+        request.setUsername("boss");
+        request.setNom("Boss");
+        request.setPrenom("Big");
+        request.setEmail("boss@test.local");
+        request.setPassword("secret1");
+        request.setRole("ADMIN");
+
+        assertThatThrownBy(() -> userService.create(request))
+                .isInstanceOf(ResponseStatusException.class)
+                .satisfies(ex -> {
+                    ResponseStatusException rse = (ResponseStatusException) ex;
+                    assertThat(rse.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+                    assertThat(rse.getReason()).contains("super-administrateur");
+                });
     }
 
     @Test
@@ -244,7 +268,7 @@ class UserServiceTest {
         assertThatThrownBy(() -> userService.create(request))
                 .isInstanceOf(ResponseStatusException.class)
                 .extracting(ex -> ((ResponseStatusException) ex).getReason())
-                .isEqualTo("Rôle invalide. Choisissez Administrateur ou Technicien.");
+                .isEqualTo("Rôle invalide. Choisissez Super-administrateur, Administrateur ou Technicien.");
     }
 
     @Test
@@ -287,6 +311,7 @@ class UserServiceTest {
         verify(transactionalMail).sendUserWelcome(eq("tech@test.local"), ctx.capture());
         assertThat(ctx.getValue().username()).isEqualTo("tech");
         assertThat(ctx.getValue().temporaryPassword()).hasSize(12);
+        assertThat(ctx.getValue().appUrl()).isEqualTo("http://localhost:4200");
         assertThat(ctx.getValue().resetUrl())
                 .isEqualTo("http://localhost:4200/reset-password?token=welcome-token");
     }

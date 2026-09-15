@@ -90,7 +90,7 @@ public class DataInitializer implements CommandLineRunner {
         assignExistingDataToAtelier(defaultAtelier);
 
         if (!environment.matchesProfiles("production")) {
-            upsertUser("admin", "admin123", Roles.ADMIN, circus, null);
+            upsertUser("admin", "admin123", Roles.SUPER_ADMIN, circus, null);
             upsertUser("tech", "tech123", Roles.TECHNICIEN, circus, defaultAtelier);
 
             userRepository.findByUsername("tech").ifPresent(user -> {

@@ -229,9 +229,10 @@
           }
         </span>
         <span class="mas-nav-label-wrap">
-          <span [class.pending-label-blink]="visites.warningCount() > 0">MAS</span>
           @if (visites.warningCount() > 0) {
-            <span class="mas-warning-label pending-label-blink" aria-hidden="true">WARNING</span>
+            <span class="mas-warning-label pending-label-blink" aria-hidden="true">MAS Warning</span>
+          } @else {
+            <span>MAS</span>
           }
         </span>
       </button>

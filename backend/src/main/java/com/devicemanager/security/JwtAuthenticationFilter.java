@@ -23,7 +23,8 @@ import java.util.List;
  * <p>
  * Lit l'en-tête {@code Authorization: Bearer &lt;token&gt;}, valide le JWT via {@link JwtService},
  * charge l'utilisateur en base et peuple le {@link SecurityContextHolder} avec son rôle
- * ({@code ROLE_ADMIN} ou {@code ROLE_TECHNICIEN}).
+ * ({@code ROLE_ADMIN}, {@code ROLE_SUPER_ADMIN} ou {@code ROLE_TECHNICIEN}).
+ * Un super-administrateur reçoit aussi {@code ROLE_ADMIN} pour conserver les droits admin existants.
  * <p>
  * Un token absent, invalide ou expiré laisse la requête non authentifiée : les endpoints protégés
  * seront refusés par {@link com.devicemanager.config.SecurityConfig}. Ce filtre s'exécute
@@ -59,7 +60,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                         var auth = new UsernamePasswordAuthenticationToken(
                                 user.getUsername(),
                                 null,
-                                List.of(new SimpleGrantedAuthority("ROLE_" + user.getRole())));
+                                authoritiesFor(user.getRole()));
                         auth.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                         SecurityContextHolder.getContext().setAuthentication(auth);
                     }
@@ -71,5 +72,18 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
 
         filterChain.doFilter(request, response);
+    }
+
+    static List<SimpleGrantedAuthority> authoritiesFor(String role) {
+        if (Roles.SUPER_ADMIN.equals(role)) {
+            return List.of(
+                    new SimpleGrantedAuthority(Roles.ROLE_SUPER_ADMIN),
+                    new SimpleGrantedAuthority(Roles.ROLE_ADMIN));
+        }
+        String code = role == null || role.isBlank() ? Roles.TECHNICIEN : role.trim().toUpperCase();
+        if ("TECH".equals(code)) {
+            code = Roles.TECHNICIEN;
+        }
+        return List.of(new SimpleGrantedAuthority("ROLE_" + code));
     }
 }

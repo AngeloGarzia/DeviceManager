@@ -525,7 +525,7 @@ export class AppTourService {
         align: 'end',
         title: 'Administration',
         description:
-          'Comptes utilisateurs et Paramètres (mail, stockage, IA, ateliers). Vous pouvez aussi relancer ce tutoriel depuis Setup.'
+          'Comptes utilisateurs et Paramètres (organisation ateliers ; réglages techniques réservés au super-admin). Vous pouvez aussi relancer ce tutoriel depuis Setup.'
       },
       {
         element: '[data-tour="footer-tour"]',
