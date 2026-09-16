@@ -137,7 +137,13 @@
               <mat-form-field appearance="outline" class="mas-field" subscriptSizing="dynamic">
                 <mat-label>Date de cessation</mat-label>
                 <input matInput type="date" formControlName="dateCessation" />
-                <mat-hint>Accessible si Vendue, En réserve ou Détruite</mat-hint>
+                <mat-hint>
+                  @if (isStatutChangePending()) {
+                    Renseignée dans la modale de changement de statut
+                  } @else {
+                    Accessible si Vendue, En réserve ou Détruite
+                  }
+                </mat-hint>
               </mat-form-field>
             </div>
 
@@ -145,7 +151,13 @@
               <mat-form-field appearance="outline" class="mas-field" subscriptSizing="dynamic">
                 <mat-label>Destination machine usagée</mat-label>
                 <input matInput formControlName="destinationMachineUsagee" />
-                <mat-hint>Accessible uniquement si Vendue</mat-hint>
+                <mat-hint>
+                  @if (isStatutChangePending()) {
+                    Renseignée dans la modale de changement de statut
+                  } @else {
+                    Accessible uniquement si Vendue
+                  }
+                </mat-hint>
               </mat-form-field>
             </div>
           </div>

@@ -63,4 +63,10 @@ public class MasRequest {
 
     /** Identifiants des règles de jeux — au moins une obligatoire. */
     private List<Long> regleJeuxIds;
+
+    /**
+     * Obligatoire en mise à jour si {@link #statut} diffère du statut en base :
+     * signatures FIT + champs métier selon le nouveau statut.
+     */
+    private MasStatutChangeRequest statutChange;
 }

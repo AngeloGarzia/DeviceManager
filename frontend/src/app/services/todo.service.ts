@@ -7,7 +7,8 @@ import {
   TodoList,
   TodoRecurrence,
   TodoRecurrenceForm,
-  TodoTacheForm
+  TodoTacheForm,
+  TodoWeekCalendar
 } from '../models/models';
 
 @Injectable({ providedIn: 'root' })
@@ -99,6 +100,10 @@ export class TodoService {
 
   listRecurrences(): Observable<TodoRecurrence[]> {
     return this.http.get<TodoRecurrence[]>(`${this.base}/recurrences`);
+  }
+
+  weekCalendar(): Observable<TodoWeekCalendar> {
+    return this.http.get<TodoWeekCalendar>(`${this.base}/week-calendar`);
   }
 
   createRecurrence(payload: TodoRecurrenceForm): Observable<TodoRecurrence> {

@@ -1,6 +1,7 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
+import { ActivatedRoute } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -46,6 +47,7 @@ type TodoFilter = 'ALL' | 'ACTIVE' | 'OVERDUE' | 'OPEN' | 'IN_PROGRESS' | 'DONE'
 export class TodoListComponent implements OnInit {
   readonly auth = inject(AuthService);
   private readonly fb = inject(FormBuilder);
+  private readonly route = inject(ActivatedRoute);
   private readonly todoService = inject(TodoService);
   private readonly masService = inject(MasService);
   private readonly interventionTechniqueService = inject(InterventionTechniqueService);
@@ -61,6 +63,7 @@ export class TodoListComponent implements OnInit {
   readonly linkingId = signal<number | null>(null);
   readonly closingId = signal<number | null>(null);
   readonly filter = signal<TodoFilter>('ACTIVE');
+  readonly dayFilter = signal<string | null>(null);
   readonly query = signal('');
   readonly masses = signal<Mas[]>([]);
   readonly massesLoading = signal(false);
@@ -69,6 +72,7 @@ export class TodoListComponent implements OnInit {
 
   readonly filteredItems = computed(() => {
     const f = this.filter();
+    const day = this.dayFilter();
     const q = this.normalize(this.query());
     let list = this.items();
     if (f === 'ACTIVE') {
@@ -77,6 +81,9 @@ export class TodoListComponent implements OnInit {
       list = list.filter((t) => !!t.overdue);
     } else if (f !== 'ALL') {
       list = list.filter((t) => t.statut === f);
+    }
+    if (day) {
+      list = list.filter((t) => (t.dueAt || '').startsWith(day));
     }
     if (!q) {
       return list;
@@ -131,6 +138,17 @@ export class TodoListComponent implements OnInit {
   });
 
   ngOnInit(): void {
+    const params = this.route.snapshot.queryParamMap;
+    const filterParam = params.get('filter');
+    if (filterParam === 'OVERDUE' || filterParam === 'ACTIVE' || filterParam === 'OPEN'
+        || filterParam === 'IN_PROGRESS' || filterParam === 'DONE' || filterParam === 'CANCELLED'
+        || filterParam === 'ALL') {
+      this.filter.set(filterParam);
+    }
+    const day = params.get('day');
+    if (day && /^\d{4}-\d{2}-\d{2}$/.test(day)) {
+      this.dayFilter.set(day);
+    }
     this.load();
     this.loadRecurrences();
     this.loadMasses();
@@ -138,6 +156,7 @@ export class TodoListComponent implements OnInit {
 
   setFilter(f: TodoFilter): void {
     this.filter.set(f);
+    this.dayFilter.set(null);
     this.closingId.set(null);
     this.linkingId.set(null);
   }

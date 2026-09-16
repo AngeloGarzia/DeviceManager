@@ -2,6 +2,7 @@ package com.devicemanager.service;
 
 import com.devicemanager.dto.FitFromMasRequest;
 import com.devicemanager.dto.FitLigneRequest;
+import com.devicemanager.dto.MasStatutChangeRequest;
 import com.devicemanager.dto.FitLigneResponse;
 import com.devicemanager.dto.FitResponse;
 import com.devicemanager.dto.FitSignataireDto;
@@ -12,6 +13,7 @@ import com.devicemanager.entity.Fit;
 import com.devicemanager.entity.FitLigne;
 import com.devicemanager.entity.Intervention;
 import com.devicemanager.entity.Mas;
+import com.devicemanager.entity.MasStatut;
 import com.devicemanager.entity.User;
 import com.devicemanager.repository.DenoRepository;
 import com.devicemanager.repository.FitLigneRepository;
@@ -259,6 +261,47 @@ public class FitService {
         FitLigne saved = persistLigne(fit, ligne);
         log.info("FIT ligne depuis visite technique — fitId={} mas={}", fit.getId(), mas.getNumero());
         return saved;
+    }
+
+    /**
+     * Ajoute une ligne FIT signée lors d'un changement de statut MAS.
+     */
+    public void appendFromMasStatutChange(Mas mas, MasStatut newStatut, MasStatutChangeRequest change) {
+        if (mas == null || mas.getAtelier() == null || change == null) {
+            return;
+        }
+        validateSignatures(change.getSignatureAdmin(), change.getSignatureTechnicien());
+        Fit fit = ensureFitEntity(mas.getAtelier(), mas);
+        LocalDate dateOp = change.getDateOperation() != null ? change.getDateOperation() : LocalDate.now();
+        FitLigne ligne = FitLigne.builder()
+                .dateOperation(dateOp)
+                .motifNatureOperations(resolveMotifForStatutChange(newStatut, change, mas))
+                .signatureAdmin(change.getSignatureAdmin().trim())
+                .signatureTechnicien(change.getSignatureTechnicien().trim())
+                .signataireAdminNom(trimToNull(change.getSignataireAdminNom()))
+                .signataireTechnicienNom(trimToNull(change.getSignataireTechnicienNom()))
+                .build();
+        inheritFromMasIfPresent(ligne, mas);
+        persistLigne(fit, ligne);
+        log.info("FIT ligne depuis changement statut MAS — fitId={} mas={} statut={}",
+                fit.getId(), mas.getNumero(), newStatut);
+    }
+
+    private static String resolveMotifForStatutChange(
+            MasStatut statut, MasStatutChangeRequest change, Mas mas) {
+        String custom = trimToNull(change.getMotifNatureOperations());
+        if (custom != null) {
+            return custom;
+        }
+        return switch (statut) {
+            case UTILISEE -> "Remise en service — machine utilisée";
+            case EN_RESERVE -> "Machine en réserve";
+            case VENDUE -> {
+                String dest = mas.getDestinationMachineUsagee();
+                yield "Vente — destination : " + (dest != null && !dest.isBlank() ? dest : "—");
+            }
+            case DETRUITE -> "Destruction de la machine";
+        };
     }
 
     /**

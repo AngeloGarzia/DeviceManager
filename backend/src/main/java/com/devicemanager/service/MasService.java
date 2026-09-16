@@ -7,21 +7,26 @@ import com.devicemanager.dto.MarqueMasRequest;
 import com.devicemanager.dto.MarqueMasResponse;
 import com.devicemanager.dto.MasRequest;
 import com.devicemanager.dto.MasResponse;
+import com.devicemanager.dto.MasStatutChangeRequest;
 import com.devicemanager.dto.RegleJeuxPdfCheckResponse;
 import com.devicemanager.dto.RegleJeuxMasLinkRequest;
 import com.devicemanager.dto.RegleJeuxMasSummary;
 import com.devicemanager.dto.RegleJeuxRequest;
 import com.devicemanager.dto.RegleJeuxResponse;
 import com.devicemanager.entity.Atelier;
+import com.devicemanager.entity.Casino;
 import com.devicemanager.entity.Deno;
 import com.devicemanager.entity.MarqueMas;
 import com.devicemanager.entity.Mas;
 import com.devicemanager.entity.MasStatut;
 import com.devicemanager.entity.RegleJeux;
+import com.devicemanager.entity.Sfm;
+import com.devicemanager.repository.CasinoRepository;
 import com.devicemanager.repository.DenoRepository;
 import com.devicemanager.repository.MarqueMasRepository;
 import com.devicemanager.repository.MasRepository;
 import com.devicemanager.repository.RegleJeuxRepository;
+import com.devicemanager.repository.SfmRepository;
 import com.devicemanager.security.DocumentUploadValidator;
 import com.devicemanager.security.PdfDocumentInspector;
 import lombok.RequiredArgsConstructor;
@@ -73,6 +78,8 @@ public class MasService {
     private final StorageService storageService;
     private final FitService fitService;
     private final AtelierMemoirePublisher atelierMemoirePublisher;
+    private final CasinoRepository casinoRepository;
+    private final SfmRepository sfmRepository;
 
     @Transactional(readOnly = true)
     public List<MasResponse> findAll(String q) {
@@ -461,6 +468,16 @@ public class MasService {
 
     public MasResponse update(Long id, MasRequest request) {
         Mas entity = getEntity(id);
+        MasStatut previousStatut = entity.getStatut() != null ? entity.getStatut() : MasStatut.UTILISEE;
+        MasStatut statut = resolveStatut(request);
+        boolean statutChanged = previousStatut != statut;
+        MasStatutChangeRequest statutChange = request.getStatutChange();
+
+        if (statutChanged && statutChange == null) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Changement de statut : modale signatures requise");
+        }
+
         String numero = request.getNumero().trim();
         ensureUniqueNumero(numero, entity.getAtelier().getId(), entity.getId());
         entity.setNumero(numero);
@@ -469,12 +486,15 @@ public class MasService {
         entity.setDateMiseEnService(request.getDateMiseEnService());
         entity.setTypeMachine(trimToNull(request.getTypeMachine()));
         entity.setNumeroSerie(trimToNull(request.getNumeroSerie()));
-        entity.setDateCessation(request.getDateCessation());
-        entity.setDestinationMachineUsagee(trimToNull(request.getDestinationMachineUsagee()));
+        if (statutChanged) {
+            applyStatutChangeFields(entity, statut, statutChange);
+        } else {
+            entity.setDateCessation(request.getDateCessation());
+            entity.setDestinationMachineUsagee(trimToNull(request.getDestinationMachineUsagee()));
+        }
         entity.setMarque(getMarque(request.getMarqueId()));
         applyDeno(entity, request);
         applyReglesJeux(entity, request.getRegleJeuxIds());
-        MasStatut statut = resolveStatut(request);
         entity.applyStatut(statut);
         applyIdentificationRules(entity, statut);
         Mas saved = masRepository.save(entity);
@@ -483,7 +503,11 @@ public class MasService {
                 saved.getNumero(),
                 saved.getMarque() != null ? saved.getMarque().getLabel() : null,
                 saved.getAtelier() != null ? saved.getAtelier().getId() : null);
+        fitService.ensureFitSnapshotForMas(saved);
         fitService.syncEvolvingFieldsOnMasUpdate(saved);
+        if (statutChanged) {
+            fitService.appendFromMasStatutChange(saved, statut, statutChange);
+        }
         return toResponse(saved);
     }
 
@@ -674,12 +698,84 @@ public class MasService {
             clearDestructionStorage(entity);
             return;
         }
-        if (statut != MasStatut.VENDUE) {
+        if (statut == MasStatut.DETRUITE) {
+            entity.setDestinationMachineUsagee("Destruction");
+        } else if (statut != MasStatut.VENDUE) {
             entity.setDestinationMachineUsagee(null);
         }
         if (statut != MasStatut.DETRUITE) {
             clearDestructionStorage(entity);
         }
+    }
+
+    private void applyStatutChangeFields(Mas entity, MasStatut targetStatut, MasStatutChangeRequest change) {
+        FitService.validateSignatures(change.getSignatureAdmin(), change.getSignatureTechnicien());
+        switch (targetStatut) {
+            case VENDUE -> {
+                if (change.getDateCessation() == null) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                            "Date de vente (cessation) obligatoire pour une MAS vendue");
+                }
+                entity.setDateCessation(change.getDateCessation());
+                String destination = resolveVendueDestination(change, entity.getAtelier());
+                entity.setDestinationMachineUsagee(destination);
+            }
+            case DETRUITE -> {
+                if (change.getDateCessation() != null) {
+                    entity.setDateCessation(change.getDateCessation());
+                }
+                entity.setDestinationMachineUsagee("Destruction");
+            }
+            case EN_RESERVE -> {
+                if (change.getDateCessation() != null) {
+                    entity.setDateCessation(change.getDateCessation());
+                }
+            }
+            case UTILISEE -> {
+                // Effacement via applyIdentificationRules
+            }
+            default -> throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Statut MAS invalide");
+        }
+    }
+
+    private String resolveVendueDestination(MasStatutChangeRequest change, Atelier atelier) {
+        String explicit = trimToNull(change.getDestinationMachineUsagee());
+        String type = change.getAcheteurType() == null ? null : change.getAcheteurType().trim().toUpperCase();
+        if (type == null || type.isBlank()) {
+            if (explicit != null) {
+                return explicit;
+            }
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Type d'acheteur (CASINO ou SFM) ou destination obligatoire pour une vente");
+        }
+        if ("CASINO".equals(type)) {
+            if (change.getCasinoAcheteurId() == null) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Casino acheteur obligatoire");
+            }
+            Casino casino = casinoRepository.findByIdWithGroupe(change.getCasinoAcheteurId())
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                            "Casino acheteur introuvable"));
+            Long groupeId = atelier.getCasino() != null && atelier.getCasino().getGroupe() != null
+                    ? atelier.getCasino().getGroupe().getId()
+                    : null;
+            if (groupeId == null || casino.getGroupe() == null
+                    || !groupeId.equals(casino.getGroupe().getId())) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "Casino acheteur hors du groupe de l'atelier");
+            }
+            return "Casino " + casino.getNom();
+        }
+        if ("SFM".equals(type)) {
+            if (change.getSfmAcheteurId() == null) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "SFM acheteur obligatoire");
+            }
+            Sfm sfm = sfmRepository.findByIdWithContacts(change.getSfmAcheteurId(), atelier.getId())
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                            "SFM acheteur introuvable dans cet atelier"));
+            return "SFM " + sfm.getNom();
+        }
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                "Type d'acheteur invalide (CASINO ou SFM attendu)");
     }
 
     private void clearDestructionStorage(Mas entity) {

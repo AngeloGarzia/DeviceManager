@@ -7,6 +7,7 @@ import com.devicemanager.dto.TodoTacheLinkRequest;
 import com.devicemanager.dto.TodoTacheRequest;
 import com.devicemanager.dto.TodoTacheResponse;
 import com.devicemanager.dto.TodoTacheStatusRequest;
+import com.devicemanager.dto.TodoWeekCalendarResponse;
 import com.devicemanager.service.TodoRecurrenceService;
 import com.devicemanager.service.TodoService;
 import jakarta.validation.Valid;
@@ -35,6 +36,11 @@ public class TodoController {
     public ResponseEntity<TodoListResponse> list(
             @RequestParam(required = false, defaultValue = "false") boolean all) {
         return ResponseEntity.ok(all ? todoService.listAll() : todoService.listPending());
+    }
+
+    @GetMapping("/week-calendar")
+    public ResponseEntity<TodoWeekCalendarResponse> weekCalendar() {
+        return ResponseEntity.ok(todoRecurrenceService.weekCalendar());
     }
 
     @GetMapping("/recurrences")

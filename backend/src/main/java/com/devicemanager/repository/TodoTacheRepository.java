@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -69,4 +70,20 @@ public interface TodoTacheRepository extends JpaRepository<TodoTache, Long> {
     List<Long> findDistinctMasIdsByAtelierId(@Param("atelierId") Long atelierId);
 
     boolean existsByRecurrenceIdAndOccurrenceKey(Long recurrenceId, String occurrenceKey);
+
+    @Query("""
+            SELECT t FROM TodoTache t
+            JOIN FETCH t.recurrence
+            WHERE t.atelier.id = :atelierId
+              AND t.statut IN :statuts
+              AND t.recurrence IS NOT NULL
+              AND t.dueAt IS NOT NULL
+              AND t.dueAt >= :fromInclusive
+              AND t.dueAt < :toExclusive
+            """)
+    List<TodoTache> findRecurringActiveDueBetween(
+            @Param("atelierId") Long atelierId,
+            @Param("statuts") Collection<TodoTacheStatut> statuts,
+            @Param("fromInclusive") LocalDateTime fromInclusive,
+            @Param("toExclusive") LocalDateTime toExclusive);
 }

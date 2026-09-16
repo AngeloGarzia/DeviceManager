@@ -2,12 +2,14 @@ package com.devicemanager.service;
 
 import com.devicemanager.dto.FitFromMasRequest;
 import com.devicemanager.dto.FitLigneRequest;
+import com.devicemanager.dto.MasStatutChangeRequest;
 import com.devicemanager.dto.FitResponse;
 import com.devicemanager.entity.Atelier;
 import com.devicemanager.entity.Fit;
 import com.devicemanager.entity.FitLigne;
 import com.devicemanager.entity.Intervention;
 import com.devicemanager.entity.Mas;
+import com.devicemanager.entity.MasStatut;
 import com.devicemanager.repository.DenoRepository;
 import com.devicemanager.repository.FitLigneRepository;
 import com.devicemanager.repository.FitRepository;
@@ -180,5 +182,42 @@ class FitServiceTest {
         assertThat(saved.getIntervention()).isEqualTo(intervention);
         assertThat(saved.getFit()).isNotNull();
         assertThat(saved.getFit().getId()).isEqualTo(9L);
+    }
+
+    @Test
+    void appendFromMasStatutChange_writesSignedLigneWithAutoMotif() {
+        Atelier atelier = TestFixtures.atelier();
+        Mas mas = TestFixtures.mas();
+        mas.setDestinationMachineUsagee("Destruction");
+        when(fitRepository.findByAtelierIdAndMasId(atelier.getId(), mas.getId())).thenReturn(Optional.empty());
+        when(fitRepository.findByAtelierIdAndNumeroMachineCasinoIgnoreCase(atelier.getId(), mas.getNumero()))
+                .thenReturn(Optional.empty());
+        when(fitRepository.saveAndFlush(any(Fit.class))).thenAnswer(inv -> {
+            Fit f = inv.getArgument(0);
+            f.setId(11L);
+            if (f.getLignes() == null) {
+                f.setLignes(new ArrayList<>());
+            }
+            return f;
+        });
+        when(fitLigneRepository.saveAndFlush(any(FitLigne.class))).thenAnswer(inv -> {
+            FitLigne l = inv.getArgument(0);
+            l.setId(201L);
+            return l;
+        });
+
+        MasStatutChangeRequest change = new MasStatutChangeRequest();
+        change.setDateOperation(LocalDate.of(2026, 9, 1));
+        change.setSignatureAdmin(SIG_ADMIN);
+        change.setSignatureTechnicien(SIG_TECH);
+
+        fitService.appendFromMasStatutChange(mas, MasStatut.DETRUITE, change);
+
+        ArgumentCaptor<FitLigne> captor = ArgumentCaptor.forClass(FitLigne.class);
+        verify(fitLigneRepository).saveAndFlush(captor.capture());
+        FitLigne saved = captor.getValue();
+        assertThat(saved.getMotifNatureOperations()).isEqualTo("Destruction de la machine");
+        assertThat(saved.getDateOperation()).isEqualTo(LocalDate.of(2026, 9, 1));
+        assertThat(saved.getSignatureAdmin()).startsWith("data:image/");
     }
 }

@@ -10,7 +10,7 @@ import { MatCardModule } from '@angular/material/card';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatTableModule } from '@angular/material/table';
 import { MatCheckboxModule } from '@angular/material/checkbox';
-import { Device, TodoItem } from '../../models/models';
+import { Device, TodoItem, TodoWeekCalendar, TodoWeekCalendarDay } from '../../models/models';
 import { DeviceService } from '../../services/device.service';
 import { TodoService } from '../../services/todo.service';
 import { AuthService } from '../../services/auth.service';
@@ -57,8 +57,20 @@ export class DeviceListComponent implements OnInit {
   readonly tileOpen = signal(false);
   readonly todos = signal<TodoItem[]>([]);
   readonly todosLoading = signal(false);
+  readonly weekCalendar = signal<TodoWeekCalendar | null>(null);
+  readonly weekCalendarLoading = signal(false);
   pendingDelete: Device | null = null;
   query = '';
+
+  readonly todayIso = computed(() => {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  });
+
+  readonly weekDays = computed(() => this.weekCalendar()?.days ?? []);
 
   readonly displayedColumns: string[] = ['nom', 'reference', 'stock', 'statut', 'sfm', 'mas'];
 
@@ -102,6 +114,7 @@ export class DeviceListComponent implements OnInit {
   ngOnInit(): void {
     this.load();
     this.loadTodos();
+    this.loadWeekCalendar();
     this.route.queryParamMap.subscribe((params) => {
       if (params.get('open') === 'pieces') {
         this.tileOpen.set(true);
@@ -165,6 +178,27 @@ export class DeviceListComponent implements OnInit {
         this.todosLoading.set(false);
       }
     });
+  }
+
+  loadWeekCalendar(): void {
+    this.weekCalendarLoading.set(true);
+    this.todoService.weekCalendar().subscribe({
+      next: (data) => {
+        this.weekCalendar.set(data);
+        this.weekCalendarLoading.set(false);
+      },
+      error: () => {
+        this.weekCalendar.set(null);
+        this.weekCalendarLoading.set(false);
+      }
+    });
+  }
+
+  dayQueryParams(day: TodoWeekCalendarDay): Record<string, string> {
+    if (day.overdueCount > 0) {
+      return { filter: 'OVERDUE', day: day.date };
+    }
+    return { day: day.date };
   }
 
   askDelete(item: Device): void {

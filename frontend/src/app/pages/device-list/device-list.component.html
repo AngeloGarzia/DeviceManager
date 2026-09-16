@@ -1,6 +1,6 @@
 <section class="grid gap-4">
-  <a routerLink="/todos" class="todo-summary-link">
-    <mat-card class="devices-tile todo-tile !rounded-xl !border !border-line !shadow-soft">
+  <mat-card class="devices-tile todo-tile !rounded-xl !border !border-line !shadow-soft">
+    <a routerLink="/todos" class="todo-summary-link">
       <div class="devices-tile-toggle">
         <div class="min-w-0 text-left">
           <h1 class="page-title">À faire</h1>
@@ -10,7 +10,8 @@
             } @else if (todoCount === 0) {
               Aucune tâche active — ouvrir Todo
             } @else {
-              {{ todoCount }} tâche{{ todoCount > 1 ? 's' : '' }} active{{ todoCount > 1 ? 's' : '' }} — gérer le cycle de vie
+              {{ todoCount }} tâche{{ todoCount > 1 ? 's' : '' }} active{{ todoCount > 1 ? 's' : '' }} — gérer le cycle de
+              vie
             }
           </p>
         </div>
@@ -21,8 +22,50 @@
           <mat-icon>arrow_forward</mat-icon>
         </div>
       </div>
-    </mat-card>
-  </a>
+    </a>
+
+    @if (weekCalendarLoading()) {
+      <div class="todo-week todo-week--loading" aria-hidden="true">
+        @for (_ of [1, 2, 3, 4, 5, 6, 7]; track _) {
+          <span class="todo-week__day todo-week__day--skeleton"></span>
+        }
+      </div>
+    } @else if (weekDays().length > 0) {
+      <div class="todo-week" role="list" aria-label="Calendrier des tâches récurrentes cette semaine">
+        @for (day of weekDays(); track day.date) {
+          <a
+            class="todo-week__day"
+            role="listitem"
+            [routerLink]="['/todos']"
+            [queryParams]="dayQueryParams(day)"
+            [class.todo-week__day--today]="day.date === todayIso()"
+            [class.todo-week__day--has]="day.recurringCount > 0"
+            [class.todo-week__day--overdue]="day.overdueCount > 0"
+            [attr.aria-label]="
+              day.label +
+              ' ' +
+              day.date +
+              (day.overdueCount > 0
+                ? ', ' + day.overdueCount + ' en retard'
+                : day.recurringCount > 0
+                  ? ', ' + day.recurringCount + ' récurrente(s)'
+                  : '')
+            "
+          >
+            <span class="todo-week__label">{{ day.label }}</span>
+            <span class="todo-week__num">{{ day.date.slice(8) }}</span>
+            @if (day.recurringCount > 0) {
+              <span
+                class="todo-week__dot"
+                [class.todo-week__dot--warn]="day.overdueCount > 0"
+                aria-hidden="true"
+              ></span>
+            }
+          </a>
+        }
+      </div>
+    }
+  </mat-card>
 
   <mat-card
     class="devices-tile !rounded-xl !border !border-line !shadow-soft"

@@ -3,15 +3,19 @@ package com.devicemanager.service;
 import com.devicemanager.dto.MarqueMasRequest;
 import com.devicemanager.dto.MasRequest;
 import com.devicemanager.dto.MasResponse;
+import com.devicemanager.dto.MasStatutChangeRequest;
 import com.devicemanager.dto.RegleJeuxMasLinkRequest;
 import com.devicemanager.dto.RegleJeuxResponse;
 import com.devicemanager.entity.MarqueMas;
 import com.devicemanager.entity.Mas;
+import com.devicemanager.entity.MasStatut;
 import com.devicemanager.entity.RegleJeux;
+import com.devicemanager.repository.CasinoRepository;
 import com.devicemanager.repository.DenoRepository;
 import com.devicemanager.repository.MarqueMasRepository;
 import com.devicemanager.repository.MasRepository;
 import com.devicemanager.repository.RegleJeuxRepository;
+import com.devicemanager.repository.SfmRepository;
 import com.devicemanager.support.TestFixtures;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -25,6 +29,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.LocalDate;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
@@ -33,6 +38,7 @@ import java.util.Set;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -49,7 +55,14 @@ class MasServiceTest {
     @Mock private StorageService storageService;
     @Mock private FitService fitService;
     @Mock private AtelierMemoirePublisher atelierMemoirePublisher;
+    @Mock private CasinoRepository casinoRepository;
+    @Mock private SfmRepository sfmRepository;
     @InjectMocks private MasService masService;
+
+    private static final String SIG_ADMIN =
+            "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
+    private static final String SIG_TECH =
+            "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
 
     @BeforeEach
     void setUp() {
@@ -342,6 +355,94 @@ class MasServiceTest {
                     assertThat(rse.getReason()).contains("MAS-001");
                 });
         verify(masRepository, never()).save(any(Mas.class));
+    }
+
+    @Test
+    void update_statutChangeWithoutPayload_returns409() {
+        Mas entity = TestFixtures.mas();
+        entity.setStatut(MasStatut.UTILISEE);
+        when(masRepository.findByIdAndAtelierId(20L, 100L)).thenReturn(Optional.of(entity));
+
+        MasRequest request = baseUpdateRequest();
+        request.setStatut("EN_RESERVE");
+
+        assertThatThrownBy(() -> masService.update(20L, request))
+                .isInstanceOf(ResponseStatusException.class)
+                .satisfies(ex -> {
+                    ResponseStatusException rse = (ResponseStatusException) ex;
+                    assertThat(rse.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+                    assertThat(rse.getReason()).contains("modale signatures");
+                });
+        verify(masRepository, never()).save(any(Mas.class));
+        verify(fitService, never()).appendFromMasStatutChange(any(), any(), any());
+    }
+
+    @Test
+    void update_statutChangeToDetruite_appendsFitLigne() {
+        Mas entity = TestFixtures.mas();
+        entity.setStatut(MasStatut.UTILISEE);
+        when(masRepository.findByIdAndAtelierId(20L, 100L)).thenReturn(Optional.of(entity));
+        when(masRepository.existsByNumeroIgnoreCaseAndAtelierIdAndIdNot("MAS-001", 100L, 20L)).thenReturn(false);
+        when(marqueMasRepository.findById(5L)).thenReturn(Optional.of(TestFixtures.marque()));
+        when(masRepository.save(any(Mas.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        MasRequest request = baseUpdateRequest();
+        request.setStatut("DETRUITE");
+        request.setStatutChange(statutChangeForDetruite());
+
+        masService.update(20L, request);
+
+        ArgumentCaptor<Mas> captor = ArgumentCaptor.forClass(Mas.class);
+        verify(masRepository).save(captor.capture());
+        assertThat(captor.getValue().getStatut()).isEqualTo(MasStatut.DETRUITE);
+        assertThat(captor.getValue().getDestinationMachineUsagee()).isEqualTo("Destruction");
+        verify(fitService).ensureFitSnapshotForMas(any(Mas.class));
+        verify(fitService).syncEvolvingFieldsOnMasUpdate(any(Mas.class));
+        verify(fitService).appendFromMasStatutChange(any(Mas.class), eq(MasStatut.DETRUITE), any());
+    }
+
+    @Test
+    void update_statutChangeToVendue_resolvesCasinoDestination() {
+        Mas entity = TestFixtures.mas();
+        entity.setStatut(MasStatut.EN_RESERVE);
+        when(masRepository.findByIdAndAtelierId(20L, 100L)).thenReturn(Optional.of(entity));
+        when(masRepository.existsByNumeroIgnoreCaseAndAtelierIdAndIdNot("MAS-001", 100L, 20L)).thenReturn(false);
+        when(marqueMasRepository.findById(5L)).thenReturn(Optional.of(TestFixtures.marque()));
+        when(casinoRepository.findByIdWithGroupe(10L)).thenReturn(Optional.of(TestFixtures.casino()));
+        when(masRepository.save(any(Mas.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        MasRequest request = baseUpdateRequest();
+        request.setStatut("VENDUE");
+        MasStatutChangeRequest change = statutChangeForDetruite();
+        change.setDateCessation(LocalDate.of(2026, 3, 1));
+        change.setAcheteurType("CASINO");
+        change.setCasinoAcheteurId(10L);
+        request.setStatutChange(change);
+
+        masService.update(20L, request);
+
+        ArgumentCaptor<Mas> captor = ArgumentCaptor.forClass(Mas.class);
+        verify(masRepository).save(captor.capture());
+        assertThat(captor.getValue().getDestinationMachineUsagee()).isEqualTo("Casino Balaruc");
+        verify(fitService).appendFromMasStatutChange(any(Mas.class), eq(MasStatut.VENDUE), any());
+    }
+
+    private static MasRequest baseUpdateRequest() {
+        MasRequest request = new MasRequest();
+        request.setNumero("MAS-001");
+        request.setMarqueId(5L);
+        request.setRegleJeuxIds(List.of(1L));
+        return request;
+    }
+
+    private static MasStatutChangeRequest statutChangeForDetruite() {
+        MasStatutChangeRequest change = new MasStatutChangeRequest();
+        change.setDateOperation(LocalDate.of(2026, 3, 15));
+        change.setSignatureAdmin(SIG_ADMIN);
+        change.setSignatureTechnicien(SIG_TECH);
+        change.setSignataireAdminNom("Admin Demo");
+        change.setSignataireTechnicienNom("Tech Demo");
+        return change;
     }
 
     @Test

@@ -234,6 +234,21 @@ export interface Mas {
   reglesJeux?: RegleJeuxOption[];
 }
 
+/** Bloc obligatoire lors d'un changement de statut MAS (signatures FIT + champs métier). */
+export interface MasStatutChangeRequest {
+  dateOperation?: string | null;
+  dateCessation?: string | null;
+  destinationMachineUsagee?: string | null;
+  acheteurType?: 'CASINO' | 'SFM' | string | null;
+  casinoAcheteurId?: number | null;
+  sfmAcheteurId?: number | null;
+  motifNatureOperations?: string | null;
+  signatureAdmin: string;
+  signatureTechnicien: string;
+  signataireAdminNom?: string | null;
+  signataireTechnicienNom?: string | null;
+}
+
 export interface MasForm {
   numero: string;
   numeroSocle?: string | null;
@@ -249,6 +264,7 @@ export interface MasForm {
   statut: MasStatut | string;
   utilise?: boolean;
   regleJeuxIds: number[];
+  statutChange?: MasStatutChangeRequest;
 }
 
 export interface DevicePhoto {
@@ -769,5 +785,19 @@ export interface TodoRecurrenceForm {
   dateDebut: string;
   dateFin?: string | null;
   active?: boolean;
+}
+
+export interface TodoWeekCalendarDay {
+  date: string;
+  dayOfWeek: number;
+  label: string;
+  recurringCount: number;
+  overdueCount: number;
+}
+
+export interface TodoWeekCalendar {
+  weekStart: string;
+  weekEnd: string;
+  days: TodoWeekCalendarDay[];
 }
 

@@ -10,14 +10,26 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatCardModule } from '@angular/material/card';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MasService } from '../../services/mas.service';
-import { DenoOption, MarqueMasOption, MasForm, MasStatut, RegleJeuxOption } from '../../models/models';
+import {
+  DenoOption,
+  MarqueMasOption,
+  MasForm,
+  MasStatut,
+  RegleJeuxOption
+} from '../../models/models';
 import { apiErrorMessage } from '../../shared/api-error';
 import { isPdfFile, PDF_ACCEPT } from '../../shared/document-upload';
 import {
   RegleJeuxAiDialogComponent,
   RegleJeuxAiDialogConfirm
 } from '../../shared/regle-jeux-ai-dialog.component';
+import {
+  MasStatutChangeDialogData,
+  MasStatutChangeDialogResult,
+  MasStatutChangeModalComponent
+} from './mas-statut-change-modal.component';
 
 const MAS_STATUT_OPTIONS: { value: MasStatut; label: string }[] = [
   { value: 'UTILISEE', label: 'Machine utilisée' },
@@ -53,6 +65,7 @@ const MAS_TYPE_OPTIONS = [
     MatCheckboxModule,
     MatCardModule,
     MatProgressSpinnerModule,
+    MatDialogModule,
     RegleJeuxAiDialogComponent
   ],
   templateUrl: './mas-form.component.html',
@@ -63,6 +76,7 @@ export class MasFormComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly masService = inject(MasService);
+  private readonly dialog = inject(MatDialog);
 
   readonly loading = signal(false);
   readonly saving = signal(false);
@@ -86,6 +100,7 @@ export class MasFormComponent implements OnInit {
   readonly aiSuggested = signal<{ label?: string | null; description?: string | null } | null>(null);
   pendingRegleJeuxFile: File | null = null;
   id: number | null = null;
+  initialStatut: MasStatut | null = null;
   returnDevice: string | null = null;
   private returnForOrderRequest = false;
 
@@ -117,14 +132,28 @@ export class MasFormComponent implements OnInit {
     return this.id !== null;
   }
 
-  /** Date de cessation : accessible si Vendue, En réserve ou Détruite. */
+  /** Changement de statut en cours (modale FIT requise à l'enregistrement). */
+  isStatutChangePending(): boolean {
+    if (!this.isEdit || this.initialStatut == null) {
+      return false;
+    }
+    return (this.form.controls.statut.value as MasStatut) !== this.initialStatut;
+  }
+
+  /** Date de cessation : accessible si Vendue, En réserve ou Détruite (sauf changement de statut → modale). */
   canEditDateCessation(): boolean {
+    if (this.isStatutChangePending()) {
+      return false;
+    }
     const s = this.form.controls.statut.value;
     return s === 'VENDUE' || s === 'EN_RESERVE' || s === 'DETRUITE';
   }
 
-  /** Destination machine usagée : accessible uniquement si Vendue. */
+  /** Destination machine usagée : accessible uniquement si Vendue (sauf changement → modale). */
   canEditDestination(): boolean {
+    if (this.isStatutChangePending()) {
+      return false;
+    }
     return this.form.controls.statut.value === 'VENDUE';
   }
 
@@ -197,6 +226,8 @@ export class MasFormComponent implements OnInit {
       this.loading.set(true);
       this.masService.get(this.id).subscribe({
         next: (mas) => {
+          const loadedStatut = (mas.statut || (mas.utilise ? 'UTILISEE' : 'EN_RESERVE')) as MasStatut;
+          this.initialStatut = loadedStatut;
           this.form.patchValue({
             numero: mas.numero,
             numeroSocle: mas.numeroSocle || '',
@@ -209,7 +240,7 @@ export class MasFormComponent implements OnInit {
             marqueId: mas.marqueId,
             denoId: mas.multiDeno ? null : (mas.denoId ?? null),
             multiDeno: !!mas.multiDeno,
-            statut: mas.statut || (mas.utilise ? 'UTILISEE' : 'EN_RESERVE'),
+            statut: loadedStatut,
             regleJeuxIds: mas.regleJeuxIds ?? mas.reglesJeux?.map((r) => r.id) ?? []
           });
           this.syncStatutDependentFields();
@@ -449,8 +480,15 @@ export class MasFormComponent implements OnInit {
       this.form.markAllAsTouched();
       return;
     }
-    this.saving.set(true);
     this.error.set(null);
+    if (this.isStatutChangePending()) {
+      this.openStatutChangeModal();
+      return;
+    }
+    this.persist(this.buildPayload());
+  }
+
+  private buildPayload(statutChange?: MasStatutChangeDialogResult): MasForm {
     const raw = this.form.getRawValue();
     const tauxRaw = raw.tauxRedistribution;
     const taux =
@@ -458,6 +496,16 @@ export class MasFormComponent implements OnInit {
         ? null
         : Number(tauxRaw);
     const regleJeuxIds = raw.regleJeuxIds ?? [];
+    const dateCessation = statutChange
+      ? statutChange.dateCessation
+      : this.canEditDateCessation()
+        ? raw.dateCessation?.trim() || null
+        : null;
+    const destinationMachineUsagee = statutChange
+      ? statutChange.destinationMachineUsagee
+      : this.canEditDestination()
+        ? raw.destinationMachineUsagee?.trim() || null
+        : null;
     const payload: MasForm = {
       numero: raw.numero!.trim(),
       numeroSocle: raw.numeroSocle?.trim() || null,
@@ -465,12 +513,8 @@ export class MasFormComponent implements OnInit {
       dateMiseEnService: raw.dateMiseEnService?.trim() || null,
       typeMachine: raw.typeMachine?.trim() || null,
       numeroSerie: raw.numeroSerie?.trim() || null,
-      dateCessation: this.canEditDateCessation()
-        ? raw.dateCessation?.trim() || null
-        : null,
-      destinationMachineUsagee: this.canEditDestination()
-        ? raw.destinationMachineUsagee?.trim() || null
-        : null,
+      dateCessation,
+      destinationMachineUsagee,
       marqueId: raw.marqueId,
       denoId: raw.multiDeno ? null : raw.denoId,
       multiDeno: !!raw.multiDeno,
@@ -478,6 +522,41 @@ export class MasFormComponent implements OnInit {
       utilise: (raw.statut || 'UTILISEE') === 'UTILISEE',
       regleJeuxIds: [...regleJeuxIds]
     };
+    if (statutChange) {
+      payload.statutChange = statutChange.statutChange;
+    }
+    return payload;
+  }
+
+  private openStatutChangeModal(): void {
+    const targetStatut = (this.form.controls.statut.value || 'UTILISEE') as MasStatut;
+    const dialogRef = this.dialog.open<
+      MasStatutChangeModalComponent,
+      MasStatutChangeDialogData,
+      MasStatutChangeDialogResult
+    >(MasStatutChangeModalComponent, {
+      width: 'min(720px, 96vw)',
+      maxHeight: '90vh',
+      disableClose: true,
+      data: { targetStatut }
+    });
+    dialogRef.afterClosed().subscribe((result) => {
+      if (!result) {
+        return;
+      }
+      this.form.patchValue({
+        dateCessation: result.dateCessation || '',
+        destinationMachineUsagee: result.destinationMachineUsagee || ''
+      });
+      const payload = this.buildPayload(result);
+      payload.statutChange = result.statutChange;
+      this.persist(payload);
+    });
+  }
+
+  private persist(payload: MasForm): void {
+    this.saving.set(true);
+    this.error.set(null);
     const req$ = this.id ? this.masService.update(this.id, payload) : this.masService.create(payload);
     req$.subscribe({
       next: (saved) => this.navigateAfterSave(saved.id),

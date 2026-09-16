@@ -1,0 +1,112 @@
+<h2 mat-dialog-title>Changement de statut — {{ statutLabel }}</h2>
+
+<mat-dialog-content class="grid gap-3">
+  @if (loading) {
+    <p class="text-sm text-ink-soft">Chargement…</p>
+  } @else {
+    @if (isUtilisee()) {
+      <p class="m-0 rounded-lg bg-sky-50 px-3 py-2 text-sm text-sky-900">
+        La date de cessation et la destination seront effacées sur la MAS et la FIT.
+      </p>
+    }
+
+    <form class="grid gap-3" [formGroup]="form">
+      <mat-form-field appearance="outline">
+        <mat-label>Date d'opération (ligne FIT)</mat-label>
+        <input matInput type="date" formControlName="dateOperation" />
+      </mat-form-field>
+
+      @if (isVendue()) {
+        <mat-form-field appearance="outline">
+          <mat-label>Date de vente</mat-label>
+          <input matInput type="date" formControlName="dateCessation" />
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Type d'acheteur</mat-label>
+          <mat-select formControlName="acheteurType">
+            <mat-option value="CASINO">Casino</mat-option>
+            <mat-option value="SFM">SFM</mat-option>
+          </mat-select>
+        </mat-form-field>
+
+        @if (form.controls.acheteurType.value === 'CASINO') {
+          <mat-form-field appearance="outline">
+            <mat-label>Casino acheteur</mat-label>
+            <mat-select formControlName="casinoAcheteurId">
+              @for (c of casinos; track c.id) {
+                <mat-option [value]="c.id">{{ c.nom }}</mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+        } @else {
+          <mat-form-field appearance="outline">
+            <mat-label>SFM acheteur</mat-label>
+            <mat-select formControlName="sfmAcheteurId">
+              @for (s of sfms; track s.id) {
+                <mat-option [value]="s.id">{{ s.nom }}</mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+        }
+      }
+
+      @if (isEnReserve() || isDetruite()) {
+        <mat-form-field appearance="outline">
+          <mat-label>Date de cessation (optionnelle)</mat-label>
+          <input matInput type="date" formControlName="dateCessation" />
+        </mat-form-field>
+      }
+
+      @if (isDetruite()) {
+        <mat-form-field appearance="outline">
+          <mat-label>Destination</mat-label>
+          <input matInput value="Destruction" readonly />
+          <mat-hint>Valeur fixe pour une machine détruite</mat-hint>
+        </mat-form-field>
+      }
+
+      <mat-form-field appearance="outline">
+        <mat-label>Motif ligne FIT (optionnel)</mat-label>
+        <textarea matInput rows="2" formControlName="motifNatureOperations"></textarea>
+        <mat-hint>Si vide, un libellé automatique sera utilisé selon le statut.</mat-hint>
+      </mat-form-field>
+
+      <div class="sig-grid">
+        <div>
+          <app-signature-pad label="Signature admin / directeur" formControlName="signatureAdmin" />
+          <mat-form-field appearance="outline" class="mt-2 w-full">
+            <mat-label>Signataire admin</mat-label>
+            <mat-select formControlName="signataireAdminId">
+              @for (u of admins; track u.id) {
+                <mat-option [value]="u.id">{{ u.displayName }}</mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+        </div>
+        <div>
+          <app-signature-pad label="Signature technicien" formControlName="signatureTechnicien" />
+          <mat-form-field appearance="outline" class="mt-2 w-full">
+            <mat-label>Signataire technicien</mat-label>
+            <mat-select formControlName="signataireTechnicienId">
+              @for (u of techniciens; track u.id) {
+                <mat-option [value]="u.id">{{ u.displayName }}</mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+        </div>
+      </div>
+    </form>
+
+    @if (error) {
+      <p class="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{{ error }}</p>
+    }
+  }
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button mat-button type="button" (click)="cancel()">Annuler</button>
+  <button mat-flat-button color="primary" type="button" [disabled]="loading" (click)="confirm()">
+    Valider et enregistrer
+  </button>
+</mat-dialog-actions>

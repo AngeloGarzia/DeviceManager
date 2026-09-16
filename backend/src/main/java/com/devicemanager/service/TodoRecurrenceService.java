@@ -2,6 +2,7 @@ package com.devicemanager.service;
 
 import com.devicemanager.dto.TodoRecurrenceRequest;
 import com.devicemanager.dto.TodoRecurrenceResponse;
+import com.devicemanager.dto.TodoWeekCalendarResponse;
 import com.devicemanager.entity.Atelier;
 import com.devicemanager.entity.Mas;
 import com.devicemanager.entity.TodoRecurrence;
@@ -26,9 +27,16 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
+import java.time.format.TextStyle;
+import java.time.temporal.ChronoUnit;
 import java.time.temporal.TemporalAdjusters;
+import java.util.ArrayList;
+import java.util.EnumSet;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -100,6 +108,115 @@ public class TodoRecurrenceService {
         TodoRecurrence entity = getEntity(id);
         todoRecurrenceRepository.delete(entity);
         log.info("Suppression règle todo récurrente id={} par={}", id, username);
+    }
+
+    /**
+     * Calendrier de la semaine ISO courante : pastilles pour tâches récurrentes dues.
+     */
+    public TodoWeekCalendarResponse weekCalendar() {
+        Atelier atelier = atelierService.requireCurrentAtelier();
+        generateDueOccurrences(atelier);
+
+        LocalDate today = LocalDate.now(clock);
+        LocalDateTime now = LocalDateTime.now(clock);
+        LocalDate weekStart = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
+        LocalDate weekEnd = weekStart.plusDays(6);
+
+        EnumSet<TodoTacheStatut> active = EnumSet.of(TodoTacheStatut.OPEN, TodoTacheStatut.IN_PROGRESS);
+        List<TodoTache> occurrences = todoTacheRepository.findRecurringActiveDueBetween(
+                atelier.getId(),
+                active,
+                weekStart.atStartOfDay(),
+                weekEnd.plusDays(1).atStartOfDay());
+
+        Map<LocalDate, Integer> recurringByDay = new HashMap<>();
+        Map<LocalDate, Integer> overdueByDay = new HashMap<>();
+        Set<String> existingKeys = new HashSet<>();
+        for (TodoTache t : occurrences) {
+            if (t.getDueAt() == null || t.getRecurrence() == null) {
+                continue;
+            }
+            LocalDate day = t.getDueAt().toLocalDate();
+            recurringByDay.merge(day, 1, Integer::sum);
+            if (t.getDueAt().isBefore(now)) {
+                overdueByDay.merge(day, 1, Integer::sum);
+            }
+            existingKeys.add(t.getRecurrence().getId() + "|" + occurrenceKey(t.getDueAt()));
+        }
+
+        List<TodoRecurrence> rules = todoRecurrenceRepository.findActiveByAtelierId(atelier.getId());
+        for (LocalDate day = weekStart; !day.isAfter(weekEnd); day = day.plusDays(1)) {
+            // Jours futurs : compléter avec les échéances virtuelles (pas encore matérialisées).
+            if (day.isAfter(today)) {
+                for (TodoRecurrence rule : rules) {
+                    if (!isDueOn(rule, day)) {
+                        continue;
+                    }
+                    String key = rule.getId() + "|" + day.format(OCCURRENCE_KEY);
+                    if (existingKeys.contains(key)) {
+                        continue;
+                    }
+                    recurringByDay.merge(day, 1, Integer::sum);
+                    existingKeys.add(key);
+                }
+            }
+        }
+
+        List<TodoWeekCalendarResponse.Day> days = new ArrayList<>(7);
+        for (LocalDate day = weekStart; !day.isAfter(weekEnd); day = day.plusDays(1)) {
+            int recurring = recurringByDay.getOrDefault(day, 0);
+            int overdue = overdueByDay.getOrDefault(day, 0);
+            days.add(TodoWeekCalendarResponse.Day.builder()
+                    .date(day)
+                    .dayOfWeek(day.getDayOfWeek().getValue())
+                    .label(day.getDayOfWeek().getDisplayName(TextStyle.SHORT, Locale.FRENCH))
+                    .recurringCount(recurring)
+                    .overdueCount(overdue)
+                    .build());
+        }
+
+        return TodoWeekCalendarResponse.builder()
+                .weekStart(weekStart)
+                .weekEnd(weekEnd)
+                .days(days)
+                .build();
+    }
+
+    /**
+     * Indique si la règle produit une échéance ce jour-là (sans créer d'occurrence).
+     */
+    boolean isDueOn(TodoRecurrence rule, LocalDate day) {
+        if (rule.getDateDebut() != null && day.isBefore(rule.getDateDebut())) {
+            return false;
+        }
+        if (rule.getDateFin() != null && day.isAfter(rule.getDateFin())) {
+            return false;
+        }
+        return switch (rule.getFrequence()) {
+            case DAILY -> true;
+            case WEEKLY -> {
+                if (rule.getJourSemaine() == null) {
+                    yield false;
+                }
+                DayOfWeek wanted = DayOfWeek.of(rule.getJourSemaine());
+                LocalDate first = rule.getDateDebut().with(TemporalAdjusters.nextOrSame(wanted));
+                yield !day.isBefore(first) && day.getDayOfWeek() == wanted;
+            }
+            case MONTHLY -> {
+                if (rule.getJourMois() == null) {
+                    yield false;
+                }
+                LocalDateTime firstDue = computeFirstDue(rule);
+                yield !day.isBefore(firstDue.toLocalDate()) && day.getDayOfMonth() == rule.getJourMois();
+            }
+            case INTERVAL_DAYS -> {
+                if (rule.getIntervalDays() == null || rule.getIntervalDays() < 1) {
+                    yield false;
+                }
+                long days = ChronoUnit.DAYS.between(rule.getDateDebut(), day);
+                yield days >= 0 && days % rule.getIntervalDays() == 0;
+            }
+        };
     }
 
     /**

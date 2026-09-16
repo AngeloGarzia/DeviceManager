@@ -34,6 +34,98 @@
   color: inherit;
 }
 
+.todo-week {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.35rem;
+  padding: 0 0.85rem 0.9rem;
+}
+
+.todo-week--loading {
+  opacity: 0.55;
+}
+
+.todo-week__day {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+  min-height: 3.1rem;
+  padding: 0.35rem 0.15rem 0.55rem;
+  border: 1px solid #d9e2ec;
+  border-radius: 0.65rem;
+  background: #fff;
+  text-decoration: none;
+  color: #52606d;
+  box-sizing: border-box;
+}
+
+.todo-week__day:hover {
+  border-color: #0f4c81;
+  background: #f0f9ff;
+}
+
+.todo-week__day--today {
+  border-color: #0f4c81;
+  box-shadow: 0 0 0 1px color-mix(in srgb, #0f4c81 35%, transparent);
+}
+
+.todo-week__day--has {
+  background: #f8fafc;
+}
+
+.todo-week__day--overdue {
+  border-color: #f87171;
+  background: #fff1f2;
+}
+
+.todo-week__day--skeleton {
+  pointer-events: none;
+  background: #e2e8f0;
+  border-color: transparent;
+}
+
+.todo-week__label {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: capitalize;
+  letter-spacing: 0.02em;
+  color: #829ab1;
+}
+
+.todo-week__num {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #1f2933;
+}
+
+.todo-week__dot {
+  position: absolute;
+  bottom: 0.3rem;
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 999px;
+  background: #0f4c81;
+  animation: todo-week-blink 1.2s ease-in-out infinite;
+}
+
+.todo-week__dot--warn {
+  background: #c62828;
+}
+
+@keyframes todo-week-blink {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.35;
+    transform: scale(0.85);
+  }
+}
+
 .todo-tile-toggle-end {
   display: inline-flex;
   align-items: center;
