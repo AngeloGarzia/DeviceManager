@@ -12,5 +12,7 @@ import java.util.List;
 @Builder
 public class TodoListResponse {
     private long count;
+    /** Occurrences échues non clôturées (warning). */
+    private long overdueCount;
     private List<TodoTacheResponse> items;
 }

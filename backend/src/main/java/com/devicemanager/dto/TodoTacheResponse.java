@@ -49,4 +49,11 @@ public class TodoTacheResponse {
     private String link;
     private Long relatedId;
     private LocalDateTime since;
+
+    /** Occurrence récurrente. */
+    private Long recurrenceId;
+    private LocalDateTime dueAt;
+    private String occurrenceKey;
+    /** true si due_at dépassée et statut encore ouvert. */
+    private boolean overdue;
 }

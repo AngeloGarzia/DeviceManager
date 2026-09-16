@@ -2,7 +2,13 @@ import { Injectable, signal } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable, tap } from 'rxjs';
 import { environment } from '../../environments/environment';
-import { TodoItem, TodoList, TodoTacheForm } from '../models/models';
+import {
+  TodoItem,
+  TodoList,
+  TodoRecurrence,
+  TodoRecurrenceForm,
+  TodoTacheForm
+} from '../models/models';
 
 @Injectable({ providedIn: 'root' })
 export class TodoService {
@@ -10,6 +16,8 @@ export class TodoService {
 
   /** Nombre de tâches actives (ouvertes + en cours) pour le badge nav. */
   readonly pendingCount = signal(0);
+  /** Occurrences échues non clôturées — warning Todo. */
+  readonly overdueCount = signal(0);
 
   constructor(private http: HttpClient) {}
 
@@ -20,6 +28,8 @@ export class TodoService {
     }
     return this.http.get<TodoList>(this.base, { params }).pipe(
       tap((data) => {
+        const overdue = data.overdueCount ?? (data.items ?? []).filter((t) => t.overdue).length;
+        this.overdueCount.set(overdue);
         if (!all) {
           this.pendingCount.set(data.count ?? data.items?.length ?? 0);
         } else {
@@ -33,7 +43,10 @@ export class TodoService {
   }
 
   refreshPendingCount(): void {
-    this.list(false).subscribe({ error: () => this.pendingCount.set(0) });
+    this.list(false).subscribe({ error: () => {
+      this.pendingCount.set(0);
+      this.overdueCount.set(0);
+    } });
   }
 
   create(payload: TodoTacheForm): Observable<TodoItem> {
@@ -82,5 +95,48 @@ export class TodoService {
 
   delete(id: number): Observable<void> {
     return this.http.delete<void>(`${this.base}/${id}`).pipe(tap(() => this.refreshPendingCount()));
+  }
+
+  listRecurrences(): Observable<TodoRecurrence[]> {
+    return this.http.get<TodoRecurrence[]>(`${this.base}/recurrences`);
+  }
+
+  createRecurrence(payload: TodoRecurrenceForm): Observable<TodoRecurrence> {
+    return this.http.post<TodoRecurrence>(`${this.base}/recurrences`, this.toRecurrenceBody(payload)).pipe(
+      tap(() => this.refreshPendingCount())
+    );
+  }
+
+  updateRecurrence(id: number, payload: TodoRecurrenceForm): Observable<TodoRecurrence> {
+    return this.http.put<TodoRecurrence>(`${this.base}/recurrences/${id}`, this.toRecurrenceBody(payload)).pipe(
+      tap(() => this.refreshPendingCount())
+    );
+  }
+
+  setRecurrenceActive(id: number, active: boolean): Observable<TodoRecurrence> {
+    return this.http
+      .put<TodoRecurrence>(`${this.base}/recurrences/${id}/active`, { active })
+      .pipe(tap(() => this.refreshPendingCount()));
+  }
+
+  deleteRecurrence(id: number): Observable<void> {
+    return this.http.delete<void>(`${this.base}/recurrences/${id}`);
+  }
+
+  private toRecurrenceBody(payload: TodoRecurrenceForm) {
+    return {
+      titre: payload.titre.trim(),
+      description: payload.description?.trim() || null,
+      severite: payload.severite || 'MEDIUM',
+      masId: payload.masId ?? null,
+      frequence: payload.frequence,
+      intervalDays: payload.intervalDays ?? null,
+      jourSemaine: payload.jourSemaine ?? null,
+      jourMois: payload.jourMois ?? null,
+      heureDue: payload.heureDue || '08:00:00',
+      dateDebut: payload.dateDebut,
+      dateFin: payload.dateFin || null,
+      active: payload.active ?? true
+    };
   }
 }

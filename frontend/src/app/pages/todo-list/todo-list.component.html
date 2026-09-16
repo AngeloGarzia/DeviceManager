@@ -2,21 +2,38 @@
   <header class="flex flex-wrap items-start justify-between gap-3">
     <div>
       <h1 class="page-title" data-tour="page-todo">Todo</h1>
-      <p class="page-subtitle">Cycle de vie des tâches : ouvertes, en cours, clôturées et annulées</p>
+      <p class="page-subtitle">
+        Tâches ponctuelles et récurrentes — warning si une occurrence échue n’est pas clôturée
+      </p>
     </div>
-    <button
-      mat-flat-button
-      color="primary"
-      type="button"
-      (click)="openCreate()"
-      [disabled]="saving() || showCreate()"
-    >
-      <mat-icon>add_task</mat-icon>
-      Nouvelle tâche
-    </button>
+    <div class="flex flex-wrap gap-2">
+      <button
+        mat-stroked-button
+        type="button"
+        (click)="openRecurrenceCreate()"
+        [disabled]="saving() || showRecurrenceCreate()"
+      >
+        <mat-icon>event_repeat</mat-icon>
+        Tâche récurrente
+      </button>
+      <button
+        mat-flat-button
+        color="primary"
+        type="button"
+        (click)="openCreate()"
+        [disabled]="saving() || showCreate()"
+      >
+        <mat-icon>add_task</mat-icon>
+        Nouvelle tâche
+      </button>
+    </div>
   </header>
 
   <div class="todo-stats">
+    <div class="panel todo-stat" [class.todo-stat--warn]="counts().overdue > 0">
+      <div class="todo-stat__label">En retard</div>
+      <div class="todo-stat__value">{{ counts().overdue }}</div>
+    </div>
     <div class="panel todo-stat">
       <div class="todo-stat__label">Actives</div>
       <div class="todo-stat__value">{{ counts().active }}</div>
@@ -33,10 +50,6 @@
       <div class="todo-stat__label">Clôturées</div>
       <div class="todo-stat__value">{{ counts().done }}</div>
     </div>
-    <div class="panel todo-stat">
-      <div class="todo-stat__label">Annulées</div>
-      <div class="todo-stat__value">{{ counts().cancelled }}</div>
-    </div>
   </div>
 
   <div class="todo-filters" role="tablist" aria-label="Filtrer les tâches">
@@ -48,6 +61,16 @@
     >
       Actives
       <span class="todo-filter__count">{{ counts().active }}</span>
+    </button>
+    <button
+      type="button"
+      class="todo-filter"
+      [class.todo-filter--warn]="counts().overdue > 0"
+      [class.todo-filter--active]="filter() === 'OVERDUE'"
+      (click)="setFilter('OVERDUE')"
+    >
+      En retard
+      <span class="todo-filter__count">{{ counts().overdue }}</span>
     </button>
     <button
       type="button"
@@ -158,6 +181,149 @@
     </form>
   }
 
+  @if (showRecurrenceCreate()) {
+    <form class="panel grid gap-3" [formGroup]="recurrenceForm" (ngSubmit)="submitRecurrenceCreate()">
+      <h2 class="m-0 text-base font-semibold">Nouvelle tâche récurrente</h2>
+      <mat-form-field appearance="outline" class="w-full">
+        <mat-label>Titre</mat-label>
+        <input matInput formControlName="titre" maxlength="200" />
+      </mat-form-field>
+      <mat-form-field appearance="outline" class="w-full">
+        <mat-label>Description</mat-label>
+        <textarea matInput rows="2" formControlName="description" maxlength="2000"></textarea>
+      </mat-form-field>
+      <div class="grid gap-3 sm:grid-cols-2">
+        <mat-form-field appearance="outline" class="w-full">
+          <mat-label>Fréquence</mat-label>
+          <mat-select formControlName="frequence">
+            <mat-option value="DAILY">Quotidienne</mat-option>
+            <mat-option value="WEEKLY">Hebdomadaire</mat-option>
+            <mat-option value="MONTHLY">Mensuelle</mat-option>
+            <mat-option value="INTERVAL_DAYS">Tous les N jours</mat-option>
+          </mat-select>
+        </mat-form-field>
+        <mat-form-field appearance="outline" class="w-full">
+          <mat-label>Priorité</mat-label>
+          <mat-select formControlName="severite">
+            <mat-option value="HIGH">Urgent</mat-option>
+            <mat-option value="MEDIUM">Normal</mat-option>
+            <mat-option value="LOW">Faible</mat-option>
+          </mat-select>
+        </mat-form-field>
+      </div>
+      @if (recurrenceForm.controls.frequence.value === 'INTERVAL_DAYS') {
+        <mat-form-field appearance="outline" class="w-full">
+          <mat-label>Intervalle (jours)</mat-label>
+          <input matInput type="number" min="1" max="365" formControlName="intervalDays" />
+        </mat-form-field>
+      }
+      @if (recurrenceForm.controls.frequence.value === 'WEEKLY') {
+        <mat-form-field appearance="outline" class="w-full">
+          <mat-label>Jour de la semaine</mat-label>
+          <mat-select formControlName="jourSemaine">
+            <mat-option [value]="1">Lundi</mat-option>
+            <mat-option [value]="2">Mardi</mat-option>
+            <mat-option [value]="3">Mercredi</mat-option>
+            <mat-option [value]="4">Jeudi</mat-option>
+            <mat-option [value]="5">Vendredi</mat-option>
+            <mat-option [value]="6">Samedi</mat-option>
+            <mat-option [value]="7">Dimanche</mat-option>
+          </mat-select>
+        </mat-form-field>
+      }
+      @if (recurrenceForm.controls.frequence.value === 'MONTHLY') {
+        <mat-form-field appearance="outline" class="w-full">
+          <mat-label>Jour du mois (1–28)</mat-label>
+          <input matInput type="number" min="1" max="28" formControlName="jourMois" />
+        </mat-form-field>
+      }
+      <div class="grid gap-3 sm:grid-cols-3">
+        <mat-form-field appearance="outline" class="w-full">
+          <mat-label>Heure d'échéance</mat-label>
+          <input matInput type="time" formControlName="heureDue" />
+        </mat-form-field>
+        <mat-form-field appearance="outline" class="w-full">
+          <mat-label>Date de début</mat-label>
+          <input matInput type="date" formControlName="dateDebut" />
+        </mat-form-field>
+        <mat-form-field appearance="outline" class="w-full">
+          <mat-label>Date de fin (optionnel)</mat-label>
+          <input matInput type="date" formControlName="dateFin" />
+        </mat-form-field>
+      </div>
+      <mat-form-field appearance="outline" class="w-full">
+        <mat-label>MAS (optionnel)</mat-label>
+        <mat-select formControlName="masId">
+          <mat-option [value]="null">Aucune</mat-option>
+          @for (m of masses(); track m.id) {
+            <mat-option [value]="m.id">{{ masOptionLabel(m) }}</mat-option>
+          }
+        </mat-select>
+      </mat-form-field>
+      <mat-checkbox formControlName="active">Active</mat-checkbox>
+      <div class="flex flex-wrap gap-2">
+        <button mat-button type="button" (click)="cancelRecurrenceCreate()">Annuler</button>
+        <button mat-flat-button color="primary" type="submit" [disabled]="saving()">
+          {{ saving() ? 'Enregistrement…' : 'Créer la récurrence' }}
+        </button>
+      </div>
+    </form>
+  }
+
+  @if (recurrences().length > 0) {
+    <div class="panel grid gap-2">
+      <h2 class="m-0 text-base font-semibold">Règles récurrentes</h2>
+      <ul class="todo-recurrence-list">
+        @for (rule of recurrences(); track rule.id) {
+          <li class="todo-recurrence" [class.todo-recurrence--off]="!rule.active">
+            <div class="min-w-0 flex-1">
+              <div class="flex flex-wrap items-center gap-2">
+                <span class="font-semibold">{{ rule.titre }}</span>
+                <span class="todo-sev" [attr.data-severity]="rule.severite">{{
+                  severityLabel(rule.severite)
+                }}</span>
+                <span class="todo-statut">{{ frequenceLabel(rule.frequence) }}</span>
+                @if (!rule.active) {
+                  <span class="todo-statut" data-statut="CANCELLED">En pause</span>
+                }
+              </div>
+              <p class="todo-item__meta">
+                Début {{ rule.dateDebut }}
+                @if (rule.dateFin) {
+                  → {{ rule.dateFin }}
+                }
+                · {{ rule.heureDue || '08:00' }}
+                @if (rule.frequence === 'WEEKLY') {
+                  · {{ jourSemaineLabel(rule.jourSemaine) }}
+                }
+                @if (rule.frequence === 'MONTHLY') {
+                  · jour {{ rule.jourMois }}
+                }
+                @if (rule.frequence === 'INTERVAL_DAYS') {
+                  · tous les {{ rule.intervalDays }} j
+                }
+                @if (rule.masNumero) {
+                  · MAS {{ rule.masNumero }}
+                }
+                @if (rule.prochaineEcheance) {
+                  · prochaine {{ formatDateTime(rule.prochaineEcheance) }}
+                }
+              </p>
+            </div>
+            <div class="flex flex-wrap gap-1">
+              <button mat-stroked-button type="button" (click)="toggleRecurrenceActive(rule)" [disabled]="saving()">
+                {{ rule.active ? 'Pause' : 'Activer' }}
+              </button>
+              <button mat-button color="warn" type="button" (click)="deleteRecurrence(rule)" [disabled]="saving()">
+                Suppr.
+              </button>
+            </div>
+          </li>
+        }
+      </ul>
+    </div>
+  }
+
   @if (loading()) {
     <div class="flex justify-center py-10">
       <mat-spinner diameter="36"></mat-spinner>
@@ -178,8 +344,13 @@
   } @else {
     <ul class="todo-list">
       @for (item of filteredItems(); track item.id) {
-        <li class="todo-item" [attr.data-severity]="item.severite || item.severity" [attr.data-statut]="item.statut">
-          <mat-icon class="todo-item__icon">task_alt</mat-icon>
+        <li
+          class="todo-item"
+          [class.todo-item--overdue]="item.overdue"
+          [attr.data-severity]="item.severite || item.severity"
+          [attr.data-statut]="item.statut"
+        >
+          <mat-icon class="todo-item__icon">{{ item.recurrenceId ? 'event_repeat' : 'task_alt' }}</mat-icon>
           <div class="todo-item__body min-w-0 flex-1">
             <div class="flex flex-wrap items-center gap-2">
               <span class="todo-item__title">{{ item.titre || item.title }}</span>
@@ -187,6 +358,12 @@
                 severityLabel(item.severite || item.severity || 'MEDIUM')
               }}</span>
               <span class="todo-statut" [attr.data-statut]="item.statut">{{ statutLabel(item.statut) }}</span>
+              @if (item.recurrenceId) {
+                <span class="todo-statut">Récurrente</span>
+              }
+              @if (item.overdue) {
+                <span class="todo-overdue-badge">En retard</span>
+              }
             </div>
             @if (item.description) {
               <p class="todo-item__desc">{{ item.description }}</p>
@@ -195,6 +372,9 @@
               Créée le {{ formatDateTime(item.dateCreation || item.createdAt) }}
               · Resp. création :
               {{ item.responsableCreation || item.createdByDisplayName || item.createdByUsername || '—' }}
+              @if (item.dueAt) {
+                · Échéance {{ formatDateTime(item.dueAt) }}
+              }
               @if (item.masNumero) {
                 · MAS {{ item.masNumero }}
               }

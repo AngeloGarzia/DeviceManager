@@ -263,6 +263,11 @@
   animation: pending-blink 1.1s ease-in-out infinite;
 }
 
+.pending-badge--warn {
+  background: #b71c1c;
+  box-shadow: 0 0 0 2px color-mix(in srgb, #ef4444 35%, transparent);
+}
+
 .pending-label-blink {
   animation: pending-blink 1.1s ease-in-out infinite;
   color: #c62828;

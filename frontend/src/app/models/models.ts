@@ -716,10 +716,15 @@ export interface TodoItem {
   link?: string;
   relatedId?: number | null;
   since?: string | null;
+  recurrenceId?: number | null;
+  dueAt?: string | null;
+  occurrenceKey?: string | null;
+  overdue?: boolean;
 }
 
 export interface TodoList {
   count: number;
+  overdueCount?: number;
   items: TodoItem[];
 }
 
@@ -728,5 +733,41 @@ export interface TodoTacheForm {
   description?: string | null;
   severite?: string | null;
   masId?: number | null;
+}
+
+export interface TodoRecurrence {
+  id: number;
+  titre: string;
+  description?: string | null;
+  severite: string;
+  masId?: number | null;
+  masNumero?: string | null;
+  frequence: 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'INTERVAL_DAYS' | string;
+  intervalDays?: number | null;
+  jourSemaine?: number | null;
+  jourMois?: number | null;
+  heureDue?: string | null;
+  dateDebut: string;
+  dateFin?: string | null;
+  active: boolean;
+  prochaineEcheance?: string | null;
+  createdByUsername?: string;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+}
+
+export interface TodoRecurrenceForm {
+  titre: string;
+  description?: string | null;
+  severite?: string | null;
+  masId?: number | null;
+  frequence: string;
+  intervalDays?: number | null;
+  jourSemaine?: number | null;
+  jourMois?: number | null;
+  heureDue?: string | null;
+  dateDebut: string;
+  dateFin?: string | null;
+  active?: boolean;
 }
 

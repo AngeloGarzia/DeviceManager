@@ -90,6 +90,20 @@ public class TodoTache {
             foreignKey = @ForeignKey(name = "fk_todo_tache_bi"))
     private Intervention intervention;
 
+    /** Règle de récurrence d'origine (null = tâche ponctuelle). */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "recurrence_id",
+            foreignKey = @ForeignKey(name = "fk_todo_tache_recurrence"))
+    private TodoRecurrence recurrence;
+
+    /** Échéance de l'occurrence (null pour les tâches ponctuelles). */
+    @Column(name = "due_at")
+    private LocalDateTime dueAt;
+
+    /** Clé anti-doublon de période (ex. 2026-09-16). */
+    @Column(name = "occurrence_key", length = 32)
+    private String occurrenceKey;
+
     @PrePersist
     void onCreate() {
         LocalDateTime now = LocalDateTime.now();

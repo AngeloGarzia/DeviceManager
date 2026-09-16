@@ -17,6 +17,7 @@ public interface TodoTacheRepository extends JpaRepository<TodoTache, Long> {
             LEFT JOIN FETCH t.mas
             LEFT JOIN FETCH t.interventionTechnique
             LEFT JOIN FETCH t.intervention
+            LEFT JOIN FETCH t.recurrence
             WHERE t.atelier.id = :atelierId
               AND t.statut IN :statuts
             ORDER BY t.createdAt DESC
@@ -30,6 +31,7 @@ public interface TodoTacheRepository extends JpaRepository<TodoTache, Long> {
             LEFT JOIN FETCH t.mas
             LEFT JOIN FETCH t.interventionTechnique
             LEFT JOIN FETCH t.intervention
+            LEFT JOIN FETCH t.recurrence
             WHERE t.id = :id AND t.atelier.id = :atelierId
             """)
     Optional<TodoTache> findByIdAndAtelierId(@Param("id") Long id, @Param("atelierId") Long atelierId);
@@ -65,4 +67,6 @@ public interface TodoTacheRepository extends JpaRepository<TodoTache, Long> {
             WHERE t.atelier.id = :atelierId AND t.mas IS NOT NULL
             """)
     List<Long> findDistinctMasIdsByAtelierId(@Param("atelierId") Long atelierId);
+
+    boolean existsByRecurrenceIdAndOccurrenceKey(Long recurrenceId, String occurrenceKey);
 }

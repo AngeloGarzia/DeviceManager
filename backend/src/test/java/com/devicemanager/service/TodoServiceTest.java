@@ -21,6 +21,9 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 
@@ -40,10 +43,18 @@ class TodoServiceTest {
     @Mock private UserRepository userRepository;
     @Mock private AtelierService atelierService;
     @Mock private AtelierMemoirePublisher atelierMemoirePublisher;
+    @Mock private TodoRecurrenceService todoRecurrenceService;
+    @Mock private Clock clock;
     @InjectMocks private TodoService todoService;
+
+    private void stubClock() {
+        when(clock.instant()).thenReturn(Instant.parse("2026-09-16T10:00:00Z"));
+        when(clock.getZone()).thenReturn(ZoneOffset.UTC);
+    }
 
     @Test
     void create_persistsOpenTask() {
+        stubClock();
         Atelier atelier = TestFixtures.atelier();
         User user = TestFixtures.user("tech", "TECHNICIEN");
         when(atelierService.requireCurrentAtelier()).thenReturn(atelier);
@@ -70,6 +81,7 @@ class TodoServiceTest {
 
     @Test
     void changeStatus_marksDoneWithSignature() {
+        stubClock();
         Atelier atelier = TestFixtures.atelier();
         User admin = TestFixtures.user("admin", "ADMIN");
         TodoTache entity = TodoTache.builder()
@@ -105,6 +117,7 @@ class TodoServiceTest {
 
     @Test
     void linkIntervention_attachesTechnique() {
+        stubClock();
         Atelier atelier = TestFixtures.atelier();
         TodoTache entity = TodoTache.builder()
                 .id(5L)
@@ -141,6 +154,7 @@ class TodoServiceTest {
 
     @Test
     void listPending_returnsOnlyActive() {
+        stubClock();
         Atelier atelier = TestFixtures.atelier();
         when(atelierService.requireCurrentAtelier()).thenReturn(atelier);
         when(todoTacheRepository.findByAtelierIdAndStatutIn(
@@ -155,5 +169,6 @@ class TodoServiceTest {
                         .build()));
 
         assertThat(todoService.listPending().getCount()).isEqualTo(1);
+        verify(todoRecurrenceService).generateDueOccurrences();
     }
 }

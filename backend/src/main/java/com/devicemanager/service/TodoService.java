@@ -24,6 +24,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.EnumSet;
 import java.util.List;
@@ -51,33 +52,44 @@ public class TodoService {
     private final UserRepository userRepository;
     private final AtelierService atelierService;
     private final AtelierMemoirePublisher atelierMemoirePublisher;
+    private final TodoRecurrenceService todoRecurrenceService;
+    private final Clock clock;
 
-    @Transactional(readOnly = true)
     public TodoListResponse listPending() {
+        todoRecurrenceService.generateDueOccurrences();
         Long atelierId = atelierService.requireCurrentAtelier().getId();
+        LocalDateTime now = LocalDateTime.now(clock);
         List<TodoTacheResponse> items = todoTacheRepository
                 .findByAtelierIdAndStatutIn(atelierId, ACTIVE)
                 .stream()
                 // Associée à une intervention = purgée de la liste active (clôture formelle ensuite)
                 .filter(t -> t.getInterventionTechnique() == null)
-                .map(this::toResponse)
+                .map(t -> toResponse(t, now))
                 .toList();
+        long overdueCount = items.stream().filter(TodoTacheResponse::isOverdue).count();
         return TodoListResponse.builder()
                 .count(items.size())
+                .overdueCount(overdueCount)
                 .items(items)
                 .build();
     }
 
-    @Transactional(readOnly = true)
     public TodoListResponse listAll() {
+        todoRecurrenceService.generateDueOccurrences();
         Long atelierId = atelierService.requireCurrentAtelier().getId();
+        LocalDateTime now = LocalDateTime.now(clock);
         List<TodoTacheResponse> items = todoTacheRepository
                 .findByAtelierIdAndStatutIn(atelierId, EnumSet.allOf(TodoTacheStatut.class))
                 .stream()
-                .map(this::toResponse)
+                .map(t -> toResponse(t, now))
                 .toList();
+        long overdueCount = items.stream()
+                .filter(i -> i.isOverdue()
+                        && ("OPEN".equals(i.getStatut()) || "IN_PROGRESS".equals(i.getStatut())))
+                .count();
         return TodoListResponse.builder()
                 .count(items.size())
+                .overdueCount(overdueCount)
                 .items(items)
                 .build();
     }
@@ -104,7 +116,7 @@ public class TodoService {
                 saved.getId(), saved.getTitre(), username);
         atelierMemoirePublisher.publish("TODO_CREATED",
                 "Tâche À faire créée : « " + saved.getTitre() + " » (" + saved.getSeverite() + ")");
-        return toResponse(saved);
+        return toResponse(saved, LocalDateTime.now(clock));
     }
 
     public TodoTacheResponse update(Long id, TodoTacheRequest request, String username) {
@@ -119,7 +131,7 @@ public class TodoService {
         entity.setMas(resolveMas(request.getMasId(), entity.getAtelier().getId()));
         TodoTache saved = todoTacheRepository.save(entity);
         log.info("Modification en base — Tâche À faire id={} par={}", id, username);
-        return toResponse(saved);
+        return toResponse(saved, LocalDateTime.now(clock));
     }
 
     public TodoTacheResponse changeStatus(Long id, TodoTacheStatusRequest request, String username) {
@@ -127,7 +139,7 @@ public class TodoService {
         TodoTacheStatut next = parseStatut(request.getStatut());
         TodoTacheStatut current = entity.getStatut();
         if (current == next) {
-            return toResponse(entity);
+            return toResponse(entity, LocalDateTime.now(clock));
         }
         validateTransition(current, next);
         User actor = requireUser(username);
@@ -167,7 +179,7 @@ public class TodoService {
         log.info("Statut tâche À faire id={} {} → {} par={}", id, current, next, username);
         atelierMemoirePublisher.publish("TODO_STATUS",
                 "Tâche « " + entity.getTitre() + " » : " + current + " → " + next);
-        return toResponse(saved);
+        return toResponse(saved, LocalDateTime.now(clock));
     }
 
     public TodoTacheResponse linkIntervention(Long id, TodoTacheLinkRequest request, String username) {
@@ -203,7 +215,7 @@ public class TodoService {
 
         TodoTache saved = todoTacheRepository.save(entity);
         log.info("Rattachement intervention — Tâche id={} par={}", id, username);
-        return toResponse(saved);
+        return toResponse(saved, LocalDateTime.now(clock));
     }
 
     public void delete(Long id, String username) {
@@ -311,7 +323,7 @@ public class TodoService {
         }
     }
 
-    private TodoTacheResponse toResponse(TodoTache t) {
+    private TodoTacheResponse toResponse(TodoTache t, LocalDateTime now) {
         Mas mas = t.getMas();
         InterventionTechnique it = t.getInterventionTechnique();
         Intervention bon = t.getIntervention();
@@ -330,6 +342,10 @@ public class TodoService {
                 : (t.getSignataireClotureNom() != null && !t.getSignataireClotureNom().isBlank()
                         ? t.getSignataireClotureNom()
                         : t.getCompletedByUsername());
+        boolean overdue = t.getDueAt() != null
+                && t.getStatut().isOpen()
+                && t.getDueAt().isBefore(now);
+        Long recurrenceId = t.getRecurrence() != null ? t.getRecurrence().getId() : null;
         return TodoTacheResponse.builder()
                 .id(t.getId())
                 .titre(t.getTitre())
@@ -356,12 +372,16 @@ public class TodoService {
                 .interventionTechniqueLabel(itLabel)
                 .interventionId(bon != null ? bon.getId() : null)
                 .interventionNumero(bon != null ? bon.getNumero() : null)
-                .type("USER")
+                .type(recurrenceId != null ? "RECURRING" : "USER")
                 .severity(t.getSeverite())
                 .title(t.getTitre())
                 .link("/devices")
                 .relatedId(t.getId())
                 .since(t.getCreatedAt())
+                .recurrenceId(recurrenceId)
+                .dueAt(t.getDueAt())
+                .occurrenceKey(t.getOccurrenceKey())
+                .overdue(overdue)
                 .build();
     }
 

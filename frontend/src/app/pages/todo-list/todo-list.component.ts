@@ -8,7 +8,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatCardModule } from '@angular/material/card';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { Intervention, InterventionTechnique, Mas, TodoItem } from '../../models/models';
+import { Intervention, InterventionTechnique, Mas, TodoItem, TodoRecurrence } from '../../models/models';
 import { TodoService } from '../../services/todo.service';
 import { MasService } from '../../services/mas.service';
 import { InterventionTechniqueService } from '../../services/intervention-technique.service';
@@ -16,11 +16,12 @@ import { InterventionService } from '../../services/intervention.service';
 import { AuthService } from '../../services/auth.service';
 import { SignaturePadComponent } from '../../shared/signature-pad.component';
 import { apiErrorMessage } from '../../shared/api-error';
+import { MatCheckboxModule } from '@angular/material/checkbox';
 
-type TodoFilter = 'ALL' | 'ACTIVE' | 'OPEN' | 'IN_PROGRESS' | 'DONE' | 'CANCELLED';
+type TodoFilter = 'ALL' | 'ACTIVE' | 'OVERDUE' | 'OPEN' | 'IN_PROGRESS' | 'DONE' | 'CANCELLED';
 
 /**
- * Page Todo : cycle de vie complet des tâches (création → clôture signée).
+ * Page Todo : cycle de vie complet des tâches (création → clôture signée) + règles récurrentes.
  */
 @Component({
   selector: 'app-todo-list',
@@ -36,6 +37,7 @@ type TodoFilter = 'ALL' | 'ACTIVE' | 'OPEN' | 'IN_PROGRESS' | 'DONE' | 'CANCELLE
     MatSelectModule,
     MatCardModule,
     MatProgressSpinnerModule,
+    MatCheckboxModule,
     SignaturePadComponent
   ],
   templateUrl: './todo-list.component.html',
@@ -50,10 +52,12 @@ export class TodoListComponent implements OnInit {
   private readonly interventionService = inject(InterventionService);
 
   readonly items = signal<TodoItem[]>([]);
+  readonly recurrences = signal<TodoRecurrence[]>([]);
   readonly loading = signal(false);
   readonly error = signal<string | null>(null);
   readonly saving = signal(false);
   readonly showCreate = signal(false);
+  readonly showRecurrenceCreate = signal(false);
   readonly linkingId = signal<number | null>(null);
   readonly closingId = signal<number | null>(null);
   readonly filter = signal<TodoFilter>('ACTIVE');
@@ -69,6 +73,8 @@ export class TodoListComponent implements OnInit {
     let list = this.items();
     if (f === 'ACTIVE') {
       list = list.filter((t) => t.statut === 'OPEN' || t.statut === 'IN_PROGRESS');
+    } else if (f === 'OVERDUE') {
+      list = list.filter((t) => !!t.overdue);
     } else if (f !== 'ALL') {
       list = list.filter((t) => t.statut === f);
     }
@@ -83,6 +89,7 @@ export class TodoListComponent implements OnInit {
     return {
       all: list.length,
       active: list.filter((t) => t.statut === 'OPEN' || t.statut === 'IN_PROGRESS').length,
+      overdue: list.filter((t) => !!t.overdue).length,
       open: list.filter((t) => t.statut === 'OPEN').length,
       inProgress: list.filter((t) => t.statut === 'IN_PROGRESS').length,
       done: list.filter((t) => t.statut === 'DONE').length,
@@ -95,6 +102,21 @@ export class TodoListComponent implements OnInit {
     description: ['', Validators.maxLength(2000)],
     severite: ['MEDIUM'],
     masId: [null as number | null]
+  });
+
+  readonly recurrenceForm = this.fb.nonNullable.group({
+    titre: ['', [Validators.required, Validators.maxLength(200)]],
+    description: ['', Validators.maxLength(2000)],
+    severite: ['MEDIUM'],
+    masId: [null as number | null],
+    frequence: ['WEEKLY', Validators.required],
+    intervalDays: [7 as number | null],
+    jourSemaine: [1 as number | null],
+    jourMois: [1 as number | null],
+    heureDue: ['08:00'],
+    dateDebut: ['', Validators.required],
+    dateFin: [''],
+    active: [true]
   });
 
   readonly linkForm = this.fb.nonNullable.group({
@@ -110,6 +132,7 @@ export class TodoListComponent implements OnInit {
 
   ngOnInit(): void {
     this.load();
+    this.loadRecurrences();
     this.loadMasses();
   }
 
@@ -182,6 +205,13 @@ export class TodoListComponent implements OnInit {
     });
   }
 
+  loadRecurrences(): void {
+    this.todoService.listRecurrences().subscribe({
+      next: (list) => this.recurrences.set(list ?? []),
+      error: () => this.recurrences.set([])
+    });
+  }
+
   loadMasses(): void {
     this.massesLoading.set(true);
     this.masService.list().subscribe({
@@ -200,12 +230,127 @@ export class TodoListComponent implements OnInit {
 
   openCreate(): void {
     this.showCreate.set(true);
+    this.showRecurrenceCreate.set(false);
     this.todoForm.reset({ titre: '', description: '', severite: 'MEDIUM', masId: null });
     this.loadMasses();
   }
 
   cancelCreate(): void {
     this.showCreate.set(false);
+  }
+
+  openRecurrenceCreate(): void {
+    this.showRecurrenceCreate.set(true);
+    this.showCreate.set(false);
+    const today = new Date().toISOString().slice(0, 10);
+    this.recurrenceForm.reset({
+      titre: '',
+      description: '',
+      severite: 'MEDIUM',
+      masId: null,
+      frequence: 'WEEKLY',
+      intervalDays: 7,
+      jourSemaine: 1,
+      jourMois: 1,
+      heureDue: '08:00',
+      dateDebut: today,
+      dateFin: '',
+      active: true
+    });
+    this.loadMasses();
+  }
+
+  cancelRecurrenceCreate(): void {
+    this.showRecurrenceCreate.set(false);
+  }
+
+  submitRecurrenceCreate(): void {
+    if (this.recurrenceForm.invalid) {
+      this.recurrenceForm.markAllAsTouched();
+      return;
+    }
+    const raw = this.recurrenceForm.getRawValue();
+    this.saving.set(true);
+    this.error.set(null);
+    this.todoService
+      .createRecurrence({
+        titre: raw.titre,
+        description: raw.description || null,
+        severite: raw.severite,
+        masId: raw.masId,
+        frequence: raw.frequence,
+        intervalDays: raw.frequence === 'INTERVAL_DAYS' ? raw.intervalDays : null,
+        jourSemaine: raw.frequence === 'WEEKLY' ? raw.jourSemaine : null,
+        jourMois: raw.frequence === 'MONTHLY' ? raw.jourMois : null,
+        heureDue: raw.heureDue ? `${raw.heureDue}:00`.slice(0, 8) : '08:00:00',
+        dateDebut: raw.dateDebut,
+        dateFin: raw.dateFin || null,
+        active: raw.active
+      })
+      .subscribe({
+        next: () => {
+          this.saving.set(false);
+          this.showRecurrenceCreate.set(false);
+          this.loadRecurrences();
+          this.load();
+        },
+        error: (err) => {
+          this.saving.set(false);
+          this.error.set(apiErrorMessage(err, 'Création de la récurrence impossible.'));
+        }
+      });
+  }
+
+  toggleRecurrenceActive(rule: TodoRecurrence): void {
+    this.saving.set(true);
+    this.todoService.setRecurrenceActive(rule.id, !rule.active).subscribe({
+      next: () => {
+        this.saving.set(false);
+        this.loadRecurrences();
+        this.load();
+      },
+      error: (err) => {
+        this.saving.set(false);
+        this.error.set(apiErrorMessage(err, 'Mise à jour de la récurrence impossible.'));
+      }
+    });
+  }
+
+  deleteRecurrence(rule: TodoRecurrence): void {
+    if (!confirm(`Supprimer la récurrence « ${rule.titre} » ? Les occurrences déjà créées restent.`)) {
+      return;
+    }
+    this.saving.set(true);
+    this.todoService.deleteRecurrence(rule.id).subscribe({
+      next: () => {
+        this.saving.set(false);
+        this.loadRecurrences();
+      },
+      error: (err) => {
+        this.saving.set(false);
+        this.error.set(apiErrorMessage(err, 'Suppression de la récurrence impossible.'));
+      }
+    });
+  }
+
+  frequenceLabel(freq: string): string {
+    switch (freq) {
+      case 'DAILY':
+        return 'Quotidienne';
+      case 'WEEKLY':
+        return 'Hebdomadaire';
+      case 'MONTHLY':
+        return 'Mensuelle';
+      case 'INTERVAL_DAYS':
+        return 'Tous les N jours';
+      default:
+        return freq;
+    }
+  }
+
+  jourSemaineLabel(day?: number | null): string {
+    const labels = ['', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'];
+    return day && day >= 1 && day <= 7 ? labels[day] : '—';
   }
 
   submitCreate(): void {

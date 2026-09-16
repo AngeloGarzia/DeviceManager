@@ -305,13 +305,27 @@
       >
         <span class="nav-icon-wrap">
           <mat-icon>task_alt</mat-icon>
-          @if (todos.pendingCount() > 0) {
-            <span class="pending-badge" [attr.aria-label]="todos.pendingCount() + ' tâche(s) active(s)'">
-              {{ todos.pendingCount() > 99 ? '99+' : todos.pendingCount() }}
+          @if (todos.pendingCount() > 0 || todos.overdueCount() > 0) {
+            <span
+              class="pending-badge"
+              [class.pending-badge--warn]="todos.overdueCount() > 0"
+              [attr.aria-label]="
+                todos.overdueCount() > 0
+                  ? todos.overdueCount() + ' tâche(s) en retard'
+                  : todos.pendingCount() + ' tâche(s) active(s)'
+              "
+            >
+              {{
+                (todos.overdueCount() > 0 ? todos.overdueCount() : todos.pendingCount()) > 99
+                  ? '99+'
+                  : todos.overdueCount() > 0
+                    ? todos.overdueCount()
+                    : todos.pendingCount()
+              }}
             </span>
           }
         </span>
-        <span [class.pending-label-blink]="todos.pendingCount() > 0">Todo</span>
+        <span [class.pending-label-blink]="todos.pendingCount() > 0 || todos.overdueCount() > 0">Todo</span>
       </a>
 
       <a
