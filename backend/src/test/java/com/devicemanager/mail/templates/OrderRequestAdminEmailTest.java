@@ -25,6 +25,8 @@ class OrderRequestAdminEmailTest {
 
         assertThat(email.subject()).contains("#42").contains("1 pièce");
         assertThat(email.text()).contains("Jean Dupont").contains("Urgent").contains("Carte mère");
+        assertThat(email.text()).contains(EmailHtml.RESPONSIVE_NOTA);
         assertThat(email.html()).contains("DeviceManager").contains("Carte mère");
+        assertThat(email.html()).contains("conçu pour toutes les tailles");
     }
 }

@@ -23,11 +23,13 @@ class PasswordWelcomeEmailTest {
         assertThat(email.text()).contains("https://devicemanagercircus.onrender.com");
         assertThat(email.text()).contains("https://app.example/reset-password?token=abc");
         assertThat(email.text()).contains("24 heures");
+        assertThat(email.text()).contains(EmailHtml.RESPONSIVE_NOTA);
         assertThat(email.text()).doesNotContain("Bienvenue sur DeviceManager");
         assertThat(email.html()).contains("agarzia");
         assertThat(email.html()).contains("TmpPass1234");
         assertThat(email.html()).contains("https://devicemanagercircus.onrender.com");
         assertThat(email.html()).contains("Réinitialiser mon mot de passe");
+        assertThat(email.html()).contains("conçu pour toutes les tailles");
         assertThat(email.html()).doesNotContain("Bienvenue sur DeviceManager");
     }
 }

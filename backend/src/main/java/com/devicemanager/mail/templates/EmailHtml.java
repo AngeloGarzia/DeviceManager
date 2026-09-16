@@ -7,6 +7,12 @@ import java.util.List;
  */
 public final class EmailHtml {
 
+    /**
+     * Nota affiché dans le corps de chaque e-mail (versions texte et HTML).
+     */
+    public static final String RESPONSIVE_NOTA =
+            "Nota : DeviceManager est conçu pour toutes les tailles d'écran et tous types d'appareils.";
+
     private EmailHtml() {
     }
 
@@ -60,6 +66,11 @@ public final class EmailHtml {
                           </tr>
                           %s
                           <tr>
+                            <td style="padding:8px 32px 16px;font-size:13px;line-height:1.5;color:#4b5563;">
+                              <em>%s</em>
+                            </td>
+                          </tr>
+                          <tr>
                             <td style="padding:16px 32px 24px;font-size:12px;color:#9ca3af;border-top:1px solid #e5e7eb;">
                               Message automatique — ne pas répondre directement à cet e-mail.
                             </td>
@@ -70,7 +81,21 @@ public final class EmailHtml {
                   </table>
                 </body>
                 </html>
-                """.formatted(safeTitle, bodyHtml, ctaBlock);
+                """.formatted(safeTitle, bodyHtml, ctaBlock, escapeHtml(RESPONSIVE_NOTA));
+    }
+
+    /**
+     * Ajoute le nota responsive en fin de corps texte, s'il n'y est pas déjà.
+     */
+    public static String appendResponsiveNotaText(String textBody) {
+        String body = textBody == null ? "" : textBody.stripTrailing();
+        if (body.contains(RESPONSIVE_NOTA)) {
+            return body.isEmpty() ? RESPONSIVE_NOTA : body + "\n";
+        }
+        if (body.isEmpty()) {
+            return RESPONSIVE_NOTA + "\n";
+        }
+        return body + "\n\n" + RESPONSIVE_NOTA + "\n";
     }
 
     /** Convertit du texte multiligne en paragraphes HTML. */
