@@ -3,19 +3,21 @@
     <div>
       <h1 class="page-title" data-tour="page-todo">Todo</h1>
       <p class="page-subtitle">
-        Tâches ponctuelles et récurrentes — warning si une occurrence échue n’est pas clôturée
+        Tâches ponctuelles et récurrentes — une occurrence hebdo/mensuelle peut être clôturée jusqu’à 7 jours avant l’échéance
       </p>
     </div>
     <div class="flex flex-wrap gap-2">
-      <button
-        mat-stroked-button
-        type="button"
-        (click)="openRecurrenceCreate()"
-        [disabled]="saving() || showRecurrenceCreate()"
-      >
-        <mat-icon>event_repeat</mat-icon>
-        Tâche récurrente
-      </button>
+      @if (auth.isAdmin()) {
+        <button
+          mat-stroked-button
+          type="button"
+          (click)="openRecurrenceCreate()"
+          [disabled]="saving() || showRecurrenceCreate()"
+        >
+          <mat-icon>event_repeat</mat-icon>
+          Tâche récurrente
+        </button>
+      }
       <button
         mat-flat-button
         color="primary"
@@ -50,6 +52,123 @@
       <div class="todo-stat__label">Clôturées</div>
       <div class="todo-stat__value">{{ counts().done }}</div>
     </div>
+  </div>
+
+  <div class="panel todo-modeles" id="todo-modeles">
+    <div class="todo-modeles__header">
+      <div>
+        <h2 class="m-0 text-base font-semibold">Modèles de tâches simples</h2>
+        <p class="m-0 mt-1 text-sm text-ink-soft">
+          Touchez un modèle pour créer la tâche immédiatement — liste éditable par tous.
+        </p>
+      </div>
+      <button mat-stroked-button type="button" (click)="toggleModeleManage()" [disabled]="saving()">
+        <mat-icon>{{ showModeleManage() ? 'expand_less' : 'tune' }}</mat-icon>
+        {{ showModeleManage() ? 'Masquer' : 'Gérer' }}
+      </button>
+    </div>
+
+    @if (modelesLoading()) {
+      <p class="text-sm text-ink-soft">Chargement des modèles…</p>
+    } @else if (modeles().length === 0) {
+      <p class="m-0 text-sm text-ink-soft">
+        Aucun modèle pour l'instant.
+        <button mat-button type="button" class="!px-1" (click)="openModeleForm()">Ajouter le premier</button>
+      </p>
+    } @else {
+      <div class="todo-modeles__grid" role="list" aria-label="Modèles rapides">
+        @for (m of modeles(); track m.id) {
+          <button
+            type="button"
+            class="todo-modele-chip"
+            role="listitem"
+            [attr.data-severity]="m.severite"
+            [disabled]="saving()"
+            (click)="createFromModele(m)"
+          >
+            <span class="todo-modele-chip__title">{{ m.titre }}</span>
+            @if (m.masNumero) {
+              <span class="todo-modele-chip__meta">MAS {{ m.masNumero }}</span>
+            }
+          </button>
+        }
+      </div>
+    }
+
+    @if (showModeleManage()) {
+      <div class="todo-modeles__manage">
+        <div class="flex flex-wrap gap-2 mb-2">
+          <button mat-stroked-button type="button" (click)="openModeleForm()" [disabled]="saving()">
+            <mat-icon>add</mat-icon>
+            Nouveau modèle
+          </button>
+        </div>
+
+        @if (showModeleForm()) {
+          <form class="grid gap-3 mb-3" [formGroup]="modeleForm" (ngSubmit)="submitModeleForm()">
+            <mat-form-field appearance="outline" class="w-full">
+              <mat-label>Titre du modèle</mat-label>
+              <input matInput formControlName="titre" maxlength="200" />
+            </mat-form-field>
+            <mat-form-field appearance="outline" class="w-full">
+              <mat-label>Description</mat-label>
+              <textarea matInput rows="2" formControlName="description" maxlength="2000"></textarea>
+            </mat-form-field>
+            <div class="grid gap-3 sm:grid-cols-2">
+              <mat-form-field appearance="outline" class="w-full">
+                <mat-label>Priorité</mat-label>
+                <mat-select formControlName="severite">
+                  <mat-option value="HIGH">Urgent</mat-option>
+                  <mat-option value="MEDIUM">Normal</mat-option>
+                  <mat-option value="LOW">Faible</mat-option>
+                </mat-select>
+              </mat-form-field>
+              <mat-form-field appearance="outline" class="w-full">
+                <mat-label>MAS (optionnel)</mat-label>
+                <mat-select formControlName="masId">
+                  <mat-option [value]="null">Aucune</mat-option>
+                  @for (mas of masses(); track mas.id) {
+                    <mat-option [value]="mas.id">{{ masOptionLabel(mas) }}</mat-option>
+                  }
+                </mat-select>
+              </mat-form-field>
+            </div>
+            <div class="flex flex-wrap gap-2">
+              <button mat-button type="button" (click)="cancelModeleForm()">Annuler</button>
+              <button mat-flat-button color="primary" type="submit" [disabled]="saving()">
+                {{ saving() ? 'Enregistrement…' : editingModeleId() ? 'Enregistrer' : 'Créer le modèle' }}
+              </button>
+            </div>
+          </form>
+        }
+
+        @if (modeles().length > 0) {
+          <ul class="todo-modeles__list">
+            @for (m of modeles(); track m.id) {
+              <li class="todo-modeles__item">
+                <div class="min-w-0 flex-1">
+                  <span class="font-medium">{{ m.titre }}</span>
+                  <span class="todo-sev ml-2" [attr.data-severity]="m.severite">{{
+                    severityLabel(m.severite)
+                  }}</span>
+                  @if (m.masNumero) {
+                    <span class="text-sm text-ink-soft"> · MAS {{ m.masNumero }}</span>
+                  }
+                </div>
+                <div class="flex flex-wrap gap-1">
+                  <button mat-button type="button" (click)="openModeleForm(m)" [disabled]="saving()">
+                    Modifier
+                  </button>
+                  <button mat-button color="warn" type="button" (click)="deleteModele(m)" [disabled]="saving()">
+                    Suppr.
+                  </button>
+                </div>
+              </li>
+            }
+          </ul>
+        }
+      </div>
+    }
   </div>
 
   <div class="todo-filters" role="tablist" aria-label="Filtrer les tâches">
@@ -139,51 +258,84 @@
   }
 
   @if (showCreate()) {
-    <form class="panel grid gap-3" [formGroup]="todoForm" (ngSubmit)="submitCreate()">
-      <h2 class="m-0 text-base font-semibold">Nouvelle tâche</h2>
-      <mat-form-field appearance="outline" class="w-full">
-        <mat-label>Titre</mat-label>
-        <input matInput formControlName="titre" maxlength="200" />
-      </mat-form-field>
-      <mat-form-field appearance="outline" class="w-full">
-        <mat-label>Description</mat-label>
-        <textarea matInput rows="3" formControlName="description" maxlength="2000"></textarea>
-      </mat-form-field>
-      <div class="grid gap-3 sm:grid-cols-2">
-        <mat-form-field appearance="outline" class="w-full">
-          <mat-label>Priorité</mat-label>
-          <mat-select formControlName="severite">
-            <mat-option value="HIGH">Urgent</mat-option>
-            <mat-option value="MEDIUM">Normal</mat-option>
-            <mat-option value="LOW">Faible</mat-option>
-          </mat-select>
-        </mat-form-field>
-        <mat-form-field appearance="outline" class="w-full">
-          <mat-label>MAS de l'atelier</mat-label>
-          <mat-select formControlName="masId">
-            <mat-option [value]="null">Aucune</mat-option>
-            @if (massesLoading()) {
-              <mat-option disabled>Chargement des MAS…</mat-option>
-            } @else {
-              @for (m of masses(); track m.id) {
-                <mat-option [value]="m.id">{{ masOptionLabel(m) }}</mat-option>
-              }
-            }
-          </mat-select>
-        </mat-form-field>
-      </div>
-      <div class="flex flex-wrap gap-2">
-        <button mat-button type="button" (click)="cancelCreate()">Annuler</button>
-        <button mat-flat-button color="primary" type="submit" [disabled]="saving()">
-          {{ saving() ? 'Enregistrement…' : 'Créer' }}
-        </button>
-      </div>
-    </form>
+    <div class="panel grid gap-3">
+      <h2 class="m-0 text-base font-semibold">Nouvelle tâche simple</h2>
+      <p class="m-0 text-sm text-ink-soft">
+        Choisissez un modèle ci-dessus pour créer la tâche en un clic, ou saisissez une tâche personnalisée.
+      </p>
+
+      @if (modeles().length > 0) {
+        <div class="todo-modeles__grid todo-modeles__grid--compact">
+          @for (m of modeles(); track m.id) {
+            <button
+              type="button"
+              class="todo-modele-chip"
+              [attr.data-severity]="m.severite"
+              [disabled]="saving()"
+              (click)="createFromModele(m)"
+            >
+              <span class="todo-modele-chip__title">{{ m.titre }}</span>
+            </button>
+          }
+        </div>
+      }
+
+      @if (!showCustomCreate()) {
+        <div class="flex flex-wrap gap-2">
+          <button mat-stroked-button type="button" (click)="openCustomCreate()">
+            Saisie personnalisée
+          </button>
+          <button mat-button type="button" (click)="cancelCreate()">Annuler</button>
+        </div>
+      } @else {
+        <form class="grid gap-3" [formGroup]="todoForm" (ngSubmit)="submitCreate()">
+          <mat-form-field appearance="outline" class="w-full">
+            <mat-label>Titre</mat-label>
+            <input matInput formControlName="titre" maxlength="200" />
+          </mat-form-field>
+          <mat-form-field appearance="outline" class="w-full">
+            <mat-label>Description</mat-label>
+            <textarea matInput rows="3" formControlName="description" maxlength="2000"></textarea>
+          </mat-form-field>
+          <div class="grid gap-3 sm:grid-cols-2">
+            <mat-form-field appearance="outline" class="w-full">
+              <mat-label>Priorité</mat-label>
+              <mat-select formControlName="severite">
+                <mat-option value="HIGH">Urgent</mat-option>
+                <mat-option value="MEDIUM">Normal</mat-option>
+                <mat-option value="LOW">Faible</mat-option>
+              </mat-select>
+            </mat-form-field>
+            <mat-form-field appearance="outline" class="w-full">
+              <mat-label>MAS de l'atelier</mat-label>
+              <mat-select formControlName="masId">
+                <mat-option [value]="null">Aucune</mat-option>
+                @if (massesLoading()) {
+                  <mat-option disabled>Chargement des MAS…</mat-option>
+                } @else {
+                  @for (m of masses(); track m.id) {
+                    <mat-option [value]="m.id">{{ masOptionLabel(m) }}</mat-option>
+                  }
+                }
+              </mat-select>
+            </mat-form-field>
+          </div>
+          <div class="flex flex-wrap gap-2">
+            <button mat-button type="button" (click)="cancelCreate()">Annuler</button>
+            <button mat-flat-button color="primary" type="submit" [disabled]="saving()">
+              {{ saving() ? 'Enregistrement…' : 'Créer' }}
+            </button>
+          </div>
+        </form>
+      }
+    </div>
   }
 
-  @if (showRecurrenceCreate()) {
-    <form class="panel grid gap-3" [formGroup]="recurrenceForm" (ngSubmit)="submitRecurrenceCreate()">
-      <h2 class="m-0 text-base font-semibold">Nouvelle tâche récurrente</h2>
+  @if (showRecurrenceCreate() && auth.isAdmin()) {
+    <form class="panel grid gap-3" [formGroup]="recurrenceForm" (ngSubmit)="submitRecurrenceForm()">
+      <h2 class="m-0 text-base font-semibold">
+        {{ isEditingRecurrence() ? 'Modifier la tâche récurrente' : 'Nouvelle tâche récurrente' }}
+      </h2>
       <mat-form-field appearance="outline" class="w-full">
         <mat-label>Titre</mat-label>
         <input matInput formControlName="titre" maxlength="200" />
@@ -262,9 +414,15 @@
       </mat-form-field>
       <mat-checkbox formControlName="active">Active</mat-checkbox>
       <div class="flex flex-wrap gap-2">
-        <button mat-button type="button" (click)="cancelRecurrenceCreate()">Annuler</button>
+        <button mat-button type="button" (click)="cancelRecurrenceForm()">Annuler</button>
         <button mat-flat-button color="primary" type="submit" [disabled]="saving()">
-          {{ saving() ? 'Enregistrement…' : 'Créer la récurrence' }}
+          {{
+            saving()
+              ? 'Enregistrement…'
+              : isEditingRecurrence()
+                ? 'Enregistrer les modifications'
+                : 'Créer la récurrence'
+          }}
         </button>
       </div>
     </form>
@@ -311,12 +469,17 @@
               </p>
             </div>
             <div class="flex flex-wrap gap-1">
-              <button mat-stroked-button type="button" (click)="toggleRecurrenceActive(rule)" [disabled]="saving()">
-                {{ rule.active ? 'Pause' : 'Activer' }}
-              </button>
-              <button mat-button color="warn" type="button" (click)="deleteRecurrence(rule)" [disabled]="saving()">
-                Suppr.
-              </button>
+              @if (auth.isAdmin()) {
+                <button mat-stroked-button type="button" (click)="openRecurrenceEdit(rule)" [disabled]="saving()">
+                  Modifier
+                </button>
+                <button mat-stroked-button type="button" (click)="toggleRecurrenceActive(rule)" [disabled]="saving()">
+                  {{ rule.active ? 'Pause' : 'Activer' }}
+                </button>
+                <button mat-button color="warn" type="button" (click)="deleteRecurrence(rule)" [disabled]="saving()">
+                  Suppr.
+                </button>
+              }
             </div>
           </li>
         }

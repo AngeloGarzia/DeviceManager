@@ -25,7 +25,9 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Clock;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Locale;
@@ -146,6 +148,7 @@ public class TodoService {
 
         entity.setStatut(next);
         if (next == TodoTacheStatut.DONE) {
+            validateEarlyCompletionWindow(entity);
             validateDrawnSignature(request.getSignatureCloture());
             LocalDateTime clotureAt = request.getDateHeureCloture() != null
                     ? request.getDateHeureCloture()
@@ -179,6 +182,10 @@ public class TodoService {
         log.info("Statut tâche À faire id={} {} → {} par={}", id, current, next, username);
         atelierMemoirePublisher.publish("TODO_STATUS",
                 "Tâche « " + entity.getTitre() + " » : " + current + " → " + next);
+        // Après clôture d'une occurrence : matérialise la suivante si elle entre dans la fenêtre 7j.
+        if (next == TodoTacheStatut.DONE && entity.getRecurrence() != null) {
+            todoRecurrenceService.generateDueOccurrences(entity.getAtelier());
+        }
         return toResponse(saved, LocalDateTime.now(clock));
     }
 
@@ -256,6 +263,31 @@ public class TodoService {
         if (!ok) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "Transition de statut invalide : " + from + " → " + to);
+        }
+    }
+
+    /**
+     * Une tâche récurrente hebdo/mensuelle peut être clôturée au plus
+     * {@link TodoRecurrenceService#EARLY_COMPLETION_DAYS} jours avant son échéance.
+     */
+    private void validateEarlyCompletionWindow(TodoTache entity) {
+        if (entity.getRecurrence() == null || entity.getDueAt() == null) {
+            return;
+        }
+        if (!TodoRecurrenceService.allowsEarlyCompletion(entity.getRecurrence().getFrequence())) {
+            return;
+        }
+        LocalDate today = LocalDate.now(clock);
+        LocalDate dueDay = entity.getDueAt().toLocalDate();
+        if (!dueDay.isAfter(today)) {
+            return;
+        }
+        long daysUntilDue = ChronoUnit.DAYS.between(today, dueDay);
+        if (daysUntilDue > TodoRecurrenceService.EARLY_COMPLETION_DAYS) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Une tâche récurrente ne peut être clôturée plus de "
+                            + TodoRecurrenceService.EARLY_COMPLETION_DAYS
+                            + " jours avant son échéance");
         }
     }
 

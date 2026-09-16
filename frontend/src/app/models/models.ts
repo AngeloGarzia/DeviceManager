@@ -751,6 +751,28 @@ export interface TodoTacheForm {
   masId?: number | null;
 }
 
+/** Modèle de tâche simple (création rapide). */
+export interface TodoModele {
+  id: number;
+  titre: string;
+  description?: string | null;
+  severite: string;
+  masId?: number | null;
+  masNumero?: string | null;
+  position: number;
+  createdByUsername?: string;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+}
+
+export interface TodoModeleForm {
+  titre: string;
+  description?: string | null;
+  severite?: string | null;
+  masId?: number | null;
+  position?: number | null;
+}
+
 export interface TodoRecurrence {
   id: number;
   titre: string;

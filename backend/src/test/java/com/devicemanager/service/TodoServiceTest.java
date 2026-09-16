@@ -6,6 +6,8 @@ import com.devicemanager.dto.TodoTacheResponse;
 import com.devicemanager.dto.TodoTacheStatusRequest;
 import com.devicemanager.entity.Atelier;
 import com.devicemanager.entity.InterventionTechnique;
+import com.devicemanager.entity.TodoRecurrence;
+import com.devicemanager.entity.TodoRecurrenceFrequence;
 import com.devicemanager.entity.TodoTache;
 import com.devicemanager.entity.TodoTacheStatut;
 import com.devicemanager.entity.User;
@@ -23,15 +25,20 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 
 @ExtendWith(MockitoExtension.class)
 class TodoServiceTest {
@@ -113,6 +120,81 @@ class TodoServiceTest {
         assertThat(response.getDateCloture()).isNotNull();
         assertThat(response.getResponsableCloture()).isNotBlank();
         assertThat(entity.getCompletedAt()).isNotNull();
+    }
+
+    @Test
+    void changeStatus_rejectsRecurringDoneMoreThan7DaysEarly() {
+        stubClock();
+        Atelier atelier = TestFixtures.atelier();
+        User admin = TestFixtures.user("admin", "ADMIN");
+        TodoRecurrence rule = TodoRecurrence.builder()
+                .id(3L)
+                .frequence(TodoRecurrenceFrequence.WEEKLY)
+                .jourSemaine(1)
+                .build();
+        TodoTache entity = TodoTache.builder()
+                .id(5L)
+                .atelier(atelier)
+                .titre("Hebdo")
+                .statut(TodoTacheStatut.OPEN)
+                .severite("MEDIUM")
+                .createdByUsername("tech")
+                .recurrence(rule)
+                .dueAt(LocalDateTime.of(2026, 9, 28, 8, 0)) // 12 jours après le 16
+                .build();
+        when(atelierService.requireCurrentAtelier()).thenReturn(atelier);
+        when(todoTacheRepository.findByIdAndAtelierId(5L, atelier.getId())).thenReturn(Optional.of(entity));
+        when(userRepository.findByUsername("admin")).thenReturn(Optional.of(admin));
+
+        TodoTacheStatusRequest request = new TodoTacheStatusRequest();
+        request.setStatut("DONE");
+        request.setSignatureCloture(
+                "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==");
+
+        assertThatThrownBy(() -> todoService.changeStatus(5L, request, "admin"))
+                .isInstanceOf(ResponseStatusException.class)
+                .satisfies(ex -> {
+                    ResponseStatusException rse = (ResponseStatusException) ex;
+                    assertThat(rse.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+                    assertThat(rse.getReason()).contains("7 jours");
+                });
+        verify(todoTacheRepository, never()).save(any());
+    }
+
+    @Test
+    void changeStatus_allowsRecurringDoneWithin7DaysAndGeneratesNext() {
+        stubClock();
+        Atelier atelier = TestFixtures.atelier();
+        User admin = TestFixtures.user("admin", "ADMIN");
+        TodoRecurrence rule = TodoRecurrence.builder()
+                .id(3L)
+                .frequence(TodoRecurrenceFrequence.WEEKLY)
+                .jourSemaine(1)
+                .build();
+        TodoTache entity = TodoTache.builder()
+                .id(5L)
+                .atelier(atelier)
+                .titre("Hebdo")
+                .statut(TodoTacheStatut.OPEN)
+                .severite("MEDIUM")
+                .createdByUsername("tech")
+                .recurrence(rule)
+                .dueAt(LocalDateTime.of(2026, 9, 21, 8, 0)) // 5 jours après le 16
+                .build();
+        when(atelierService.requireCurrentAtelier()).thenReturn(atelier);
+        when(todoTacheRepository.findByIdAndAtelierId(5L, atelier.getId())).thenReturn(Optional.of(entity));
+        when(userRepository.findByUsername("admin")).thenReturn(Optional.of(admin));
+        when(todoTacheRepository.save(any(TodoTache.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        TodoTacheStatusRequest request = new TodoTacheStatusRequest();
+        request.setStatut("DONE");
+        request.setSignatureCloture(
+                "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==");
+
+        TodoTacheResponse response = todoService.changeStatus(5L, request, "admin");
+
+        assertThat(response.getStatut()).isEqualTo("DONE");
+        verify(todoRecurrenceService).generateDueOccurrences(atelier);
     }
 
     @Test

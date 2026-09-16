@@ -1,3 +1,61 @@
+.todo-tile-header {
+  display: flex;
+  justify-content: center;
+}
+
+.todo-quick-add-btn {
+  display: inline-flex;
+  width: 100%;
+  max-width: 28rem;
+  min-height: 3.25rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.65rem 1.25rem;
+  border: 2px solid color-mix(in srgb, #0f4c81 25%, transparent);
+  border-radius: 1rem;
+  background: linear-gradient(180deg, #0f4c81 0%, #0a3d6b 100%);
+  color: #fff;
+  text-decoration: none;
+  font-size: 1rem;
+  font-weight: 700;
+  box-shadow: 0 4px 14px color-mix(in srgb, #0f4c81 35%, transparent);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.todo-quick-add-btn:hover {
+  box-shadow: 0 6px 18px color-mix(in srgb, #0f4c81 45%, transparent);
+}
+
+.todo-quick-add-btn:active {
+  transform: scale(0.98);
+}
+
+.todo-quick-add-btn mat-icon {
+  width: 2rem;
+  height: 2rem;
+  font-size: 2rem;
+}
+
+.todo-quick-add-btn__label {
+  line-height: 1.2;
+}
+
+@media (min-width: 640px) {
+  .todo-quick-add-btn {
+    min-height: 2.75rem;
+    max-width: 20rem;
+  }
+
+  .todo-quick-add-btn mat-icon {
+    width: 1.75rem;
+    height: 1.75rem;
+    font-size: 1.75rem;
+  }
+}
+
 .devices-tile {
   overflow: hidden;
 }

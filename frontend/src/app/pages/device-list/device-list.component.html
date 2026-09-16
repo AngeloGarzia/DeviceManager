@@ -1,4 +1,16 @@
 <section class="grid gap-4">
+  <div class="todo-tile-header">
+    <a
+      routerLink="/todos"
+      [queryParams]="{ create: '1' }"
+      class="todo-quick-add-btn"
+      aria-label="Nouvelle tâche simple"
+    >
+      <mat-icon>add</mat-icon>
+      <span class="todo-quick-add-btn__label">Nouvelle tâche</span>
+    </a>
+  </div>
+
   <mat-card class="devices-tile todo-tile !rounded-xl !border !border-line !shadow-soft">
     <a routerLink="/todos" class="todo-summary-link">
       <div class="devices-tile-toggle">

@@ -1,6 +1,8 @@
 package com.devicemanager.controller;
 
 import com.devicemanager.dto.TodoListResponse;
+import com.devicemanager.dto.TodoModeleRequest;
+import com.devicemanager.dto.TodoModeleResponse;
 import com.devicemanager.dto.TodoRecurrenceRequest;
 import com.devicemanager.dto.TodoRecurrenceResponse;
 import com.devicemanager.dto.TodoTacheLinkRequest;
@@ -8,6 +10,7 @@ import com.devicemanager.dto.TodoTacheRequest;
 import com.devicemanager.dto.TodoTacheResponse;
 import com.devicemanager.dto.TodoTacheStatusRequest;
 import com.devicemanager.dto.TodoWeekCalendarResponse;
+import com.devicemanager.service.TodoModeleService;
 import com.devicemanager.service.TodoRecurrenceService;
 import com.devicemanager.service.TodoService;
 import jakarta.validation.Valid;
@@ -30,6 +33,7 @@ public class TodoController {
 
     private final TodoService todoService;
     private final TodoRecurrenceService todoRecurrenceService;
+    private final TodoModeleService todoModeleService;
 
     /** Liste des tâches actives (OPEN / IN_PROGRESS). */
     @GetMapping
@@ -46,6 +50,42 @@ public class TodoController {
     @GetMapping("/recurrences")
     public ResponseEntity<List<TodoRecurrenceResponse>> listRecurrences() {
         return ResponseEntity.ok(todoRecurrenceService.list());
+    }
+
+    @GetMapping("/modeles")
+    public ResponseEntity<List<TodoModeleResponse>> listModeles() {
+        return ResponseEntity.ok(todoModeleService.list());
+    }
+
+    @PostMapping("/modeles")
+    public ResponseEntity<TodoModeleResponse> createModele(
+            @Valid @RequestBody TodoModeleRequest request,
+            Authentication authentication) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(todoModeleService.create(request, authentication.getName()));
+    }
+
+    @PutMapping("/modeles/{id}")
+    public ResponseEntity<TodoModeleResponse> updateModele(
+            @PathVariable Long id,
+            @Valid @RequestBody TodoModeleRequest request,
+            Authentication authentication) {
+        return ResponseEntity.ok(todoModeleService.update(id, request, authentication.getName()));
+    }
+
+    @DeleteMapping("/modeles/{id}")
+    public ResponseEntity<Void> deleteModele(@PathVariable Long id, Authentication authentication) {
+        todoModeleService.delete(id, authentication.getName());
+        return ResponseEntity.noContent().build();
+    }
+
+    /** Crée une tâche ponctuelle à partir d'un modèle. */
+    @PostMapping("/modeles/{id}/utiliser")
+    public ResponseEntity<TodoTacheResponse> utiliserModele(
+            @PathVariable Long id,
+            Authentication authentication) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(todoModeleService.utiliser(id, authentication.getName()));
     }
 
     @PostMapping("/recurrences")

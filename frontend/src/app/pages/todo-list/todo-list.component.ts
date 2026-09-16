@@ -1,7 +1,7 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -9,7 +9,14 @@ import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatCardModule } from '@angular/material/card';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { Intervention, InterventionTechnique, Mas, TodoItem, TodoRecurrence } from '../../models/models';
+import {
+  Intervention,
+  InterventionTechnique,
+  Mas,
+  TodoItem,
+  TodoModele,
+  TodoRecurrence
+} from '../../models/models';
 import { TodoService } from '../../services/todo.service';
 import { MasService } from '../../services/mas.service';
 import { InterventionTechniqueService } from '../../services/intervention-technique.service';
@@ -48,6 +55,7 @@ export class TodoListComponent implements OnInit {
   readonly auth = inject(AuthService);
   private readonly fb = inject(FormBuilder);
   private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
   private readonly todoService = inject(TodoService);
   private readonly masService = inject(MasService);
   private readonly interventionTechniqueService = inject(InterventionTechniqueService);
@@ -55,11 +63,18 @@ export class TodoListComponent implements OnInit {
 
   readonly items = signal<TodoItem[]>([]);
   readonly recurrences = signal<TodoRecurrence[]>([]);
+  readonly modeles = signal<TodoModele[]>([]);
+  readonly modelesLoading = signal(false);
   readonly loading = signal(false);
   readonly error = signal<string | null>(null);
   readonly saving = signal(false);
   readonly showCreate = signal(false);
+  readonly showCustomCreate = signal(false);
+  readonly showModeleManage = signal(false);
+  readonly showModeleForm = signal(false);
+  readonly editingModeleId = signal<number | null>(null);
   readonly showRecurrenceCreate = signal(false);
+  readonly editingRecurrenceId = signal<number | null>(null);
   readonly linkingId = signal<number | null>(null);
   readonly closingId = signal<number | null>(null);
   readonly filter = signal<TodoFilter>('ACTIVE');
@@ -111,6 +126,14 @@ export class TodoListComponent implements OnInit {
     masId: [null as number | null]
   });
 
+  readonly modeleForm = this.fb.nonNullable.group({
+    titre: ['', [Validators.required, Validators.maxLength(200)]],
+    description: ['', Validators.maxLength(2000)],
+    severite: ['MEDIUM'],
+    masId: [null as number | null],
+    position: [0 as number | null]
+  });
+
   readonly recurrenceForm = this.fb.nonNullable.group({
     titre: ['', [Validators.required, Validators.maxLength(200)]],
     description: ['', Validators.maxLength(2000)],
@@ -149,8 +172,18 @@ export class TodoListComponent implements OnInit {
     if (day && /^\d{4}-\d{2}-\d{2}$/.test(day)) {
       this.dayFilter.set(day);
     }
+    if (params.get('create') === '1') {
+      this.openCreate();
+      void this.router.navigate([], {
+        relativeTo: this.route,
+        queryParams: { create: null },
+        queryParamsHandling: 'merge',
+        replaceUrl: true
+      });
+    }
     this.load();
     this.loadRecurrences();
+    this.loadModeles();
     this.loadMasses();
   }
 
@@ -231,6 +264,20 @@ export class TodoListComponent implements OnInit {
     });
   }
 
+  loadModeles(): void {
+    this.modelesLoading.set(true);
+    this.todoService.listModeles().subscribe({
+      next: (list) => {
+        this.modeles.set(list ?? []);
+        this.modelesLoading.set(false);
+      },
+      error: () => {
+        this.modeles.set([]);
+        this.modelesLoading.set(false);
+      }
+    });
+  }
+
   loadMasses(): void {
     this.massesLoading.set(true);
     this.masService.list().subscribe({
@@ -249,16 +296,150 @@ export class TodoListComponent implements OnInit {
 
   openCreate(): void {
     this.showCreate.set(true);
-    this.showRecurrenceCreate.set(false);
+    this.showCustomCreate.set(false);
+    this.cancelRecurrenceForm();
     this.todoForm.reset({ titre: '', description: '', severite: 'MEDIUM', masId: null });
     this.loadMasses();
+    this.loadModeles();
   }
 
   cancelCreate(): void {
     this.showCreate.set(false);
+    this.showCustomCreate.set(false);
+  }
+
+  openCustomCreate(): void {
+    this.showCreate.set(true);
+    this.showCustomCreate.set(true);
+    this.todoForm.reset({ titre: '', description: '', severite: 'MEDIUM', masId: null });
+    this.loadMasses();
+  }
+
+  toggleModeleManage(): void {
+    this.showModeleManage.update((v) => !v);
+    if (!this.showModeleManage()) {
+      this.cancelModeleForm();
+    }
+  }
+
+  openModeleForm(modele?: TodoModele): void {
+    this.showModeleManage.set(true);
+    this.showModeleForm.set(true);
+    if (modele) {
+      this.editingModeleId.set(modele.id);
+      this.modeleForm.reset({
+        titre: modele.titre,
+        description: modele.description || '',
+        severite: modele.severite || 'MEDIUM',
+        masId: modele.masId ?? null,
+        position: modele.position ?? 0
+      });
+    } else {
+      this.editingModeleId.set(null);
+      this.modeleForm.reset({
+        titre: '',
+        description: '',
+        severite: 'MEDIUM',
+        masId: null,
+        position: this.modeles().length
+      });
+    }
+    this.loadMasses();
+  }
+
+  cancelModeleForm(): void {
+    this.showModeleForm.set(false);
+    this.editingModeleId.set(null);
+  }
+
+  submitModeleForm(): void {
+    if (this.modeleForm.invalid) {
+      this.modeleForm.markAllAsTouched();
+      return;
+    }
+    const raw = this.modeleForm.getRawValue();
+    const payload = {
+      titre: raw.titre,
+      description: raw.description || null,
+      severite: raw.severite,
+      masId: raw.masId,
+      position: raw.position ?? 0
+    };
+    const editId = this.editingModeleId();
+    this.saving.set(true);
+    this.error.set(null);
+    const req$ =
+      editId != null
+        ? this.todoService.updateModele(editId, payload)
+        : this.todoService.createModele(payload);
+    req$.subscribe({
+      next: () => {
+        this.saving.set(false);
+        this.cancelModeleForm();
+        this.loadModeles();
+      },
+      error: (err) => {
+        this.saving.set(false);
+        this.error.set(apiErrorMessage(err, 'Enregistrement du modèle impossible.'));
+      }
+    });
+  }
+
+  deleteModele(modele: TodoModele): void {
+    if (!confirm(`Supprimer le modèle « ${modele.titre} » ?`)) {
+      return;
+    }
+    this.saving.set(true);
+    this.todoService.deleteModele(modele.id).subscribe({
+      next: () => {
+        this.saving.set(false);
+        if (this.editingModeleId() === modele.id) {
+          this.cancelModeleForm();
+        }
+        this.loadModeles();
+      },
+      error: (err) => {
+        this.saving.set(false);
+        this.error.set(apiErrorMessage(err, 'Suppression du modèle impossible.'));
+      }
+    });
+  }
+
+  createFromModele(modele: TodoModele): void {
+    this.saving.set(true);
+    this.error.set(null);
+    this.todoService.utiliserModele(modele.id).subscribe({
+      next: () => {
+        this.saving.set(false);
+        this.showCreate.set(false);
+        this.showCustomCreate.set(false);
+        this.filter.set('ACTIVE');
+        this.load();
+      },
+      error: (err) => {
+        this.saving.set(false);
+        this.error.set(apiErrorMessage(err, 'Création depuis le modèle impossible.'));
+      }
+    });
+  }
+
+  prefillFromModele(modele: TodoModele): void {
+    this.showCreate.set(true);
+    this.showCustomCreate.set(true);
+    this.todoForm.patchValue({
+      titre: modele.titre,
+      description: modele.description || '',
+      severite: modele.severite || 'MEDIUM',
+      masId: modele.masId ?? null
+    });
+    this.loadMasses();
   }
 
   openRecurrenceCreate(): void {
+    if (!this.auth.isAdmin()) {
+      return;
+    }
+    this.editingRecurrenceId.set(null);
     this.showRecurrenceCreate.set(true);
     this.showCreate.set(false);
     const today = new Date().toISOString().slice(0, 10);
@@ -279,48 +460,106 @@ export class TodoListComponent implements OnInit {
     this.loadMasses();
   }
 
-  cancelRecurrenceCreate(): void {
-    this.showRecurrenceCreate.set(false);
+  openRecurrenceEdit(rule: TodoRecurrence): void {
+    if (!this.auth.isAdmin()) {
+      return;
+    }
+    this.editingRecurrenceId.set(rule.id);
+    this.showRecurrenceCreate.set(true);
+    this.showCreate.set(false);
+    this.recurrenceForm.reset({
+      titre: rule.titre || '',
+      description: rule.description || '',
+      severite: rule.severite || 'MEDIUM',
+      masId: rule.masId ?? null,
+      frequence: rule.frequence || 'WEEKLY',
+      intervalDays: rule.intervalDays ?? 7,
+      jourSemaine: rule.jourSemaine ?? 1,
+      jourMois: rule.jourMois ?? 1,
+      heureDue: this.toTimeInput(rule.heureDue),
+      dateDebut: rule.dateDebut || new Date().toISOString().slice(0, 10),
+      dateFin: rule.dateFin || '',
+      active: rule.active !== false
+    });
+    this.loadMasses();
   }
 
-  submitRecurrenceCreate(): void {
+  cancelRecurrenceForm(): void {
+    this.showRecurrenceCreate.set(false);
+    this.editingRecurrenceId.set(null);
+  }
+
+  isEditingRecurrence(): boolean {
+    return this.editingRecurrenceId() != null;
+  }
+
+  private toTimeInput(value?: string | null): string {
+    if (!value) {
+      return '08:00';
+    }
+    return value.length >= 5 ? value.slice(0, 5) : value;
+  }
+
+  private buildRecurrencePayload() {
+    const raw = this.recurrenceForm.getRawValue();
+    return {
+      titre: raw.titre,
+      description: raw.description || null,
+      severite: raw.severite,
+      masId: raw.masId,
+      frequence: raw.frequence,
+      intervalDays: raw.frequence === 'INTERVAL_DAYS' ? raw.intervalDays : null,
+      jourSemaine: raw.frequence === 'WEEKLY' ? raw.jourSemaine : null,
+      jourMois: raw.frequence === 'MONTHLY' ? raw.jourMois : null,
+      heureDue: raw.heureDue ? `${raw.heureDue}:00`.slice(0, 8) : '08:00:00',
+      dateDebut: raw.dateDebut,
+      dateFin: raw.dateFin || null,
+      active: raw.active
+    };
+  }
+
+  submitRecurrenceForm(): void {
     if (this.recurrenceForm.invalid) {
       this.recurrenceForm.markAllAsTouched();
       return;
     }
-    const raw = this.recurrenceForm.getRawValue();
+    if (!this.auth.isAdmin()) {
+      this.error.set('Seuls les administrateurs peuvent gérer les tâches récurrentes.');
+      return;
+    }
+    const payload = this.buildRecurrencePayload();
+    const editId = this.editingRecurrenceId();
     this.saving.set(true);
     this.error.set(null);
-    this.todoService
-      .createRecurrence({
-        titre: raw.titre,
-        description: raw.description || null,
-        severite: raw.severite,
-        masId: raw.masId,
-        frequence: raw.frequence,
-        intervalDays: raw.frequence === 'INTERVAL_DAYS' ? raw.intervalDays : null,
-        jourSemaine: raw.frequence === 'WEEKLY' ? raw.jourSemaine : null,
-        jourMois: raw.frequence === 'MONTHLY' ? raw.jourMois : null,
-        heureDue: raw.heureDue ? `${raw.heureDue}:00`.slice(0, 8) : '08:00:00',
-        dateDebut: raw.dateDebut,
-        dateFin: raw.dateFin || null,
-        active: raw.active
-      })
-      .subscribe({
-        next: () => {
-          this.saving.set(false);
-          this.showRecurrenceCreate.set(false);
-          this.loadRecurrences();
-          this.load();
-        },
-        error: (err) => {
-          this.saving.set(false);
-          this.error.set(apiErrorMessage(err, 'Création de la récurrence impossible.'));
-        }
-      });
+    const req$ =
+      editId != null
+        ? this.todoService.updateRecurrence(editId, payload)
+        : this.todoService.createRecurrence(payload);
+    req$.subscribe({
+      next: () => {
+        this.saving.set(false);
+        this.cancelRecurrenceForm();
+        this.loadRecurrences();
+        this.load();
+      },
+      error: (err) => {
+        this.saving.set(false);
+        this.error.set(
+          apiErrorMessage(
+            err,
+            editId != null
+              ? 'Modification de la récurrence impossible.'
+              : 'Création de la récurrence impossible.'
+          )
+        );
+      }
+    });
   }
 
   toggleRecurrenceActive(rule: TodoRecurrence): void {
+    if (!this.auth.isAdmin()) {
+      return;
+    }
     this.saving.set(true);
     this.todoService.setRecurrenceActive(rule.id, !rule.active).subscribe({
       next: () => {
@@ -336,6 +575,9 @@ export class TodoListComponent implements OnInit {
   }
 
   deleteRecurrence(rule: TodoRecurrence): void {
+    if (!this.auth.isAdmin()) {
+      return;
+    }
     if (!confirm(`Supprimer la récurrence « ${rule.titre} » ? Les occurrences déjà créées restent.`)) {
       return;
     }
@@ -343,6 +585,9 @@ export class TodoListComponent implements OnInit {
     this.todoService.deleteRecurrence(rule.id).subscribe({
       next: () => {
         this.saving.set(false);
+        if (this.editingRecurrenceId() === rule.id) {
+          this.cancelRecurrenceForm();
+        }
         this.loadRecurrences();
       },
       error: (err) => {

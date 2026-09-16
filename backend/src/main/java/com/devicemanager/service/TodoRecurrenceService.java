@@ -14,6 +14,7 @@ import com.devicemanager.repository.MasRepository;
 import com.devicemanager.repository.TodoRecurrenceRepository;
 import com.devicemanager.repository.TodoTacheRepository;
 import com.devicemanager.repository.UserRepository;
+import com.devicemanager.security.Roles;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -49,6 +50,11 @@ import java.util.Set;
 public class TodoRecurrenceService {
 
     private static final int MAX_CATCH_UP = 366;
+    /**
+     * Une occurrence hebdo/mensuelle peut être générée et clôturée jusqu'à N jours avant son échéance.
+     * La prochaine période (semaine/mois suivant) reste planifiée via {@link #advance}.
+     */
+    public static final int EARLY_COMPLETION_DAYS = 7;
     private static final DateTimeFormatter OCCURRENCE_KEY = DateTimeFormatter.ISO_LOCAL_DATE;
 
     private final TodoRecurrenceRepository todoRecurrenceRepository;
@@ -67,6 +73,7 @@ public class TodoRecurrenceService {
     }
 
     public TodoRecurrenceResponse create(TodoRecurrenceRequest request, String username) {
+        requireAdmin(username);
         Atelier atelier = atelierService.requireCurrentAtelier();
         User actor = requireUser(username);
         TodoRecurrence entity = applyRequest(new TodoRecurrence(), request, atelier);
@@ -79,25 +86,21 @@ public class TodoRecurrenceService {
     }
 
     public TodoRecurrenceResponse update(Long id, TodoRecurrenceRequest request, String username) {
+        requireAdmin(username);
         TodoRecurrence entity = getEntity(id);
         applyRequest(entity, request, entity.getAtelier());
-        // Recalcule le curseur si la règle est (re)activée et le prochain créneau est absent / passé.
-        LocalDateTime now = LocalDateTime.now(clock);
-        if (entity.isActive()) {
-            if (entity.getProchaineEcheance() == null || entity.getProchaineEcheance().isBefore(now.minusYears(1))) {
-                entity.setProchaineEcheance(computeFirstDue(entity));
-            }
-        }
+        recomputeProchaineEcheance(entity);
         TodoRecurrence saved = todoRecurrenceRepository.save(entity);
         log.info("Modification règle todo récurrente id={} par={}", id, username);
         return toResponse(saved);
     }
 
     public TodoRecurrenceResponse setActive(Long id, boolean active, String username) {
+        requireAdmin(username);
         TodoRecurrence entity = getEntity(id);
         entity.setActive(active);
-        if (active && entity.getProchaineEcheance() == null) {
-            entity.setProchaineEcheance(computeFirstDue(entity));
+        if (active) {
+            recomputeProchaineEcheance(entity);
         }
         TodoRecurrence saved = todoRecurrenceRepository.save(entity);
         log.info("Règle todo récurrente id={} active={} par={}", id, active, username);
@@ -105,9 +108,30 @@ public class TodoRecurrenceService {
     }
 
     public void delete(Long id, String username) {
+        requireAdmin(username);
         TodoRecurrence entity = getEntity(id);
         todoRecurrenceRepository.delete(entity);
         log.info("Suppression règle todo récurrente id={} par={}", id, username);
+    }
+
+    /**
+     * Recalcule {@code prochaineEcheance} : premier créneau ≥ maintenant (hors dateFin).
+     */
+    void recomputeProchaineEcheance(TodoRecurrence entity) {
+        LocalDateTime now = LocalDateTime.now(clock);
+        LocalDateTime next = computeFirstDue(entity);
+        int guard = 0;
+        while (next != null && next.isBefore(now) && guard++ < MAX_CATCH_UP) {
+            if (entity.getDateFin() != null && next.toLocalDate().isAfter(entity.getDateFin())) {
+                next = null;
+                break;
+            }
+            next = advance(entity, next);
+        }
+        if (next != null && entity.getDateFin() != null && next.toLocalDate().isAfter(entity.getDateFin())) {
+            next = null;
+        }
+        entity.setProchaineEcheance(next);
     }
 
     /**
@@ -220,7 +244,9 @@ public class TodoRecurrenceService {
     }
 
     /**
-     * Crée les occurrences dues ({@code due_at <= now}) pour l'atelier courant.
+     * Crée les occurrences dues ({@code due_at <= now}) pour l'atelier courant,
+     * plus au plus une occurrence anticipée (hebdo/mensuel) dans la fenêtre
+     * {@link #EARLY_COMPLETION_DAYS} jours.
      */
     public void generateDueOccurrences() {
         Atelier atelier = atelierService.requireCurrentAtelier();
@@ -229,6 +255,7 @@ public class TodoRecurrenceService {
 
     public void generateDueOccurrences(Atelier atelier) {
         LocalDateTime now = LocalDateTime.now(clock);
+        LocalDate earlyUntil = now.toLocalDate().plusDays(EARLY_COMPLETION_DAYS);
         List<TodoRecurrence> rules = todoRecurrenceRepository.findActiveByAtelierId(atelier.getId());
         for (TodoRecurrence rule : rules) {
             LocalDateTime next = rule.getProchaineEcheance();
@@ -236,35 +263,54 @@ public class TodoRecurrenceService {
                 next = computeFirstDue(rule);
             }
             int guard = 0;
+            // Rattrapage : toutes les échéances déjà dues / passées.
             while (next != null && !next.isAfter(now) && guard++ < MAX_CATCH_UP) {
-                if (rule.getDateFin() != null && next.toLocalDate().isAfter(rule.getDateFin())) {
-                    next = null;
-                    break;
-                }
-                String key = occurrenceKey(next);
-                if (!todoTacheRepository.existsByRecurrenceIdAndOccurrenceKey(rule.getId(), key)) {
-                    TodoTache occurrence = TodoTache.builder()
-                            .atelier(atelier)
-                            .titre(rule.getTitre())
-                            .description(rule.getDescription())
-                            .statut(TodoTacheStatut.OPEN)
-                            .severite(rule.getSeverite())
-                            .createdByUsername(rule.getCreatedByUsername())
-                            .createdByDisplayName(null)
-                            .mas(rule.getMas())
-                            .recurrence(rule)
-                            .dueAt(next)
-                            .occurrenceKey(key)
-                            .build();
-                    todoTacheRepository.save(occurrence);
-                    log.info("Occurrence todo générée recurrenceId={} key={} dueAt={}",
-                            rule.getId(), key, next);
-                }
-                next = advance(rule, next);
+                next = materializeOccurrence(atelier, rule, next);
+            }
+            // Anticipation : une seule prochaine occurrence WEEKLY/MONTHLY dans les 7 jours.
+            if (allowsEarlyCompletion(rule.getFrequence())
+                    && next != null
+                    && !next.toLocalDate().isAfter(earlyUntil)
+                    && guard < MAX_CATCH_UP) {
+                next = materializeOccurrence(atelier, rule, next);
             }
             rule.setProchaineEcheance(next);
             todoRecurrenceRepository.save(rule);
         }
+    }
+
+    /**
+     * Crée l'occurrence si absente, avance le curseur ; {@code null} si hors dateFin.
+     */
+    private LocalDateTime materializeOccurrence(Atelier atelier, TodoRecurrence rule, LocalDateTime due) {
+        if (rule.getDateFin() != null && due.toLocalDate().isAfter(rule.getDateFin())) {
+            return null;
+        }
+        String key = occurrenceKey(due);
+        if (!todoTacheRepository.existsByRecurrenceIdAndOccurrenceKey(rule.getId(), key)) {
+            TodoTache occurrence = TodoTache.builder()
+                    .atelier(atelier)
+                    .titre(rule.getTitre())
+                    .description(rule.getDescription())
+                    .statut(TodoTacheStatut.OPEN)
+                    .severite(rule.getSeverite())
+                    .createdByUsername(rule.getCreatedByUsername())
+                    .createdByDisplayName(null)
+                    .mas(rule.getMas())
+                    .recurrence(rule)
+                    .dueAt(due)
+                    .occurrenceKey(key)
+                    .build();
+            todoTacheRepository.save(occurrence);
+            log.info("Occurrence todo générée recurrenceId={} key={} dueAt={}",
+                    rule.getId(), key, due);
+        }
+        return advance(rule, due);
+    }
+
+    static boolean allowsEarlyCompletion(TodoRecurrenceFrequence frequence) {
+        return frequence == TodoRecurrenceFrequence.WEEKLY
+                || frequence == TodoRecurrenceFrequence.MONTHLY;
     }
 
     private TodoRecurrence applyRequest(TodoRecurrence entity, TodoRecurrenceRequest request, Atelier atelier) {
@@ -376,6 +422,14 @@ public class TodoRecurrenceService {
     private User requireUser(String username) {
         return userRepository.findByUsername(username)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Utilisateur introuvable"));
+    }
+
+    private void requireAdmin(String username) {
+        User actor = requireUser(username);
+        if (!Roles.isAdminLike(actor.getRole())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "La gestion des tâches récurrentes est réservée aux administrateurs");
+        }
     }
 
     private Mas resolveMas(Long masId, Long atelierId) {

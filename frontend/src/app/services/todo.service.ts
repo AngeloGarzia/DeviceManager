@@ -5,6 +5,8 @@ import { environment } from '../../environments/environment';
 import {
   TodoItem,
   TodoList,
+  TodoModele,
+  TodoModeleForm,
   TodoRecurrence,
   TodoRecurrenceForm,
   TodoTacheForm,
@@ -100,6 +102,39 @@ export class TodoService {
 
   listRecurrences(): Observable<TodoRecurrence[]> {
     return this.http.get<TodoRecurrence[]>(`${this.base}/recurrences`);
+  }
+
+  listModeles(): Observable<TodoModele[]> {
+    return this.http.get<TodoModele[]>(`${this.base}/modeles`);
+  }
+
+  createModele(payload: TodoModeleForm): Observable<TodoModele> {
+    return this.http.post<TodoModele>(`${this.base}/modeles`, this.toModeleBody(payload));
+  }
+
+  updateModele(id: number, payload: TodoModeleForm): Observable<TodoModele> {
+    return this.http.put<TodoModele>(`${this.base}/modeles/${id}`, this.toModeleBody(payload));
+  }
+
+  deleteModele(id: number): Observable<void> {
+    return this.http.delete<void>(`${this.base}/modeles/${id}`);
+  }
+
+  /** Crée une tâche ponctuelle à partir d'un modèle. */
+  utiliserModele(id: number): Observable<TodoItem> {
+    return this.http
+      .post<TodoItem>(`${this.base}/modeles/${id}/utiliser`, {})
+      .pipe(tap(() => this.refreshPendingCount()));
+  }
+
+  private toModeleBody(payload: TodoModeleForm) {
+    return {
+      titre: payload.titre.trim(),
+      description: payload.description?.trim() || null,
+      severite: payload.severite || 'MEDIUM',
+      masId: payload.masId ?? null,
+      position: payload.position ?? 0
+    };
   }
 
   weekCalendar(): Observable<TodoWeekCalendar> {
