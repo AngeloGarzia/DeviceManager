@@ -106,6 +106,7 @@ public class SecurityConfig {
                                 "/swagger-ui.html").permitAll()
                         .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
                         .requestMatchers("/actuator/info").hasRole(Roles.SUPER_ADMIN)
+                        .requestMatchers("/actuator/metrics", "/actuator/metrics/**").hasRole(Roles.SUPER_ADMIN)
                         .requestMatchers("/uploads/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/privacy").permitAll()
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()

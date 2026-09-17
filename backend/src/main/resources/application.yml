@@ -19,7 +19,8 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        # metrics : diag mémoire prod (SUPER_ADMIN). Pas de heapdump (trop lourd sur 512 Mo).
+        include: health,info,metrics
   endpoint:
     health:
       probes:
