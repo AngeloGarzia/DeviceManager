@@ -79,7 +79,7 @@
                 <mat-option [value]="s.id">{{ s.nom }}</mat-option>
               }
             </mat-select>
-            @if (form.controls.sfmNom.value && form.controls.sfmId.value == null) {
+            @if (form.controls.sfmNom.value && form.controls.sfmId.value === null) {
               <mat-hint>Détecté : {{ form.controls.sfmNom.value }} (non trouvé dans la liste)</mat-hint>
             }
           </mat-form-field>
