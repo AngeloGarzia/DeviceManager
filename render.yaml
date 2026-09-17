@@ -87,9 +87,9 @@ services:
         value: /app/uploads
       - key: LOGGING_LEVEL_COM_DEVICEMANAGER
         value: INFO
-      # Plan free Render (512 Mo) — headroom pour native (MySQL, images, PDFBox)
+      # Plan free Render (512 Mo) — ne pas trop serrer le heap (OOM boot = exit 3)
       - key: JAVA_OPTS
-        value: "-Xms64m -Xmx176m -XX:+UseSerialGC -XX:MaxMetaspaceSize=128m -XX:CompressedClassSpaceSize=64m -XX:ReservedCodeCacheSize=32m -XX:MaxDirectMemorySize=32m -Xss512k -XX:+ExitOnOutOfMemoryError"
+        value: "-Xms96m -Xmx192m -XX:+UseSerialGC -XX:MaxMetaspaceSize=160m -XX:ReservedCodeCacheSize=40m -XX:MaxDirectMemorySize=48m -Xss512k"
       - key: MALLOC_ARENA_MAX
         value: "2"
       - key: SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE
