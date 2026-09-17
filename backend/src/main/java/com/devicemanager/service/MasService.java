@@ -8,7 +8,6 @@ import com.devicemanager.dto.MarqueMasResponse;
 import com.devicemanager.dto.MasRequest;
 import com.devicemanager.dto.MasResponse;
 import com.devicemanager.dto.MasStatutChangeRequest;
-import com.devicemanager.dto.RegleJeuxPdfCheckResponse;
 import com.devicemanager.dto.RegleJeuxMasLinkRequest;
 import com.devicemanager.dto.RegleJeuxMasSummary;
 import com.devicemanager.dto.RegleJeuxRequest;
@@ -28,7 +27,6 @@ import com.devicemanager.repository.MasRepository;
 import com.devicemanager.repository.RegleJeuxRepository;
 import com.devicemanager.repository.SfmRepository;
 import com.devicemanager.security.DocumentUploadValidator;
-import com.devicemanager.security.PdfDocumentInspector;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
@@ -321,48 +319,6 @@ public class MasService {
         }
         log.info("PDF règle de jeux remplacé — id={} file={}", id, original);
         return toRegleJeuxResponse(saved);
-    }
-
-    /**
-     * Vérifie que le PDF stocké d'une règle de jeux est présent, valide et lisible.
-     */
-    @Transactional(readOnly = true)
-    public RegleJeuxPdfCheckResponse checkRegleJeuxPdf(Long id) {
-        RegleJeux entity = getRegleJeuxEntity(id);
-        String key = firstNonBlank(entity.getFileKey(), StorageService.extractObjectKey(entity.getFileUrl()));
-        if (key == null || key.isBlank()) {
-            return RegleJeuxPdfCheckResponse.builder()
-                    .regleJeuxId(id)
-                    .present(false)
-                    .valid(false)
-                    .readable(false)
-                    .pageCount(0)
-                    .message("Aucun fichier PDF associé à cette règle")
-                    .build();
-        }
-        var loaded = storageService.load(key);
-        if (loaded.isEmpty() && entity.getFileUrl() != null && !entity.getFileUrl().equals(key)) {
-            loaded = storageService.load(entity.getFileUrl());
-        }
-        if (loaded.isEmpty()) {
-            return RegleJeuxPdfCheckResponse.builder()
-                    .regleJeuxId(id)
-                    .present(false)
-                    .valid(false)
-                    .readable(false)
-                    .pageCount(0)
-                    .message("PDF introuvable dans le stockage")
-                    .build();
-        }
-        PdfDocumentInspector.Result result = PdfDocumentInspector.inspect(loaded.get().data());
-        return RegleJeuxPdfCheckResponse.builder()
-                .regleJeuxId(id)
-                .present(result.present())
-                .valid(result.valid())
-                .readable(result.readable())
-                .pageCount(result.pageCount())
-                .message(result.message())
-                .build();
     }
 
     /**

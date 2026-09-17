@@ -2,7 +2,7 @@ import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../environments/environment';
-import { DenoOption, Mas, MasForm, MarqueMasOption, RegleJeuxOption, RegleJeuxPdfCheck } from '../models/models';
+import { DenoOption, Mas, MasForm, MarqueMasOption, RegleJeuxOption } from '../models/models';
 
 export interface AiRegleJeuxScanResponse {
   enabled: boolean;
@@ -75,10 +75,6 @@ export class MasService {
     const form = new FormData();
     form.append('file', file, file.name);
     return this.http.post<RegleJeuxOption>(`${this.base}/regles-jeux/${id}/document`, form);
-  }
-
-  checkRegleJeuxPdf(id: number): Observable<RegleJeuxPdfCheck> {
-    return this.http.get<RegleJeuxPdfCheck>(`${this.base}/regles-jeux/${id}/document-check`);
   }
 
   /** Télécharge le PDF via l'API (auth) — préférable aux URL R2 présignées. */

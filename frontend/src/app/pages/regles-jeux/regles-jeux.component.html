@@ -150,40 +150,6 @@
                       <mat-icon class="!text-base">picture_as_pdf</mat-icon>
                       {{ item.originalName || 'Ouvrir le PDF' }}
                     </button>
-                    @if (isPdfCheckLoading(pdfCheck(item))) {
-                      <span class="inline-flex items-center gap-1 text-xs text-ink-soft">
-                        <mat-spinner diameter="14"></mat-spinner>
-                        Contrôle PDF…
-                      </span>
-                    } @else {
-                      @if (pdfCheckErrorMessage(pdfCheck(item)); as errMsg) {
-                        <span class="rounded-lg bg-rose-50 px-2 py-1 text-xs text-rose-800" role="status">
-                          {{ errMsg }}
-                        </span>
-                        <button mat-button type="button" class="!min-w-0 !px-2 !text-xs" (click)="recheckPdf(item.id)">
-                          Réessayer
-                        </button>
-                      } @else {
-                        @if (asPdfCheckResult(pdfCheck(item)); as check) {
-                          <span
-                            class="rounded-lg px-2 py-1 text-xs {{ pdfCheckBadgeClass(check) }}"
-                            role="status"
-                          >
-                            {{ check.message }}
-                          </span>
-                        }
-                        <button
-                          mat-button
-                          type="button"
-                          class="!min-w-0 !px-2 !text-xs"
-                          (click)="recheckPdf(item.id)"
-                          [disabled]="saving()"
-                          title="Vérifier le PDF"
-                        >
-                          Vérifier
-                        </button>
-                      }
-                    }
                   </div>
                 </div>
                 <div class="flex flex-wrap gap-2 shrink-0">

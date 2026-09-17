@@ -174,16 +174,6 @@ export interface RegleJeuxOption {
   masses?: RegleJeuxMasSummary[];
 }
 
-/** Contrôle serveur du PDF stocké (catalogue règles de jeux). */
-export interface RegleJeuxPdfCheck {
-  regleJeuxId: number;
-  present: boolean;
-  valid: boolean;
-  readable: boolean;
-  pageCount: number;
-  message: string;
-}
-
 export interface Sfm {
   id: number;
   nom: string;

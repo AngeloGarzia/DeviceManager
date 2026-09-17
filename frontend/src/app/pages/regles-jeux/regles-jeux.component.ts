@@ -8,7 +8,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
-import { Mas, RegleJeuxOption, RegleJeuxPdfCheck } from '../../models/models';
+import { Mas, RegleJeuxOption } from '../../models/models';
 import { MasService } from '../../services/mas.service';
 import { apiErrorMessage } from '../../shared/api-error';
 import { isPdfFile, PDF_ACCEPT } from '../../shared/document-upload';
@@ -16,8 +16,6 @@ import {
   RegleJeuxAiDialogComponent,
   RegleJeuxAiDialogConfirm
 } from '../../shared/regle-jeux-ai-dialog.component';
-
-type PdfCheckState = RegleJeuxPdfCheck | { status: 'loading' } | { status: 'error'; message: string };
 
 /**
  * Catalogue global des règles de jeux (PDF) — gestion depuis le menu MAS.
@@ -64,8 +62,6 @@ export class ReglesJeuxComponent implements OnInit {
   readonly masses = signal<Mas[]>([]);
   readonly loadingMasLinks = signal(false);
   readonly pdfAccept = PDF_ACCEPT;
-  /** Contrôles PDF par id de règle. */
-  readonly pdfChecks = signal<Record<number, PdfCheckState>>({});
 
   readonly aiDialogOpen = signal(false);
   readonly aiScanning = signal(false);
@@ -107,61 +103,12 @@ export class ReglesJeuxComponent implements OnInit {
           (a.label || '').localeCompare(b.label || '', 'fr', { sensitivity: 'base' })
         ));
         this.loading.set(false);
-        this.pdfChecks.set({});
       },
       error: (err) => {
         this.loading.set(false);
         this.error.set(apiErrorMessage(err, 'Impossible de charger les règles de jeux.'));
       }
     });
-  }
-
-  /** Lance le contrôle PDF pour une règle (uniquement sur action utilisateur). */
-  recheckPdf(id: number): void {
-    this.pdfChecks.update((map) => ({ ...map, [id]: { status: 'loading' } }));
-    this.masService.checkRegleJeuxPdf(id).subscribe({
-      next: (check) => {
-        this.pdfChecks.update((map) => ({ ...map, [id]: check }));
-      },
-      error: (err) => {
-        this.pdfChecks.update((map) => ({
-          ...map,
-          [id]: { status: 'error', message: apiErrorMessage(err, 'Contrôle PDF impossible.') }
-        }));
-      }
-    });
-  }
-
-  pdfCheck(item: RegleJeuxOption): PdfCheckState | undefined {
-    return this.pdfChecks()[item.id];
-  }
-
-  isPdfCheckLoading(state: PdfCheckState | undefined): boolean {
-    return !!state && 'status' in state && state.status === 'loading';
-  }
-
-  pdfCheckErrorMessage(state: PdfCheckState | undefined): string | null {
-    if (state && 'status' in state && state.status === 'error') {
-      return state.message;
-    }
-    return null;
-  }
-
-  asPdfCheckResult(state: PdfCheckState | undefined): RegleJeuxPdfCheck | null {
-    if (state && !('status' in state)) {
-      return state;
-    }
-    return null;
-  }
-
-  pdfCheckBadgeClass(check: RegleJeuxPdfCheck): string {
-    if (check.valid && check.readable) {
-      return 'bg-emerald-50 text-emerald-800';
-    }
-    if (check.valid) {
-      return 'bg-amber-50 text-amber-900';
-    }
-    return 'bg-rose-50 text-rose-800';
   }
 
   openCreate(): void {
