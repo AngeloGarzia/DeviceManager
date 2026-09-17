@@ -68,6 +68,10 @@ export class LoginComponent {
       this.error.set('Session expirée. Veuillez vous reconnecter.');
       return;
     }
+    if (this.route.snapshot.queryParamMap.get('reason') === 'idle') {
+      this.error.set('Déconnecté pour inactivité (30 min). Veuillez vous reconnecter.');
+      return;
+    }
     if (this.route.snapshot.queryParamMap.get('reason') === 'password-reset') {
       this.notice.set('Mot de passe mis à jour. Vous pouvez vous connecter.');
       return;

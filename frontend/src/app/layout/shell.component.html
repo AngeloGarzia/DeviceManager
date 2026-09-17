@@ -349,4 +349,19 @@
     [report]="briefingReport()"
     (dismissed)="closeSituationBriefing()"
   />
+
+  <app-confirm-dialog
+    [open]="idle.warningOpen()"
+    title="Session bientôt expirée"
+    [message]="
+      'Aucune activité détectée. Déconnexion dans ' +
+      idle.secondsLeft() +
+      ' s. Voulez-vous rester connecté ?'
+    "
+    confirmLabel="Rester connecté"
+    cancelLabel="Se déconnecter"
+    confirmColor="primary"
+    (confirmed)="staySignedIn()"
+    (dismissed)="logoutFromIdleWarning()"
+  />
 </div>

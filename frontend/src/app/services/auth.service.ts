@@ -147,6 +147,17 @@ export class AuthService {
     void this.router.navigate(['/login']);
   }
 
+  /** Déconnexion pour inactivité (révoque le refresh + message dédié sur /login). */
+  logoutDueToIdle(): void {
+    this.skipNextSessionRestore = true;
+    this.refreshInFlight = null;
+    this.clearSession();
+    this.http.post(`${environment.apiUrl}/api/auth/logout`, {}, { withCredentials: true }).subscribe({
+      error: () => undefined
+    });
+    void this.router.navigate(['/login'], { queryParams: { reason: 'idle' } });
+  }
+
   /** Rafraîchit l'access token via le cookie HttpOnly refresh (single-flight). */
   refreshAccessToken(): Observable<AuthResponse> {
     if (!this.refreshInFlight) {

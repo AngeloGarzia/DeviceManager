@@ -9,6 +9,7 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatMenuModule } from '@angular/material/menu';
 import { Subscription, switchMap, of, catchError, map } from 'rxjs';
 import { AuthService } from '../services/auth.service';
+import { IdleSessionService } from '../services/idle-session.service';
 import { OrderRequestService } from '../services/order-request.service';
 import { VisiteQuadriService } from '../services/visite-quadri.service';
 import { ArretMaintenanceService } from '../services/arret-maintenance.service';
@@ -16,6 +17,7 @@ import { AiService, MemoireSynaptiqueResponse } from '../services/ai.service';
 import { TodoService } from '../services/todo.service';
 import { AppTourService } from '../services/app-tour.service';
 import { AtelierSituationDialogComponent } from '../shared/atelier-situation-dialog.component';
+import { ConfirmDialogComponent } from '../shared/confirm-dialog.component';
 import { apiErrorMessage } from '../shared/api-error';
 
 /**
@@ -37,13 +39,15 @@ import { apiErrorMessage } from '../shared/api-error';
     MatInputModule,
     MatSelectModule,
     MatMenuModule,
-    AtelierSituationDialogComponent
+    AtelierSituationDialogComponent,
+    ConfirmDialogComponent
   ],
   templateUrl: './shell.component.html',
   styleUrl: './shell.component.scss'
 })
 export class ShellComponent implements OnInit, OnDestroy {
   readonly auth = inject(AuthService);
+  readonly idle = inject(IdleSessionService);
   readonly orders = inject(OrderRequestService);
   readonly visites = inject(VisiteQuadriService);
   readonly arrets = inject(ArretMaintenanceService);
@@ -81,6 +85,7 @@ export class ShellComponent implements OnInit, OnDestroy {
 
   /** Charge les badges au démarrage. */
   ngOnInit(): void {
+    this.idle.start();
     if (this.auth.getToken()) {
       this.orders.refreshPendingCount();
       this.visites.refreshWarningCount();
@@ -95,7 +100,17 @@ export class ShellComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.idle.stop();
     this.briefingSub?.unsubscribe();
+  }
+
+  staySignedIn(): void {
+    this.idle.staySignedIn();
+  }
+
+  logoutFromIdleWarning(): void {
+    this.idle.stop();
+    this.auth.logoutDueToIdle();
   }
 
   /** Relance le parcours guidé (pied de page). */
