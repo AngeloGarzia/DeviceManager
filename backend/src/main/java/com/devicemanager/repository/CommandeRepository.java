@@ -73,6 +73,23 @@ public interface CommandeRepository extends JpaRepository<Commande, Long> {
             @Param("statuses") List<String> statuses);
 
     /**
+     * Commandes PENDING/SENT plus anciennes que {@code cutoff} (ateliers actifs).
+     */
+    @Query("""
+            select distinct c from Commande c
+            left join fetch c.lignes
+            join fetch c.atelier a
+            join fetch c.technicien
+            where c.status in :statuses
+              and c.dateDemande < :cutoff
+              and a.utilise = true
+            order by c.dateDemande asc
+            """)
+    List<Commande> findStalePendingAcrossAteliers(
+            @Param("statuses") List<String> statuses,
+            @Param("cutoff") java.time.LocalDateTime cutoff);
+
+    /**
      * Charge une commande par identifiant et atelier avec toutes ses relations.
      *
      * @param id        identifiant de la commande

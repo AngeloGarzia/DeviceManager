@@ -576,6 +576,19 @@ public class OrderRequestService {
     }
 
     /**
+     * Commandes PENDING/SENT en attente depuis au moins {@code minAgeDays} jours (tous ateliers actifs).
+     * Hors contexte JWT — rappels planifiés.
+     */
+    @Transactional(readOnly = true)
+    public List<Commande> listStalePendingForReminder(int minAgeDays, LocalDateTime now) {
+        int days = Math.max(1, Math.min(minAgeDays, 365));
+        // Aligné sur ChronoUnit.DAYS (âge calendaire ≥ N jours).
+        LocalDateTime cutoff = now.toLocalDate().minusDays(days - 1L).atStartOfDay();
+        return commandeRepository.findStalePendingAcrossAteliers(
+                List.of(OrderStatuses.PENDING, OrderStatuses.SENT), cutoff);
+    }
+
+    /**
      * Aperçu de l'e-mail admin qui sera envoyé à la création (sans enregistrer).
      *
      * @param request brouillon de demande

@@ -13,9 +13,10 @@ import org.springframework.web.server.ResponseStatusException;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -28,6 +29,8 @@ class TransactionalMailTest {
     @BeforeEach
     void setUp() {
         ReflectionTestUtils.setField(transactionalMail, "adminEmailDefault", "admin@test.local");
+        lenient().when(appSettingsService.get(eq(AppSettingsService.MAIL_ADMIN_EMAIL), anyString()))
+                .thenReturn("admin@test.local");
     }
 
     @Test
@@ -45,8 +48,8 @@ class TransactionalMailTest {
 
     @Test
     void sendSmtpTest_reportsSimulatedWhenSkipped() {
-        when(appSettingsService.get(eq(AppSettingsService.MAIL_ADMIN_EMAIL), anyString())).thenReturn("admin@test.local");
-        when(emailService.send(anyString(), anyString(), anyString(), anyString())).thenReturn(EmailSendResult.simulated());
+        when(emailService.send(anyString(), anyString(), anyString(), anyString()))
+                .thenReturn(EmailSendResult.simulated());
 
         var response = transactionalMail.sendSmtpTest();
 
@@ -57,7 +60,8 @@ class TransactionalMailTest {
 
     @Test
     void sendPasswordReset_delegatesToEmailService() {
-        when(emailService.send(anyString(), anyString(), anyString(), anyString())).thenReturn(EmailSendResult.success());
+        when(emailService.send(anyString(), anyString(), anyString(), anyString()))
+                .thenReturn(EmailSendResult.success());
 
         EmailSendResult result = transactionalMail.sendPasswordReset(
                 "user@test.local",
@@ -65,5 +69,36 @@ class TransactionalMailTest {
                         "Marie", "http://localhost:4200/reset-password?token=x"));
 
         assertThat(result.ok()).isTrue();
+    }
+
+    @Test
+    void notifyAdminVisiteQuadriReminder_delegates() {
+        when(emailService.send(anyString(), anyString(), anyString(), anyString()))
+                .thenReturn(EmailSendResult.success());
+        EmailSendResult result = transactionalMail.notifyAdminVisiteQuadriReminder("s", "t", "h");
+        assertThat(result.ok()).isTrue();
+        verify(emailService).send("admin@test.local", "s", "t", "h");
+    }
+
+    @Test
+    void notifyAdminOrderRelance_logsFailureStillReturns() {
+        when(emailService.send(anyString(), anyString(), anyString(), anyString()))
+                .thenReturn(EmailSendResult.failure("down"));
+        EmailSendResult result = transactionalMail.notifyAdminOrderRelance("s", "t", "h");
+        assertThat(result.ok()).isFalse();
+    }
+
+    @Test
+    void notifyAdminArretMaintenanceReminder_delegates() {
+        when(emailService.send(anyString(), anyString(), anyString(), anyString()))
+                .thenReturn(EmailSendResult.success());
+        assertThat(transactionalMail.notifyAdminArretMaintenanceReminder("s", "t", "h").ok()).isTrue();
+    }
+
+    @Test
+    void notifyAdminTodoOverdueReminder_delegates() {
+        when(emailService.send(anyString(), anyString(), anyString(), anyString()))
+                .thenReturn(EmailSendResult.success());
+        assertThat(transactionalMail.notifyAdminTodoOverdueReminder("s", "t", "h").ok()).isTrue();
     }
 }

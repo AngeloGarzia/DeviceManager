@@ -254,4 +254,21 @@ class TodoServiceTest {
         assertThat(todoService.listPending().getCount()).isEqualTo(1);
         verify(todoRecurrenceService).generateDueOccurrences();
     }
+
+    @Test
+    void listOverdueForReminder_delegatesToRepository() {
+        LocalDateTime now = LocalDateTime.of(2026, 9, 17, 8, 0);
+        TodoTache overdue = TodoTache.builder()
+                .id(3L)
+                .titre("Late")
+                .statut(TodoTacheStatut.OPEN)
+                .severite("HIGH")
+                .dueAt(now.minusDays(2))
+                .build();
+        when(todoTacheRepository.findOverdueAcrossAteliers(any(), eq(now)))
+                .thenReturn(List.of(overdue));
+
+        assertThat(todoService.listOverdueForReminder(now)).containsExactly(overdue);
+        verify(todoTacheRepository).findOverdueAcrossAteliers(any(), eq(now));
+    }
 }

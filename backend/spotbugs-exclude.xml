@@ -77,6 +77,22 @@
         <Class name="com.devicemanager.mail.templates.PasswordWelcomeEmail"/>
         <Bug pattern="VA_FORMAT_STRING_USES_NEWLINE"/>
     </Match>
+    <Match>
+        <Class name="com.devicemanager.mail.templates.VisiteQuadriReminderEmail"/>
+        <Bug pattern="VA_FORMAT_STRING_USES_NEWLINE"/>
+    </Match>
+    <Match>
+        <Class name="com.devicemanager.mail.templates.OrderRequestRelanceEmail"/>
+        <Bug pattern="VA_FORMAT_STRING_USES_NEWLINE"/>
+    </Match>
+    <Match>
+        <Class name="com.devicemanager.mail.templates.ArretMaintenanceReminderEmail"/>
+        <Bug pattern="VA_FORMAT_STRING_USES_NEWLINE"/>
+    </Match>
+    <Match>
+        <Class name="com.devicemanager.mail.templates.TodoOverdueReminderEmail"/>
+        <Bug pattern="VA_FORMAT_STRING_USES_NEWLINE"/>
+    </Match>
 
     <!-- Records Context des templates mail : List.copyOf dans le constructeur compact. -->
     <Match>
@@ -85,6 +101,22 @@
     </Match>
     <Match>
         <Class name="com.devicemanager.mail.templates.OrderRequestSfmEmail$Context"/>
+        <Bug code="EI"/>
+    </Match>
+    <Match>
+        <Class name="com.devicemanager.mail.templates.VisiteQuadriReminderEmail$Context"/>
+        <Bug code="EI"/>
+    </Match>
+    <Match>
+        <Class name="com.devicemanager.mail.templates.OrderRequestRelanceEmail$Context"/>
+        <Bug code="EI"/>
+    </Match>
+    <Match>
+        <Class name="com.devicemanager.mail.templates.ArretMaintenanceReminderEmail$Context"/>
+        <Bug code="EI"/>
+    </Match>
+    <Match>
+        <Class name="com.devicemanager.mail.templates.TodoOverdueReminderEmail$Context"/>
         <Bug code="EI"/>
     </Match>
 </FindBugsFilter>

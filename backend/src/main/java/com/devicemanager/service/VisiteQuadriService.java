@@ -34,6 +34,7 @@ import java.util.Optional;
 public class VisiteQuadriService {
 
     public static final int PERIOD_MONTHS = 4;
+    /** Défaut historique ; surchargé par {@link AppSettingsService#SCHED_VISITE_QUADRI_WARN_DAYS}. */
     public static final int WARN_DAYS = 7;
     public static final String LEVEL_OK = "OK";
     public static final String LEVEL_WARN = "WARN";
@@ -42,10 +43,11 @@ public class VisiteQuadriService {
     private final VisiteQuadriRepository visiteQuadriRepository;
     private final SfmRepository sfmRepository;
     private final AtelierService atelierService;
+    private final AppSettingsService appSettingsService;
 
     @Transactional(readOnly = true)
     public List<VisiteQuadriObligationResponse> status() {
-        return buildObligations().stream()
+        return buildObligations(atelierService.requireCurrentAtelier().getId(), resolveWarnDays(), LocalDate.now()).stream()
                 .sorted(Comparator
                         .comparing(VisiteQuadriObligationResponse::getDaysRemaining,
                                 Comparator.nullsFirst(Long::compareTo))
@@ -58,9 +60,31 @@ public class VisiteQuadriService {
 
     @Transactional(readOnly = true)
     public long warningCount() {
-        return buildObligations().stream()
+        return buildObligations(atelierService.requireCurrentAtelier().getId(), resolveWarnDays(), LocalDate.now()).stream()
                 .filter(o -> LEVEL_WARN.equals(o.getLevel()) || LEVEL_OVERDUE.equals(o.getLevel()))
                 .count();
+    }
+
+    /**
+     * Obligations WARN / OVERDUE pour un atelier (hors contexte JWT) — rappels planifiés.
+     */
+    @Transactional(readOnly = true)
+    public List<VisiteQuadriObligationResponse> listAlertObligationsForAtelier(
+            Long atelierId, int warnDays, LocalDate today) {
+        if (atelierId == null) {
+            return List.of();
+        }
+        LocalDate day = today != null ? today : LocalDate.now();
+        return buildObligations(atelierId, warnDays, day).stream()
+                .filter(o -> LEVEL_WARN.equals(o.getLevel()) || LEVEL_OVERDUE.equals(o.getLevel()))
+                .sorted(Comparator
+                        .comparing(VisiteQuadriObligationResponse::getDaysRemaining,
+                                Comparator.nullsFirst(Long::compareTo))
+                        .thenComparing(VisiteQuadriObligationResponse::getSfmNom,
+                                String.CASE_INSENSITIVE_ORDER)
+                        .thenComparing(VisiteQuadriObligationResponse::getMarqueLabel,
+                                String.CASE_INSENSITIVE_ORDER))
+                .toList();
     }
 
     /**
@@ -68,7 +92,9 @@ public class VisiteQuadriService {
      */
     @Transactional(readOnly = true)
     public String statusSummaryForAi() {
-        List<VisiteQuadriObligationResponse> all = buildObligations();
+        int warnDays = resolveWarnDays();
+        List<VisiteQuadriObligationResponse> all =
+                buildObligations(atelierService.requireCurrentAtelier().getId(), warnDays, LocalDate.now());
         long warn = all.stream().filter(o -> LEVEL_WARN.equals(o.getLevel())).count();
         long overdue = all.stream().filter(o -> LEVEL_OVERDUE.equals(o.getLevel())).count();
         if (warn == 0 && overdue == 0) {
@@ -76,7 +102,7 @@ public class VisiteQuadriService {
         }
         return "Visites quadritrimestrielles SFM×marque : "
                 + overdue + " en retard, "
-                + warn + " échéance(s) ≤ " + WARN_DAYS + " j, "
+                + warn + " échéance(s) ≤ " + warnDays + " j, "
                 + "sur " + all.size() + " obligation(s).";
     }
 
@@ -112,9 +138,15 @@ public class VisiteQuadriService {
         return toResponse(saved);
     }
 
-    private List<VisiteQuadriObligationResponse> buildObligations() {
-        Long atelierId = atelierService.requireCurrentAtelier().getId();
-        LocalDate today = LocalDate.now();
+    public int resolveWarnDays() {
+        long days = appSettingsService.getLong(AppSettingsService.SCHED_VISITE_QUADRI_WARN_DAYS, WARN_DAYS);
+        if (days < 0) {
+            return WARN_DAYS;
+        }
+        return (int) Math.min(days, 365);
+    }
+
+    private List<VisiteQuadriObligationResponse> buildObligations(Long atelierId, int warnDays, LocalDate today) {
         List<Sfm> sfms = sfmRepository.findAllWithMarques(atelierId);
         List<VisiteQuadriObligationResponse> result = new ArrayList<>();
         for (Sfm sfm : sfms) {
@@ -124,7 +156,7 @@ public class VisiteQuadriService {
             for (MarqueMas marque : sfm.getMarques()) {
                 Optional<LocalDate> last = visiteQuadriRepository.findLastVisitDate(
                         atelierId, sfm.getId(), marque.getId());
-                result.add(toObligation(sfm, marque, last.orElse(null), today));
+                result.add(toObligation(sfm, marque, last.orElse(null), today, warnDays));
             }
         }
         return result;
@@ -139,6 +171,15 @@ public class VisiteQuadriService {
             MarqueMas marque,
             LocalDate lastVisit,
             LocalDate today) {
+        return toObligation(sfm, marque, lastVisit, today, WARN_DAYS);
+    }
+
+    static VisiteQuadriObligationResponse toObligation(
+            Sfm sfm,
+            MarqueMas marque,
+            LocalDate lastVisit,
+            LocalDate today,
+            int warnDays) {
         LocalDate dueDate;
         if (lastVisit == null) {
             dueDate = today;
@@ -152,7 +193,7 @@ public class VisiteQuadriService {
             if (lastVisit == null) {
                 daysRemaining = 0;
             }
-        } else if (daysRemaining <= WARN_DAYS) {
+        } else if (daysRemaining <= warnDays) {
             level = LEVEL_WARN;
         } else {
             level = LEVEL_OK;

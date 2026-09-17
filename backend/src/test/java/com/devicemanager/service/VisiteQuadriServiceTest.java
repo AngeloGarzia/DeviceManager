@@ -19,6 +19,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
@@ -33,11 +34,14 @@ class VisiteQuadriServiceTest {
     @Mock private VisiteQuadriRepository visiteQuadriRepository;
     @Mock private SfmRepository sfmRepository;
     @Mock private AtelierService atelierService;
+    @Mock private AppSettingsService appSettingsService;
     @InjectMocks private VisiteQuadriService service;
 
     @BeforeEach
     void setUp() {
         lenient().when(atelierService.requireCurrentAtelier()).thenReturn(TestFixtures.atelier());
+        lenient().when(appSettingsService.getLong(AppSettingsService.SCHED_VISITE_QUADRI_WARN_DAYS, 7))
+                .thenReturn(7L);
     }
 
     @Test
@@ -86,6 +90,56 @@ class VisiteQuadriServiceTest {
 
         assertThat(o.getDaysRemaining()).isNegative();
         assertThat(o.getLevel()).isEqualTo(VisiteQuadriService.LEVEL_OVERDUE);
+    }
+
+    @Test
+    void toObligation_customWarnDays() {
+        LocalDate today = LocalDate.of(2026, 8, 16);
+        LocalDate due = today.plusDays(5);
+        LocalDate last = due.minusMonths(4);
+        VisiteQuadriObligationResponse warn = VisiteQuadriService.toObligation(
+                sfm(1L, "SFM A"), marque(10L, "Novomatic"), last, today, 3);
+        assertThat(warn.getLevel()).isEqualTo(VisiteQuadriService.LEVEL_OK);
+
+        VisiteQuadriObligationResponse stillWarn = VisiteQuadriService.toObligation(
+                sfm(1L, "SFM A"), marque(10L, "Novomatic"), last, today, 7);
+        assertThat(stillWarn.getLevel()).isEqualTo(VisiteQuadriService.LEVEL_WARN);
+    }
+
+    @Test
+    void resolveWarnDays_clampsInvalidValues() {
+        when(appSettingsService.getLong(AppSettingsService.SCHED_VISITE_QUADRI_WARN_DAYS, 7))
+                .thenReturn(-2L);
+        assertThat(service.resolveWarnDays()).isEqualTo(7);
+
+        when(appSettingsService.getLong(AppSettingsService.SCHED_VISITE_QUADRI_WARN_DAYS, 7))
+                .thenReturn(900L);
+        assertThat(service.resolveWarnDays()).isEqualTo(365);
+    }
+
+    @Test
+    void listAlertObligationsForAtelier_filtersOk() {
+        Sfm sfm = sfm(1L, "SFM A");
+        MarqueMas okMarque = marque(10L, "Novomatic");
+        MarqueMas warnMarque = marque(11L, "Aristocrat");
+        sfm.setMarques(Set.of(okMarque, warnMarque));
+        LocalDate today = LocalDate.of(2026, 8, 16);
+        when(sfmRepository.findAllWithMarques(100L)).thenReturn(List.of(sfm));
+        when(visiteQuadriRepository.findLastVisitDate(100L, 1L, 10L))
+                .thenReturn(Optional.of(today.minusMonths(4).plusDays(20)));
+        when(visiteQuadriRepository.findLastVisitDate(100L, 1L, 11L))
+                .thenReturn(Optional.of(today.minusMonths(4).plusDays(3)));
+
+        var alerts = service.listAlertObligationsForAtelier(100L, 7, today);
+
+        assertThat(alerts).hasSize(1);
+        assertThat(alerts.getFirst().getMarqueLabel()).isEqualTo("Aristocrat");
+        assertThat(alerts.getFirst().getLevel()).isEqualTo(VisiteQuadriService.LEVEL_WARN);
+    }
+
+    @Test
+    void listAlertObligationsForAtelier_nullId_returnsEmpty() {
+        assertThat(service.listAlertObligationsForAtelier(null, 7, LocalDate.now())).isEmpty();
     }
 
     @Test

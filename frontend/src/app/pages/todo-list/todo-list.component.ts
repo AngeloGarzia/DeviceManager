@@ -325,7 +325,7 @@ export class TodoListComponent implements OnInit {
   private focusCreatePanel(preferTitre = false): void {
     afterNextRender(
       () => {
-        const panel = this.createPanelPanel()?.nativeElement;
+        const panel = this.createPanel()?.nativeElement;
         if (!panel) {
           return;
         }

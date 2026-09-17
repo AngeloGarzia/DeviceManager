@@ -254,7 +254,13 @@ public class TodoRecurrenceService {
     }
 
     public void generateDueOccurrences(Atelier atelier) {
-        LocalDateTime now = LocalDateTime.now(clock);
+        generateDueOccurrences(atelier, LocalDateTime.now(clock));
+    }
+
+    /**
+     * Variante planifiée : {@code now} doit être dans le fuseau {@code SCHED_TIMEZONE}.
+     */
+    public void generateDueOccurrences(Atelier atelier, LocalDateTime now) {
         LocalDate earlyUntil = now.toLocalDate().plusDays(EARLY_COMPLETION_DAYS);
         List<TodoRecurrence> rules = todoRecurrenceRepository.findActiveByAtelierId(atelier.getId());
         for (TodoRecurrence rule : rules) {

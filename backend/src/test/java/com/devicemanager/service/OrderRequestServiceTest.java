@@ -407,4 +407,27 @@ class OrderRequestServiceTest {
                 .asString()
                 .containsIgnoringCase("validation");
     }
+
+    @Test
+    void listStalePendingForReminder_usesCutoffAndClampsDays() {
+        LocalDateTime now = LocalDateTime.of(2026, 9, 17, 8, 0);
+        when(commandeRepository.findStalePendingAcrossAteliers(anyList(), any()))
+                .thenReturn(List.of(Commande.builder().id(1L).build()));
+
+        var result = orderRequestService.listStalePendingForReminder(7, now);
+
+        assertThat(result).hasSize(1);
+        ArgumentCaptor<LocalDateTime> cutoff = ArgumentCaptor.forClass(LocalDateTime.class);
+        verify(commandeRepository).findStalePendingAcrossAteliers(
+                eq(List.of(OrderStatuses.PENDING, OrderStatuses.SENT)), cutoff.capture());
+        assertThat(cutoff.getValue()).isEqualTo(now.toLocalDate().minusDays(6).atStartOfDay());
+
+        orderRequestService.listStalePendingForReminder(0, now);
+        verify(commandeRepository).findStalePendingAcrossAteliers(
+                anyList(), eq(now.toLocalDate().atStartOfDay()));
+
+        orderRequestService.listStalePendingForReminder(999, now);
+        verify(commandeRepository).findStalePendingAcrossAteliers(
+                anyList(), eq(now.toLocalDate().minusDays(364).atStartOfDay()));
+    }
 }

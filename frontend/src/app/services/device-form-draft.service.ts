@@ -11,6 +11,7 @@ export interface DeviceFormDraftValues {
   stock: number;
   sfmId: number | null;
   masId: number | null;
+  unitPriceHt: number | null;
 }
 
 export interface DeviceFormDraftPhoto {

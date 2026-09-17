@@ -99,6 +99,14 @@ public class TodoService {
                 .build();
     }
 
+    /**
+     * Tâches OPEN/IN_PROGRESS en retard (tous ateliers actifs), hors contexte JWT.
+     */
+    @Transactional(readOnly = true)
+    public List<TodoTache> listOverdueForReminder(LocalDateTime now) {
+        return todoTacheRepository.findOverdueAcrossAteliers(ACTIVE, now);
+    }
+
     public TodoTacheResponse create(TodoTacheRequest request, String username) {
         Atelier atelier = atelierService.requireCurrentAtelier();
         User actor = requireUser(username);

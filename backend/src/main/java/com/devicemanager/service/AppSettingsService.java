@@ -65,6 +65,29 @@ public class AppSettingsService {
     public static final String PRIVACY_POSTAL_ADDRESS = "PRIVACY_POSTAL_ADDRESS";
     public static final String PRIVACY_LAST_UPDATED = "PRIVACY_LAST_UPDATED";
 
+    /** Catégorie Setup — rappels métiers planifiés. */
+    public static final String SCHED_CATEGORY = "Rappels planifiés";
+    public static final String SCHED_ENABLED = "SCHED_ENABLED";
+    public static final String SCHED_TIMEZONE = "SCHED_TIMEZONE";
+    public static final String SCHED_VISITE_QUADRI_ENABLED = "SCHED_VISITE_QUADRI_ENABLED";
+    public static final String SCHED_VISITE_QUADRI_HOUR = "SCHED_VISITE_QUADRI_HOUR";
+    public static final String SCHED_VISITE_QUADRI_MINUTE = "SCHED_VISITE_QUADRI_MINUTE";
+    public static final String SCHED_VISITE_QUADRI_WARN_DAYS = "SCHED_VISITE_QUADRI_WARN_DAYS";
+    public static final String SCHED_ORDER_RELANC_ENABLED = "SCHED_ORDER_RELANC_ENABLED";
+    public static final String SCHED_ORDER_RELANC_HOUR = "SCHED_ORDER_RELANC_HOUR";
+    public static final String SCHED_ORDER_RELANC_MINUTE = "SCHED_ORDER_RELANC_MINUTE";
+    public static final String SCHED_ORDER_RELANC_DAYS = "SCHED_ORDER_RELANC_DAYS";
+    public static final String SCHED_ARRET_MAINT_ENABLED = "SCHED_ARRET_MAINT_ENABLED";
+    public static final String SCHED_ARRET_MAINT_HOUR = "SCHED_ARRET_MAINT_HOUR";
+    public static final String SCHED_ARRET_MAINT_MINUTE = "SCHED_ARRET_MAINT_MINUTE";
+    public static final String SCHED_ARRET_MAINT_DAYS = "SCHED_ARRET_MAINT_DAYS";
+    public static final String SCHED_TODO_RECURRENCE_ENABLED = "SCHED_TODO_RECURRENCE_ENABLED";
+    public static final String SCHED_TODO_RECURRENCE_HOUR = "SCHED_TODO_RECURRENCE_HOUR";
+    public static final String SCHED_TODO_RECURRENCE_MINUTE = "SCHED_TODO_RECURRENCE_MINUTE";
+    public static final String SCHED_TODO_OVERDUE_ENABLED = "SCHED_TODO_OVERDUE_ENABLED";
+    public static final String SCHED_TODO_OVERDUE_HOUR = "SCHED_TODO_OVERDUE_HOUR";
+    public static final String SCHED_TODO_OVERDUE_MINUTE = "SCHED_TODO_OVERDUE_MINUTE";
+
     public static final List<String> PRIVACY_PUBLIC_KEYS = List.of(
             PRIVACY_EDITOR_LEGAL,
             PRIVACY_PUBLICATION_DIRECTOR,
@@ -166,9 +189,58 @@ public class AppSettingsService {
                 "Prompt rédaction usage (placeholders {{nom}}, {{reference}}, …)",
                 "Intelligence artificielle", false);
         ensurePrivacyDefaults();
+        ensureScheduleDefaults();
         migrateLegacyGeminiModel();
         // Clés API : uniquement batterie .env (GEMINI_API_KEY, OPENAI_API_KEY, …) — pas exposées dans Setup
         reloadCache();
+    }
+
+    private void ensureScheduleDefaults() {
+        ensure(SCHED_ENABLED, "true",
+                "Activer les rappels métiers planifiés", SCHED_CATEGORY, false);
+        ensure(SCHED_TIMEZONE, "Europe/Paris",
+                "Fuseau horaire des rappels (ex. Europe/Paris)", SCHED_CATEGORY, false);
+
+        ensure(SCHED_VISITE_QUADRI_ENABLED, "true",
+                "Visites quadri — activer le rappel mail", SCHED_CATEGORY, false);
+        ensure(SCHED_VISITE_QUADRI_HOUR, "8",
+                "Visites quadri — heure d'envoi (0-23)", SCHED_CATEGORY, false);
+        ensure(SCHED_VISITE_QUADRI_MINUTE, "0",
+                "Visites quadri — minute d'envoi (0-59)", SCHED_CATEGORY, false);
+        ensure(SCHED_VISITE_QUADRI_WARN_DAYS, "7",
+                "Visites quadri — jours avant échéance (WARN)", SCHED_CATEGORY, false);
+
+        ensure(SCHED_ORDER_RELANC_ENABLED, "true",
+                "Commandes — activer la relance mail", SCHED_CATEGORY, false);
+        ensure(SCHED_ORDER_RELANC_HOUR, "8",
+                "Commandes — heure d'envoi (0-23)", SCHED_CATEGORY, false);
+        ensure(SCHED_ORDER_RELANC_MINUTE, "15",
+                "Commandes — minute d'envoi (0-59)", SCHED_CATEGORY, false);
+        ensure(SCHED_ORDER_RELANC_DAYS, "7",
+                "Commandes — âge min. PENDING/SENT (jours)", SCHED_CATEGORY, false);
+
+        ensure(SCHED_ARRET_MAINT_ENABLED, "true",
+                "Arrêts maintenance — activer le rappel mail", SCHED_CATEGORY, false);
+        ensure(SCHED_ARRET_MAINT_HOUR, "8",
+                "Arrêts maintenance — heure d'envoi (0-23)", SCHED_CATEGORY, false);
+        ensure(SCHED_ARRET_MAINT_MINUTE, "30",
+                "Arrêts maintenance — minute d'envoi (0-59)", SCHED_CATEGORY, false);
+        ensure(SCHED_ARRET_MAINT_DAYS, "3",
+                "Arrêts maintenance — durée min. ouverte (jours)", SCHED_CATEGORY, false);
+
+        ensure(SCHED_TODO_RECURRENCE_ENABLED, "true",
+                "Todos récurrents — activer la matérialisation", SCHED_CATEGORY, false);
+        ensure(SCHED_TODO_RECURRENCE_HOUR, "6",
+                "Todos récurrents — heure (0-23)", SCHED_CATEGORY, false);
+        ensure(SCHED_TODO_RECURRENCE_MINUTE, "30",
+                "Todos récurrents — minute (0-59)", SCHED_CATEGORY, false);
+
+        ensure(SCHED_TODO_OVERDUE_ENABLED, "true",
+                "Todos en retard — activer le rappel mail", SCHED_CATEGORY, false);
+        ensure(SCHED_TODO_OVERDUE_HOUR, "8",
+                "Todos en retard — heure d'envoi (0-23)", SCHED_CATEGORY, false);
+        ensure(SCHED_TODO_OVERDUE_MINUTE, "0",
+                "Todos en retard — minute d'envoi (0-59)", SCHED_CATEGORY, false);
     }
 
     private void ensurePrivacyDefaults() {

@@ -69,6 +69,18 @@ public class ArretMaintenanceService {
                 .build();
     }
 
+    /**
+     * Arrêts ouverts depuis au moins {@code minAgeDays} jours (tous ateliers actifs).
+     * Hors contexte JWT — rappels planifiés.
+     */
+    @Transactional(readOnly = true)
+    public List<ArretMaintenance> listStaleOpenForReminder(int minAgeDays, LocalDateTime now) {
+        int days = Math.max(1, Math.min(minAgeDays, 365));
+        // Aligné sur ChronoUnit.DAYS (âge calendaire ≥ N jours).
+        LocalDateTime cutoff = now.toLocalDate().minusDays(days - 1L).atStartOfDay();
+        return arretMaintenanceRepository.findStaleOpenAcrossAteliers(cutoff);
+    }
+
     public ArretMaintenanceResponse declareArret(ArretMaintenanceRequest request, String username) {
         Atelier atelier = atelierService.requireCurrentAtelier();
         Mas mas = masRepository.findByIdAndAtelierId(request.getMasId(), atelier.getId())

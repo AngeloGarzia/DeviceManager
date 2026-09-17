@@ -46,6 +46,54 @@ public class TransactionalMail {
     }
 
     /**
+     * Rappel admin — todos en retard.
+     */
+    public EmailSendResult notifyAdminTodoOverdueReminder(String subject, String text, String html) {
+        String to = getAdminEmail();
+        EmailSendResult result = emailService.send(to, subject, text, html);
+        if (!result.ok()) {
+            log.warn("E-mail rappel todos en retard non envoyé: {}", result.error());
+        }
+        return result;
+    }
+
+    /**
+     * Rappel admin — arrêts maintenance ouverts trop longtemps.
+     */
+    public EmailSendResult notifyAdminArretMaintenanceReminder(String subject, String text, String html) {
+        String to = getAdminEmail();
+        EmailSendResult result = emailService.send(to, subject, text, html);
+        if (!result.ok()) {
+            log.warn("E-mail rappel arrêts maintenance non envoyé: {}", result.error());
+        }
+        return result;
+    }
+
+    /**
+     * Relance admin — commandes PENDING/SENT trop anciennes.
+     */
+    public EmailSendResult notifyAdminOrderRelance(String subject, String text, String html) {
+        String to = getAdminEmail();
+        EmailSendResult result = emailService.send(to, subject, text, html);
+        if (!result.ok()) {
+            log.warn("E-mail relance commandes non envoyé: {}", result.error());
+        }
+        return result;
+    }
+
+    /**
+     * Rappel admin — visites quadritrimestrielles à échéance / en retard.
+     */
+    public EmailSendResult notifyAdminVisiteQuadriReminder(String subject, String text, String html) {
+        String to = getAdminEmail();
+        EmailSendResult result = emailService.send(to, subject, text, html);
+        if (!result.ok()) {
+            log.warn("E-mail rappel visite quadri non envoyé: {}", result.error());
+        }
+        return result;
+    }
+
+    /**
      * Demande de devis SFM — validation admin.
      */
     public EmailSendResult notifySfmOrderValidated(String to, OrderRequestSfmEmail.Context context) {

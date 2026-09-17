@@ -98,4 +98,22 @@ public interface TodoTacheRepository extends JpaRepository<TodoTache, Long> {
             @Param("statuts") Collection<TodoTacheStatut> statuts,
             @Param("fromInclusive") LocalDateTime fromInclusive,
             @Param("toExclusive") LocalDateTime toExclusive);
+
+    /**
+     * Tâches actives en retard (dueAt &lt; now), non liées à une IT, ateliers actifs.
+     */
+    @Query("""
+            SELECT DISTINCT t FROM TodoTache t
+            JOIN FETCH t.atelier a
+            LEFT JOIN FETCH t.mas
+            WHERE t.statut IN :statuts
+              AND t.dueAt IS NOT NULL
+              AND t.dueAt < :now
+              AND t.interventionTechnique IS NULL
+              AND a.utilise = true
+            ORDER BY t.dueAt ASC
+            """)
+    List<TodoTache> findOverdueAcrossAteliers(
+            @Param("statuts") Collection<TodoTacheStatut> statuts,
+            @Param("now") LocalDateTime now);
 }

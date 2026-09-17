@@ -39,4 +39,20 @@ public interface ArretMaintenanceRepository extends JpaRepository<ArretMaintenan
             order by a.dateHeureArret desc, a.id desc
             """)
     List<ArretMaintenance> findHistoryByAtelierId(@Param("atelierId") Long atelierId);
+
+    /**
+     * Arrêts ouverts depuis avant {@code cutoff} (ateliers actifs).
+     */
+    @Query("""
+            select a from ArretMaintenance a
+            join fetch a.mas m
+            left join fetch m.marque
+            join fetch a.atelier at
+            where a.dateHeureReprise is null
+              and a.dateHeureArret < :cutoff
+              and at.utilise = true
+            order by a.dateHeureArret asc, a.id asc
+            """)
+    List<ArretMaintenance> findStaleOpenAcrossAteliers(
+            @Param("cutoff") java.time.LocalDateTime cutoff);
 }

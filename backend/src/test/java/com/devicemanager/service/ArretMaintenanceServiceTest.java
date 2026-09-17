@@ -84,4 +84,23 @@ class ArretMaintenanceServiceTest {
         assertThat(response.isActif()).isTrue();
         assertThat(response.isRegistreTechniqueAJour()).isTrue();
     }
+
+    @Test
+    void listStaleOpenForReminder_usesCutoffAndClampsDays() {
+        java.time.LocalDateTime now = java.time.LocalDateTime.of(2026, 9, 17, 8, 30);
+        when(arretMaintenanceRepository.findStaleOpenAcrossAteliers(any()))
+                .thenReturn(java.util.List.of(ArretMaintenance.builder().id(1L).build()));
+
+        var result = arretMaintenanceService.listStaleOpenForReminder(3, now);
+
+        assertThat(result).hasSize(1);
+        org.mockito.ArgumentCaptor<java.time.LocalDateTime> cutoff =
+                org.mockito.ArgumentCaptor.forClass(java.time.LocalDateTime.class);
+        org.mockito.Mockito.verify(arretMaintenanceRepository).findStaleOpenAcrossAteliers(cutoff.capture());
+        assertThat(cutoff.getValue()).isEqualTo(now.toLocalDate().minusDays(2).atStartOfDay());
+
+        arretMaintenanceService.listStaleOpenForReminder(0, now);
+        org.mockito.Mockito.verify(arretMaintenanceRepository)
+                .findStaleOpenAcrossAteliers(now.toLocalDate().atStartOfDay());
+    }
 }
