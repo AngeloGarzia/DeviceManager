@@ -25,10 +25,10 @@ management:
     os:
       enabled: false
   health:
-    # Render free : éviter 503 sur /actuator/health si MySQL est lent/indispo
-    # (sinon redémarrages en boucle / page « almost online »)
+    # DB visible sur /actuator/health (diag). Render utilise /actuator/health/liveness
+    # (render.yaml) → pas de redémarrage plateforme si MySQL est down.
     db:
-      enabled: false
+      enabled: true
     diskspace:
       enabled: false
     livenessstate:
@@ -46,6 +46,20 @@ spring:
     driver-class-name: com.mysql.cj.jdbc.Driver
     hikari:
       connection-timeout: 30000
+      # Free-tier prudence (Aiven/Render) : recycle avant sockets morts.
+      # Aiven Free ne documente pas un wait_timeout court (souvent ~8h MySQL) ;
+      # 25 min = sous le défaut MySQL ~8h, avec marge réseau/proxy.
+      max-lifetime: 1500000
+      # Doit être < max-lifetime ; ne s'applique que si minimum-idle < maximum-pool-size.
+      idle-timeout: 1200000
+      # Défaut Hikari 7 explicité ; doit rester < max-lifetime.
+      keepalive-time: 120000
+      # Peu de connexions chaudes sur plan gratuit (évite 10 sockets idle).
+      minimum-idle: 2
+      # Timeouts réseau driver MySQL (ms) — évite un thread bloqué sur socket mort.
+      data-source-properties:
+        connectTimeout: 10000
+        socketTimeout: 30000
   jpa:
     open-in-view: false
     database-platform: org.hibernate.dialect.MySQLDialect

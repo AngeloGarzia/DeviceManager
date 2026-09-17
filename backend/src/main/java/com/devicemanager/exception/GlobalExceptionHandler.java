@@ -3,9 +3,13 @@ package com.devicemanager.exception;
 import com.devicemanager.dto.ApiError;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
+import org.hibernate.exception.JDBCConnectionException;
+import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.QueryTimeoutException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.jdbc.CannotGetJdbcConnectionException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -28,6 +32,9 @@ public class GlobalExceptionHandler {
             "Une erreur interne est survenue dans Device Manager. Réessayez ou contactez un administrateur.";
     private static final String MSG_ATELIER_REQUIS =
             "Sélectionnez un atelier pour continuer.";
+    private static final String MSG_DB_UNAVAILABLE =
+            "La base de données est temporairement indisponible "
+                    + "(connexion interrompue ou serveur en veille). Réessayez dans quelques instants.";
 
     /**
      * Convertit une {@link ResponseStatusException} en réponse HTTP avec le statut et le message fournis.
@@ -116,6 +123,20 @@ public class GlobalExceptionHandler {
         }
         log.error("État incohérent sur {}: {}", request.getRequestURI(), msg, ex);
         return build(HttpStatus.INTERNAL_SERVER_ERROR.value(), MSG_INTERNAL, request.getRequestURI());
+    }
+
+    /**
+     * Connexion MySQL / pool indisponible (idle stale, cold start, Aiven coupé, timeout socket).
+     */
+    @ExceptionHandler({
+            CannotGetJdbcConnectionException.class,
+            DataAccessResourceFailureException.class,
+            JDBCConnectionException.class,
+            QueryTimeoutException.class
+    })
+    public ResponseEntity<ApiError> handleDatabaseUnavailable(Exception ex, HttpServletRequest request) {
+        log.error("Base de données indisponible sur {}: {}", request.getRequestURI(), ex.getMessage(), ex);
+        return build(HttpStatus.SERVICE_UNAVAILABLE.value(), MSG_DB_UNAVAILABLE, request.getRequestURI());
     }
 
     /**

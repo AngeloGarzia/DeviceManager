@@ -11,7 +11,10 @@ import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.jdbc.CannotGetJdbcConnectionException;
 import org.springframework.web.server.ResponseStatusException;
+
+import java.sql.SQLException;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
@@ -75,5 +78,18 @@ class GlobalExceptionHandlerTest {
 
         assertThat(response.getBody().getMessage()).contains("encore utilisé");
         assertThat(response.getBody().getMessage()).doesNotContain("Référence déjà utilisée");
+    }
+
+    @Test
+    void handleDatabaseUnavailable_returns503() {
+        when(request.getRequestURI()).thenReturn("/api/devices");
+
+        ResponseEntity<ApiError> response = handler.handleDatabaseUnavailable(
+                new CannotGetJdbcConnectionException("Pool", new SQLException("Communications link failure")),
+                request);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().getMessage()).contains("temporairement indisponible");
     }
 }
