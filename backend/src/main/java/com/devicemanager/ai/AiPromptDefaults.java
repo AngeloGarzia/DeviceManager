@@ -36,6 +36,30 @@ public final class AiPromptDefaults {
             Ne invente pas de valeurs absentes de l'image : utilise null.
             """;
 
+    public static final String FACTURE_EXTRACT = """
+            Tu analyses une photo de facture, bon de livraison ou ticket d'achat
+            concernant une pièce détachée (casino / machines à sous / électronique).
+
+            Extrais les informations utiles pour créer une fiche pièce détachée.
+            Réponds UNIQUEMENT avec un JSON valide, sans markdown :
+            {
+              "nom": "désignation / libellé de la pièce si lisible, sinon null",
+              "reference": "référence / P/N / code article si lisible, sinon null",
+              "numeroSerie": "numéro de série de la pièce si lisible, sinon null",
+              "marque": "marque / fabricant si lisible, sinon null",
+              "sfmNom": "nom du fournisseur / SFM / société vendeuse si lisible, sinon null",
+              "fournisseur": "autre intitulé fournisseur si distinct de sfmNom, sinon null",
+              "unitPriceHt": 12.50,
+              "dateAcquisition": "yyyy-MM-dd si date de facture lisible, sinon null",
+              "rawText": "extrait court des lignes utiles",
+              "notes": "incertitudes, devise, TVA, quantité, ou null"
+            }
+            Contraintes :
+            - unitPriceHt : nombre décimal (point), prix unitaire HT en euros si identifiable, sinon null (pas de chaîne)
+            - ne pas inventer de valeurs absentes de l'image : utiliser null
+            - si plusieurs lignes articles, privilégier la pièce détachée principale (pas frais de port)
+            """;
+
     /**
      * Placeholders supportés : {@code {{nom}}}, {@code {{reference}}}, {@code {{marque}}},
      * {@code {{rawText}}}, {@code {{notes}}}, {@code {{webContext}}}.

@@ -1,10 +1,12 @@
 package com.devicemanager.repository;
 
 import com.devicemanager.entity.Fit;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -22,6 +24,22 @@ public interface FitRepository extends JpaRepository<Fit, Long> {
             order by f.numeroMachineCasino
             """)
     List<Fit> findAllByAtelierId(@Param("atelierId") Long atelierId);
+
+    @Query("""
+            select f.id from Fit f
+            where f.atelier.id = :atelierId
+            order by f.id desc
+            """)
+    List<Long> findIdsByAtelierIdOrderByIdDesc(@Param("atelierId") Long atelierId, Pageable pageable);
+
+    @Query("""
+            select distinct f from Fit f
+            left join fetch f.lignes
+            left join fetch f.mas
+            left join fetch f.deno
+            where f.id in :ids
+            """)
+    List<Fit> findWithRelationsByIds(@Param("ids") Collection<Long> ids);
 
     @Query("""
             select distinct f from Fit f

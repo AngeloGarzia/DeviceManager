@@ -6,6 +6,14 @@
 server:
   # Render injecte PORT ; en local on garde SERVER_PORT / 8080
   port: ${PORT:${SERVER_PORT:8080}}
+  tomcat:
+    # Plan free 512 Mo : éviter 200 threads Tomcat (stacks + native).
+    threads:
+      max: ${SERVER_TOMCAT_THREADS_MAX:25}
+      min-spare: ${SERVER_TOMCAT_THREADS_MIN_SPARE:2}
+    accept-count: ${SERVER_TOMCAT_ACCEPT_COUNT:50}
+    max-http-form-post-size: 45MB
+    max-swallow-size: 45MB
 
 management:
   endpoints:
@@ -55,7 +63,8 @@ spring:
       # Défaut Hikari 7 explicité ; doit rester < max-lifetime.
       keepalive-time: 120000
       # Peu de connexions chaudes sur plan gratuit (évite 10 sockets idle).
-      minimum-idle: 2
+      minimum-idle: ${SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE:1}
+      maximum-pool-size: ${SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE:3}
       # Timeouts réseau driver MySQL (ms) — évite un thread bloqué sur socket mort.
       data-source-properties:
         connectTimeout: 10000

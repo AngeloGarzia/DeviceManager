@@ -19,5 +19,7 @@ public class UserResponse {
     private String role;
     private Long preferredAtelierId;
     private String preferredAtelierNom;
+    /** Préférence ADMIN / SUPER_ADMIN : recevoir les e-mails d'alerte planifiés. */
+    private Boolean receiveAlertMails;
     private Instant createdAt;
 }

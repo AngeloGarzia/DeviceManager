@@ -112,4 +112,18 @@ public interface UserRepository extends JpaRepository<User, Long> {
             ORDER BY u.nom, u.prenom, u.username
             """)
     List<User> findAllByPreferredAtelierId(@Param("atelierId") Long atelierId);
+
+    /**
+     * Admins / super-admins d'un groupe (email + atelier préféré + casino préféré).
+     */
+    @Query("""
+            SELECT DISTINCT u FROM User u
+            LEFT JOIN FETCH u.groupe
+            LEFT JOIN FETCH u.preferredAtelier pa
+            LEFT JOIN FETCH pa.casino
+            WHERE u.groupe.id = :groupeId
+              AND u.role IN ('ADMIN', 'SUPER_ADMIN')
+            ORDER BY u.nom, u.prenom, u.username
+            """)
+    List<User> findAdminLikeByGroupeId(@Param("groupeId") Long groupeId);
 }

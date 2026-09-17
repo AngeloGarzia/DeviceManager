@@ -27,9 +27,10 @@ import { DeviceService } from '../../services/device.service';
 import { DeviceFormDraftService } from '../../services/device-form-draft.service';
 import { SfmService } from '../../services/sfm.service';
 import { MasService } from '../../services/mas.service';
-import { AiService } from '../../services/ai.service';
+import { AiService, AiFactureScanResponse } from '../../services/ai.service';
 import { DeviceDocument, DeviceDocumentType, DeviceForm, DevicePhoto, Mas, Sfm } from '../../models/models';
 import { ConfirmDialogComponent } from '../../shared/confirm-dialog.component';
+import { FactureAiDialogComponent, FactureAiDialogConfirm } from '../../shared/facture-ai-dialog.component';
 import { ImageEditorDialogComponent } from '../../shared/image-editor-dialog.component';
 import { apiErrorMessage } from '../../shared/api-error';
 import { isPdfFile, isPdfOrImageFile, PDF_OR_IMAGE_ACCEPT } from '../../shared/document-upload';
@@ -47,7 +48,7 @@ interface NewDocumentItem {
 /**
  * Formulaire de création ou modification d'une pièce détachée.
  * Gère la capture photo (caméra ou galerie), documents PDF ou image, rattachement SFM/MAS,
- * le scan IA d'étiquette et la sauvegarde avec brouillon de retour.
+ * le scan IA d'étiquette / facture et la sauvegarde avec brouillon de retour.
  */
 @Component({
   selector: 'app-device-form',
@@ -65,7 +66,8 @@ interface NewDocumentItem {
     MatProgressSpinnerModule,
     MatTooltipModule,
     MatDialogModule,
-    ConfirmDialogComponent
+    ConfirmDialogComponent,
+    FactureAiDialogComponent
   ],
   templateUrl: './device-form.component.html',
   styleUrl: './device-form.component.scss'
@@ -76,6 +78,7 @@ export class DeviceFormComponent implements OnInit, AfterViewInit, OnDestroy {
   @ViewChild('videoEl') videoEl?: ElementRef<HTMLVideoElement>;
   @ViewChild('canvasEl') canvasEl?: ElementRef<HTMLCanvasElement>;
   @ViewChild('fileInput') fileInput?: ElementRef<HTMLInputElement>;
+  @ViewChild('factureInput') factureInput?: ElementRef<HTMLInputElement>;
 
   private readonly fb = inject(FormBuilder);
   private readonly route = inject(ActivatedRoute);
@@ -91,6 +94,10 @@ export class DeviceFormComponent implements OnInit, AfterViewInit, OnDestroy {
   readonly loading = signal(false);
   readonly saving = signal(false);
   readonly scanningLabel = signal(false);
+  readonly scanningFacture = signal(false);
+  readonly factureReviewOpen = signal(false);
+  readonly factureSuggestion = signal<AiFactureScanResponse | null>(null);
+  readonly factureScanNotes = signal<string | null>(null);
   readonly error = signal<string | null>(null);
   readonly aiHint = signal<string | null>(null);
   readonly associatedMasHint = signal<string | null>(null);
@@ -443,7 +450,7 @@ export class DeviceFormComponent implements OnInit, AfterViewInit, OnDestroy {
 
   /** Capture (ou dernière photo) puis analyse IA de l'étiquette → préremplit le formulaire. */
   async scanLabelWithAi(): Promise<void> {
-    if (!this.aiService.enabled() || this.scanningLabel()) {
+    if (!this.aiService.enabled() || this.scanningLabel() || this.scanningFacture()) {
       return;
     }
     this.error.set(null);
@@ -489,6 +496,151 @@ export class DeviceFormComponent implements OnInit, AfterViewInit, OnDestroy {
         );
       }
     });
+  }
+
+  /** Ouvre le sélecteur de fichier pour scanner une facture (création uniquement). */
+  openFacturePicker(): void {
+    if (this.isEdit || !this.aiService.enabled() || this.scanningFacture() || this.scanningLabel()) {
+      return;
+    }
+    this.factureInput?.nativeElement?.click();
+  }
+
+  async onFactureSelected(event: Event): Promise<void> {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0] ?? null;
+    input.value = '';
+    if (!file) {
+      return;
+    }
+    if (!file.type.startsWith('image/')) {
+      this.error.set('Choisissez une image de facture (JPG, PNG, etc.).');
+      return;
+    }
+    await this.scanFactureWithAi(file);
+  }
+
+  /** Capture caméra puis analyse IA facture → modale de revue. */
+  async scanFactureFromCamera(): Promise<void> {
+    if (this.isEdit || !this.aiService.enabled() || this.scanningFacture() || this.scanningLabel()) {
+      return;
+    }
+    let file: File | null = null;
+    try {
+      file = await this.captureBlobAsFile();
+    } catch {
+      file = null;
+    }
+    if (!file) {
+      this.openFacturePicker();
+      return;
+    }
+    await this.scanFactureWithAi(file);
+  }
+
+  private async scanFactureWithAi(source: File): Promise<void> {
+    this.error.set(null);
+    this.aiHint.set(null);
+    const edited = await this.openImageEditor(source, 'Recadrer la facture pour le scan IA');
+    if (!edited) {
+      return;
+    }
+    if (this.canAddPhoto()) {
+      this.addNewPhoto(edited);
+    }
+
+    this.factureSuggestion.set(null);
+    this.factureScanNotes.set(null);
+    this.factureReviewOpen.set(true);
+    this.scanningFacture.set(true);
+
+    this.aiService.scanFacture(edited).subscribe({
+      next: (res) => {
+        this.scanningFacture.set(false);
+        this.factureSuggestion.set(res);
+        this.factureScanNotes.set(res.notes?.trim() || null);
+        if (
+          !res.nom &&
+          !res.reference &&
+          !res.numeroSerie &&
+          !res.marque &&
+          res.unitPriceHt == null &&
+          !res.sfmNom &&
+          !res.fournisseur
+        ) {
+          this.factureScanNotes.set(
+            res.notes?.trim() ||
+              'Aucune information lisible sur la facture. Réessayez avec une photo plus nette.'
+          );
+        }
+      },
+      error: (err) => {
+        this.scanningFacture.set(false);
+        this.factureReviewOpen.set(false);
+        this.error.set(
+          apiErrorMessage(err, 'Scan facture impossible. Vérifiez que l’assistant est activé dans Paramètres.')
+        );
+      }
+    });
+  }
+
+  dismissFactureReview(): void {
+    if (this.scanningFacture()) {
+      return;
+    }
+    this.factureReviewOpen.set(false);
+    this.factureSuggestion.set(null);
+    this.factureScanNotes.set(null);
+  }
+
+  applyFactureReview(data: FactureAiDialogConfirm): void {
+    const patch: Record<string, string | number | null> = {};
+    if (data.nom?.trim()) {
+      patch['nom'] = data.nom.trim().slice(0, 120);
+    }
+    if (data.reference?.trim()) {
+      patch['reference'] = data.reference.trim().slice(0, 80);
+    }
+    if (data.usage?.trim()) {
+      patch['usage'] = data.usage.trim().slice(0, 500);
+    }
+    if (data.dateAcquisition?.trim()) {
+      patch['dateAcquisition'] = data.dateAcquisition.trim();
+    }
+    if (!this.isEdit && data.unitPriceHt != null && data.unitPriceHt >= 0) {
+      patch['unitPriceHt'] = data.unitPriceHt;
+    }
+    if (data.sfmId != null) {
+      patch['sfmId'] = data.sfmId;
+      this.selectedSfmId.set(data.sfmId);
+    }
+    if (Object.keys(patch).length > 0) {
+      this.form.patchValue(patch);
+    }
+
+    if (data.numeroSerie?.trim()) {
+      const serialLine = `N° série : ${data.numeroSerie.trim()}`;
+      const current = (this.form.controls.informationTechnique.value || '').trim();
+      if (!current.includes(serialLine)) {
+        this.form.patchValue({
+          informationTechnique: current ? `${serialLine}\n${current}` : serialLine
+        });
+      }
+    }
+
+    const hints: string[] = [];
+    if (data.marque?.trim()) {
+      hints.push(`Marque détectée : ${data.marque.trim()} (à rattacher via MAS si besoin)`);
+    }
+    if (data.sfmNom?.trim() && data.sfmId == null) {
+      hints.push(`Fournisseur détecté « ${data.sfmNom.trim()} » — aucun SFM correspondant`);
+    }
+    this.aiHint.set(
+      hints.length > 0
+        ? hints.join(' · ')
+        : 'Champs intégrés depuis la facture — vérifiez avant enregistrement.'
+    );
+    this.dismissFactureReview();
   }
 
   private applyLabelScan(res: {

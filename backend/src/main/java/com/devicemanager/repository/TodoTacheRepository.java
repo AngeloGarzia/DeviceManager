@@ -2,6 +2,7 @@ package com.devicemanager.repository;
 
 import com.devicemanager.entity.TodoTache;
 import com.devicemanager.entity.TodoTacheStatut;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -76,6 +77,24 @@ public interface TodoTacheRepository extends JpaRepository<TodoTache, Long> {
     List<TodoTache> findAllWithMasByAtelierId(@Param("atelierId") Long atelierId);
 
     @Query("""
+            SELECT t.id FROM TodoTache t
+            WHERE t.atelier.id = :atelierId
+              AND t.mas IS NOT NULL
+            ORDER BY t.createdAt DESC
+            """)
+    List<Long> findIdsWithMasByAtelierIdOrderByCreatedDesc(
+            @Param("atelierId") Long atelierId, Pageable pageable);
+
+    @Query("""
+            SELECT DISTINCT t FROM TodoTache t
+            LEFT JOIN FETCH t.mas
+            LEFT JOIN FETCH t.interventionTechnique
+            LEFT JOIN FETCH t.intervention
+            WHERE t.id IN :ids
+            """)
+    List<TodoTache> findWithMasByIds(@Param("ids") Collection<Long> ids);
+
+    @Query("""
             SELECT DISTINCT t.mas.id FROM TodoTache t
             WHERE t.atelier.id = :atelierId AND t.mas IS NOT NULL
             """)
@@ -105,6 +124,8 @@ public interface TodoTacheRepository extends JpaRepository<TodoTache, Long> {
     @Query("""
             SELECT DISTINCT t FROM TodoTache t
             JOIN FETCH t.atelier a
+            JOIN FETCH a.casino cas
+            JOIN FETCH cas.groupe
             LEFT JOIN FETCH t.mas
             WHERE t.statut IN :statuts
               AND t.dueAt IS NOT NULL

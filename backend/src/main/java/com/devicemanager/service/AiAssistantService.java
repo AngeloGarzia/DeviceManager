@@ -10,6 +10,7 @@ import com.devicemanager.dto.AiDevisPrixSuggestion;
 import com.devicemanager.dto.AiDevisScanResponse;
 import com.devicemanager.dto.AiDevisSuggestion;
 import com.devicemanager.dto.AiDevisUnmatchedPart;
+import com.devicemanager.dto.AiFactureScanResponse;
 import com.devicemanager.dto.AiLabelScanResponse;
 import com.devicemanager.dto.AiPdfScanResponse;
 import com.devicemanager.dto.AiRegleJeuxScanResponse;
@@ -224,6 +225,88 @@ public class AiAssistantService {
             log.error("Échec scan étiquette IA: {}", ex.getMessage(), ex);
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
                     "Analyse de l'étiquette impossible. Réessayez ou changez de fournisseur dans Paramètres.");
+        }
+    }
+
+    /**
+     * Analyse une photo de facture / bon de livraison (OCR vision) pour préremplir une fiche pièce.
+     *
+     * @param image photo de la facture
+     * @return champs extraits (référence, prix, SFM, marque, etc.)
+     */
+    public AiFactureScanResponse scanFacture(MultipartFile image) {
+        requireEnabled();
+        if (image == null || image.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Photo de facture obligatoire pour le scan");
+        }
+        VisionEndpoint vision = resolveVisionEndpoint();
+        String provider = vision.providerId();
+        String apiKey = vision.apiKey();
+        String visionModel = vision.model();
+
+        MultipartFile optimized = imageOptimizationService.optimize(image);
+        byte[] bytes;
+        try {
+            bytes = optimized.getBytes();
+        } catch (Exception ex) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Photo illisible ou format non pris en charge");
+        }
+        if (bytes.length == 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La photo est vide");
+        }
+
+        try {
+            ChatClient visionClient = buildChatClient(apiKey, provider, visionModel, 0.1);
+            String extractRaw = visionClient.prompt()
+                    .user(u -> u.text(factureExtractPrompt())
+                            .media(new Media(MimeTypeUtils.IMAGE_JPEG, new ByteArrayResource(bytes))))
+                    .call()
+                    .content();
+
+            JsonNode extracted = parseJsonObject(extractRaw);
+            String nom = truncate(textOrNull(extracted, "nom"), 120);
+            String reference = truncate(textOrNull(extracted, "reference"), 80);
+            String numeroSerie = truncate(textOrNull(extracted, "numeroSerie"), 80);
+            String marque = truncate(textOrNull(extracted, "marque"), 80);
+            String sfmNom = truncate(textOrNull(extracted, "sfmNom"), 120);
+            String fournisseur = truncate(textOrNull(extracted, "fournisseur"), 120);
+            if (sfmNom == null) {
+                sfmNom = fournisseur;
+            }
+            BigDecimal unitPriceHt = decimalOrNull(extracted, "unitPriceHt");
+            if (unitPriceHt != null && unitPriceHt.compareTo(BigDecimal.ZERO) < 0) {
+                unitPriceHt = null;
+            }
+            String dateAcquisition = normalizeIsoDate(textOrNull(extracted, "dateAcquisition"));
+            String rawText = truncate(textOrNull(extracted, "rawText"), 2000);
+            String notes = textOrNull(extracted, "notes");
+
+            String webContext = webEnrichmentService.gatherContext(marque, nom, reference);
+            String usage = generateUsage(apiKey, provider, resolveChatModelForProvider(provider),
+                    nom, reference, marque, rawText, notes, webContext);
+
+            return AiFactureScanResponse.builder()
+                    .enabled(true)
+                    .nom(nom)
+                    .reference(reference)
+                    .numeroSerie(numeroSerie)
+                    .marque(marque)
+                    .sfmNom(sfmNom)
+                    .fournisseur(fournisseur)
+                    .unitPriceHt(unitPriceHt)
+                    .dateAcquisition(dateAcquisition)
+                    .usage(truncate(usage, 500))
+                    .rawText(rawText)
+                    .notes(blankToNull(joinNotes(notes, webContext.isBlank()
+                            ? null
+                            : "Infos web trouvées pour enrichir l'usage.")))
+                    .build();
+        } catch (ResponseStatusException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            log.error("Échec scan facture IA: {}", ex.getMessage(), ex);
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
+                    "Analyse de la facture impossible. Réessayez ou changez de fournisseur dans Paramètres.");
         }
     }
 
@@ -1037,6 +1120,38 @@ public class AiAssistantService {
         return firstNonBlank(
                 appSettingsService.get(AppSettingsService.AI_LABEL_EXTRACT_PROMPT, ""),
                 AiPromptDefaults.LABEL_EXTRACT);
+    }
+
+    private String factureExtractPrompt() {
+        return firstNonBlank(
+                appSettingsService.get(AppSettingsService.AI_FACTURE_EXTRACT_PROMPT, ""),
+                AiPromptDefaults.FACTURE_EXTRACT);
+    }
+
+    /** Accepte {@code yyyy-MM-dd} ou formats FR courants ; sinon null. */
+    private static String normalizeIsoDate(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return null;
+        }
+        String v = raw.trim();
+        if (v.matches("\\d{4}-\\d{2}-\\d{2}")) {
+            return v;
+        }
+        if (v.matches("\\d{1,2}/\\d{1,2}/\\d{4}")) {
+            String[] parts = v.split("/");
+            int d = Integer.parseInt(parts[0]);
+            int m = Integer.parseInt(parts[1]);
+            int y = Integer.parseInt(parts[2]);
+            return String.format("%04d-%02d-%02d", y, m, d);
+        }
+        if (v.matches("\\d{1,2}-\\d{1,2}-\\d{4}")) {
+            String[] parts = v.split("-");
+            int d = Integer.parseInt(parts[0]);
+            int m = Integer.parseInt(parts[1]);
+            int y = Integer.parseInt(parts[2]);
+            return String.format("%04d-%02d-%02d", y, m, d);
+        }
+        return null;
     }
 
     private String regleJeuxExtractPrompt() {

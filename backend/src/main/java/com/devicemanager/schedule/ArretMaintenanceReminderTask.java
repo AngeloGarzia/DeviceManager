@@ -1,9 +1,8 @@
 package com.devicemanager.schedule;
 
 import com.devicemanager.entity.ArretMaintenance;
-import com.devicemanager.mail.EmailSendResult;
+import com.devicemanager.entity.Casino;
 import com.devicemanager.mail.RenderedEmail;
-import com.devicemanager.mail.TransactionalMail;
 import com.devicemanager.mail.templates.ArretMaintenanceReminderEmail;
 import com.devicemanager.service.AppSettingsService;
 import com.devicemanager.service.ArretMaintenanceService;
@@ -18,9 +17,11 @@ import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /**
- * Rappel quotidien des arrêts maintenance ouverts trop longtemps → {@code MAIL_ADMIN_EMAIL}.
+ * Rappel quotidien des arrêts maintenance ouverts trop longtemps
+ * → ADMIN / SUPER_ADMIN du casino concerné.
  */
 @Component
 @RequiredArgsConstructor
@@ -33,7 +34,7 @@ public class ArretMaintenanceReminderTask {
     private final ScheduledJobSupport scheduledJobSupport;
     private final AppSettingsService appSettingsService;
     private final ArretMaintenanceService arretMaintenanceService;
-    private final TransactionalMail transactionalMail;
+    private final ScheduledDigestMailer digestMailer;
 
     @Scheduled(cron = "${app.schedule.tick-cron:0 * * * * *}")
     @Transactional
@@ -51,52 +52,34 @@ public class ArretMaintenanceReminderTask {
             return;
         }
 
-        String recipient = transactionalMail.getAdminEmail();
-        if (recipient == null || recipient.isBlank() || !recipient.contains("@")) {
-            log.warn("Rappel arrêts maintenance ignoré — MAIL_ADMIN_EMAIL invalide");
-            return;
-        }
-
-        String periodKey = scheduledJobSupport.periodKeyToday();
-        if (scheduledJobSupport.alreadySent(JOB_KEY, periodKey, recipient)) {
-            return;
-        }
-
         int minAgeDays = resolveMinAgeDays();
         LocalDateTime now = scheduledJobSupport.now();
         List<ArretMaintenance> stale = arretMaintenanceService.listStaleOpenForReminder(minAgeDays, now);
         if (stale.isEmpty()) {
-            log.debug("Rappel arrêts — aucun ouvert ≥ {} j (period={})", minAgeDays, periodKey);
+            log.debug("Rappel arrêts — aucun ouvert ≥ {} j", minAgeDays);
             return;
         }
 
-        List<ArretMaintenanceReminderEmail.ArretLine> lines = new ArrayList<>();
-        for (ArretMaintenance a : stale) {
-            long ageDays = a.getDateHeureArret() == null
-                    ? 0
-                    : Math.max(0, ChronoUnit.DAYS.between(a.getDateHeureArret().toLocalDate(), now.toLocalDate()));
-            lines.add(new ArretMaintenanceReminderEmail.ArretLine(
-                    a.getId(),
-                    a.getAtelier() != null ? a.getAtelier().getNom() : null,
-                    a.getMas() != null ? a.getMas().getNumero() : null,
-                    a.getMotifArret(),
-                    a.getDateHeureArret() == null ? null : a.getDateHeureArret().format(DATE_FMT),
-                    ageDays));
-        }
-
-        if (!scheduledJobSupport.tryClaim(JOB_KEY, periodKey, recipient)) {
-            return;
-        }
-        RenderedEmail email = ArretMaintenanceReminderEmail.render(
-                new ArretMaintenanceReminderEmail.Context(periodKey, minAgeDays, lines));
-        EmailSendResult result = transactionalMail.notifyAdminArretMaintenanceReminder(
-                email.subject(), email.text(), email.html());
-        if (result.ok()) {
-            log.info("Rappel arrêts maintenance envoyé period={} lines={} simulated={}",
-                    periodKey, lines.size(), result.skipped());
-        } else {
-            scheduledJobSupport.releaseClaim(JOB_KEY, periodKey, recipient);
-            log.warn("Rappel arrêts maintenance échec period={} error={}", periodKey, result.error());
+        String dateKey = scheduledJobSupport.periodKeyToday();
+        Map<Casino, List<ArretMaintenance>> byCasino =
+                ScheduledDigestMailer.groupByCasino(stale, ArretMaintenance::getAtelier);
+        for (Map.Entry<Casino, List<ArretMaintenance>> entry : byCasino.entrySet()) {
+            List<ArretMaintenanceReminderEmail.ArretLine> lines = new ArrayList<>();
+            for (ArretMaintenance a : entry.getValue()) {
+                long ageDays = a.getDateHeureArret() == null
+                        ? 0
+                        : Math.max(0, ChronoUnit.DAYS.between(a.getDateHeureArret().toLocalDate(), now.toLocalDate()));
+                lines.add(new ArretMaintenanceReminderEmail.ArretLine(
+                        a.getId(),
+                        a.getAtelier() != null ? a.getAtelier().getNom() : null,
+                        a.getMas() != null ? a.getMas().getNumero() : null,
+                        a.getMotifArret(),
+                        a.getDateHeureArret() == null ? null : a.getDateHeureArret().format(DATE_FMT),
+                        ageDays));
+            }
+            RenderedEmail email = ArretMaintenanceReminderEmail.render(
+                    new ArretMaintenanceReminderEmail.Context(dateKey, minAgeDays, lines));
+            digestMailer.sendToCasinoAdmins(JOB_KEY, dateKey, entry.getKey(), email);
         }
     }
 

@@ -82,16 +82,24 @@ export class OrderTimelineComponent implements OnInit {
   load(): void {
     this.loading.set(true);
     this.error.set(null);
-    this.timelineService.list().subscribe({
-      next: (data) => {
-        this.items.set(data);
-        this.loading.set(false);
-      },
-      error: (err) => {
-        this.error.set(apiErrorMessage(err, 'Impossible de charger la timeline.'));
-        this.loading.set(false);
-      }
-    });
+    const to = new Date();
+    const from = new Date();
+    from.setDate(from.getDate() - 90);
+    this.timelineService
+      .list({
+        from: from.toISOString().slice(0, 19),
+        to: to.toISOString().slice(0, 19)
+      })
+      .subscribe({
+        next: (data) => {
+          this.items.set(data);
+          this.loading.set(false);
+        },
+        error: (err) => {
+          this.error.set(apiErrorMessage(err, 'Impossible de charger la timeline.'));
+          this.loading.set(false);
+        }
+      });
   }
 
   isActive(col: TimelineColumn): boolean {

@@ -31,6 +31,7 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -108,16 +109,26 @@ class TimelineServiceTest {
                 .createdAt(t3.plusHours(1))
                 .build();
 
-        when(commandeRepository.findAllWithRelationsOrderByDateDesc(100L)).thenReturn(List.of(commande));
-        when(interventionRepository.findAllWithRelationsByAtelierId(100L)).thenReturn(List.of(intervention));
-        when(interventionTechniqueRepository.findAllByAtelierId(100L)).thenReturn(List.of());
-        when(fitRepository.findAllByAtelierId(100L)).thenReturn(List.of());
-        when(todoTacheRepository.findAllWithMasByAtelierId(100L)).thenReturn(List.of());
-        when(stockMouvementRepository.findByAtelierAndSourceType(
-                eq(100L), eq(StockMouvementSources.MANUAL)))
+        when(commandeRepository.findIdsByAtelierIdOrderByDateDesc(eq(100L), any()))
+                .thenReturn(List.of(1L));
+        when(commandeRepository.findWithRelationsByIds(any())).thenReturn(List.of(commande));
+        when(interventionRepository.findIdsByAtelierIdOrderByDateDesc(eq(100L), any()))
+                .thenReturn(List.of(9L));
+        when(interventionRepository.findWithRelationsByIds(any())).thenReturn(List.of(intervention));
+        when(interventionTechniqueRepository.findIdsByAtelierIdOrderByDateDesc(eq(100L), any()))
+                .thenReturn(List.of());
+        when(fitRepository.findIdsByAtelierIdOrderByIdDesc(eq(100L), any())).thenReturn(List.of());
+        when(todoTacheRepository.findIdsWithMasByAtelierIdOrderByCreatedDesc(eq(100L), any()))
+                .thenReturn(List.of());
+        when(stockMouvementRepository.findByAtelierAndSourceTypeBetween(
+                eq(100L), eq(StockMouvementSources.MANUAL), any(), any()))
                 .thenReturn(List.of(manual));
 
-        List<TimelineEventResponse> events = timelineService.findEvents(null, null, null, null);
+        List<TimelineEventResponse> events = timelineService.findEvents(
+                LocalDateTime.of(2026, 7, 1, 0, 0),
+                LocalDateTime.of(2026, 9, 1, 0, 0),
+                null,
+                null);
 
         assertThat(events).extracting(TimelineEventResponse::getType)
                 .containsExactly(
@@ -142,10 +153,25 @@ class TimelineServiceTest {
                 .lignes(new ArrayList<>())
                 .build();
 
-        when(commandeRepository.findAllWithRelationsOrderByDateDesc(100L)).thenReturn(List.of(old));
+        when(commandeRepository.findIdsByAtelierIdOrderByDateDesc(eq(100L), any()))
+                .thenReturn(List.of(2L));
+        when(commandeRepository.findWithRelationsByIds(any())).thenReturn(List.of(old));
+        lenient().when(interventionRepository.findIdsByAtelierIdOrderByDateDesc(eq(100L), any()))
+                .thenReturn(List.of());
+        lenient().when(interventionTechniqueRepository.findIdsByAtelierIdOrderByDateDesc(eq(100L), any()))
+                .thenReturn(List.of());
+        lenient().when(fitRepository.findIdsByAtelierIdOrderByIdDesc(eq(100L), any())).thenReturn(List.of());
+        lenient().when(todoTacheRepository.findIdsWithMasByAtelierIdOrderByCreatedDesc(eq(100L), any()))
+                .thenReturn(List.of());
+        lenient().when(stockMouvementRepository.findByAtelierAndSourceTypeBetween(
+                eq(100L), eq(StockMouvementSources.MANUAL), any(), any()))
+                .thenReturn(List.of());
 
         List<TimelineEventResponse> events = timelineService.findEvents(
-                null, null, List.of(TimelineEventTypes.ORDER_RECEIVED, TimelineEventTypes.ORDER_REQUEST), null);
+                LocalDateTime.of(2026, 6, 1, 0, 0),
+                LocalDateTime.of(2026, 8, 1, 0, 0),
+                List.of(TimelineEventTypes.ORDER_RECEIVED, TimelineEventTypes.ORDER_REQUEST),
+                null);
 
         assertThat(events).hasSize(1);
         assertThat(events.getFirst().getType()).isEqualTo(TimelineEventTypes.ORDER_REQUEST);

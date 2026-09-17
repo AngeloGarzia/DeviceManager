@@ -24,6 +24,7 @@ import com.devicemanager.repository.TodoTacheRepository;
 import com.devicemanager.security.StockMouvementSources;
 import com.devicemanager.security.TimelineEventTypes;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,11 +33,14 @@ import org.springframework.web.server.ResponseStatusException;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
@@ -46,6 +50,11 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class TimelineService {
+
+    /** Fenêtre par défaut si aucune borne « from » (plan free : évite de charger tout l'historique). */
+    static final int DEFAULT_WINDOW_DAYS = 90;
+    /** Plafond par source pour les listes atelier (commandes, bons, IT, FIT, todos). */
+    static final int SOURCE_LIMIT = 120;
 
     private final CommandeRepository commandeRepository;
     private final InterventionRepository interventionRepository;
@@ -72,6 +81,10 @@ public class TimelineService {
             Long masId) {
         Long atelierId = atelierService.requireCurrentAtelier().getId();
         Set<String> typeFilter = normalizeTypes(types);
+        LocalDateTime effectiveFrom = from != null
+                ? from
+                : LocalDateTime.now().minusDays(DEFAULT_WINDOW_DAYS);
+        LocalDateTime effectiveTo = to;
         String masNumero = null;
         if (masId != null) {
             Mas mas = masRepository.findByIdAndAtelierId(masId, atelierId)
@@ -81,13 +94,13 @@ public class TimelineService {
 
         List<TimelineEventResponse> events = new ArrayList<>();
         if (masId == null) {
-            appendOrderEvents(events, atelierId, from, to, typeFilter);
-            appendManualStockEvents(events, atelierId, from, to, typeFilter);
+            appendOrderEvents(events, atelierId, effectiveFrom, effectiveTo, typeFilter);
+            appendManualStockEvents(events, atelierId, effectiveFrom, effectiveTo, typeFilter);
         }
-        appendBonEvents(events, atelierId, from, to, typeFilter, masId, masNumero);
-        appendTechniqueEvents(events, atelierId, from, to, typeFilter, masId);
-        appendFitEvents(events, atelierId, from, to, typeFilter, masId);
-        appendTodoEvents(events, atelierId, from, to, typeFilter, masId);
+        appendBonEvents(events, atelierId, effectiveFrom, effectiveTo, typeFilter, masId, masNumero);
+        appendTechniqueEvents(events, atelierId, effectiveFrom, effectiveTo, typeFilter, masId);
+        appendFitEvents(events, atelierId, effectiveFrom, effectiveTo, typeFilter, masId);
+        appendTodoEvents(events, atelierId, effectiveFrom, effectiveTo, typeFilter, masId);
 
         events.sort(Comparator
                 .comparing(TimelineEventResponse::getAt, Comparator.nullsLast(Comparator.reverseOrder()))
@@ -137,7 +150,7 @@ public class TimelineService {
             LocalDateTime from,
             LocalDateTime to,
             Set<String> typeFilter) {
-        for (Commande commande : commandeRepository.findAllWithRelationsOrderByDateDesc(atelierId)) {
+        for (Commande commande : loadRecentCommandes(atelierId)) {
             List<TimelineLineDto> lignes = orderLines(commande);
             int totalQty = lignes.stream().mapToInt(l -> l.getQuantite() == null ? 0 : l.getQuantite()).sum();
 
@@ -206,7 +219,7 @@ public class TimelineService {
         }
         List<Intervention> list = masId != null
                 ? interventionRepository.findByAtelierAndMas(atelierId, masId, masNumero)
-                : interventionRepository.findAllWithRelationsByAtelierId(atelierId);
+                : loadRecentInterventions(atelierId);
         for (Intervention intervention : list) {
             if (!inRange(intervention.getDateIntervention(), from, to)) {
                 continue;
@@ -245,7 +258,7 @@ public class TimelineService {
         }
         List<InterventionTechnique> list = masId != null
                 ? interventionTechniqueRepository.findByAtelierIdAndMasId(atelierId, masId)
-                : interventionTechniqueRepository.findAllByAtelierId(atelierId);
+                : loadRecentTechniques(atelierId);
         for (InterventionTechnique it : list) {
             if (!inRange(it.getDateIntervention(), from, to)) {
                 continue;
@@ -283,7 +296,7 @@ public class TimelineService {
                     .map(List::of)
                     .orElse(List.of());
         } else {
-            fits = fitRepository.findAllByAtelierId(atelierId);
+            fits = loadRecentFits(atelierId);
         }
         for (Fit fit : fits) {
             Mas mas = fit.getMas();
@@ -331,7 +344,7 @@ public class TimelineService {
         }
         List<TodoTache> list = masId != null
                 ? todoTacheRepository.findByAtelierIdAndMasId(atelierId, masId)
-                : todoTacheRepository.findAllWithMasByAtelierId(atelierId);
+                : loadRecentTodos(atelierId);
         for (TodoTache todo : list) {
             LocalDateTime at = todoEventAt(todo);
             if (!inRange(at, from, to)) {
@@ -407,13 +420,11 @@ public class TimelineService {
         if (!include(typeFilter, TimelineEventTypes.STOCK_ADJUSTMENT)) {
             return;
         }
-        List<StockMouvement> mouvements = (from == null && to == null)
-                ? stockMouvementRepository.findByAtelierAndSourceType(atelierId, StockMouvementSources.MANUAL)
-                : stockMouvementRepository.findByAtelierAndSourceTypeBetween(
-                        atelierId,
-                        StockMouvementSources.MANUAL,
-                        from != null ? from : LocalDateTime.of(1970, 1, 1, 0, 0),
-                        to != null ? to : LocalDateTime.of(9999, 12, 31, 23, 59));
+        List<StockMouvement> mouvements = stockMouvementRepository.findByAtelierAndSourceTypeBetween(
+                atelierId,
+                StockMouvementSources.MANUAL,
+                from != null ? from : LocalDateTime.of(1970, 1, 1, 0, 0),
+                to != null ? to : LocalDateTime.of(9999, 12, 31, 23, 59));
         for (StockMouvement m : mouvements) {
             TimelineLineDto line = TimelineLineDto.builder()
                     .deviceId(m.getDevice() != null ? m.getDevice().getId() : null)
@@ -544,5 +555,66 @@ public class TimelineService {
             }
         }
         return out;
+    }
+
+    private List<Commande> loadRecentCommandes(Long atelierId) {
+        return loadByIdsOrdered(
+                commandeRepository.findIdsByAtelierIdOrderByDateDesc(atelierId, PageRequest.of(0, SOURCE_LIMIT)),
+                commandeRepository::findWithRelationsByIds,
+                Commande::getId);
+    }
+
+    private List<Intervention> loadRecentInterventions(Long atelierId) {
+        return loadByIdsOrdered(
+                interventionRepository.findIdsByAtelierIdOrderByDateDesc(atelierId, PageRequest.of(0, SOURCE_LIMIT)),
+                interventionRepository::findWithRelationsByIds,
+                Intervention::getId);
+    }
+
+    private List<InterventionTechnique> loadRecentTechniques(Long atelierId) {
+        return loadByIdsOrdered(
+                interventionTechniqueRepository.findIdsByAtelierIdOrderByDateDesc(
+                        atelierId, PageRequest.of(0, SOURCE_LIMIT)),
+                interventionTechniqueRepository::findWithRelationsByIds,
+                InterventionTechnique::getId);
+    }
+
+    private List<Fit> loadRecentFits(Long atelierId) {
+        return loadByIdsOrdered(
+                fitRepository.findIdsByAtelierIdOrderByIdDesc(atelierId, PageRequest.of(0, SOURCE_LIMIT)),
+                fitRepository::findWithRelationsByIds,
+                Fit::getId);
+    }
+
+    private List<TodoTache> loadRecentTodos(Long atelierId) {
+        return loadByIdsOrdered(
+                todoTacheRepository.findIdsWithMasByAtelierIdOrderByCreatedDesc(
+                        atelierId, PageRequest.of(0, SOURCE_LIMIT)),
+                todoTacheRepository::findWithMasByIds,
+                TodoTache::getId);
+    }
+
+    private static <T> List<T> loadByIdsOrdered(
+            List<Long> ids,
+            Function<List<Long>, List<T>> loader,
+            Function<T, Long> idFn) {
+        if (ids == null || ids.isEmpty()) {
+            return List.of();
+        }
+        Map<Long, T> byId = new HashMap<>();
+        for (T item : loader.apply(ids)) {
+            Long id = idFn.apply(item);
+            if (id != null) {
+                byId.put(id, item);
+            }
+        }
+        List<T> ordered = new ArrayList<>(ids.size());
+        for (Long id : ids) {
+            T item = byId.get(id);
+            if (item != null) {
+                ordered.add(item);
+            }
+        }
+        return ordered;
     }
 }

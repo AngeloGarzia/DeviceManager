@@ -1,0 +1,100 @@
+@if (open) {
+  <div
+    class="fixed inset-0 z-[100] flex items-end justify-center bg-slate-900/40 p-4 sm:items-center"
+    role="button"
+    tabindex="0"
+    aria-label="Fermer la modale"
+    (click)="!scanning && dismissed.emit()"
+    (keydown.enter)="!scanning && dismissed.emit()"
+    (keydown.space)="!scanning && dismissed.emit()"
+  >
+    <div
+      class="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-line bg-white p-5 shadow-soft"
+      role="dialog"
+      aria-modal="true"
+      tabindex="-1"
+      (click)="$event.stopPropagation()"
+      (keydown)="$event.stopPropagation()"
+    >
+      <div class="mb-1 flex items-start gap-2">
+        <mat-icon class="text-brand">receipt_long</mat-icon>
+        <div>
+          <h2 class="m-0 text-lg font-semibold text-ink">Informations de la facture</h2>
+          <p class="m-0 mt-1 text-sm text-ink-soft">
+            @if (scanning) {
+              Analyse de la facture en cours…
+            } @else {
+              Vérifiez les champs détectés avant de les intégrer au formulaire.
+            }
+          </p>
+        </div>
+      </div>
+
+      @if (scanNotes && !scanning) {
+        <p class="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">{{ scanNotes }}</p>
+      }
+
+      @if (scanning) {
+        <div class="flex justify-center py-10">
+          <mat-spinner diameter="36"></mat-spinner>
+        </div>
+      } @else {
+        <form class="mt-4 grid gap-3 sm:grid-cols-2" [formGroup]="form" (ngSubmit)="submit()">
+          <mat-form-field appearance="outline" class="sm:col-span-2">
+            <mat-label>Nom / désignation</mat-label>
+            <input matInput formControlName="nom" />
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>Référence</mat-label>
+            <input matInput formControlName="reference" />
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>N° de série</mat-label>
+            <input matInput formControlName="numeroSerie" />
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>Marque</mat-label>
+            <input matInput formControlName="marque" />
+            <mat-hint>À rattacher via MAS si besoin</mat-hint>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>Prix unitaire HT (€)</mat-label>
+            <input matInput type="number" min="0" step="0.01" formControlName="unitPriceHt" />
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>Date d'acquisition</mat-label>
+            <input matInput type="date" formControlName="dateAcquisition" />
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" class="sm:col-span-2">
+            <mat-label>SFM / fournisseur</mat-label>
+            <mat-select formControlName="sfmId">
+              <mat-option [value]="null">— Aucun —</mat-option>
+              @for (s of sfms; track s.id) {
+                <mat-option [value]="s.id">{{ s.nom }}</mat-option>
+              }
+            </mat-select>
+            @if (form.controls.sfmNom.value && form.controls.sfmId.value == null) {
+              <mat-hint>Détecté : {{ form.controls.sfmNom.value }} (non trouvé dans la liste)</mat-hint>
+            }
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" class="sm:col-span-2">
+            <mat-label>Usage</mat-label>
+            <textarea matInput rows="3" formControlName="usage"></textarea>
+          </mat-form-field>
+
+          <div class="sm:col-span-2 grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <button mat-stroked-button type="button" (click)="dismissed.emit()">Annuler</button>
+            <button mat-flat-button color="primary" type="submit">Intégrer au formulaire</button>
+          </div>
+        </form>
+      }
+    </div>
+  </div>
+}

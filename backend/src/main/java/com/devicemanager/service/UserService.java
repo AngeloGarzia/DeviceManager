@@ -127,6 +127,7 @@ public class UserService {
                 .role(role)
                 .groupe(groupe)
                 .preferredAtelier(preferred)
+                .receiveAlertMails(resolveReceiveAlertMails(role, request.getReceiveAlertMails()))
                 .build());
         log.info("Création en base — Utilisateur id={} username={} {} {} <{}> rôle={} atelierPréféré={} groupe={}",
                 saved.getId(),
@@ -178,6 +179,7 @@ public class UserService {
         user.setEmail(email);
         user.setRole(newRole);
         user.setPreferredAtelier(preferred);
+        user.setReceiveAlertMails(resolveReceiveAlertMails(newRole, request.getReceiveAlertMails()));
         if (request.getPassword() != null && !request.getPassword().isBlank()) {
             user.setPassword(passwordEncoder.encode(request.getPassword()));
         }
@@ -442,7 +444,19 @@ public class UserService {
                 .role(user.getRole())
                 .preferredAtelierId(preferred != null ? preferred.getId() : null)
                 .preferredAtelierNom(preferred != null ? preferred.getNom() : null)
+                .receiveAlertMails(user.isReceiveAlertMails())
                 .createdAt(user.getCreatedAt())
                 .build();
+    }
+
+    /**
+     * Préférence alerte mail : pertinente pour ADMIN / SUPER_ADMIN ; défaut {@code true}.
+     * Les techniciens gardent {@code true} (non utilisé pour les digests).
+     */
+    private static boolean resolveReceiveAlertMails(String role, Boolean requested) {
+        if (!Roles.isAdminLike(role)) {
+            return true;
+        }
+        return requested == null || requested;
     }
 }

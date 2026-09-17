@@ -1,10 +1,12 @@
 package com.devicemanager.repository;
 
 import com.devicemanager.entity.Intervention;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -22,6 +24,22 @@ public interface InterventionRepository extends JpaRepository<Intervention, Long
             order by i.dateIntervention desc, i.id desc
             """)
     List<Intervention> findAllWithRelationsByAtelierId(@Param("atelierId") Long atelierId);
+
+    @Query("""
+            select i.id from Intervention i
+            where i.atelier.id = :atelierId
+            order by i.dateIntervention desc, i.id desc
+            """)
+    List<Long> findIdsByAtelierIdOrderByDateDesc(@Param("atelierId") Long atelierId, Pageable pageable);
+
+    @Query("""
+            select distinct i from Intervention i
+            left join fetch i.lignes l
+            left join fetch l.device d
+            join fetch i.technicien
+            where i.id in :ids
+            """)
+    List<Intervention> findWithRelationsByIds(@Param("ids") Collection<Long> ids);
 
     @Query("""
             select distinct i from Intervention i

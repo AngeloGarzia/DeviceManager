@@ -1,11 +1,13 @@
 package com.devicemanager.repository;
 
 import com.devicemanager.entity.Commande;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -31,6 +33,30 @@ public interface CommandeRepository extends JpaRepository<Commande, Long> {
             order by c.dateDemande desc
             """)
     List<Commande> findAllWithRelationsOrderByDateDesc(@Param("atelierId") Long atelierId);
+
+    /**
+     * Identifiants des commandes récentes (sans JOIN FETCH — paginable côté SQL).
+     */
+    @Query("""
+            select c.id from Commande c
+            where c.atelier.id = :atelierId
+            order by c.dateDemande desc
+            """)
+    List<Long> findIdsByAtelierIdOrderByDateDesc(@Param("atelierId") Long atelierId, Pageable pageable);
+
+    /**
+     * Charge le graphe relations pour un ensemble d'ids (évite de tout charger en mémoire).
+     */
+    @Query("""
+            select distinct c from Commande c
+            left join fetch c.lignes l
+            left join fetch l.device d
+            left join fetch d.sfm
+            left join fetch d.mas
+            join fetch c.technicien
+            where c.id in :ids
+            """)
+    List<Commande> findWithRelationsByIds(@Param("ids") Collection<Long> ids);
 
     /**
      * Commandes dont au moins une ligne référence une pièce rattachée à l'une des MAS.
@@ -79,6 +105,8 @@ public interface CommandeRepository extends JpaRepository<Commande, Long> {
             select distinct c from Commande c
             left join fetch c.lignes
             join fetch c.atelier a
+            join fetch a.casino cas
+            join fetch cas.groupe
             join fetch c.technicien
             where c.status in :statuses
               and c.dateDemande < :cutoff

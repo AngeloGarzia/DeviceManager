@@ -2,6 +2,7 @@ package com.devicemanager.controller;
 
 import com.devicemanager.dto.AiChatRequest;
 import com.devicemanager.dto.AiChatResponse;
+import com.devicemanager.dto.AiFactureScanResponse;
 import com.devicemanager.dto.AiLabelScanResponse;
 import com.devicemanager.dto.AiModelsResponse;
 import com.devicemanager.dto.AiPdfScanResponse;
@@ -106,6 +107,15 @@ public class AiController {
     @PreAuthorize("hasAnyRole('ADMIN', 'TECHNICIEN')")
     public ResponseEntity<AiLabelScanResponse> labelScan(@RequestPart("image") MultipartFile image) {
         return ResponseEntity.ok(aiAssistantService.scanLabel(image));
+    }
+
+    /**
+     * Analyse une photo de facture / bon de livraison pour préremplir une fiche pièce.
+     */
+    @PostMapping(value = "/facture-scan", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasAnyRole('ADMIN', 'TECHNICIEN')")
+    public ResponseEntity<AiFactureScanResponse> factureScan(@RequestPart("image") MultipartFile image) {
+        return ResponseEntity.ok(aiAssistantService.scanFacture(image));
     }
 
     /**

@@ -38,4 +38,9 @@ public class UserRequest {
 
     /** Obligatoire pour TECHNICIEN ; optionnel pour ADMIN. */
     private Long preferredAtelierId;
+
+    /**
+     * Recevoir les e-mails d'alerte (ADMIN / SUPER_ADMIN). Défaut {@code true} si omis.
+     */
+    private Boolean receiveAlertMails;
 }

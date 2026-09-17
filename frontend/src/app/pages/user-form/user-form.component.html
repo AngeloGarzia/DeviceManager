@@ -69,6 +69,18 @@
             </mat-form-field>
           }
 
+          @if (isAdminLike) {
+            <div class="sm:col-span-2">
+              <mat-checkbox formControlName="receiveAlertMails" color="primary">
+                Recevoir les mails d'alerte
+              </mat-checkbox>
+              <p class="m-0 mt-1 text-xs text-ink-soft">
+                Si décoché, ce compte ne recevra pas les e-mails automatiques
+                (visites, commandes, arrêts, todos) pour les casinos qui le concernent.
+              </p>
+            </div>
+          }
+
           @if (error()) {
             <p class="sm:col-span-2 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{{ error() }}</p>
           }

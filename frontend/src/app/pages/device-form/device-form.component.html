@@ -73,7 +73,7 @@
                 color="primary"
                 type="button"
                 (click)="capturePhoto()"
-                [disabled]="!cameraReady() || !canAddPhoto() || scanningLabel()"
+                [disabled]="!cameraReady() || !canAddPhoto() || scanningLabel() || scanningFacture()"
               >
                 <mat-icon>photo_camera</mat-icon>
                 Acquisition image
@@ -84,7 +84,7 @@
                 color="accent"
                 type="button"
                 (click)="scanLabelWithAi()"
-                [disabled]="scanningLabel() || !aiService.enabled()"
+                [disabled]="scanningLabel() || scanningFacture() || !aiService.enabled()"
                 [matTooltip]="
                   aiService.enabled()
                     ? 'Analyser l’étiquette avec l’IA'
@@ -99,11 +99,50 @@
                 Scanner étiquette (IA)
               </button>
 
+              @if (!isEdit) {
+                <button
+                  mat-flat-button
+                  color="accent"
+                  type="button"
+                  (click)="scanFactureFromCamera()"
+                  [disabled]="scanningFacture() || scanningLabel() || !aiService.enabled()"
+                  [matTooltip]="
+                    aiService.enabled()
+                      ? 'Analyser une facture avec l’IA (caméra ou fichier)'
+                      : aiService.disabledReason() || 'IA désactivée'
+                  "
+                >
+                  @if (scanningFacture()) {
+                    <mat-spinner diameter="20" class="!inline-block"></mat-spinner>
+                  } @else {
+                    <mat-icon>receipt_long</mat-icon>
+                  }
+                  Scanner facture (IA)
+                </button>
+                <button
+                  mat-stroked-button
+                  type="button"
+                  (click)="openFacturePicker()"
+                  [disabled]="scanningFacture() || scanningLabel() || !aiService.enabled()"
+                  matTooltip="Choisir une image de facture dans la galerie"
+                >
+                  <mat-icon>upload_file</mat-icon>
+                  Facture fichier
+                </button>
+                <input
+                  #factureInput
+                  type="file"
+                  accept="image/*"
+                  class="hidden"
+                  (change)="onFactureSelected($event)"
+                />
+              }
+
               <button
                 mat-stroked-button
                 type="button"
                 (click)="openGallery()"
-                [disabled]="!canAddPhoto() || scanningLabel()"
+                [disabled]="!canAddPhoto() || scanningLabel() || scanningFacture()"
               >
                 <mat-icon>image</mat-icon>
                 Galerie / appareil
@@ -380,6 +419,16 @@
       </mat-card-content>
     </mat-card>
   }
+
+  <app-facture-ai-dialog
+    [open]="factureReviewOpen()"
+    [scanning]="scanningFacture()"
+    [suggested]="factureSuggestion()"
+    [scanNotes]="factureScanNotes()"
+    [sfms]="sfms()"
+    (dismissed)="dismissFactureReview()"
+    (confirmed)="applyFactureReview($event)"
+  />
 
   <app-confirm-dialog
     [open]="pdfAnalyzeOpen()"

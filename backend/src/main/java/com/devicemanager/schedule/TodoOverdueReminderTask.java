@@ -1,9 +1,8 @@
 package com.devicemanager.schedule;
 
+import com.devicemanager.entity.Casino;
 import com.devicemanager.entity.TodoTache;
-import com.devicemanager.mail.EmailSendResult;
 import com.devicemanager.mail.RenderedEmail;
-import com.devicemanager.mail.TransactionalMail;
 import com.devicemanager.mail.templates.TodoOverdueReminderEmail;
 import com.devicemanager.service.AppSettingsService;
 import com.devicemanager.service.TodoService;
@@ -18,9 +17,10 @@ import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /**
- * Rappel quotidien des todos en retard → {@code MAIL_ADMIN_EMAIL}.
+ * Rappel quotidien des todos en retard → ADMIN / SUPER_ADMIN du casino concerné.
  */
 @Component
 @RequiredArgsConstructor
@@ -33,7 +33,7 @@ public class TodoOverdueReminderTask {
     private final ScheduledJobSupport scheduledJobSupport;
     private final AppSettingsService appSettingsService;
     private final TodoService todoService;
-    private final TransactionalMail transactionalMail;
+    private final ScheduledDigestMailer digestMailer;
 
     @Scheduled(cron = "${app.schedule.tick-cron:0 * * * * *}")
     @Transactional
@@ -51,52 +51,34 @@ public class TodoOverdueReminderTask {
             return;
         }
 
-        String recipient = transactionalMail.getAdminEmail();
-        if (recipient == null || recipient.isBlank() || !recipient.contains("@")) {
-            log.warn("Rappel todos en retard ignoré — MAIL_ADMIN_EMAIL invalide");
-            return;
-        }
-
-        String periodKey = scheduledJobSupport.periodKeyToday();
-        if (scheduledJobSupport.alreadySent(JOB_KEY, periodKey, recipient)) {
-            return;
-        }
-
         LocalDateTime now = scheduledJobSupport.now();
         List<TodoTache> overdue = todoService.listOverdueForReminder(now);
         if (overdue.isEmpty()) {
-            log.debug("Rappel todos — aucun en retard (period={})", periodKey);
+            log.debug("Rappel todos — aucun en retard");
             return;
         }
 
-        List<TodoOverdueReminderEmail.TodoLine> lines = new ArrayList<>();
-        for (TodoTache t : overdue) {
-            long overdueDays = t.getDueAt() == null
-                    ? 0
-                    : Math.max(0, ChronoUnit.DAYS.between(t.getDueAt().toLocalDate(), now.toLocalDate()));
-            lines.add(new TodoOverdueReminderEmail.TodoLine(
-                    t.getId(),
-                    t.getAtelier() != null ? t.getAtelier().getNom() : null,
-                    t.getTitre(),
-                    t.getSeverite(),
-                    t.getDueAt() == null ? null : t.getDueAt().format(DATE_FMT),
-                    overdueDays,
-                    t.getMas() != null ? t.getMas().getNumero() : null));
-        }
-
-        if (!scheduledJobSupport.tryClaim(JOB_KEY, periodKey, recipient)) {
-            return;
-        }
-        RenderedEmail email = TodoOverdueReminderEmail.render(
-                new TodoOverdueReminderEmail.Context(periodKey, lines));
-        EmailSendResult result = transactionalMail.notifyAdminTodoOverdueReminder(
-                email.subject(), email.text(), email.html());
-        if (result.ok()) {
-            log.info("Rappel todos en retard envoyé period={} lines={} simulated={}",
-                    periodKey, lines.size(), result.skipped());
-        } else {
-            scheduledJobSupport.releaseClaim(JOB_KEY, periodKey, recipient);
-            log.warn("Rappel todos en retard échec period={} error={}", periodKey, result.error());
+        String dateKey = scheduledJobSupport.periodKeyToday();
+        Map<Casino, List<TodoTache>> byCasino =
+                ScheduledDigestMailer.groupByCasino(overdue, TodoTache::getAtelier);
+        for (Map.Entry<Casino, List<TodoTache>> entry : byCasino.entrySet()) {
+            List<TodoOverdueReminderEmail.TodoLine> lines = new ArrayList<>();
+            for (TodoTache t : entry.getValue()) {
+                long overdueDays = t.getDueAt() == null
+                        ? 0
+                        : Math.max(0, ChronoUnit.DAYS.between(t.getDueAt().toLocalDate(), now.toLocalDate()));
+                lines.add(new TodoOverdueReminderEmail.TodoLine(
+                        t.getId(),
+                        t.getAtelier() != null ? t.getAtelier().getNom() : null,
+                        t.getTitre(),
+                        t.getSeverite(),
+                        t.getDueAt() == null ? null : t.getDueAt().format(DATE_FMT),
+                        overdueDays,
+                        t.getMas() != null ? t.getMas().getNumero() : null));
+            }
+            RenderedEmail email = TodoOverdueReminderEmail.render(
+                    new TodoOverdueReminderEmail.Context(dateKey, lines));
+            digestMailer.sendToCasinoAdmins(JOB_KEY, dateKey, entry.getKey(), email);
         }
     }
 }

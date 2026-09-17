@@ -23,6 +23,7 @@ import com.devicemanager.entity.User;
 import com.devicemanager.repository.CommandeRepository;
 import com.devicemanager.repository.DeviceRepository;
 import com.devicemanager.repository.UserRepository;
+import com.devicemanager.schedule.ScheduledAdminRecipientService;
 import com.devicemanager.security.DocumentUploadValidator;
 import com.devicemanager.security.OrderStatuses;
 import com.devicemanager.security.Roles;
@@ -68,6 +69,7 @@ public class OrderRequestService {
     private final AiAssistantService aiAssistantService;
     private final DeviceService deviceService;
     private final AtelierMemoirePublisher atelierMemoirePublisher;
+    private final ScheduledAdminRecipientService scheduledAdminRecipientService;
 
     /**
      * Crée une demande {@code PENDING} et notifie l'administrateur par e-mail.
@@ -119,7 +121,8 @@ public class OrderRequestService {
         Commande saved = commandeRepository.save(commande);
 
         EmailSendResult adminMail = transactionalMail.notifyAdminNewOrderRequest(
-                buildAdminEmailContext(saved, atelier, quantities, devices));
+                buildAdminEmailContext(saved, atelier, quantities, devices),
+                scheduledAdminRecipientService.emailsForAtelier(atelier));
         if (!adminMail.ok()) {
             log.error("Demande #{} enregistrée mais e-mail admin non envoyé: {}",
                     saved.getId(), adminMail.error());
@@ -541,9 +544,26 @@ public class OrderRequestService {
     @Transactional(readOnly = true)
     public List<OrderRequestResponse> findAll() {
         Long atelierId = atelierService.requireCurrentAtelier().getId();
-        return commandeRepository.findAllWithRelationsOrderByDateDesc(atelierId).stream()
-                .map(this::toResponse)
-                .toList();
+        // Plafond mémoire (Render free) : ids récents puis graphe JOIN FETCH.
+        List<Long> ids = commandeRepository.findIdsByAtelierIdOrderByDateDesc(
+                atelierId, org.springframework.data.domain.PageRequest.of(0, 150));
+        if (ids.isEmpty()) {
+            return List.of();
+        }
+        Map<Long, Commande> byId = new LinkedHashMap<>();
+        for (Commande c : commandeRepository.findWithRelationsByIds(ids)) {
+            if (c.getId() != null) {
+                byId.put(c.getId(), c);
+            }
+        }
+        List<OrderRequestResponse> out = new ArrayList<>(ids.size());
+        for (Long id : ids) {
+            Commande c = byId.get(id);
+            if (c != null) {
+                out.add(toResponse(c));
+            }
+        }
+        return out;
     }
 
     /**

@@ -11,6 +11,7 @@ import com.devicemanager.entity.CommandeLigne;
 import com.devicemanager.repository.CommandeRepository;
 import com.devicemanager.repository.DeviceRepository;
 import com.devicemanager.repository.UserRepository;
+import com.devicemanager.schedule.ScheduledAdminRecipientService;
 import com.devicemanager.security.OrderStatuses;
 import com.devicemanager.security.Roles;
 import com.devicemanager.support.TestFixtures;
@@ -50,14 +51,18 @@ class OrderRequestServiceTest {
     @Mock private AiAssistantService aiAssistantService;
     @Mock private DeviceService deviceService;
     @Mock private AtelierMemoirePublisher atelierMemoirePublisher;
+    @Mock private ScheduledAdminRecipientService scheduledAdminRecipientService;
     @InjectMocks private OrderRequestService orderRequestService;
 
     @BeforeEach
     void setUp() {
-        lenient().when(transactionalMail.notifyAdminNewOrderRequest(any(OrderRequestAdminEmail.Context.class)))
+        lenient().when(transactionalMail.notifyAdminNewOrderRequest(
+                        any(OrderRequestAdminEmail.Context.class), anyList()))
                 .thenReturn(EmailSendResult.success());
         lenient().when(transactionalMail.getAdminEmail()).thenReturn("admin@test.local");
         lenient().when(atelierService.requireCurrentAtelier()).thenReturn(TestFixtures.atelier());
+        lenient().when(scheduledAdminRecipientService.emailsForAtelier(any()))
+                .thenReturn(List.of("admin@casino.local"));
         lenient().when(storageService.resolveAccessUrl(any(), any(), any())).thenAnswer(inv -> {
             Object legacy = inv.getArgument(1);
             if (legacy != null && !legacy.toString().isBlank()) {
@@ -96,10 +101,13 @@ class OrderRequestServiceTest {
         assertThat(response.getStatus()).isEqualTo(OrderStatuses.PENDING);
         ArgumentCaptor<OrderRequestAdminEmail.Context> ctxCaptor =
                 ArgumentCaptor.forClass(OrderRequestAdminEmail.Context.class);
-        verify(transactionalMail).notifyAdminNewOrderRequest(ctxCaptor.capture());
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<String>> recipientsCaptor = ArgumentCaptor.forClass(List.class);
+        verify(transactionalMail).notifyAdminNewOrderRequest(ctxCaptor.capture(), recipientsCaptor.capture());
         assertThat(ctxCaptor.getValue().message()).contains("Urgent");
         assertThat(ctxCaptor.getValue().lines()).hasSize(1);
         assertThat(ctxCaptor.getValue().lines().getFirst().sfmLabel()).isEqualTo("SFM Nord");
+        assertThat(recipientsCaptor.getValue()).containsExactly("admin@casino.local");
     }
 
     @Test
@@ -136,7 +144,7 @@ class OrderRequestServiceTest {
 
     @Test
     void findAll_listsForAtelier() {
-        when(commandeRepository.findAllWithRelationsOrderByDateDesc(100L)).thenReturn(List.of());
+        when(commandeRepository.findIdsByAtelierIdOrderByDateDesc(eq(100L), any())).thenReturn(List.of());
 
         assertThat(orderRequestService.findAll()).isEmpty();
     }

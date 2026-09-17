@@ -50,6 +50,7 @@ public class AppSettingsService {
     public static final String AI_MODEL = "AI_MODEL";
     public static final String AI_SYSTEM_PROMPT = "AI_SYSTEM_PROMPT";
     public static final String AI_LABEL_EXTRACT_PROMPT = "AI_LABEL_EXTRACT_PROMPT";
+    public static final String AI_FACTURE_EXTRACT_PROMPT = "AI_FACTURE_EXTRACT_PROMPT";
     public static final String AI_USAGE_PROMPT = "AI_USAGE_PROMPT";
 
     /** Catégorie Setup + page publique /confidentialite. */
@@ -185,6 +186,8 @@ public class AppSettingsService {
                 "Prompt système (chat)", "Intelligence artificielle", false);
         ensure(AI_LABEL_EXTRACT_PROMPT, AiPromptDefaults.LABEL_EXTRACT,
                 "Prompt scan étiquette (vision)", "Intelligence artificielle", false);
+        ensure(AI_FACTURE_EXTRACT_PROMPT, AiPromptDefaults.FACTURE_EXTRACT,
+                "Prompt scan facture (vision)", "Intelligence artificielle", false);
         ensure(AI_USAGE_PROMPT, AiPromptDefaults.USAGE,
                 "Prompt rédaction usage (placeholders {{nom}}, {{reference}}, …)",
                 "Intelligence artificielle", false);

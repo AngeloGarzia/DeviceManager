@@ -25,6 +25,21 @@ export interface AiLabelScanResponse {
   notes?: string | null;
 }
 
+export interface AiFactureScanResponse {
+  enabled: boolean;
+  nom?: string | null;
+  reference?: string | null;
+  numeroSerie?: string | null;
+  marque?: string | null;
+  sfmNom?: string | null;
+  fournisseur?: string | null;
+  unitPriceHt?: number | null;
+  dateAcquisition?: string | null;
+  usage?: string | null;
+  rawText?: string | null;
+  notes?: string | null;
+}
+
 export interface AiPdfScanResponse {
   enabled: boolean;
   informationTechnique?: string | null;
@@ -120,6 +135,16 @@ export class AiService {
         : new File([image], `label-${Date.now()}.jpg`, { type: image.type || 'image/jpeg' });
     form.append('image', file);
     return this.http.post<AiLabelScanResponse>(`${this.base}/label-scan`, form);
+  }
+
+  scanFacture(image: File | Blob): Observable<AiFactureScanResponse> {
+    const form = new FormData();
+    const file =
+      image instanceof File
+        ? image
+        : new File([image], `facture-${Date.now()}.jpg`, { type: image.type || 'image/jpeg' });
+    form.append('image', file);
+    return this.http.post<AiFactureScanResponse>(`${this.base}/facture-scan`, form);
   }
 
   analyzePdf(

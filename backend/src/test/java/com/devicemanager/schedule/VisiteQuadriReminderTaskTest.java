@@ -2,14 +2,15 @@ package com.devicemanager.schedule;
 
 import com.devicemanager.dto.VisiteQuadriObligationResponse;
 import com.devicemanager.entity.Atelier;
-import com.devicemanager.mail.EmailSendResult;
-import com.devicemanager.mail.TransactionalMail;
+import com.devicemanager.entity.Casino;
+import com.devicemanager.mail.RenderedEmail;
 import com.devicemanager.repository.AtelierRepository;
 import com.devicemanager.service.AppSettingsService;
 import com.devicemanager.service.VisiteQuadriService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -17,6 +18,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.time.LocalDate;
 import java.util.List;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -33,7 +35,7 @@ class VisiteQuadriReminderTaskTest {
     @Mock private AppSettingsService appSettingsService;
     @Mock private AtelierRepository atelierRepository;
     @Mock private VisiteQuadriService visiteQuadriService;
-    @Mock private TransactionalMail transactionalMail;
+    @Mock private ScheduledDigestMailer digestMailer;
     @InjectMocks private VisiteQuadriReminderTask task;
 
     @BeforeEach
@@ -45,9 +47,7 @@ class VisiteQuadriReminderTaskTest {
                 AppSettingsService.SCHED_VISITE_QUADRI_HOUR,
                 AppSettingsService.SCHED_VISITE_QUADRI_MINUTE,
                 8, 0)).thenReturn(true);
-        lenient().when(transactionalMail.getAdminEmail()).thenReturn("admin@casino.local");
         lenient().when(scheduledJobSupport.periodKeyToday()).thenReturn("2026-09-17");
-        lenient().when(scheduledJobSupport.alreadySent(anyString(), anyString(), anyString())).thenReturn(false);
         lenient().when(visiteQuadriService.resolveWarnDays()).thenReturn(7);
         lenient().when(scheduledJobSupport.today()).thenReturn(LocalDate.of(2026, 9, 17));
     }
@@ -64,7 +64,7 @@ class VisiteQuadriReminderTaskTest {
         when(appSettingsService.getBoolean(AppSettingsService.SCHED_VISITE_QUADRI_ENABLED, true))
                 .thenReturn(false);
         task.run();
-        verify(transactionalMail, never()).getAdminEmail();
+        verify(atelierRepository, never()).findAllActiveWithCasino();
     }
 
     @Test
@@ -74,87 +74,37 @@ class VisiteQuadriReminderTaskTest {
                 AppSettingsService.SCHED_VISITE_QUADRI_MINUTE,
                 8, 0)).thenReturn(false);
         task.run();
-        verify(transactionalMail, never()).getAdminEmail();
+        verify(atelierRepository, never()).findAllActiveWithCasino();
     }
 
     @Test
-    void run_skipsWhenAdminEmailInvalid() {
-        when(transactionalMail.getAdminEmail()).thenReturn("not-an-email");
-        task.run();
-        verify(atelierRepository, never()).findAll();
-    }
-
-    @Test
-    void run_emptyAlerts_doesNotSendNorMark() {
-        when(atelierRepository.findAll()).thenReturn(List.of(
-                Atelier.builder().id(100L).nom("A").utilise(true).build()));
+    void run_emptyAlerts_doesNotSend() {
+        Casino casino = Casino.builder().id(1L).nom("A").build();
+        when(atelierRepository.findAllActiveWithCasino()).thenReturn(List.of(
+                Atelier.builder().id(100L).nom("A").utilise(true).casino(casino).build()));
         when(visiteQuadriService.listAlertObligationsForAtelier(any(), anyInt(), any()))
                 .thenReturn(List.of());
         task.run();
-        verify(transactionalMail, never()).notifyAdminVisiteQuadriReminder(any(), any(), any());
-        verify(scheduledJobSupport, never()).markSent(anyString(), anyString(), anyString());
+        verify(digestMailer, never()).sendToCasinoAdmins(anyString(), anyString(), any(), any());
     }
 
     @Test
-    void run_ignoresUnusedAteliers() {
-        Atelier unused = Atelier.builder().id(99L).nom("Off").utilise(false).build();
-        Atelier used = Atelier.builder().id(100L).nom("On").utilise(true).build();
-        when(atelierRepository.findAll()).thenReturn(List.of(unused, used));
+    void run_groupsByCasinoAndSendsDigest() {
+        Casino casino = Casino.builder().id(1L).nom("Casino A").build();
+        when(atelierRepository.findAllActiveWithCasino()).thenReturn(List.of(
+                Atelier.builder().id(100L).nom("Atelier Centre").utilise(true).casino(casino).build()));
         when(visiteQuadriService.listAlertObligationsForAtelier(eq(100L), eq(7), any()))
                 .thenReturn(List.of(alert()));
-        when(transactionalMail.notifyAdminVisiteQuadriReminder(anyString(), anyString(), anyString()))
-                .thenReturn(EmailSendResult.success());
-        when(scheduledJobSupport.tryClaim(anyString(), anyString(), anyString())).thenReturn(true);
 
         task.run();
 
-        verify(transactionalMail).notifyAdminVisiteQuadriReminder(anyString(), anyString(), anyString());
-        verify(scheduledJobSupport).tryClaim(
-                VisiteQuadriReminderTask.JOB_KEY, "2026-09-17", "admin@casino.local");
-        verify(visiteQuadriService, never()).listAlertObligationsForAtelier(eq(99L), anyInt(), any());
-    }
-
-    @Test
-    void run_sendsDigestAndClaims() {
-        when(atelierRepository.findAll()).thenReturn(List.of(
-                Atelier.builder().id(100L).nom("Atelier Centre").utilise(true).build()));
-        when(visiteQuadriService.listAlertObligationsForAtelier(eq(100L), eq(7), any()))
-                .thenReturn(List.of(alert()));
-        when(scheduledJobSupport.tryClaim(anyString(), anyString(), anyString())).thenReturn(true);
-        when(transactionalMail.notifyAdminVisiteQuadriReminder(anyString(), anyString(), anyString()))
-                .thenReturn(EmailSendResult.success());
-
-        task.run();
-
-        verify(transactionalMail).notifyAdminVisiteQuadriReminder(anyString(), anyString(), anyString());
-        verify(scheduledJobSupport).tryClaim(
-                VisiteQuadriReminderTask.JOB_KEY, "2026-09-17", "admin@casino.local");
-        verify(scheduledJobSupport, never()).releaseClaim(anyString(), anyString(), anyString());
-    }
-
-    @Test
-    void run_skipsWhenAlreadySent() {
-        when(scheduledJobSupport.alreadySent(
-                VisiteQuadriReminderTask.JOB_KEY, "2026-09-17", "admin@casino.local"))
-                .thenReturn(true);
-        task.run();
-        verify(atelierRepository, never()).findAll();
-    }
-
-    @Test
-    void run_releasesClaimWhenSmtpFails() {
-        when(atelierRepository.findAll()).thenReturn(List.of(
-                Atelier.builder().id(100L).nom("A").utilise(true).build()));
-        when(visiteQuadriService.listAlertObligationsForAtelier(any(), anyInt(), any()))
-                .thenReturn(List.of(alert()));
-        when(scheduledJobSupport.tryClaim(anyString(), anyString(), anyString())).thenReturn(true);
-        when(transactionalMail.notifyAdminVisiteQuadriReminder(anyString(), anyString(), anyString()))
-                .thenReturn(EmailSendResult.failure("SMTP down"));
-
-        task.run();
-
-        verify(scheduledJobSupport).releaseClaim(
-                VisiteQuadriReminderTask.JOB_KEY, "2026-09-17", "admin@casino.local");
+        ArgumentCaptor<Casino> casinoCap = ArgumentCaptor.forClass(Casino.class);
+        verify(digestMailer).sendToCasinoAdmins(
+                eq(VisiteQuadriReminderTask.JOB_KEY),
+                eq("2026-09-17"),
+                casinoCap.capture(),
+                any(RenderedEmail.class));
+        assertThat(casinoCap.getValue().getId()).isEqualTo(1L);
     }
 
     private static VisiteQuadriObligationResponse alert() {

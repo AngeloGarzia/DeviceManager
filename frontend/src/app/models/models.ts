@@ -608,6 +608,8 @@ export interface AppUser {
   role: string;
   preferredAtelierId?: number | null;
   preferredAtelierNom?: string | null;
+  /** ADMIN / SUPER_ADMIN : recevoir les e-mails d'alerte planifiés (défaut true). */
+  receiveAlertMails?: boolean;
   createdAt: string;
 }
 
@@ -619,6 +621,7 @@ export interface AppUserForm {
   password?: string;
   role: string;
   preferredAtelierId?: number | null;
+  receiveAlertMails?: boolean;
 }
 
 export interface AppSetting {

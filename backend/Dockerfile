@@ -17,6 +17,9 @@ ENV APP_ENV=production
 ENV APP_S3_LOCAL_FALLBACK_DIR=/app/uploads
 # Render free = 512 Mo : privilégier Metaspace (Spring AI + AWS SDK) plutôt qu'un gros heap.
 # 128m Metaspace → OOM sous charge (upload image / R2). Heap abaissé pour rester sous 512 Mo.
-ENV JAVA_OPTS="-Xms96m -Xmx192m -XX:+UseSerialGC -XX:MaxMetaspaceSize=160m -XX:ReservedCodeCacheSize=40m"
+# Render free = 512 Mo : heap + metaspace + direct + stacks doivent rester < 512.
+# MaxDirectMemorySize/Xss limitent la mémoire native hors heap.
+ENV JAVA_OPTS="-Xms64m -Xmx176m -XX:+UseSerialGC -XX:MaxMetaspaceSize=128m -XX:CompressedClassSpaceSize=64m -XX:ReservedCodeCacheSize=32m -XX:MaxDirectMemorySize=32m -Xss512k -XX:+ExitOnOutOfMemoryError"
+ENV MALLOC_ARENA_MAX=2
 EXPOSE 8080
 ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]

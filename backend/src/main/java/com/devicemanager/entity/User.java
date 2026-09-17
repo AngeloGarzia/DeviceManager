@@ -54,6 +54,14 @@ public class User {
     @JoinColumn(name = "preferred_atelier_id", foreignKey = @ForeignKey(name = "fk_user_preferred_atelier"))
     private Atelier preferredAtelier;
 
+    /**
+     * Si {@code true} (défaut), le compte ADMIN / SUPER_ADMIN reçoit les e-mails d'alerte planifiés
+     * (visites, commandes, arrêts, todos) pour les casinos qui le concernent.
+     */
+    @Column(name = "receive_alert_mails", nullable = false)
+    @Builder.Default
+    private Boolean receiveAlertMails = Boolean.TRUE;
+
     /** Si {@code true}, l'utilisateur doit changer son mot de passe avant d'utiliser l'API métier. */
     @Column(name = "must_change_password", nullable = false)
     @Builder.Default
@@ -71,5 +79,10 @@ public class User {
     @PrePersist
     void onCreate() {
         createdAt = Instant.now();
+    }
+
+    /** Null-safe : défaut = reçoit les alertes. */
+    public boolean isReceiveAlertMails() {
+        return receiveAlertMails == null || receiveAlertMails;
     }
 }

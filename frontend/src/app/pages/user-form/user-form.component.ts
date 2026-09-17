@@ -8,6 +8,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatCardModule } from '@angular/material/card';
+import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { AppUserForm, AtelierSummary } from '../../models/models';
 import { UserService } from '../../services/user.service';
@@ -17,7 +18,7 @@ import { apiErrorMessage } from '../../shared/api-error';
 
 /**
  * Formulaire de création ou modification d'un compte utilisateur.
- * Gère rôle, atelier préféré pour les techniciens et mot de passe.
+ * Gère rôle, atelier préféré pour les techniciens, option alerte mail admin et mot de passe.
  */
 @Component({
   selector: 'app-user-form',
@@ -32,6 +33,7 @@ import { apiErrorMessage } from '../../shared/api-error';
     MatInputModule,
     MatSelectModule,
     MatCardModule,
+    MatCheckboxModule,
     MatProgressSpinnerModule
   ],
   templateUrl: './user-form.component.html',
@@ -58,7 +60,8 @@ export class UserFormComponent implements OnInit {
     username: ['', [Validators.required, Validators.maxLength(80)]],
     password: [''],
     role: ['TECHNICIEN', Validators.required],
-    preferredAtelierId: [null as number | null]
+    preferredAtelierId: [null as number | null],
+    receiveAlertMails: [true]
   });
 
   /** Indique si le formulaire est en mode édition. */
@@ -70,6 +73,12 @@ export class UserFormComponent implements OnInit {
   get isTechnicien(): boolean {
     const role = this.form.controls.role.value;
     return role === 'TECHNICIEN' || role === 'TECH';
+  }
+
+  /** ADMIN / SUPER_ADMIN : case « Recevoir les mails d'alerte ». */
+  get isAdminLike(): boolean {
+    const role = this.form.controls.role.value;
+    return role === 'ADMIN' || role === 'SUPER_ADMIN';
   }
 
   /** Seul un super-admin peut assigner ADMIN / SUPER_ADMIN. */
@@ -109,6 +118,7 @@ export class UserFormComponent implements OnInit {
           username: user.username,
           role: user.role,
           preferredAtelierId: user.preferredAtelierId ?? null,
+          receiveAlertMails: user.receiveAlertMails !== false,
           password: ''
         });
         this.syncPreferredValidators();
@@ -137,6 +147,7 @@ export class UserFormComponent implements OnInit {
       username: raw.username!.trim(),
       role: raw.role!,
       preferredAtelierId: this.isTechnicien ? raw.preferredAtelierId : (raw.preferredAtelierId ?? null),
+      receiveAlertMails: this.isAdminLike ? !!raw.receiveAlertMails : true,
       ...(raw.password ? { password: raw.password } : {})
     };
     this.saving.set(true);

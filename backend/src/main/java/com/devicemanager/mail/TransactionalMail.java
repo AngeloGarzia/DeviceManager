@@ -14,6 +14,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.List;
+
 /**
  * Façade métier des e-mails transactionnels — ne fait jamais planter l'appelant (sauf test SMTP admin).
  */
@@ -33,64 +35,81 @@ public class TransactionalMail {
     }
 
     /**
-     * Notification admin — nouvelle demande de commande.
+     * Envoie un rappel planifié à un destinataire explicite (ADMIN / SUPER_ADMIN casino).
+     */
+    public EmailSendResult sendScheduledReminder(String to, String subject, String text, String html) {
+        EmailSendResult result = emailService.send(to, subject, text, html);
+        if (!result.ok()) {
+            log.warn("E-mail rappel planifié non envoyé à {}: {}", to, result.error());
+        }
+        return result;
+    }
+
+    /**
+     * Notification admin — nouvelle demande de commande (destinataires casino).
+     */
+    public EmailSendResult notifyAdminNewOrderRequest(OrderRequestAdminEmail.Context context, List<String> recipients) {
+        RenderedEmail email = OrderRequestAdminEmail.render(context);
+        if (recipients == null || recipients.isEmpty()) {
+            String fallback = getAdminEmail();
+            return sendToOne(fallback, email, context.orderId());
+        }
+        EmailSendResult last = EmailSendResult.failure("aucun destinataire");
+        for (String to : recipients) {
+            last = sendToOne(to, email, context.orderId());
+        }
+        return last;
+    }
+
+    /**
+     * Notification admin — nouvelle demande de commande (legacy : MAIL_ADMIN_EMAIL).
      */
     public EmailSendResult notifyAdminNewOrderRequest(OrderRequestAdminEmail.Context context) {
-        RenderedEmail email = OrderRequestAdminEmail.render(context);
-        String to = getAdminEmail();
+        return notifyAdminNewOrderRequest(context, List.of(getAdminEmail()));
+    }
+
+    private EmailSendResult sendToOne(String to, RenderedEmail email, Long orderId) {
         EmailSendResult result = emailService.send(to, email.subject(), email.text(), email.html());
         if (!result.ok()) {
-            log.warn("E-mail admin non envoyé (demande {}): {}", context.orderId(), result.error());
+            log.warn("E-mail admin non envoyé (demande {}): {}", orderId, result.error());
         }
         return result;
     }
 
     /**
      * Rappel admin — todos en retard.
+     * @deprecated utiliser {@link #sendScheduledReminder}
      */
+    @Deprecated
     public EmailSendResult notifyAdminTodoOverdueReminder(String subject, String text, String html) {
-        String to = getAdminEmail();
-        EmailSendResult result = emailService.send(to, subject, text, html);
-        if (!result.ok()) {
-            log.warn("E-mail rappel todos en retard non envoyé: {}", result.error());
-        }
-        return result;
+        return sendScheduledReminder(getAdminEmail(), subject, text, html);
     }
 
     /**
      * Rappel admin — arrêts maintenance ouverts trop longtemps.
+     * @deprecated utiliser {@link #sendScheduledReminder}
      */
+    @Deprecated
     public EmailSendResult notifyAdminArretMaintenanceReminder(String subject, String text, String html) {
-        String to = getAdminEmail();
-        EmailSendResult result = emailService.send(to, subject, text, html);
-        if (!result.ok()) {
-            log.warn("E-mail rappel arrêts maintenance non envoyé: {}", result.error());
-        }
-        return result;
+        return sendScheduledReminder(getAdminEmail(), subject, text, html);
     }
 
     /**
      * Relance admin — commandes PENDING/SENT trop anciennes.
+     * @deprecated utiliser {@link #sendScheduledReminder}
      */
+    @Deprecated
     public EmailSendResult notifyAdminOrderRelance(String subject, String text, String html) {
-        String to = getAdminEmail();
-        EmailSendResult result = emailService.send(to, subject, text, html);
-        if (!result.ok()) {
-            log.warn("E-mail relance commandes non envoyé: {}", result.error());
-        }
-        return result;
+        return sendScheduledReminder(getAdminEmail(), subject, text, html);
     }
 
     /**
      * Rappel admin — visites quadritrimestrielles à échéance / en retard.
+     * @deprecated utiliser {@link #sendScheduledReminder}
      */
+    @Deprecated
     public EmailSendResult notifyAdminVisiteQuadriReminder(String subject, String text, String html) {
-        String to = getAdminEmail();
-        EmailSendResult result = emailService.send(to, subject, text, html);
-        if (!result.ok()) {
-            log.warn("E-mail rappel visite quadri non envoyé: {}", result.error());
-        }
-        return result;
+        return sendScheduledReminder(getAdminEmail(), subject, text, html);
     }
 
     /**

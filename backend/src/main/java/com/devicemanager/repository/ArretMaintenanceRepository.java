@@ -48,6 +48,8 @@ public interface ArretMaintenanceRepository extends JpaRepository<ArretMaintenan
             join fetch a.mas m
             left join fetch m.marque
             join fetch a.atelier at
+            join fetch at.casino cas
+            join fetch cas.groupe
             where a.dateHeureReprise is null
               and a.dateHeureArret < :cutoff
               and at.utilise = true
