@@ -295,6 +295,17 @@
             }
           </mat-form-field>
 
+          @if (!isEdit) {
+            <mat-form-field appearance="outline">
+              <mat-label>Prix unitaire HT (€)</mat-label>
+              <input matInput type="number" min="0" step="0.01" formControlName="unitPriceHt" />
+              <mat-hint>Optionnel — enregistré à la date de saisie</mat-hint>
+              @if (form.controls.unitPriceHt.invalid && form.controls.unitPriceHt.touched) {
+                <mat-error>Prix ≥ 0</mat-error>
+              }
+            </mat-form-field>
+          }
+
           <div class="flex items-center py-1 sm:pb-2">
             <mat-checkbox formControlName="obsolete">Pièce obsolète</mat-checkbox>
           </div>

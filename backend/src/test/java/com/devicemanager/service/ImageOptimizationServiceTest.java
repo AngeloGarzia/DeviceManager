@@ -22,25 +22,35 @@ class ImageOptimizationServiceTest {
     private final ImageOptimizationService service = new ImageOptimizationService();
 
     @Test
-    void optimize_resizesLargeImageToMaxDimension() throws Exception {
-        log.info("Test resize image > {}px", ImageOptimizationService.MAX_DIMENSION);
+    void optimize_normalizesLandscapeTo800x600() throws Exception {
+        log.info("Test normalize landscape → {}x{}", ImageOptimizationService.TARGET_WIDTH,
+                ImageOptimizationService.TARGET_HEIGHT);
         MockMultipartFile input = imageFile("large.png", 2400, 1800);
 
         MultipartFile optimized = service.optimize(input);
         BufferedImage result = ImageIO.read(optimized.getInputStream());
 
-        assertThat(result.getWidth()).isLessThanOrEqualTo(ImageOptimizationService.MAX_DIMENSION);
-        assertThat(result.getHeight()).isLessThanOrEqualTo(ImageOptimizationService.MAX_DIMENSION);
-        assertThat(result.getWidth()).isEqualTo(900);
-        assertThat(result.getHeight()).isEqualTo(675);
+        assertThat(result.getWidth()).isEqualTo(ImageOptimizationService.TARGET_WIDTH);
+        assertThat(result.getHeight()).isEqualTo(ImageOptimizationService.TARGET_HEIGHT);
         assertThat(optimized.getContentType()).isEqualTo(MediaType.IMAGE_JPEG_VALUE);
         assertThat(optimized.getOriginalFilename()).endsWith(".jpg");
         assertThat(optimized.getSize()).isGreaterThan(0);
     }
 
     @Test
-    void optimize_keepsSmallImageWithinBounds() throws Exception {
-        MockMultipartFile input = imageFile("small.jpg", 800, 600);
+    void optimize_centerCropsPortraitTo4by3Then800x600() throws Exception {
+        MockMultipartFile input = imageFile("portrait.png", 900, 1600);
+
+        MultipartFile optimized = service.optimize(input);
+        BufferedImage result = ImageIO.read(optimized.getInputStream());
+
+        assertThat(result.getWidth()).isEqualTo(800);
+        assertThat(result.getHeight()).isEqualTo(600);
+    }
+
+    @Test
+    void optimize_keepsExact800x600() throws Exception {
+        MockMultipartFile input = imageFile("exact.jpg", 800, 600);
 
         MultipartFile optimized = service.optimize(input);
         BufferedImage result = ImageIO.read(optimized.getInputStream());

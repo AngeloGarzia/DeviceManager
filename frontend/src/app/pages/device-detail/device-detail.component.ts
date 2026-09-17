@@ -42,6 +42,7 @@ export class DeviceDetailComponent implements OnInit {
       id: number;
       unitPriceHt: number;
       currency: string;
+      source?: string | null;
       commandeId?: number | null;
       observedAt: string;
       confirmedBy: string;
@@ -79,6 +80,17 @@ export class DeviceDetailComponent implements OnInit {
   /** URL absolue de la photo principale d'une pièce. */
   photoUrl(device: Device): string {
     return this.deviceService.resolvePhotoUrl(device.photoUrl);
+  }
+
+  prixSourceLabel(source?: string | null): string {
+    switch ((source || '').toUpperCase()) {
+      case 'SAISIE':
+        return 'saisie manuelle';
+      case 'DEVIS':
+        return 'devis';
+      default:
+        return source || 'prix';
+    }
   }
 
   /** Relance le chargement si l'API Render est encore endormie. */

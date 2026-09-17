@@ -28,19 +28,21 @@ import java.util.Locale;
 /**
  * Optimisation des photos de pièces détachées avant stockage.
  * <p>
- * Redimensionne (max {@link #MAX_DIMENSION} px) et compresse en JPEG
- * pour limiter l'espace disque/S3 et accélérer le scan IA d'étiquettes.
+ * Normalise en JPEG {@link #TARGET_WIDTH}×{@link #TARGET_HEIGHT} (ratio 4:3) :
+ * recadrage centré si besoin, puis mise à l'échelle fixe.
  */
 @Service
 @Slf4j
 public class ImageOptimizationService {
 
-    /** Plus grand côté conservé — compromis stockage / lisibilité étiquette (~900 px). */
-    public static final int MAX_DIMENSION = 900;
-    private static final float JPEG_QUALITY = 0.78f;
+    /** Largeur fixe des photos stockées (ratio 4:3). */
+    public static final int TARGET_WIDTH = 800;
+    /** Hauteur fixe des photos stockées (ratio 4:3). */
+    public static final int TARGET_HEIGHT = 600;
+    private static final float JPEG_QUALITY = 0.82f;
 
     /**
-     * Redimensionne et compresse une image en JPEG optimisé.
+     * Recadre / redimensionne et compresse une image en JPEG 800×600 (4:3).
      *
      * @param file image source
      * @return fichier multipart en mémoire (JPEG)
@@ -60,8 +62,8 @@ public class ImageOptimizationService {
             if (source == null) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Photo illisible ou format non pris en charge");
             }
-            BufferedImage resized = resizeIfNeeded(source);
-            byte[] jpegBytes = encodeJpeg(resized);
+            BufferedImage normalized = normalizeToFixedFourByThree(source);
+            byte[] jpegBytes = encodeJpeg(normalized);
 
             String originalName = file.getOriginalFilename();
             String filename = toJpegFilename(originalName);
@@ -70,8 +72,8 @@ public class ImageOptimizationService {
                     "Image optimisée: {}x{} → {}x{} ({} → {} octets)",
                     source.getWidth(),
                     source.getHeight(),
-                    resized.getWidth(),
-                    resized.getHeight(),
+                    normalized.getWidth(),
+                    normalized.getHeight(),
                     file.getSize(),
                     jpegBytes.length
             );
@@ -91,6 +93,54 @@ public class ImageOptimizationService {
         }
     }
 
+    /**
+     * Recadre au centre en 4:3 puis met à l'échelle exacte {@value #TARGET_WIDTH}×{@value #TARGET_HEIGHT}.
+     */
+    BufferedImage normalizeToFixedFourByThree(BufferedImage source) {
+        BufferedImage rgb = toRgb(source);
+        BufferedImage cropped = centerCropToAspect(rgb, TARGET_WIDTH, TARGET_HEIGHT);
+        if (cropped.getWidth() == TARGET_WIDTH && cropped.getHeight() == TARGET_HEIGHT) {
+            return cropped;
+        }
+        BufferedImage target = new BufferedImage(TARGET_WIDTH, TARGET_HEIGHT, BufferedImage.TYPE_INT_RGB);
+        Graphics2D g = target.createGraphics();
+        try {
+            g.setColor(java.awt.Color.WHITE);
+            g.fillRect(0, 0, TARGET_WIDTH, TARGET_HEIGHT);
+            g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
+            g.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
+            g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            g.drawImage(cropped, 0, 0, TARGET_WIDTH, TARGET_HEIGHT, null);
+        } finally {
+            g.dispose();
+        }
+        return target;
+    }
+
+    private BufferedImage centerCropToAspect(BufferedImage source, int aspectW, int aspectH) {
+        int width = source.getWidth();
+        int height = source.getHeight();
+        if (width < 1 || height < 1) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Photo illisible ou format non pris en charge");
+        }
+        double targetAspect = (double) aspectW / aspectH;
+        double sourceAspect = (double) width / height;
+        int cropW = width;
+        int cropH = height;
+        int x = 0;
+        int y = 0;
+        if (sourceAspect > targetAspect) {
+            cropW = Math.max(1, (int) Math.round(height * targetAspect));
+            x = Math.max(0, (width - cropW) / 2);
+        } else if (sourceAspect < targetAspect) {
+            cropH = Math.max(1, (int) Math.round(width / targetAspect));
+            y = Math.max(0, (height - cropH) / 2);
+        }
+        cropW = Math.min(cropW, width - x);
+        cropH = Math.min(cropH, height - y);
+        return source.getSubimage(x, y, cropW, cropH);
+    }
+
     private BufferedImage toRgb(BufferedImage source) {
         if (source.getType() == BufferedImage.TYPE_INT_RGB) {
             return source;
@@ -105,32 +155,6 @@ public class ImageOptimizationService {
             g.dispose();
         }
         return rgb;
-    }
-
-    private BufferedImage resizeIfNeeded(BufferedImage source) {
-        int width = source.getWidth();
-        int height = source.getHeight();
-        if (width <= MAX_DIMENSION && height <= MAX_DIMENSION) {
-            return toRgb(source);
-        }
-
-        double scale = Math.min((double) MAX_DIMENSION / width, (double) MAX_DIMENSION / height);
-        int targetWidth = Math.max(1, (int) Math.round(width * scale));
-        int targetHeight = Math.max(1, (int) Math.round(height * scale));
-
-        BufferedImage target = new BufferedImage(targetWidth, targetHeight, BufferedImage.TYPE_INT_RGB);
-        Graphics2D g = target.createGraphics();
-        try {
-            g.setColor(java.awt.Color.WHITE);
-            g.fillRect(0, 0, targetWidth, targetHeight);
-            g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
-            g.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
-            g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-            g.drawImage(source, 0, 0, targetWidth, targetHeight, null);
-        } finally {
-            g.dispose();
-        }
-        return target;
     }
 
     private byte[] encodeJpeg(BufferedImage image) throws IOException {

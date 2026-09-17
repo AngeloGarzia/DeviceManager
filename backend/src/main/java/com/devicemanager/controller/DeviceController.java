@@ -65,11 +65,12 @@ public class DeviceController {
     public ResponseEntity<DeviceResponse> create(
             @Valid @RequestPart("data") DeviceRequest data,
             @RequestPart(value = "photos", required = false) MultipartFile[] photos,
-            @RequestPart(value = "documents", required = false) MultipartFile[] documents) {
+            @RequestPart(value = "documents", required = false) MultipartFile[] documents,
+            Authentication authentication) {
         List<MultipartFile> photoList = photos == null ? List.of() : Arrays.asList(photos);
         List<MultipartFile> docList = documents == null ? List.of() : Arrays.asList(documents);
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(deviceService.create(data, photoList, docList));
+                .body(deviceService.create(data, photoList, docList, authentication.getName()));
     }
 
     /**

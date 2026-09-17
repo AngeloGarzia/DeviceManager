@@ -40,6 +40,18 @@ public interface TodoTacheRepository extends JpaRepository<TodoTache, Long> {
     long countByAtelierIdAndStatutIn(Long atelierId, Collection<TodoTacheStatut> statuts);
 
     @Query("""
+            SELECT t FROM TodoTache t
+            WHERE t.atelier.id = :atelierId
+              AND t.statut IN :statuts
+              AND t.description LIKE CONCAT('%', :marker, '%')
+            ORDER BY t.createdAt DESC
+            """)
+    List<TodoTache> findByAtelierIdAndStatutInAndDescriptionContaining(
+            @Param("atelierId") Long atelierId,
+            @Param("statuts") Collection<TodoTacheStatut> statuts,
+            @Param("marker") String marker);
+
+    @Query("""
             SELECT DISTINCT t FROM TodoTache t
             LEFT JOIN FETCH t.mas
             LEFT JOIN FETCH t.interventionTechnique

@@ -8,8 +8,6 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
-import { forkJoin, of } from 'rxjs';
-import { catchError } from 'rxjs/operators';
 import { Mas, RegleJeuxOption, RegleJeuxPdfCheck } from '../../models/models';
 import { MasService } from '../../services/mas.service';
 import { apiErrorMessage } from '../../shared/api-error';
@@ -109,7 +107,7 @@ export class ReglesJeuxComponent implements OnInit {
           (a.label || '').localeCompare(b.label || '', 'fr', { sensitivity: 'base' })
         ));
         this.loading.set(false);
-        this.checkAllPdfs(list);
+        this.pdfChecks.set({});
       },
       error: (err) => {
         this.loading.set(false);
@@ -118,44 +116,7 @@ export class ReglesJeuxComponent implements OnInit {
     });
   }
 
-  checkAllPdfs(list: RegleJeuxOption[]): void {
-    if (list.length === 0) {
-      this.pdfChecks.set({});
-      return;
-    }
-    const loadingMap: Record<number, PdfCheckState> = {};
-    for (const item of list) {
-      loadingMap[item.id] = { status: 'loading' };
-    }
-    this.pdfChecks.set(loadingMap);
-
-    forkJoin(
-      list.map((item) =>
-        this.masService.checkRegleJeuxPdf(item.id).pipe(
-          catchError((err) =>
-            of({
-              kind: 'error' as const,
-              id: item.id,
-              message: apiErrorMessage(err, 'Contrôle PDF impossible.')
-            })
-          )
-        )
-      )
-    ).subscribe((results) => {
-      const next: Record<number, PdfCheckState> = {};
-      for (let i = 0; i < list.length; i++) {
-        const item = list[i];
-        const result = results[i] as RegleJeuxPdfCheck | { kind: 'error'; id: number; message: string };
-        if (result && 'kind' in result && result.kind === 'error') {
-          next[item.id] = { status: 'error', message: result.message };
-        } else {
-          next[item.id] = result as RegleJeuxPdfCheck;
-        }
-      }
-      this.pdfChecks.set(next);
-    });
-  }
-
+  /** Lance le contrôle PDF pour une règle (uniquement sur action utilisateur). */
   recheckPdf(id: number): void {
     this.pdfChecks.update((map) => ({ ...map, [id]: { status: 'loading' } }));
     this.masService.checkRegleJeuxPdf(id).subscribe({

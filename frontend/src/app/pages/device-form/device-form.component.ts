@@ -130,6 +130,7 @@ export class DeviceFormComponent implements OnInit, AfterViewInit, OnDestroy {
     dateAcquisition: [this.todayIso(), Validators.required],
     obsolete: [false],
     stock: [0, [Validators.required, Validators.min(0)]],
+    unitPriceHt: [null as number | null, [Validators.min(0)]],
     sfmId: [null as number | null],
     masId: [null as number | null]
   });
@@ -789,7 +790,10 @@ export class DeviceFormComponent implements OnInit, AfterViewInit, OnDestroy {
     const payload = {
       ...(this.form.getRawValue() as DeviceForm),
       keepPhotoIds,
-      keepDocumentIds
+      keepDocumentIds,
+      unitPriceHt: this.id
+        ? undefined
+        : this.normalizeUnitPrice(this.form.controls.unitPriceHt.value)
     };
     const files = this.newPhotos().map((p) => p.file);
     const documents = this.newDocuments().map((d) => ({ file: d.file, type: d.type }));
@@ -860,6 +864,7 @@ export class DeviceFormComponent implements OnInit, AfterViewInit, OnDestroy {
       dateAcquisition: this.todayIso(),
       obsolete: false,
       stock: 0,
+      unitPriceHt: null,
       sfmId: keepSfmId,
       masId: keepMasId
     });
@@ -896,6 +901,7 @@ export class DeviceFormComponent implements OnInit, AfterViewInit, OnDestroy {
         dateAcquisition: raw.dateAcquisition || this.todayIso(),
         obsolete: !!raw.obsolete,
         stock: Number(raw.stock) || 0,
+        unitPriceHt: this.normalizeUnitPrice(raw.unitPriceHt),
         sfmId: raw.sfmId ?? null,
         masId: raw.masId ?? null
       },
@@ -945,6 +951,17 @@ export class DeviceFormComponent implements OnInit, AfterViewInit, OnDestroy {
     const m = String(d.getMonth() + 1).padStart(2, '0');
     const day = String(d.getDate()).padStart(2, '0');
     return `${y}-${m}-${day}`;
+  }
+
+  private normalizeUnitPrice(value: unknown): number | null {
+    if (value === null || value === undefined || value === '') {
+      return null;
+    }
+    const n = typeof value === 'number' ? value : Number(value);
+    if (!Number.isFinite(n) || n < 0) {
+      return null;
+    }
+    return Math.round(n * 100) / 100;
   }
 
   /** Ouvre l'éditeur d'image (zoom, recadrage, rotation, miroir). */

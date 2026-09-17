@@ -51,6 +51,7 @@ class TodoServiceTest {
     @Mock private AtelierService atelierService;
     @Mock private AtelierMemoirePublisher atelierMemoirePublisher;
     @Mock private TodoRecurrenceService todoRecurrenceService;
+    @Mock private MissingRegleJeuxTodoService missingRegleJeuxTodoService;
     @Mock private Clock clock;
     @InjectMocks private TodoService todoService;
 

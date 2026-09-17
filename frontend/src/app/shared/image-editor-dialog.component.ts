@@ -3,7 +3,6 @@ import { CommonModule } from '@angular/common';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
-import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import {
   ImageCroppedEvent,
@@ -16,9 +15,14 @@ export interface ImageEditorDialogData {
   title?: string;
 }
 
+/** Sortie fixe des photos pièces : 4/3 à 800×600. */
+export const DEVICE_PHOTO_WIDTH = 800;
+export const DEVICE_PHOTO_HEIGHT = 600;
+export const DEVICE_PHOTO_ASPECT = DEVICE_PHOTO_WIDTH / DEVICE_PHOTO_HEIGHT;
+
 /**
- * Dialogue d'édition d'image : zoom, recadrage, rotation et miroir.
- * Retourne un fichier JPEG recadré, ou {@code null} si annulé.
+ * Dialogue d'édition d'image : zoom, recadrage 4:3 manuel, rotation et miroir.
+ * Retourne un fichier JPEG 800×600, ou {@code null} si annulé.
  */
 @Component({
   selector: 'app-image-editor-dialog',
@@ -28,7 +32,6 @@ export interface ImageEditorDialogData {
     MatDialogModule,
     MatButtonModule,
     MatIconModule,
-    MatButtonToggleModule,
     MatTooltipModule,
     ImageCropperComponent
   ],
@@ -44,18 +47,14 @@ export class ImageEditorDialogComponent {
   readonly saving = signal(false);
   readonly error = signal<string | null>(null);
 
+  readonly aspectRatio = DEVICE_PHOTO_ASPECT;
+  readonly outputWidth = DEVICE_PHOTO_WIDTH;
+  readonly outputHeight = DEVICE_PHOTO_HEIGHT;
+
   transform: ImageTransform = { scale: 1, rotate: 0, flipH: false, flipV: false };
-  aspectRatio = 0;
-  maintainAspectRatio = false;
   roundCropper = false;
 
   private croppedBlob: Blob | null = null;
-
-  /** Change le ratio de recadrage (0 = libre). */
-  setAspect(ratio: number): void {
-    this.aspectRatio = ratio;
-    this.maintainAspectRatio = ratio > 0;
-  }
 
   /** Zoom avant. */
   zoomIn(): void {
@@ -91,10 +90,9 @@ export class ImageEditorDialogComponent {
     this.transform = { ...this.transform, flipV: !this.transform.flipV };
   }
 
-  /** Réinitialise zoom, rotation et miroirs. */
+  /** Réinitialise zoom, rotation et miroirs (le ratio 4:3 reste imposé). */
   resetTransforms(): void {
     this.transform = { scale: 1, rotate: 0, flipH: false, flipV: false };
-    this.setAspect(0);
   }
 
   onImageCropped(event: ImageCroppedEvent): void {
@@ -109,7 +107,7 @@ export class ImageEditorDialogComponent {
     this.dialogRef.close(null);
   }
 
-  /** Valide le recadrage et renvoie un fichier JPEG. */
+  /** Valide le recadrage et renvoie un fichier JPEG 800×600. */
   async apply(): Promise<void> {
     if (!this.croppedBlob) {
       this.error.set('Recadrez l’image avant de valider.');
@@ -119,11 +117,38 @@ export class ImageEditorDialogComponent {
     this.error.set(null);
     try {
       const name = this.imageFile.name.replace(/\.[^.]+$/, '') || `image-${Date.now()}`;
-      const file = new File([this.croppedBlob], `${name}-edit.jpg`, { type: 'image/jpeg' });
+      const file = await this.toFixedJpeg(this.croppedBlob, `${name}-edit.jpg`);
       this.dialogRef.close(file);
     } catch {
       this.error.set('Enregistrement de l’image impossible.');
       this.saving.set(false);
+    }
+  }
+
+  /** Garantit exactement 800×600 même si le cropper dérive légèrement. */
+  private async toFixedJpeg(blob: Blob, filename: string): Promise<File> {
+    const bitmap = await createImageBitmap(blob);
+    try {
+      const canvas = document.createElement('canvas');
+      canvas.width = DEVICE_PHOTO_WIDTH;
+      canvas.height = DEVICE_PHOTO_HEIGHT;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        throw new Error('Canvas 2D indisponible');
+      }
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, DEVICE_PHOTO_WIDTH, DEVICE_PHOTO_HEIGHT);
+      ctx.drawImage(bitmap, 0, 0, DEVICE_PHOTO_WIDTH, DEVICE_PHOTO_HEIGHT);
+      const out = await new Promise<Blob>((resolve, reject) => {
+        canvas.toBlob(
+          (b) => (b ? resolve(b) : reject(new Error('toBlob failed'))),
+          'image/jpeg',
+          0.82
+        );
+      });
+      return new File([out], filename, { type: 'image/jpeg' });
+    } finally {
+      bitmap.close();
     }
   }
 }

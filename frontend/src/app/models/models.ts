@@ -322,6 +322,8 @@ export interface DeviceForm {
   dateAcquisition: string;
   obsolete: boolean;
   stock: number;
+  /** Prix unitaire HT EUR à la création (optionnel). */
+  unitPriceHt?: number | null;
   sfmId: number | null;
   masId: number | null;
   keepPhotoIds?: number[];

@@ -258,8 +258,14 @@
   }
 
   @if (showCreate()) {
-    <div class="panel grid gap-3">
-      <h2 class="m-0 text-base font-semibold">Nouvelle tâche simple</h2>
+    <div
+      #todoCreatePanel
+      id="todo-create-panel"
+      class="panel grid gap-3 todo-create-panel todo-create-panel--attention"
+      tabindex="-1"
+      aria-labelledby="todo-create-title"
+    >
+      <h2 id="todo-create-title" class="m-0 text-base font-semibold">Nouvelle tâche simple</h2>
       <p class="m-0 text-sm text-ink-soft">
         Choisissez un modèle ci-dessus pour créer la tâche en un clic, ou saisissez une tâche personnalisée.
       </p>
@@ -291,7 +297,7 @@
         <form class="grid gap-3" [formGroup]="todoForm" (ngSubmit)="submitCreate()">
           <mat-form-field appearance="outline" class="w-full">
             <mat-label>Titre</mat-label>
-            <input matInput formControlName="titre" maxlength="200" />
+            <input #createTitreInput matInput formControlName="titre" maxlength="200" />
           </mat-form-field>
           <mat-form-field appearance="outline" class="w-full">
             <mat-label>Description</mat-label>

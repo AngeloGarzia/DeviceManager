@@ -30,17 +30,7 @@
       </button>
     </div>
 
-    <mat-button-toggle-group
-      class="aspect-group"
-      [value]="aspectRatio"
-      (change)="setAspect($event.value)"
-      aria-label="Ratio de recadrage"
-    >
-      <mat-button-toggle [value]="0">Libre</mat-button-toggle>
-      <mat-button-toggle [value]="1">1:1</mat-button-toggle>
-      <mat-button-toggle [value]="4 / 3">4:3</mat-button-toggle>
-      <mat-button-toggle [value]="16 / 9">16:9</mat-button-toggle>
-    </mat-button-toggle-group>
+    <span class="aspect-badge" aria-label="Format de sortie">4:3 · {{ outputWidth }}×{{ outputHeight }}</span>
 
     <button mat-button type="button" (click)="resetTransforms()" matTooltip="Réinitialiser">
       <mat-icon>restart_alt</mat-icon>
@@ -49,19 +39,21 @@
   </div>
 
   <p class="hint">
-    Déplacez et redimensionnez le cadre pour recadrer. Molette ou boutons pour zoomer.
+    Cadre fixe 4:3 — déplacez et zoomez pour cadrer la pièce. La photo sera enregistrée en
+    {{ outputWidth }}×{{ outputHeight }} px.
   </p>
 
   <div class="cropper-wrap">
     <image-cropper
       [imageFile]="imageFile"
-      [maintainAspectRatio]="maintainAspectRatio"
-      [aspectRatio]="aspectRatio || 1"
+      [maintainAspectRatio]="true"
+      [aspectRatio]="aspectRatio"
       [roundCropper]="roundCropper"
       [transform]="transform"
-      [resizeToWidth]="900"
+      [resizeToWidth]="outputWidth"
+      [resizeToHeight]="outputHeight"
       [format]="'jpeg'"
-      [imageQuality]="80"
+      [imageQuality]="82"
       [autoCrop]="true"
       [onlyScaleDown]="false"
       [alignImage]="'center'"

@@ -1,4 +1,4 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, ElementRef, Injector, OnInit, afterNextRender, computed, inject, signal, viewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -60,6 +60,10 @@ export class TodoListComponent implements OnInit {
   private readonly masService = inject(MasService);
   private readonly interventionTechniqueService = inject(InterventionTechniqueService);
   private readonly interventionService = inject(InterventionService);
+  private readonly injector = inject(Injector);
+
+  private readonly createPanel = viewChild<ElementRef<HTMLElement>>('todoCreatePanel');
+  private readonly createTitreInput = viewChild<ElementRef<HTMLInputElement>>('createTitreInput');
 
   readonly items = signal<TodoItem[]>([]);
   readonly recurrences = signal<TodoRecurrence[]>([]);
@@ -301,6 +305,7 @@ export class TodoListComponent implements OnInit {
     this.todoForm.reset({ titre: '', description: '', severite: 'MEDIUM', masId: null });
     this.loadMasses();
     this.loadModeles();
+    this.focusCreatePanel();
   }
 
   cancelCreate(): void {
@@ -313,6 +318,29 @@ export class TodoListComponent implements OnInit {
     this.showCustomCreate.set(true);
     this.todoForm.reset({ titre: '', description: '', severite: 'MEDIUM', masId: null });
     this.loadMasses();
+    this.focusCreatePanel(true);
+  }
+
+  /** Scroll + focus sur le panneau de création (tuile clignotante). */
+  private focusCreatePanel(preferTitre = false): void {
+    afterNextRender(
+      () => {
+        const panel = this.createPanelPanel()?.nativeElement;
+        if (!panel) {
+          return;
+        }
+        panel.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        const titre = preferTitre || this.showCustomCreate()
+          ? this.createTitreInput()?.nativeElement
+          : null;
+        if (titre) {
+          titre.focus({ preventScroll: true });
+        } else {
+          panel.focus({ preventScroll: true });
+        }
+      },
+      { injector: this.injector }
+    );
   }
 
   toggleModeleManage(): void {
@@ -433,6 +461,7 @@ export class TodoListComponent implements OnInit {
       masId: modele.masId ?? null
     });
     this.loadMasses();
+    this.focusCreatePanel(true);
   }
 
   openRecurrenceCreate(): void {

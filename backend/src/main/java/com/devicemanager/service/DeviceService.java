@@ -57,6 +57,7 @@ public class DeviceService {
     private final StockMouvementService stockMouvementService;
     private final UserRepository userRepository;
     private final AtelierMemoirePublisher atelierMemoirePublisher;
+    private final DevicePrixService devicePrixService;
 
     /**
      * Liste ou recherche les pièces de l'atelier courant.
@@ -132,12 +133,14 @@ public class DeviceService {
      * @param request   métadonnées (nom, usage, MAS/SFM, types des nouveaux PDF, etc.)
      * @param photos    images (1 à {@link #MAX_PHOTOS})
      * @param documents PDF (manuel / datasheet / notice), types dans {@code request.newDocumentTypes}
+     * @param username  acteur authentifié (historique prix saisie)
      * @return pièce persistée
      */
     public DeviceResponse create(
             DeviceRequest request,
             List<MultipartFile> photos,
-            List<MultipartFile> documents) {
+            List<MultipartFile> documents,
+            String username) {
         List<MultipartFile> files = normalizeFiles(photos);
         ensurePhotoCount(files.size(), true);
         files.forEach(this::validateImageFile);
@@ -178,6 +181,9 @@ public class DeviceService {
         addNewDocuments(entity, docs, docTypes);
 
         Device saved = deviceRepository.save(entity);
+        if (request.getUnitPriceHt() != null) {
+            devicePrixService.recordInitialSaisie(saved, request.getUnitPriceHt(), username);
+        }
         log.info("Création en base — Pièce id={} nom={} référence={} photos={} docs={} atelier={}",
                 saved.getId(), saved.getNom(), saved.getReference(),
                 saved.getPhotos().size(), saved.getDocuments().size(), atelier.getId());

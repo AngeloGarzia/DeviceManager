@@ -57,6 +57,7 @@ class MasServiceTest {
     @Mock private AtelierMemoirePublisher atelierMemoirePublisher;
     @Mock private CasinoRepository casinoRepository;
     @Mock private SfmRepository sfmRepository;
+    @Mock private MissingRegleJeuxTodoService missingRegleJeuxTodoService;
     @InjectMocks private MasService masService;
 
     private static final String SIG_ADMIN =

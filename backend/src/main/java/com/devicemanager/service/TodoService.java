@@ -55,10 +55,12 @@ public class TodoService {
     private final AtelierService atelierService;
     private final AtelierMemoirePublisher atelierMemoirePublisher;
     private final TodoRecurrenceService todoRecurrenceService;
+    private final MissingRegleJeuxTodoService missingRegleJeuxTodoService;
     private final Clock clock;
 
     public TodoListResponse listPending() {
         todoRecurrenceService.generateDueOccurrences();
+        missingRegleJeuxTodoService.syncForCurrentAtelier();
         Long atelierId = atelierService.requireCurrentAtelier().getId();
         LocalDateTime now = LocalDateTime.now(clock);
         List<TodoTacheResponse> items = todoTacheRepository
@@ -78,6 +80,7 @@ public class TodoService {
 
     public TodoListResponse listAll() {
         todoRecurrenceService.generateDueOccurrences();
+        missingRegleJeuxTodoService.syncForCurrentAtelier();
         Long atelierId = atelierService.requireCurrentAtelier().getId();
         LocalDateTime now = LocalDateTime.now(clock);
         List<TodoTacheResponse> items = todoTacheRepository

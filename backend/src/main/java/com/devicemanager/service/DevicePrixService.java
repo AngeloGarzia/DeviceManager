@@ -103,6 +103,45 @@ public class DevicePrixService {
         return closeAlerte(id, username, PrixAlerteStatus.DISMISSED);
     }
 
+    /**
+     * Enregistre un prix saisi manuellement (création de pièce) à la date courante.
+     * Met à jour le dernier prix dénormalisé sur la fiche — sans alerte (pas d'historique).
+     */
+    public void recordInitialSaisie(Device device, BigDecimal unitPriceHt, String username) {
+        if (device == null || device.getId() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Pièce invalide pour la saisie de prix");
+        }
+        if (unitPriceHt == null) {
+            return;
+        }
+        if (unitPriceHt.compareTo(BigDecimal.ZERO) < 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Le prix ne peut pas être négatif");
+        }
+        Atelier atelier = atelierService.requireCurrentAtelier();
+        BigDecimal price = unitPriceHt.setScale(2, RoundingMode.HALF_UP);
+        LocalDateTime now = LocalDateTime.now();
+        String actor = username == null || username.isBlank() ? "system" : username.trim();
+
+        DevicePrixObservation obs = DevicePrixObservation.builder()
+                .atelier(atelier)
+                .device(device)
+                .commande(null)
+                .source(PrixSource.SAISIE)
+                .unitPriceHt(price)
+                .currency("EUR")
+                .observedAt(now)
+                .confirmedAt(now)
+                .confirmedBy(actor)
+                .invalidated(false)
+                .build();
+        observationRepository.save(obs);
+
+        device.setLastUnitPriceHt(price);
+        device.setLastUnitPriceAt(now);
+        deviceRepository.save(device);
+        log.info("Prix saisie initiale pièce id={} prix={} EUR HT par={}", device.getId(), price, actor);
+    }
+
     public AiDevisPrixScanResponse analyzeDevisPrices(Long orderId, MultipartFile file) {
         DocumentUploadValidator.Kind kind = DocumentUploadValidator.validatePdfOrImage(file, "devis");
         if (kind != DocumentUploadValidator.Kind.PDF) {

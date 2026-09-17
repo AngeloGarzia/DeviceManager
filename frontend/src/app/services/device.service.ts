@@ -27,6 +27,7 @@ export class DeviceService {
       id: number;
       unitPriceHt: number;
       currency: string;
+      source?: string | null;
       commandeId?: number | null;
       observedAt: string;
       confirmedAt: string;
@@ -40,6 +41,7 @@ export class DeviceService {
         id: number;
         unitPriceHt: number;
         currency: string;
+        source?: string | null;
         commandeId?: number | null;
         observedAt: string;
         confirmedAt: string;

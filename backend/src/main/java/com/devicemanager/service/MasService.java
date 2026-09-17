@@ -80,6 +80,7 @@ public class MasService {
     private final AtelierMemoirePublisher atelierMemoirePublisher;
     private final CasinoRepository casinoRepository;
     private final SfmRepository sfmRepository;
+    private final MissingRegleJeuxTodoService missingRegleJeuxTodoService;
 
     @Transactional(readOnly = true)
     public List<MasResponse> findAll(String q) {
@@ -211,6 +212,7 @@ public class MasService {
         }
 
         log.info("Rattachement MAS — Règle de jeux id={} mas={}", regleId, targetIds.size());
+        missingRegleJeuxTodoService.syncForCurrentAtelier();
         return toRegleJeuxResponseDetailed(regle, atelierId);
     }
 
@@ -463,6 +465,7 @@ public class MasService {
         atelierMemoirePublisher.publish("MAS_CREATED",
                 "Nouvelle MAS « " + saved.getNumero() + " »"
                         + (saved.getMarque() != null ? " (" + saved.getMarque().getLabel() + ")" : ""));
+        missingRegleJeuxTodoService.sync(atelier);
         return toResponse(saved);
     }
 
@@ -508,6 +511,7 @@ public class MasService {
         if (statutChanged) {
             fitService.appendFromMasStatutChange(saved, statut, statutChange);
         }
+        missingRegleJeuxTodoService.syncForCurrentAtelier();
         return toResponse(saved);
     }
 

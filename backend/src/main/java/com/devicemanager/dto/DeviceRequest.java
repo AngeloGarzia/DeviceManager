@@ -1,11 +1,13 @@
 package com.devicemanager.dto;
 
+import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -40,6 +42,13 @@ public class DeviceRequest {
     /** Quantité en stock (≥ 0). Défaut 0 si absent. */
     @Min(value = 0, message = "Le stock ne peut pas être négatif")
     private Integer stock;
+
+    /**
+     * Prix unitaire HT (EUR) à la date de saisie — optionnel à la création.
+     * Enregistré comme observation {@code SAISIE} et dernier prix connu.
+     */
+    @DecimalMin(value = "0.0", inclusive = true, message = "Le prix ne peut pas être négatif")
+    private BigDecimal unitPriceHt;
 
     /** Identifiant SFM associé (optionnel). */
     private Long sfmId;

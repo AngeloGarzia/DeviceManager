@@ -46,6 +46,43 @@
   }
 }
 
+.todo-create-panel {
+  outline: none;
+  border: 2px solid #d9e2ec;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.todo-create-panel:focus-visible {
+  border-color: #0f4c81;
+}
+
+.todo-create-panel--attention {
+  animation: todo-create-blink 1.1s ease-in-out infinite;
+}
+
+@keyframes todo-create-blink {
+  0%,
+  100% {
+    border-color: #0f4c81;
+    box-shadow: 0 0 0 0 color-mix(in srgb, #0f4c81 35%, transparent);
+    background-color: #fff;
+  }
+  50% {
+    border-color: #38bdf8;
+    box-shadow: 0 0 0 4px color-mix(in srgb, #0ea5e9 28%, transparent);
+    background-color: #f0f9ff;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .todo-create-panel--attention {
+    animation: none;
+    border-color: #0f4c81;
+    box-shadow: 0 0 0 3px color-mix(in srgb, #0ea5e9 30%, transparent);
+    background-color: #f0f9ff;
+  }
+}
+
 .todo-modeles__header {
   display: flex;
   flex-wrap: wrap;

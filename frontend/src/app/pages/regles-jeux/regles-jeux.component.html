@@ -171,17 +171,17 @@
                           >
                             {{ check.message }}
                           </span>
-                          <button
-                            mat-button
-                            type="button"
-                            class="!min-w-0 !px-2 !text-xs"
-                            (click)="recheckPdf(item.id)"
-                            [disabled]="saving()"
-                            title="Revérifier le PDF"
-                          >
-                            Vérifier
-                          </button>
                         }
+                        <button
+                          mat-button
+                          type="button"
+                          class="!min-w-0 !px-2 !text-xs"
+                          (click)="recheckPdf(item.id)"
+                          [disabled]="saving()"
+                          title="Vérifier le PDF"
+                        >
+                          Vérifier
+                        </button>
                       }
                     }
                   </div>

@@ -28,6 +28,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
@@ -45,6 +46,7 @@ class DeviceServiceTest {
     @Mock private StockMouvementService stockMouvementService;
     @Mock private UserRepository userRepository;
     @Mock private AtelierMemoirePublisher atelierMemoirePublisher;
+    @Mock private DevicePrixService devicePrixService;
     @InjectMocks private DeviceService deviceService;
 
     private MockMultipartFile photo;
@@ -90,7 +92,7 @@ class DeviceServiceTest {
             return d;
         });
 
-        DeviceResponse response = deviceService.create(request(), List.of(photo), List.of());
+        DeviceResponse response = deviceService.create(request(), List.of(photo), List.of(), "tech");
 
         assertThat(response.getNom()).isEqualTo("Carte mère");
         assertThat(response.getReference()).isEqualTo("REF-100");
@@ -98,6 +100,31 @@ class DeviceServiceTest {
         assertThat(response.getPhotos()).hasSize(1);
         verify(imageOptimizationService).optimize(photo);
         verify(storageService).store(photo);
+        verify(devicePrixService, never()).recordInitialSaisie(any(), any(), anyString());
+    }
+
+    @Test
+    void create_recordsInitialPriceWhenProvided() {
+        DeviceRequest req = request();
+        req.setUnitPriceHt(new java.math.BigDecimal("42.50"));
+        when(deviceRepository.existsByNomIgnoreCaseAndAtelierId("Carte mère", 100L)).thenReturn(false);
+        when(deviceRepository.existsByReferenceIgnoreCaseAndAtelierId("REF-100", 100L)).thenReturn(false);
+        when(sfmService.getEntity(30L)).thenReturn(TestFixtures.sfm());
+        when(masService.getEntity(20L)).thenReturn(TestFixtures.mas());
+        when(imageOptimizationService.optimize(photo)).thenReturn(photo);
+        when(storageService.store(photo)).thenReturn(new StorageService.StoredObject("k1", "/u/k1", "image/jpeg", 3L));
+        when(deviceRepository.save(any(Device.class))).thenAnswer(inv -> {
+            Device d = inv.getArgument(0);
+            d.setId(43L);
+            return d;
+        });
+
+        deviceService.create(req, List.of(photo), List.of(), "tech");
+
+        verify(devicePrixService).recordInitialSaisie(
+                argThat(d -> d.getId().equals(43L)),
+                eq(new java.math.BigDecimal("42.50")),
+                eq("tech"));
     }
 
     @Test
@@ -115,7 +142,7 @@ class DeviceServiceTest {
             return d;
         });
 
-        DeviceResponse response = deviceService.create(req, List.of(photo), List.of());
+        DeviceResponse response = deviceService.create(req, List.of(photo), List.of(), "tech");
 
         assertThat(response.getReference()).isNull();
         assertThat(response.getSfmId()).isNull();
@@ -127,7 +154,7 @@ class DeviceServiceTest {
 
     @Test
     void create_requiresPhoto() {
-        assertThatThrownBy(() -> deviceService.create(request(), List.of(), List.of()))
+        assertThatThrownBy(() -> deviceService.create(request(), List.of(), List.of(), "tech"))
                 .isInstanceOf(ResponseStatusException.class)
                 .extracting(ex -> ((ResponseStatusException) ex).getReason())
                 .isEqualTo("Ajoutez au moins une photo de la pièce");
@@ -141,7 +168,7 @@ class DeviceServiceTest {
         MockMultipartFile p5 = new MockMultipartFile("photos", "5.jpg", MediaType.IMAGE_JPEG_VALUE, new byte[]{5});
         MockMultipartFile p6 = new MockMultipartFile("photos", "6.jpg", MediaType.IMAGE_JPEG_VALUE, new byte[]{6});
 
-        assertThatThrownBy(() -> deviceService.create(request(), List.of(photo, p2, p3, p4, p5, p6), List.of()))
+        assertThatThrownBy(() -> deviceService.create(request(), List.of(photo, p2, p3, p4, p5, p6), List.of(), "tech"))
                 .isInstanceOf(ResponseStatusException.class)
                 .extracting(ex -> ((ResponseStatusException) ex).getReason())
                 .isEqualTo("Maximum 5 photos par pièce détachée");
@@ -151,7 +178,7 @@ class DeviceServiceTest {
     void create_rejectsNonImage() {
         MockMultipartFile bad = new MockMultipartFile("photos", "a.pdf", "application/pdf", new byte[]{1});
 
-        assertThatThrownBy(() -> deviceService.create(request(), List.of(bad), List.of()))
+        assertThatThrownBy(() -> deviceService.create(request(), List.of(bad), List.of(), "tech"))
                 .isInstanceOf(ResponseStatusException.class)
                 .extracting(ex -> ((ResponseStatusException) ex).getReason())
                 .isEqualTo("Le fichier doit être une photo (JPEG, PNG…)");
@@ -161,7 +188,7 @@ class DeviceServiceTest {
     void create_rejectsDuplicateNom() {
         when(deviceRepository.existsByNomIgnoreCaseAndAtelierId("Carte mère", 100L)).thenReturn(true);
 
-        assertThatThrownBy(() -> deviceService.create(request(), List.of(photo), List.of()))
+        assertThatThrownBy(() -> deviceService.create(request(), List.of(photo), List.of(), "tech"))
                 .isInstanceOf(ResponseStatusException.class)
                 .satisfies(ex -> {
                     ResponseStatusException rse = (ResponseStatusException) ex;
@@ -175,7 +202,7 @@ class DeviceServiceTest {
         when(deviceRepository.existsByNomIgnoreCaseAndAtelierId("Carte mère", 100L)).thenReturn(false);
         when(deviceRepository.existsByReferenceIgnoreCaseAndAtelierId("REF-100", 100L)).thenReturn(true);
 
-        assertThatThrownBy(() -> deviceService.create(request(), List.of(photo), List.of()))
+        assertThatThrownBy(() -> deviceService.create(request(), List.of(photo), List.of(), "tech"))
                 .isInstanceOf(ResponseStatusException.class)
                 .extracting(ex -> ((ResponseStatusException) ex).getReason())
                 .isEqualTo("Référence déjà utilisée dans cet atelier");

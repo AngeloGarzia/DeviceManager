@@ -26,6 +26,22 @@ describe('ReglesJeuxComponent', () => {
       { id: 2, label: 'Roulette live', description: 'Table', masCount: 0 }
     ]);
     http.expectOne('/api/mas').flush([]);
+
+    expect(component.items().length).toBe(2);
+    expect(component.pdfChecks()).toEqual({});
+    component.searchQuery.set('book');
+    expect(component.filteredItems().length).toBe(1);
+    expect(component.filteredItems()[0].label).toBe('Book of Ra');
+  });
+
+  it('checks pdf only when Vérifier is clicked', () => {
+    fixture.detectChanges();
+    http.expectOne('/api/mas/regles-jeux').flush([
+      { id: 1, label: 'Book of Ra', description: 'Novomatic', masCount: 0 }
+    ]);
+    http.expectOne('/api/mas').flush([]);
+
+    component.recheckPdf(1);
     http.expectOne('/api/mas/regles-jeux/1/document-check').flush({
       regleJeuxId: 1,
       present: true,
@@ -34,18 +50,8 @@ describe('ReglesJeuxComponent', () => {
       pageCount: 2,
       message: 'PDF valide et lisible (2 pages)'
     });
-    http.expectOne('/api/mas/regles-jeux/2/document-check').flush({
-      regleJeuxId: 2,
-      present: true,
-      valid: true,
-      readable: false,
-      pageCount: 1,
-      message: 'PDF valide mais texte non extractible (scan image ou PDF protégé)'
-    });
 
-    expect(component.items().length).toBe(2);
-    component.searchQuery.set('book');
-    expect(component.filteredItems().length).toBe(1);
-    expect(component.filteredItems()[0].label).toBe('Book of Ra');
+    const check = component.pdfCheck({ id: 1 } as never);
+    expect(check && !('status' in check) && check.valid).toBeTrue();
   });
 });

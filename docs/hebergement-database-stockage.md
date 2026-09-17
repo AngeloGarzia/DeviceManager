@@ -182,7 +182,7 @@ L’API utilise le SDK S3 AWS **uniquement comme client compatible** ; le stocka
 
 | Contenu | Estimation |
 |---------|------------|
-| Photos pièces (optimisées max **900 px**, JPEG) | ~50–300 Ko / photo |
+| Photos pièces (optimisées **800×600** 4:3, JPEG) | ~50–250 Ko / photo |
 | PDF devis / notices / règles de jeux | 0,5–15 Mo / fichier (plafond app **20 Mo**) |
 | Petite flotte | **5–20 Go** |
 | Flotte multi-casino | **50–200 Go** + egress |
@@ -193,7 +193,7 @@ R2 : egress vers Internet souvent **0 $** (avantage devis vs AWS S3).
 
 | Type | Formats | Limite applicative | Optimisation |
 |------|---------|-------------------|--------------|
-| Photos pièces détachées | JPEG, PNG, WebP, GIF… | Multipart **20 Mo** / fichier | Redim. max **900 px** + JPEG |
+| Photos pièces détachées | JPEG, PNG, WebP, GIF… | Multipart **20 Mo** / fichier | Recadrage **4:3** + JPEG **800×600** |
 | Documents pièce | PDF (+ images selon flux) | 20 Mo | — |
 | Devis commande | PDF / image | 20 Mo | — |
 | Bon destruction MAS | PDF / image | 20 Mo | — |

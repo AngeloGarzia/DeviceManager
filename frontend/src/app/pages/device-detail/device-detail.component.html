@@ -126,7 +126,7 @@
 
           @if (prixHistory().length) {
             <div class="mt-5">
-              <h2 class="m-0 mb-2 text-base font-semibold text-ink">Historique des prix (devis)</h2>
+              <h2 class="m-0 mb-2 text-base font-semibold text-ink">Historique des prix</h2>
               <ul class="m-0 grid list-none gap-2 p-0">
                 @for (p of prixHistory(); track p.id) {
                   <li class="rounded-lg border border-line bg-slate-50 px-3 py-2 text-sm">
@@ -135,6 +135,7 @@
                     </div>
                     <div class="text-xs text-ink-soft">
                       {{ p.observedAt | date: 'dd/MM/yyyy HH:mm' }}
+                      · {{ prixSourceLabel(p.source) }}
                       @if (p.commandeId) {
                         · commande #{{ p.commandeId }}
                       }
