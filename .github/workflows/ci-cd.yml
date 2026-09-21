@@ -105,8 +105,8 @@ jobs:
 
       - name: Production build
         env:
-          # URL de l’API prod (override possible via variable de repo GITHUB)
-          API_URL: ${{ vars.API_URL != '' && vars.API_URL || 'https://devicemanager-x5g4.onrender.com' }}
+          # URL de l’API prod (override : Settings → Variables → Actions → API_URL)
+          API_URL: ${{ vars.API_URL != '' && vars.API_URL || 'https://devicemanager.cleverapps.io' }}
         run: |
           node scripts/inject-api-url.mjs
           npm run build -- --configuration=production
@@ -128,54 +128,27 @@ jobs:
           exit-code: "1"
           ignore-unfixed: true
 
-  deploy:
-    name: Deploy Render
-    needs: [backend, frontend, trivy-backend-image]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    environment: production
-    steps:
-      - name: Trigger API deploy
-        env:
-          HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_API }}
-        run: |
-          if [ -z "$HOOK" ]; then
-            echo "Secret RENDER_DEPLOY_HOOK_API manquant — skip API"
-            exit 0
-          fi
-          curl -fsS -X POST "$HOOK"
-          echo "API deploy triggered"
-
-      - name: Trigger frontend deploy
-        env:
-          HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_WEB }}
-        run: |
-          if [ -z "$HOOK" ]; then
-            echo "Secret RENDER_DEPLOY_HOOK_WEB manquant — skip front"
-            exit 0
-          fi
-          curl -fsS -X POST "$HOOK"
-          echo "Frontend deploy triggered"
+  # Le déploiement prod est fait par Clever Cloud (lien GitHub → auto-deploy sur push main).
+  # Pas de job deploy ici → évite un double déploiement.
 
   smoke-prod:
     name: Smoke (production health)
-    needs: [deploy]
+    needs: [backend, frontend, trivy-backend-image]
     if: |
-      always() && (
-        github.event_name == 'workflow_dispatch' ||
-        (needs.deploy.result == 'success')
-      )
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
     environment: production
     steps:
       - name: Curl actuator health
         env:
-          API_URL: ${{ vars.API_URL }}
+          API_URL: ${{ vars.API_URL != '' && vars.API_URL || 'https://devicemanager.cleverapps.io' }}
         run: |
           if [ -z "$API_URL" ]; then
             echo "vars.API_URL missing — skip smoke-prod gracefully"
             exit 0
           fi
-          curl -fsS --retry 5 --retry-delay 10 --retry-all-errors "${API_URL%/}/actuator/health"
+          # Clever rebuild en parallèle du CI : retries larges
+          curl -fsS --retry 18 --retry-delay 20 --retry-all-errors "${API_URL%/}/actuator/health"
           echo
           echo "Health check OK"
