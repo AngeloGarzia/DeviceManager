@@ -440,9 +440,9 @@
       <ul class="todo-recurrence-list">
         @for (rule of recurrences(); track rule.id) {
           <li class="todo-recurrence" [class.todo-recurrence--off]="!rule.active">
-            <div class="min-w-0 flex-1">
-              <div class="flex flex-wrap items-center gap-2">
-                <span class="font-semibold">{{ rule.titre }}</span>
+            <div class="todo-recurrence__body min-w-0">
+              <div class="todo-recurrence__head">
+                <span class="todo-recurrence__title">{{ rule.titre }}</span>
                 <span class="todo-sev" [attr.data-severity]="rule.severite">{{
                   severityLabel(rule.severite)
                 }}</span>
@@ -474,8 +474,8 @@
                 }
               </p>
             </div>
-            <div class="flex flex-wrap gap-1">
-              @if (auth.isAdmin()) {
+            @if (auth.isAdmin()) {
+              <div class="todo-recurrence__actions">
                 <button mat-stroked-button type="button" (click)="openRecurrenceEdit(rule)" [disabled]="saving()">
                   Modifier
                 </button>
@@ -485,8 +485,8 @@
                 <button mat-button color="warn" type="button" (click)="deleteRecurrence(rule)" [disabled]="saving()">
                   Suppr.
                 </button>
-              }
-            </div>
+              </div>
+            }
           </li>
         }
       </ul>

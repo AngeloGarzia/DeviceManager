@@ -181,14 +181,50 @@
 
 .todo-recurrence {
   display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 0.75rem;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.65rem;
   padding: 0.65rem 0.75rem;
   border: 1px solid #d9e2ec;
   border-radius: 0.65rem;
   background: #f8fafc;
+}
+
+@media (min-width: 640px) {
+  .todo-recurrence {
+    flex-direction: row;
+    align-items: flex-start;
+    justify-content: space-between;
+  }
+}
+
+.todo-recurrence__body {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.todo-recurrence__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.5rem;
+}
+
+.todo-recurrence__title {
+  flex: 1 1 12rem;
+  min-width: 0;
+  font-weight: 600;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.todo-recurrence__actions {
+  display: flex;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 0.35rem;
 }
 
 .todo-recurrence--off {
