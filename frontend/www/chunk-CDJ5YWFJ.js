@@ -1,0 +1,1 @@
+var o="application/pdf,.pdf,image/*,.jpg,.jpeg,.png,.webp,.gif",i="application/pdf,.pdf";function n(e){let t=(e.name||"").toLowerCase();return e.type==="application/pdf"||t.endsWith(".pdf")}function p(e){let t=(e.name||"").toLowerCase();return e.type.startsWith("image/")||/\.(png|jpe?g|webp|gif)$/.test(t)}function a(e){return n(e)||p(e)}export{o as a,i as b,n as c,a as d};

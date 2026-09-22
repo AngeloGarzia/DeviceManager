@@ -7,8 +7,11 @@
 
 ## Mode choisi
 
-**Push sur `main` → Clever déploie tout seul** (intégration GitHub).  
-GitHub Actions ne fait que **CI** (tests) + **smoke** health — pas de `clever deploy`.
+**Push sur `main` → Clever déploie tout seul** (intégration GitHub).
+
+- **Back** : build Maven sur Clever (`spring-boot:run`).
+- **Front** : **pas de `ng build` sur Clever** (deadlock / hang esbuild récurrents).  
+  GitHub Actions build Angular → commit `frontend/www` → Clever sert uniquement ces fichiers statiques.
 
 ## Activer l’auto-deploy (console Clever)
 
@@ -39,24 +42,13 @@ Pour **chaque** app (back + front) :
 
 | Variable | Valeur |
 |----------|--------|
-| `APP_FOLDER` | `frontend` |
-| `CC_NODE_VERSION` | `22` |
-| `API_URL` | `https://api-devicemanager.cleverapps.io` |
-| `NODE_OPTIONS` | `--max-old-space-size=1536` |
-| `CC_WEBROOT` | `frontend/dist/frontend/browser` |
-| `CC_BUILD_COMMAND` | `npm ci --include=dev && node scripts/inject-api-url.mjs && npm run build && ls -la dist/frontend/browser` |
-| `CC_PRE_RUN_HOOK` | *(optionnel si le dist disparaît entre build et run)* même commande build sans `npm ci` si déjà installé |
-| `CC_OVERRIDE_BUILDCACHE` | `frontend/dist/frontend/browser` |
+| `CC_WEBROOT` | `frontend/www` |
+| `CC_BUILD_COMMAND` | `echo "prebuilt frontend/www — skip ng build"` |
+| `CC_STATIC_FLAGS` | `--page-fallback index.html` |
 
-Le script `npm run build` est un `ng build --configuration=production` simple.  
-**`overrides.esbuild`: `^0.28.2`** unifie la version d’esbuild dans tout l’arbre (évite les deadlocks Go quand plusieurs binaires coexistent). Détails : [frontend/README.md](./frontend/README.md#clever-cloud--ci--esbuild-deadlock).
+**Supprimer** si présentes : `APP_FOLDER`, `CC_PRE_RUN_HOOK`, `API_URL` (build), `NODE_OPTIONS`, `CC_OVERRIDE_BUILDCACHE`, tout `npm ci` / `ng build`.
 
-`APP_FOLDER` place le shell dans `frontend/` (d’où `dist/...` dans les commandes).  
-`CC_WEBROOT` est résolu depuis la **racine du repo** → préfixe `frontend/`.
-
-Dans les logs, cherche `ls -la` + `index.html` **avant** `Starting the application`. Sans ça, le build n’a pas produit le `dist`.
-
-`API_URL` doit être présente au moment du build.
+Le dossier versionné `frontend/www` est produit par le job CI `publish-frontend-www` (message `[skip ci]`).
 
 ## GitHub Actions
 
@@ -65,7 +57,8 @@ Workflow : [`.github/workflows/ci-cd.yml`](./.github/workflows/ci-cd.yml)
 | Événement | Action |
 |-----------|--------|
 | PR / push `main` | Tests backend + frontend + Trivy |
-| Push `main` | Smoke `GET /actuator/health` (retries longs, Clever rebuild en parallèle) |
+| Push `main` | Build Angular → met à jour `frontend/www` → Clever redéploie le static |
+| Push `main` | Smoke `GET /actuator/health` |
 
 ### Variable GitHub (recommandé)
 
@@ -74,8 +67,6 @@ Settings → Secrets and variables → Actions → **Variables** :
 | Name | Value |
 |------|--------|
 | `API_URL` | `https://api-devicemanager.cleverapps.io` |
-
-**Pas besoin** de `CLEVER_TOKEN` / `CLEVER_SECRET` / `CLEVER_APP_ID_*` pour ce mode.
 
 ## Smoke manuel
 

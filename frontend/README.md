@@ -36,22 +36,10 @@ npm run build
 
 ### Clever Cloud / CI — esbuild deadlock
 
-On Clever (and some containers), `ng build` can fail with:
+On Clever, `ng build` hangs or crashes (`all goroutines are asleep - deadlock!`).  
+**Mitigation :** Angular is built on **GitHub Actions**; Clever only serves the committed `frontend/www` tree (no `ng build` on Clever). See [CLEVERCLOUD.md](../CLEVERCLOUD.md).
 
-```text
-fatal error: all goroutines are asleep - deadlock!
-… esbuild … ThreadSafeWaitGroup.Wait …
-```
-
-Cause: esbuild Go service-mode deadlock, often worse when **several esbuild versions** coexist in `node_modules` (concurrent native binaries). Forced single-thread env vars (`GOMAXPROCS=1`, etc.) did not help and were removed.
-
-Mitigation in this repo:
-
-1. **`overrides.esbuild`: `^0.28.2`** — one resolved version for the whole tree (latest stable compatible with Angular 19.2.27 as of this write-up).
-2. After changing overrides: delete `node_modules` + `package-lock.json`, then `npm ci --include=dev`, and verify with `npm ls esbuild` (single version, no extras).
-3. Prefer enough RAM on Clever (`NODE_OPTIONS=--max-old-space-size=1536`) if OOM-related deadlocks persist.
-
-Angular CLI / build-angular stay on **19.2.27** (latest 19.x). Clever `CC_BUILD_COMMAND` can keep calling `npm run build` (or `npm run build -- --configuration=production`).
+`overrides.esbuild: ^0.28.2` still keeps a single esbuild version for local / CI builds.
 
 ## Running unit tests
 

@@ -1,0 +1,1 @@
+function l(t,e){return{numeroSocle:t.numeroSocle?.trim()||"",numeroEmplacement:o(e)}}function o(t){let e=t?.lignes;return e?.length&&[...e].sort((n,r)=>{let i=(r.dateOperation||"").localeCompare(n.dateOperation||"");return i!==0?i:r.id-n.id})[0]?.numeroEmplacement?.trim()||""}export{l as a};

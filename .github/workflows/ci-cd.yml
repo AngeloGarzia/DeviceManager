@@ -105,11 +105,46 @@ jobs:
 
       - name: Production build
         env:
-          # URL de l’API prod (override : Settings → Variables → Actions → API_URL)
-          API_URL: ${{ vars.API_URL != '' && vars.API_URL || 'https://devicemanager.cleverapps.io' }}
+          API_URL: ${{ vars.API_URL != '' && vars.API_URL || 'https://api-devicemanager.cleverapps.io' }}
         run: |
           node scripts/inject-api-url.mjs
-          npm run build -- --configuration=production
+          npm run build
+
+      - name: Upload Clever static bundle
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-www
+          path: frontend/dist/frontend/browser/
+          if-no-files-found: error
+
+  publish-frontend-www:
+    name: Push frontend/www (Clever static)
+    needs: [frontend]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Download static bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-www
+          path: frontend/www
+
+      - name: Commit www if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A frontend/www
+          if git diff --staged --quiet; then
+            echo "frontend/www unchanged"
+            exit 0
+          fi
+          git commit -m "chore(frontend): refresh Clever static www [skip ci]"
+          git push
 
   trivy-backend-image:
     name: Trivy (backend image)
@@ -128,8 +163,8 @@ jobs:
           exit-code: "1"
           ignore-unfixed: true
 
-  # Le déploiement prod est fait par Clever Cloud (lien GitHub → auto-deploy sur push main).
-  # Pas de job deploy ici → évite un double déploiement.
+  # Front : GitHub Actions met à jour frontend/www ; Clever sert ce dossier (pas de ng build).
+  # Back : auto-deploy Clever (Maven).
 
   smoke-prod:
     name: Smoke (production health)
@@ -142,7 +177,7 @@ jobs:
     steps:
       - name: Curl actuator health
         env:
-          API_URL: ${{ vars.API_URL != '' && vars.API_URL || 'https://devicemanager.cleverapps.io' }}
+          API_URL: ${{ vars.API_URL != '' && vars.API_URL || 'https://api-devicemanager.cleverapps.io' }}
         run: |
           if [ -z "$API_URL" ]; then
             echo "vars.API_URL missing — skip smoke-prod gracefully"
