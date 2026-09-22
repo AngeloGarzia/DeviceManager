@@ -4,7 +4,7 @@
   "scripts": {
     "ng": "ng",
     "start": "ng serve --host 127.0.0.1",
-    "build": "cross-env GOMAXPROCS=1 NG_BUILD_MAX_WORKERS=1 UV_THREADPOOL_SIZE=1 ESBUILD_WORKER_THREADS=0 ng build",
+    "build": "ng build --configuration=production",
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
     "test:ci": "ng test --watch=false --browsers=ChromeHeadless",
@@ -15,7 +15,7 @@
   "private": true,
   "overrides": {
     "uuid": "^11.1.1",
-    "esbuild": "0.28.2"
+    "esbuild": "^0.28.2"
   },
   "dependencies": {
     "@angular/animations": "^19.2.25",
@@ -47,7 +47,6 @@
     "@types/jasmine": "~5.1.0",
     "angular-eslint": "^19.8.1",
     "autoprefixer": "^10.5.4",
-    "cross-env": "^7.0.3",
     "eslint": "^9.39.5",
     "jasmine-core": "~5.6.0",
     "karma": "~6.4.0",

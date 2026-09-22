@@ -44,11 +44,12 @@ Pour **chaque** app (back + front) :
 | `API_URL` | `https://api-devicemanager.cleverapps.io` |
 | `NODE_OPTIONS` | `--max-old-space-size=1536` |
 | `CC_WEBROOT` | `frontend/dist/frontend/browser` |
-| `CC_BUILD_COMMAND` | `npm ci --include=dev && node scripts/inject-api-url.mjs && npm run build -- --configuration=production && ls -la dist/frontend/browser` |
+| `CC_BUILD_COMMAND` | `npm ci --include=dev && node scripts/inject-api-url.mjs && npm run build && ls -la dist/frontend/browser` |
 | `CC_PRE_RUN_HOOK` | *(optionnel si le dist disparaît entre build et run)* même commande build sans `npm ci` si déjà installé |
 | `CC_OVERRIDE_BUILDCACHE` | `frontend/dist/frontend/browser` |
 
-Le script `npm run build` force un mode peu parallèle (`GOMAXPROCS=1`, `NG_BUILD_MAX_WORKERS=1`, …) et pin **esbuild 0.28.2** pour éviter le deadlock Go (`all goroutines are asleep`) fréquent sur Clever/cgroups. Détails : [frontend/README.md](./frontend/README.md#clever-cloud--ci--esbuild-deadlock).
+Le script `npm run build` est un `ng build --configuration=production` simple.  
+**`overrides.esbuild`: `^0.28.2`** unifie la version d’esbuild dans tout l’arbre (évite les deadlocks Go quand plusieurs binaires coexistent). Détails : [frontend/README.md](./frontend/README.md#clever-cloud--ci--esbuild-deadlock).
 
 `APP_FOLDER` place le shell dans `frontend/` (d’où `dist/...` dans les commandes).  
 `CC_WEBROOT` est résolu depuis la **racine du repo** → préfixe `frontend/`.

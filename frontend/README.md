@@ -29,10 +29,10 @@ ng generate --help
 ## Building
 
 ```bash
-npm run build -- --configuration=production
+npm run build
 ```
 
-Artifacts go to `dist/frontend/browser`.
+(`package.json` → `ng build --configuration=production`. Artifacts : `dist/frontend/browser`.)
 
 ### Clever Cloud / CI — esbuild deadlock
 
@@ -43,19 +43,15 @@ fatal error: all goroutines are asleep - deadlock!
 … esbuild … ThreadSafeWaitGroup.Wait …
 ```
 
-Cause: esbuild (Go) + Angular workers mis-detect CPU/threads under cgroups; also seen when RAM is tight. Local builds are usually fine.
+Cause: esbuild Go service-mode deadlock, often worse when **several esbuild versions** coexist in `node_modules` (concurrent native binaries). Forced single-thread env vars (`GOMAXPROCS=1`, etc.) did not help and were removed.
 
-Mitigations in this repo:
+Mitigation in this repo:
 
-1. **`overrides.esbuild`: `0.28.2`** — patch release that fixes a known deadlock (was `0.28.0` via Angular 19.2.27).
-2. **`npm run build`** sets (via `cross-env`, Windows + Linux):
-   - `GOMAXPROCS=1`
-   - `NG_BUILD_MAX_WORKERS=1`
-   - `UV_THREADPOOL_SIZE=1`
-   - `ESBUILD_WORKER_THREADS=0`
-3. Production config already sets `optimization.styles.inlineCritical: false` (less CSS pipeline pressure). Prefer `NODE_OPTIONS=--max-old-space-size=1536` on Clever if OOM persists.
+1. **`overrides.esbuild`: `^0.28.2`** — one resolved version for the whole tree (latest stable compatible with Angular 19.2.27 as of this write-up).
+2. After changing overrides: delete `node_modules` + `package-lock.json`, then `npm ci --include=dev`, and verify with `npm ls esbuild` (single version, no extras).
+3. Prefer enough RAM on Clever (`NODE_OPTIONS=--max-old-space-size=1536`) if OOM-related deadlocks persist.
 
-Angular CLI / build-angular stay on **19.2.27** (latest 19.x). Clever `CC_BUILD_COMMAND` can keep calling `npm run build -- --configuration=production` — the env vars are baked into the script.
+Angular CLI / build-angular stay on **19.2.27** (latest 19.x). Clever `CC_BUILD_COMMAND` can keep calling `npm run build` (or `npm run build -- --configuration=production`).
 
 ## Running unit tests
 
