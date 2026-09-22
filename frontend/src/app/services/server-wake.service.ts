@@ -20,7 +20,8 @@ export interface ServerWakeState {
 }
 
 /**
- * Réveille l’API Render (free tier) via /actuator/health/liveness.
+ * Attend que l’API soit joignable via /actuator/health/liveness
+ * (cold start PaaS / premier hit après deploy).
  * Affiche toujours l’overlay jusqu’à ce que l’API réponde (ou timeout).
  */
 @Injectable({ providedIn: 'root' })
@@ -31,7 +32,7 @@ export class ServerWakeService {
   /** Temps mini d’affichage pour que l’utilisateur voie la popup même si l’API répond vite. */
   private readonly minDisplayMs = 1200;
   private readonly pollIntervalMs = 2500;
-  /** Timeout long : un cold start Render peut garder la connexion ouverte ~30–60s. */
+  /** Timeout long : un cold start PaaS peut garder la connexion ouverte ~30–60s. */
   private readonly requestTimeoutMs = 60_000;
   private readonly maxWaitMs = 120_000;
 
@@ -50,7 +51,7 @@ export class ServerWakeService {
         if (ready) {
           return 'Serveurs prêts';
         }
-        return 'Les serveurs Render démarrent… Cela peut prendre jusqu’à une minute.';
+        return 'Connexion à l’API en cours… Cela peut prendre jusqu’à une minute.';
       };
 
       const emit = (partial: Partial<ServerWakeState> = {}) => {

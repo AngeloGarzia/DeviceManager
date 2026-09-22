@@ -35,7 +35,7 @@ import { ServerWakeService } from './services/server-wake.service';
           ></mat-progress-bar>
           <p class="mt-2 text-xs text-ink-soft">
             @if (timedOut()) {
-              Toujours en attente de l’API hébergée sur Render…
+              Toujours en attente de l’API…
             } @else if (progress() >= 100) {
               Prêt
             } @else {
@@ -66,7 +66,7 @@ export class AppComponent implements OnInit, OnDestroy {
 
   readonly showOverlay = signal(true);
   readonly progress = signal(8);
-  readonly message = signal('Les serveurs Render démarrent… Cela peut prendre jusqu’à une minute.');
+  readonly message = signal('Connexion à l’API en cours… Cela peut prendre jusqu’à une minute.');
   readonly timedOut = signal(false);
 
   ngOnInit(): void {
@@ -85,7 +85,7 @@ export class AppComponent implements OnInit, OnDestroy {
     this.sub?.unsubscribe();
     this.timedOut.set(false);
     this.progress.set(8);
-    this.message.set('Les serveurs Render démarrent… Cela peut prendre jusqu’à une minute.');
+    this.message.set('Connexion à l’API en cours… Cela peut prendre jusqu’à une minute.');
     this.showOverlay.set(true);
 
     this.sub = this.wakeService.wake().subscribe({
