@@ -1,4 +1,4 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import {
   FormArray,
@@ -66,7 +66,7 @@ import { MasExcelImportComponent } from './mas-excel-import.component';
   templateUrl: './setup.component.html',
   styleUrl: './setup.component.scss'
 })
-export class SetupComponent implements OnInit {
+export class SetupComponent implements OnInit, OnDestroy {
   private readonly setupService = inject(SetupService);
   private readonly atelierService = inject(AtelierService);
   private readonly adminLogService = inject(AdminLogService);
@@ -268,6 +268,11 @@ export class SetupComponent implements OnInit {
       this.loading.set(false);
     }
     this.loadAteliers();
+  }
+
+  ngOnDestroy(): void {
+    this.aiProviderSub?.unsubscribe();
+    this.aiProviderSub = null;
   }
 
   isTileOpen(id: string): boolean {

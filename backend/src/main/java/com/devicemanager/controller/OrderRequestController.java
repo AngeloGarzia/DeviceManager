@@ -16,6 +16,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.Map;
@@ -89,8 +90,12 @@ public class OrderRequestController {
     @PostMapping("/mail-preview")
     @PreAuthorize("hasAnyRole('ADMIN', 'TECHNICIEN')")
     public ResponseEntity<List<MailPreviewItem>> previewCreate(
-            @RequestBody OrderRequestDto request,
+            @Valid @RequestBody OrderRequestDto request,
             Authentication authentication) {
+        if (request == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Corps de requête manquant pour l'aperçu des e-mails.");
+        }
         return ResponseEntity.ok(orderRequestService.previewCreateMails(request, authentication.getName()));
     }
 

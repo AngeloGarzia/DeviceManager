@@ -1,4 +1,5 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
@@ -47,6 +48,7 @@ export class FitNewComponent implements OnInit {
   private readonly fitService = inject(FitService);
   private readonly interventionService = inject(InterventionService);
   private readonly auth = inject(AuthService);
+  private readonly destroyRef = inject(DestroyRef);
 
   readonly masses = signal<Mas[]>([]);
   readonly interventions = signal<Intervention[]>([]);
@@ -100,25 +102,29 @@ export class FitNewComponent implements OnInit {
       }
     });
 
-    this.form.controls.masId.valueChanges.subscribe((masId) => {
-      this.form.patchValue({ interventionId: null }, { emitEvent: false });
-      this.loadInterventions(masId);
-      if (masId != null) {
-        this.applyMasDefaults(masId);
-      } else {
-        this.form.patchValue({ numeroSocle: '', numeroEmplacement: '' });
-      }
-    });
+    this.form.controls.masId.valueChanges
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((masId) => {
+        this.form.patchValue({ interventionId: null }, { emitEvent: false });
+        this.loadInterventions(masId);
+        if (masId != null) {
+          this.applyMasDefaults(masId);
+        } else {
+          this.form.patchValue({ numeroSocle: '', numeroEmplacement: '' });
+        }
+      });
 
-    this.form.controls.interventionId.valueChanges.subscribe((interventionId) => {
-      if (interventionId == null) {
-        return;
-      }
-      const item = this.interventions().find((i) => i.id === interventionId);
-      if (item?.emplacement?.trim()) {
-        this.form.patchValue({ numeroEmplacement: item.emplacement.trim() });
-      }
-    });
+    this.form.controls.interventionId.valueChanges
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((interventionId) => {
+        if (interventionId == null) {
+          return;
+        }
+        const item = this.interventions().find((i) => i.id === interventionId);
+        if (item?.emplacement?.trim()) {
+          this.form.patchValue({ numeroEmplacement: item.emplacement.trim() });
+        }
+      });
   }
 
   private applyMasDefaults(masId: number): void {

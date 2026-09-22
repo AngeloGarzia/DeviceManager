@@ -3,15 +3,17 @@ package com.devicemanager.tenancy;
 import com.devicemanager.entity.Atelier;
 import com.devicemanager.entity.Casino;
 import com.devicemanager.entity.Groupe;
+import com.devicemanager.exception.ApiErrorWriter;
 import com.devicemanager.repository.AtelierRepository;
 import com.devicemanager.repository.UserRepository;
 import com.devicemanager.security.Roles;
 import com.devicemanager.support.TestFixtures;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.FilterChain;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -31,7 +33,14 @@ class AtelierContextFilterTest {
     @Mock private AtelierRepository atelierRepository;
     @Mock private UserRepository userRepository;
     @Mock private FilterChain filterChain;
-    @InjectMocks private AtelierContextFilter filter;
+    private AtelierContextFilter filter;
+
+    @BeforeEach
+    void setUp() {
+        filter = new AtelierContextFilter(
+                atelierRepository, userRepository,
+                new ApiErrorWriter(new ObjectMapper().findAndRegisterModules()));
+    }
 
     @AfterEach
     void cleanup() {

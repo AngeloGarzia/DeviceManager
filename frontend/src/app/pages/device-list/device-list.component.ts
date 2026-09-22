@@ -1,4 +1,5 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
@@ -47,6 +48,7 @@ export class DeviceListComponent implements OnInit {
   private readonly todoService = inject(TodoService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  private readonly destroyRef = inject(DestroyRef);
 
   readonly allItems = signal<Device[]>([]);
   readonly showObsolete = signal(false);
@@ -115,7 +117,7 @@ export class DeviceListComponent implements OnInit {
     this.load();
     this.loadTodos();
     this.loadWeekCalendar();
-    this.route.queryParamMap.subscribe((params) => {
+    this.route.queryParamMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
       if (params.get('open') === 'pieces') {
         this.tileOpen.set(true);
         void this.router.navigate([], {

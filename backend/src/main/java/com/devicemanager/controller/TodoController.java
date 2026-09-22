@@ -5,6 +5,7 @@ import com.devicemanager.dto.TodoModeleRequest;
 import com.devicemanager.dto.TodoModeleResponse;
 import com.devicemanager.dto.TodoRecurrenceRequest;
 import com.devicemanager.dto.TodoRecurrenceResponse;
+import com.devicemanager.dto.TodoRecurrenceToggleRequest;
 import com.devicemanager.dto.TodoTacheLinkRequest;
 import com.devicemanager.dto.TodoTacheRequest;
 import com.devicemanager.dto.TodoTacheResponse;
@@ -21,7 +22,6 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.Map;
 
 /**
  * Tâches « À faire » : CRUD, cycle de vie, rattachement d'interventions, récurrences.
@@ -107,10 +107,10 @@ public class TodoController {
     @PutMapping("/recurrences/{id}/active")
     public ResponseEntity<TodoRecurrenceResponse> setRecurrenceActive(
             @PathVariable Long id,
-            @RequestBody Map<String, Boolean> body,
+            @Valid @RequestBody TodoRecurrenceToggleRequest body,
             Authentication authentication) {
-        boolean active = Boolean.TRUE.equals(body.get("active"));
-        return ResponseEntity.ok(todoRecurrenceService.setActive(id, active, authentication.getName()));
+        return ResponseEntity.ok(
+                todoRecurrenceService.setActive(id, Boolean.TRUE.equals(body.getActive()), authentication.getName()));
     }
 
     @DeleteMapping("/recurrences/{id}")

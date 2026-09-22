@@ -2,6 +2,7 @@ package com.devicemanager.tenancy;
 
 import com.devicemanager.entity.Atelier;
 import com.devicemanager.entity.User;
+import com.devicemanager.exception.ApiErrorWriter;
 import com.devicemanager.repository.AtelierRepository;
 import com.devicemanager.repository.UserRepository;
 import com.devicemanager.security.Roles;
@@ -10,6 +11,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -35,6 +37,7 @@ import java.io.IOException;
  * Ignoré pour {@code /api/auth/**} et {@code /uploads/**}. En fin de requête, le contexte
  * thread-local est toujours nettoyé dans un bloc {@code finally}.
  */
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class AtelierContextFilter extends OncePerRequestFilter {
@@ -44,6 +47,7 @@ public class AtelierContextFilter extends OncePerRequestFilter {
 
     private final AtelierRepository atelierRepository;
     private final UserRepository userRepository;
+    private final ApiErrorWriter apiErrorWriter;
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
@@ -85,19 +89,29 @@ public class AtelierContextFilter extends OncePerRequestFilter {
             }
             filterChain.doFilter(request, response);
         } catch (ResponseStatusException ex) {
-            response.setStatus(ex.getStatusCode().value());
-            response.setContentType("application/json");
+            HttpStatus status = HttpStatus.resolve(ex.getStatusCode().value());
+            if (status == null) {
+                status = HttpStatus.BAD_REQUEST;
+            }
             String reason = ex.getReason();
             if (reason == null || reason.isBlank()) {
                 reason = "Impossible d'accéder à cet atelier.";
             }
-            response.getWriter().write("{\"message\":\"" + reason.replace("\"", "\\\"") + "\"}");
+            writeError(request, response, status, reason);
         } catch (NumberFormatException ex) {
-            response.setStatus(HttpStatus.BAD_REQUEST.value());
-            response.setContentType("application/json");
-            response.getWriter().write("{\"message\":\"Atelier sélectionné invalide. Resélectionnez un atelier.\"}");
+            writeError(request, response, HttpStatus.BAD_REQUEST,
+                    "Atelier sélectionné invalide. Resélectionnez un atelier.");
         } finally {
             AtelierContext.clear();
+        }
+    }
+
+    private void writeError(HttpServletRequest request, HttpServletResponse response,
+                            HttpStatus status, String message) {
+        try {
+            apiErrorWriter.write(request, response, status, message);
+        } catch (IOException io) {
+            log.warn("Impossible d'écrire l'erreur tenancy sur {}: {}", request.getRequestURI(), io.getMessage());
         }
     }
 

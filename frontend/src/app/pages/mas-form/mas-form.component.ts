@@ -1,4 +1,5 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -77,6 +78,7 @@ export class MasFormComponent implements OnInit {
   private readonly router = inject(Router);
   private readonly masService = inject(MasService);
   private readonly dialog = inject(MatDialog);
+  private readonly destroyRef = inject(DestroyRef);
 
   readonly loading = signal(false);
   readonly saving = signal(false);
@@ -217,8 +219,12 @@ export class MasFormComponent implements OnInit {
     this.loadReglesJeux();
     this.syncStatutDependentFields();
     this.syncMultiDenoFields();
-    this.form.controls.statut.valueChanges.subscribe(() => this.syncStatutDependentFields());
-    this.form.controls.multiDeno.valueChanges.subscribe(() => this.syncMultiDenoFields());
+    this.form.controls.statut.valueChanges
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(() => this.syncStatutDependentFields());
+    this.form.controls.multiDeno.valueChanges
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(() => this.syncMultiDenoFields());
 
     const rawId = this.route.snapshot.paramMap.get('id');
     if (rawId) {
@@ -540,18 +546,21 @@ export class MasFormComponent implements OnInit {
       disableClose: true,
       data: { targetStatut }
     });
-    dialogRef.afterClosed().subscribe((result) => {
-      if (!result) {
-        return;
-      }
-      this.form.patchValue({
-        dateCessation: result.dateCessation || '',
-        destinationMachineUsagee: result.destinationMachineUsagee || ''
+    dialogRef
+      .afterClosed()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((result) => {
+        if (!result) {
+          return;
+        }
+        this.form.patchValue({
+          dateCessation: result.dateCessation || '',
+          destinationMachineUsagee: result.destinationMachineUsagee || ''
+        });
+        const payload = this.buildPayload(result);
+        payload.statutChange = result.statutChange;
+        this.persist(payload);
       });
-      const payload = this.buildPayload(result);
-      payload.statutChange = result.statutChange;
-      this.persist(payload);
-    });
   }
 
   private persist(payload: MasForm): void {

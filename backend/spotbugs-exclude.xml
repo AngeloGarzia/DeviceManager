@@ -27,6 +27,23 @@
         <Class name="com.devicemanager.service.S3StorageService"/>
         <Bug pattern="EI_EXPOSE_REP2"/>
     </Match>
+    <!-- ApiErrorWriter est un bean Spring stateless : partage attendu entre filtres. -->
+    <Match>
+        <Class name="com.devicemanager.security.LoginRateLimitFilter"/>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
+    <Match>
+        <Class name="com.devicemanager.tenancy.AtelierContextFilter"/>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
+    <Match>
+        <Class name="com.devicemanager.exception.ApiAuthenticationEntryPoint"/>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
+    <Match>
+        <Class name="com.devicemanager.exception.ApiAccessDeniedHandler"/>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
 
     <!-- Validation config dans constructeurs Spring (@Value) : échec rapide voulu. -->
     <Match>

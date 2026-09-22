@@ -157,7 +157,8 @@ public class AiAssistantService {
         } catch (ResponseStatusException ex) {
             throw ex;
         } catch (Exception ex) {
-            log.error("Échec appel Spring AI (model={}): {}", model, ex.getMessage());
+            // Stack trace attachée pour diagnostic prod (Sentry / logs Clever).
+            log.error("Échec appel Spring AI (model={}): {}", model, ex.getMessage(), ex);
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, friendlyAiError(provider, ex));
         }
     }
@@ -991,8 +992,11 @@ public class AiAssistantService {
             stripper.setSortByPosition(true);
             return stripper.getText(document);
         } catch (Exception ex) {
+            // Ne pas fuiter le message technique PDFBox (chemins, offsets, exceptions internes).
+            log.warn("Lecture PDF impossible : {}", ex.getMessage(), ex);
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "Impossible de lire le PDF : " + ex.getMessage());
+                    "Impossible de lire le PDF. Vérifiez qu'il n'est pas protégé, "
+                            + "corrompu ou converti à partir d'une image scannée sans texte.");
         }
     }
 

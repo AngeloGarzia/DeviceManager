@@ -1,4 +1,5 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
@@ -42,6 +43,7 @@ export class MasSuiviComponent implements OnInit {
   private readonly masService = inject(MasService);
   private readonly timelineService = inject(TimelineService);
   private readonly route = inject(ActivatedRoute);
+  private readonly destroyRef = inject(DestroyRef);
 
   readonly columns: ColumnDef[] = [
     { id: 'BONS', label: "Bons d'intervention", icon: 'receipt_long' },
@@ -103,7 +105,9 @@ export class MasSuiviComponent implements OnInit {
       }
     });
 
-    this.masCtrl.valueChanges.subscribe((id) => this.onMasSelected(id));
+    this.masCtrl.valueChanges
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((id) => this.onMasSelected(id));
   }
 
   hasSuivi(masId: number): boolean {

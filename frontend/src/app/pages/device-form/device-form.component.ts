@@ -1,6 +1,7 @@
 import {
   AfterViewInit,
   Component,
+  DestroyRef,
   ElementRef,
   OnDestroy,
   OnInit,
@@ -9,6 +10,7 @@ import {
   inject,
   signal
 } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -88,6 +90,7 @@ export class DeviceFormComponent implements OnInit, AfterViewInit, OnDestroy {
   private readonly sfmService = inject(SfmService);
   private readonly masService = inject(MasService);
   private readonly dialog = inject(MatDialog);
+  private readonly destroyRef = inject(DestroyRef);
   readonly aiService = inject(AiService);
   readonly pdfOrImageAccept = PDF_OR_IMAGE_ACCEPT;
 
@@ -220,10 +223,14 @@ export class DeviceFormComponent implements OnInit, AfterViewInit, OnDestroy {
   ngOnInit(): void {
     this.aiService.refreshStatus();
     this.forOrderRequest = this.route.snapshot.queryParamMap.get('forOrderRequest') === '1';
-    this.form.controls.masId.valueChanges.subscribe((masId) => this.selectedMasId.set(masId));
-    this.form.controls.sfmId.valueChanges.subscribe((sfmId) => {
-      this.selectedSfmId.set(sfmId);
-    });
+    this.form.controls.masId.valueChanges
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((masId) => this.selectedMasId.set(masId));
+    this.form.controls.sfmId.valueChanges
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((sfmId) => {
+        this.selectedSfmId.set(sfmId);
+      });
 
     const draft = this.draftService.take();
     const querySfmId = this.parseOptionalId(this.route.snapshot.queryParamMap.get('sfmId'));
@@ -1125,8 +1132,13 @@ export class DeviceFormComponent implements OnInit, AfterViewInit, OnDestroy {
       autoFocus: false,
       disableClose: true
     });
-    const result = await firstValueFrom(ref.afterClosed());
-    return result ?? null;
+    try {
+      const result = await firstValueFrom(ref.afterClosed());
+      return result ?? null;
+    } catch (err) {
+      console.warn('[device-form] éditeur image annulé/erreur', err);
+      return null;
+    }
   }
 
   private addNewPhoto(file: File): void {

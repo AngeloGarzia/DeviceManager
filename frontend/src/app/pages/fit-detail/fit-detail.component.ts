@@ -1,4 +1,5 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
@@ -46,6 +47,7 @@ export class FitDetailComponent implements OnInit {
   private readonly interventionService = inject(InterventionService);
   private readonly masService = inject(MasService);
   private readonly auth = inject(AuthService);
+  private readonly destroyRef = inject(DestroyRef);
 
   readonly fit = signal<Fit | null>(null);
   readonly interventions = signal<Intervention[]>([]);
@@ -79,15 +81,17 @@ export class FitDetailComponent implements OnInit {
     this.loadSignataires();
     this.load(id);
 
-    this.form.controls.interventionId.valueChanges.subscribe((interventionId) => {
-      if (interventionId == null) {
-        return;
-      }
-      const item = this.interventions().find((i) => i.id === interventionId);
-      if (item?.emplacement?.trim()) {
-        this.form.patchValue({ numeroEmplacement: item.emplacement.trim() });
-      }
-    });
+    this.form.controls.interventionId.valueChanges
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((interventionId) => {
+        if (interventionId == null) {
+          return;
+        }
+        const item = this.interventions().find((i) => i.id === interventionId);
+        if (item?.emplacement?.trim()) {
+          this.form.patchValue({ numeroEmplacement: item.emplacement.trim() });
+        }
+      });
   }
 
   openForm(): void {

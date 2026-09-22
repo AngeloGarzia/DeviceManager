@@ -1,5 +1,7 @@
 package com.devicemanager.config;
 
+import com.devicemanager.exception.ApiAccessDeniedHandler;
+import com.devicemanager.exception.ApiAuthenticationEntryPoint;
 import com.devicemanager.security.JwtAuthenticationFilter;
 import com.devicemanager.security.LoginRateLimitFilter;
 import com.devicemanager.security.Roles;
@@ -46,6 +48,8 @@ public class SecurityConfig {
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final AtelierContextFilter atelierContextFilter;
     private final LoginRateLimitFilter loginRateLimitFilter;
+    private final ApiAuthenticationEntryPoint apiAuthenticationEntryPoint;
+    private final ApiAccessDeniedHandler apiAccessDeniedHandler;
     private final Environment environment;
 
     @Value("${app.cors.allowed-origins:}")
@@ -67,6 +71,9 @@ public class SecurityConfig {
                 .csrf(AbstractHttpConfigurer::disable)
                 .cors(Customizer.withDefaults())
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .exceptionHandling(ex -> ex
+                        .authenticationEntryPoint(apiAuthenticationEntryPoint)
+                        .accessDeniedHandler(apiAccessDeniedHandler))
                 .headers(headers -> {
                     headers.contentTypeOptions(Customizer.withDefaults());
                     headers.frameOptions(frame -> frame.deny());

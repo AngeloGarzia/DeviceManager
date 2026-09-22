@@ -170,3 +170,23 @@ a.mat-mdc-raised-button {
 .driver-popover-close-btn {
   color: #334155 !important;
 }
+
+/* Snackbar Device Manager (NotificationService) — teintes par sévérité. */
+.dm-snack {
+  --mdc-snackbar-container-color: #1f2933;
+  --mdc-snackbar-supporting-text-color: #f8fafc;
+  --mat-snack-bar-button-color: #93c5fd;
+  font-family: 'IBM Plex Sans', 'Segoe UI', sans-serif;
+}
+.dm-snack--success {
+  --mdc-snackbar-container-color: #15803d;
+}
+.dm-snack--info {
+  --mdc-snackbar-container-color: #0b6bcb;
+}
+.dm-snack--warning {
+  --mdc-snackbar-container-color: #b45309;
+}
+.dm-snack--error {
+  --mdc-snackbar-container-color: #b91c1c;
+}

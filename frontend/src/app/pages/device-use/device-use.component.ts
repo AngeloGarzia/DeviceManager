@@ -165,6 +165,14 @@ export class DeviceUseComponent implements OnInit {
       next: (device) => {
         this.applyDevice(device);
         this.addLine();
+      },
+      error: (err) => {
+        this.error.set(
+          apiErrorMessage(
+            err,
+            "Impossible de charger la pièce demandée. Reprenez sans préremplissage."
+          )
+        );
       }
     });
   }

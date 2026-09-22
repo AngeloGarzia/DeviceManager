@@ -83,7 +83,12 @@ export class AppTourService {
         return;
       }
 
-      await this.prepareStep(defs[0]);
+      try {
+        await this.prepareStep(defs[0]);
+      } catch (err) {
+        console.warn('[tour] prepareStep(0) failed', err);
+        return;
+      }
 
       const steps: DriveStep[] = defs.map((def) => ({
         element: def.element,
@@ -115,14 +120,22 @@ export class AppTourService {
             d.destroy();
             return;
           }
-          await this.prepareStep(defs[idx + 1]);
+          try {
+            await this.prepareStep(defs[idx + 1]);
+          } catch (err) {
+            console.warn('[tour] prepareStep(next) failed', err);
+          }
           d.moveNext();
         },
         onPrevClick: async (_el, _step, { driver: d }) => {
           const idx = d.getActiveIndex() ?? 0;
           const prev = defs[idx - 1];
           if (prev) {
-            await this.prepareStep(prev);
+            try {
+              await this.prepareStep(prev);
+            } catch (err) {
+              console.warn('[tour] prepareStep(prev) failed', err);
+            }
           }
           d.movePrevious();
         },
@@ -143,6 +156,16 @@ export class AppTourService {
       });
 
       this.active.drive();
+    } catch (err) {
+      console.warn('[tour] startTour failed', err);
+      if (this.active) {
+        try {
+          this.active.destroy();
+        } catch {
+          /* ignore */
+        }
+        this.active = null;
+      }
     } finally {
       this.starting = false;
     }
@@ -155,7 +178,12 @@ export class AppTourService {
       this.active = null;
     }
     this.resetTour();
-    await this.router.navigateByUrl('/devices');
+    try {
+      await this.router.navigateByUrl('/devices');
+    } catch (err) {
+      console.warn('[tour] restart navigate failed', err);
+      return;
+    }
     await this.delay(300);
     await this.startTour(true);
   }
@@ -165,11 +193,19 @@ export class AppTourService {
     if (def.route) {
       const target = def.route.split('?')[0];
       if (!this.router.url.startsWith(target)) {
-        await this.router.navigateByUrl(def.route);
+        try {
+          await this.router.navigateByUrl(def.route);
+        } catch (err) {
+          console.warn('[tour] navigateByUrl failed', def.route, err);
+        }
       }
     }
     if (def.before) {
-      await def.before();
+      try {
+        await def.before();
+      } catch (err) {
+        console.warn('[tour] before() failed for step', def.title, err);
+      }
     }
     await this.waitForDom(def.element);
   }

@@ -1,7 +1,9 @@
 package com.devicemanager.exception;
 
 import com.devicemanager.dto.ApiError;
+import jakarta.persistence.EntityNotFoundException;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
 import org.hibernate.exception.JDBCConnectionException;
 import org.springframework.dao.DataAccessResourceFailureException;
@@ -9,11 +11,18 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.QueryTimeoutException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.jdbc.CannotGetJdbcConnectionException;
 import org.springframework.validation.FieldError;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
@@ -137,6 +146,135 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiError> handleDatabaseUnavailable(Exception ex, HttpServletRequest request) {
         log.error("Base de données indisponible sur {}: {}", request.getRequestURI(), ex.getMessage(), ex);
         return build(HttpStatus.SERVICE_UNAVAILABLE.value(), MSG_DB_UNAVAILABLE, request.getRequestURI());
+    }
+
+    /**
+     * Argument métier invalide (par exemple clé de stockage vide) : renvoie 400 sans exposer la stack.
+     */
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<ApiError> handleIllegalArgument(IllegalArgumentException ex, HttpServletRequest request) {
+        String msg = ex.getMessage();
+        if (msg == null || msg.isBlank() || looksTechnical(msg)) {
+            msg = "Requête invalide : vérifiez les informations transmises.";
+        }
+        log.debug("Argument invalide sur {}: {}", request.getRequestURI(), ex.getMessage());
+        return build(HttpStatus.BAD_REQUEST.value(), msg, request.getRequestURI());
+    }
+
+    /**
+     * Corps JSON absent, malformé ou incompatible avec le DTO cible.
+     */
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ApiError> handleNotReadable(HttpMessageNotReadableException ex, HttpServletRequest request) {
+        log.debug("Corps de requête illisible sur {}: {}", request.getRequestURI(), ex.getMessage());
+        return build(HttpStatus.BAD_REQUEST.value(),
+                "Le corps de la requête est absent ou mal formé. Vérifiez le format JSON attendu.",
+                request.getRequestURI());
+    }
+
+    /**
+     * Champ multipart obligatoire manquant (upload de fichier absent).
+     */
+    @ExceptionHandler(MissingServletRequestPartException.class)
+    public ResponseEntity<ApiError> handleMissingPart(MissingServletRequestPartException ex, HttpServletRequest request) {
+        log.debug("Multipart manquant sur {}: {}", request.getRequestURI(), ex.getMessage());
+        return build(HttpStatus.BAD_REQUEST.value(),
+                "Fichier requis manquant : « " + ex.getRequestPartName() + " ».",
+                request.getRequestURI());
+    }
+
+    /**
+     * Paramètre de requête obligatoire absent.
+     */
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<ApiError> handleMissingParam(MissingServletRequestParameterException ex,
+                                                      HttpServletRequest request) {
+        return build(HttpStatus.BAD_REQUEST.value(),
+                "Paramètre requis manquant : « " + ex.getParameterName() + " ».",
+                request.getRequestURI());
+    }
+
+    /**
+     * Paramètre de type incompatible dans l'URL (ex. attendait un {@code Long}, reçu {@code "abc"}).
+     */
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ApiError> handleTypeMismatch(MethodArgumentTypeMismatchException ex,
+                                                      HttpServletRequest request) {
+        return build(HttpStatus.BAD_REQUEST.value(),
+                "Paramètre « " + ex.getName() + " » invalide : format inattendu.",
+                request.getRequestURI());
+    }
+
+    /**
+     * Violation de contrainte Bean Validation hors {@code @RequestBody} (ex. {@code @RequestParam} annoté).
+     */
+    @ExceptionHandler(ConstraintViolationException.class)
+    public ResponseEntity<ApiError> handleConstraintViolation(ConstraintViolationException ex,
+                                                              HttpServletRequest request) {
+        String message = ex.getConstraintViolations().stream()
+                .map(v -> v.getPropertyPath() + " : " + v.getMessage())
+                .collect(Collectors.joining("; "));
+        if (message.isBlank()) {
+            message = "Requête invalide : contraintes non respectées.";
+        }
+        return build(HttpStatus.BAD_REQUEST.value(), message, request.getRequestURI());
+    }
+
+    /**
+     * Entité JPA introuvable (par exemple {@code getReferenceById} suivi d'un accès).
+     */
+    @ExceptionHandler(EntityNotFoundException.class)
+    public ResponseEntity<ApiError> handleEntityNotFound(EntityNotFoundException ex, HttpServletRequest request) {
+        log.debug("Entité introuvable sur {}: {}", request.getRequestURI(), ex.getMessage());
+        return build(HttpStatus.NOT_FOUND.value(), "Élément introuvable.", request.getRequestURI());
+    }
+
+    /**
+     * Méthode HTTP non supportée par l'endpoint.
+     */
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<ApiError> handleMethodNotSupported(HttpRequestMethodNotSupportedException ex,
+                                                             HttpServletRequest request) {
+        return build(HttpStatus.METHOD_NOT_ALLOWED.value(),
+                "Méthode HTTP non autorisée pour ce point d'accès.",
+                request.getRequestURI());
+    }
+
+    /**
+     * Type de contenu non supporté (ex. XML envoyé sur un endpoint JSON).
+     */
+    @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
+    public ResponseEntity<ApiError> handleMediaTypeNotSupported(HttpMediaTypeNotSupportedException ex,
+                                                                HttpServletRequest request) {
+        return build(HttpStatus.UNSUPPORTED_MEDIA_TYPE.value(),
+                "Format de contenu non pris en charge.",
+                request.getRequestURI());
+    }
+
+    /**
+     * Upload trop volumineux : dépassement de la taille maximale de fichier configurée.
+     */
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<ApiError> handleMaxUploadSize(MaxUploadSizeExceededException ex, HttpServletRequest request) {
+        log.debug("Upload trop volumineux sur {}", request.getRequestURI());
+        return build(HttpStatus.PAYLOAD_TOO_LARGE.value(),
+                "Fichier trop volumineux. Réduisez sa taille ou compressez-le avant de réessayer.",
+                request.getRequestURI());
+    }
+
+    /**
+     * Stockage cloud (R2/S3) injoignable, refusé (auth) ou en panne serveur : renvoyer 503
+     * afin de ne pas masquer l'erreur en 404 métier.
+     */
+    @ExceptionHandler(StorageUnavailableException.class)
+    public ResponseEntity<ApiError> handleStorageUnavailable(StorageUnavailableException ex,
+                                                             HttpServletRequest request) {
+        log.error("Stockage cloud indisponible sur {}: {}", request.getRequestURI(), ex.getMessage(), ex);
+        return build(HttpStatus.SERVICE_UNAVAILABLE.value(),
+                ex.getMessage() == null || ex.getMessage().isBlank()
+                        ? "Stockage cloud temporairement indisponible."
+                        : ex.getMessage(),
+                request.getRequestURI());
     }
 
     /**

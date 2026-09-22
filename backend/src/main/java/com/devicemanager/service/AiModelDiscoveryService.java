@@ -10,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
@@ -33,11 +34,24 @@ import java.util.concurrent.ConcurrentHashMap;
 public class AiModelDiscoveryService {
 
     private static final Duration CACHE_TTL = Duration.ofMinutes(10);
+    private static final Duration HTTP_CONNECT_TIMEOUT = Duration.ofSeconds(5);
+    private static final Duration HTTP_READ_TIMEOUT = Duration.ofSeconds(15);
 
     private final AiApiKeyBattery aiApiKeyBattery;
     private final ObjectMapper objectMapper;
 
     private final Map<String, CacheEntry> cache = new ConcurrentHashMap<>();
+
+    /**
+     * Client HTTP avec timeouts explicites — évite qu'un fournisseur IA lent
+     * ne bloque un thread Tomcat indéfiniment (pool par défaut ~25 threads).
+     */
+    private static RestClient timedClient() {
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout((int) HTTP_CONNECT_TIMEOUT.toMillis());
+        factory.setReadTimeout((int) HTTP_READ_TIMEOUT.toMillis());
+        return RestClient.builder().requestFactory(factory).build();
+    }
 
     /**
      * Liste les modèles online pour un fournisseur (cache court).
@@ -124,7 +138,7 @@ public class AiModelDiscoveryService {
             if (pageToken != null && !pageToken.isBlank()) {
                 uri += "&pageToken=" + java.net.URLEncoder.encode(pageToken, java.nio.charset.StandardCharsets.UTF_8);
             }
-            String body = RestClient.create()
+            String body = timedClient()
                     .get()
                     .uri(uri)
                     .header("x-goog-api-key", apiKey)
@@ -163,7 +177,7 @@ public class AiModelDiscoveryService {
     private List<AiModelOption> fetchOpenAiCompatibleModels(AiProviders.Provider provider, String apiKey)
             throws Exception {
         String url = provider.baseUrl().replaceAll("/+$", "") + "/v1/models";
-        RestClient.RequestHeadersSpec<?> req = RestClient.create()
+        RestClient.RequestHeadersSpec<?> req = timedClient()
                 .get()
                 .uri(url)
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + apiKey)

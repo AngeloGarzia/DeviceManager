@@ -12,6 +12,7 @@ import { MatMenuModule } from '@angular/material/menu';
 import { Device } from '../../models/models';
 import { DeviceService } from '../../services/device.service';
 import { DeviceStockExportService } from '../../services/device-stock-export.service';
+import { NotificationService } from '../../shared/notification.service';
 import { StockGroup, StockGroupMode } from './device-stock.types';
 
 export type { StockGroup, StockGroupMode } from './device-stock.types';
@@ -42,6 +43,7 @@ export type { StockGroup, StockGroupMode } from './device-stock.types';
 export class DeviceStockComponent implements OnInit {
   private readonly deviceService = inject(DeviceService);
   private readonly exportService = inject(DeviceStockExportService);
+  private readonly notifications = inject(NotificationService);
 
   readonly items = signal<Device[]>([]);
   readonly loading = signal(false);
@@ -130,7 +132,10 @@ export class DeviceStockComponent implements OnInit {
     if (this.items().length === 0) {
       return;
     }
-    void this.exportService.exportExcel(this.groups(), this.groupMode());
+    this.exportService.exportExcel(this.groups(), this.groupMode()).catch((err: unknown) => {
+      console.error('[stock] export Excel', err);
+      this.notifications.error("Export Excel impossible. Réessayez ou réduisez le volume filtré.");
+    });
   }
 
   /** Exporte le stock courant au format PDF. */
@@ -138,7 +143,12 @@ export class DeviceStockComponent implements OnInit {
     if (this.items().length === 0) {
       return;
     }
-    this.exportService.exportPdf(this.groups(), this.groupMode());
+    try {
+      this.exportService.exportPdf(this.groups(), this.groupMode());
+    } catch (err) {
+      console.error('[stock] export PDF', err);
+      this.notifications.error("Export PDF impossible. Réessayez ou réduisez le volume filtré.");
+    }
   }
 
   /** URL absolue de la photo d'une pièce. */

@@ -1,4 +1,5 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
@@ -47,6 +48,7 @@ export class FitFeuilleComponent implements OnInit {
   private readonly masService = inject(MasService);
   private readonly timelineService = inject(TimelineService);
   private readonly route = inject(ActivatedRoute);
+  private readonly destroyRef = inject(DestroyRef);
 
   readonly masses = signal<Mas[]>([]);
   readonly masIdsWithSuivi = signal<Set<number>>(new Set());
@@ -117,14 +119,16 @@ export class FitFeuilleComponent implements OnInit {
       }
     });
 
-    this.masCtrl.valueChanges.subscribe((id) => {
-      if (id == null) {
-        this.fit.set(null);
-        this.error.set(null);
-        return;
-      }
-      this.loadByMasId(id);
-    });
+    this.masCtrl.valueChanges
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((id) => {
+        if (id == null) {
+          this.fit.set(null);
+          this.error.set(null);
+          return;
+        }
+        this.loadByMasId(id);
+      });
   }
 
   headerField(value?: string | null): string {

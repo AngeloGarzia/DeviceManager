@@ -1,4 +1,5 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
@@ -63,6 +64,7 @@ export class InterventionTechniqueFormComponent implements OnInit {
   private readonly techniqueService = inject(InterventionTechniqueService);
   private readonly todoService = inject(TodoService);
   private readonly auth = inject(AuthService);
+  private readonly destroyRef = inject(DestroyRef);
 
   readonly masses = signal<Mas[]>([]);
   readonly bons = signal<Intervention[]>([]);
@@ -147,12 +149,14 @@ export class InterventionTechniqueFormComponent implements OnInit {
       }
     });
 
-    this.form.controls.masIds.valueChanges.subscribe((ids) => {
-      const masIds = (ids || []).filter((id): id is number => id != null);
-      this.selectedMasIds.set(masIds);
-      this.refreshLinkedRecords(masIds);
-      this.clearTodoIfNotSelectable(masIds);
-    });
+    this.form.controls.masIds.valueChanges
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((ids) => {
+        const masIds = (ids || []).filter((id): id is number => id != null);
+        this.selectedMasIds.set(masIds);
+        this.refreshLinkedRecords(masIds);
+        this.clearTodoIfNotSelectable(masIds);
+      });
   }
 
   todoLabel(todo: TodoItem): string {

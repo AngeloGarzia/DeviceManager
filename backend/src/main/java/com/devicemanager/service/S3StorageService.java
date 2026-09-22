@@ -1,5 +1,6 @@
 package com.devicemanager.service;
 
+import com.devicemanager.exception.StorageUnavailableException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -76,9 +77,15 @@ public class S3StorageService implements StorageService {
             return new StoredObject(key, key, file.getContentType(), file.getSize());
         } catch (IOException e) {
             throw new IllegalStateException("Échec d'enregistrement du fichier. Réessayez.", e);
+        } catch (S3Exception e) {
+            log.error("Échec PutObject R2 (bucket={}, key={}, http={}): {}",
+                    bucket, key, e.statusCode(), e.getMessage(), e);
+            throw new StorageUnavailableException(
+                    "Stockage cloud indisponible : impossible d'enregistrer le fichier. Réessayez dans un instant.", e);
         } catch (RuntimeException e) {
-            log.error("Échec PutObject R2 (bucket={}, key={}): {}", bucket, key, e.getMessage());
-            throw new IllegalStateException("Échec d'enregistrement vers le stockage cloud. Vérifiez la config R2.", e);
+            log.error("Échec PutObject R2 (bucket={}, key={}): {}", bucket, key, e.getMessage(), e);
+            throw new StorageUnavailableException(
+                    "Stockage cloud indisponible : impossible d'enregistrer le fichier. Réessayez dans un instant.", e);
         }
     }
 
@@ -193,13 +200,24 @@ public class S3StorageService implements StorageService {
                     : (long) data.length;
             return Optional.of(new StoredObjectBytes(data, contentType, size));
         } catch (NoSuchKeyException ex) {
+            // Fichier réellement absent → cas métier (le caller fera 404 / repli DB).
             return Optional.empty();
         } catch (S3Exception ex) {
-            log.warn("Échec lecture R2 (key={}): {}", objectKey, ex.getMessage());
-            return Optional.empty();
+            int status = ex.statusCode();
+            if (status == 404) {
+                // NoSuchBucket ou clé absente non typée : reste un cas métier.
+                return Optional.empty();
+            }
+            // 401/403/5xx et co. : ne pas masquer en 404 métier — remonter 503.
+            log.error("Erreur R2 (key={}, http={}): {}", objectKey, status, ex.getMessage(), ex);
+            throw new StorageUnavailableException(
+                    "Stockage cloud indisponible ou refusé (code " + status
+                            + "). Réessayez ou vérifiez la configuration R2.", ex);
         } catch (RuntimeException ex) {
-            log.warn("Échec lecture R2 (key={}): {}", objectKey, ex.getMessage());
-            return Optional.empty();
+            // SDK / réseau / DNS / timeout : pas un « fichier introuvable ».
+            log.error("Échec lecture R2 (key={}): {}", objectKey, ex.getMessage(), ex);
+            throw new StorageUnavailableException(
+                    "Stockage cloud injoignable. Réessayez dans un instant.", ex);
         }
     }
 

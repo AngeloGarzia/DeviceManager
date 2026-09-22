@@ -133,6 +133,14 @@ export class OrderRequestFormComponent implements OnInit {
       next: (device) => {
         this.applyDevice(device);
         this.addLine();
+      },
+      error: (err) => {
+        this.error.set(
+          apiErrorMessage(
+            err,
+            "Impossible de charger la pièce demandée. Ouvrez le formulaire vide ou réessayez."
+          )
+        );
       }
     });
   }

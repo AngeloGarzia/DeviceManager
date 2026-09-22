@@ -467,19 +467,31 @@ export class AuthService {
     }
   }
 
-  /** Rafraîchit la liste des ateliers du header après une gestion admin. */
+  /**
+   * Rafraîchit la liste des ateliers du header après une gestion admin.
+   * <p>Les erreurs sont loguées mais silencieuses côté UI : l'intercepteur
+   * global affichera un snackbar en cas de 5xx / réseau, et la liste courante
+   * reste utilisable (fallback signal existant).
+   */
   refreshAteliers(): void {
     this.http.get<AtelierSummary[]>(`${environment.apiUrl}/api/ateliers`).subscribe({
       next: (list) => {
         const ateliers = (list ?? []).map((a) => ({ ...a, id: Number(a.id) }));
         this.ateliers.set(ateliers);
-        localStorage.setItem(ATELIERS_KEY, JSON.stringify(ateliers));
+        try {
+          localStorage.setItem(ATELIERS_KEY, JSON.stringify(ateliers));
+        } catch {
+          /* quota ou mode privé : ignorer */
+        }
         const current = this.atelierId();
         if (current != null && !ateliers.some((a) => a.id === current)) {
           const fallback = ateliers[0]?.id ?? null;
           this.setAtelierId(fallback);
           this.atelierRevision.update((v) => v + 1);
         }
+      },
+      error: (err) => {
+        console.warn('[auth] refreshAteliers a échoué — liste locale conservée', err);
       }
     });
   }

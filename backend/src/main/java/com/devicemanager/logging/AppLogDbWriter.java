@@ -47,7 +47,12 @@ public class AppLogDbWriter {
         flush();
     }
 
-    /** Vide périodiquement la file vers MySQL et applique la rétention. */
+    /**
+     * Vide périodiquement la file vers MySQL et applique la rétention.
+     * <p>Toute erreur de persistance est capturée et loguée localement pour
+     * éviter (1) un tick scheduler qui remonte l'exception dans les logs applicatifs,
+     * et (2) une file mémoire qui gonfle sans limite si la DB est momentanément KO.
+     */
     @Scheduled(fixedDelayString = "${app.logs.flush-interval-ms:1000}")
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void flush() {
@@ -59,10 +64,21 @@ public class AppLogDbWriter {
         if (batch.isEmpty()) {
             return;
         }
-        appLogRepository.saveAll(batch);
-        long total = appLogRepository.count();
-        if (total > retentionMax) {
-            appLogRepository.pruneKeepingNewest(retentionMax);
+        try {
+            appLogRepository.saveAll(batch);
+        } catch (RuntimeException ex) {
+            // Ne PAS relancer : le prochain tick réessaiera avec les nouveaux événements
+            // (les lignes du lot en cours sont sacrifiées mais l'appli reste stable).
+            log.warn("Persistance app_log échouée ({} entrée(s) perdue(s)) : {}", batch.size(), ex.getMessage(), ex);
+            return;
+        }
+        try {
+            long total = appLogRepository.count();
+            if (total > retentionMax) {
+                appLogRepository.pruneKeepingNewest(retentionMax);
+            }
+        } catch (RuntimeException ex) {
+            log.warn("Purge app_log (rétention={}) échouée : {}", retentionMax, ex.getMessage(), ex);
         }
     }
 
