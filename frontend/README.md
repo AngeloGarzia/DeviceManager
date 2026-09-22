@@ -28,13 +28,34 @@ ng generate --help
 
 ## Building
 
-To build the project run:
-
 ```bash
-ng build
+npm run build -- --configuration=production
 ```
 
-This will compile your project and store the build artifacts in the `dist/` directory. By default, the production build optimizes your application for performance and speed.
+Artifacts go to `dist/frontend/browser`.
+
+### Clever Cloud / CI — esbuild deadlock
+
+On Clever (and some containers), `ng build` can fail with:
+
+```text
+fatal error: all goroutines are asleep - deadlock!
+… esbuild … ThreadSafeWaitGroup.Wait …
+```
+
+Cause: esbuild (Go) + Angular workers mis-detect CPU/threads under cgroups; also seen when RAM is tight. Local builds are usually fine.
+
+Mitigations in this repo:
+
+1. **`overrides.esbuild`: `0.28.2`** — patch release that fixes a known deadlock (was `0.28.0` via Angular 19.2.27).
+2. **`npm run build`** sets (via `cross-env`, Windows + Linux):
+   - `GOMAXPROCS=1`
+   - `NG_BUILD_MAX_WORKERS=1`
+   - `UV_THREADPOOL_SIZE=1`
+   - `ESBUILD_WORKER_THREADS=0`
+3. Production config already sets `optimization.styles.inlineCritical: false` (less CSS pipeline pressure). Prefer `NODE_OPTIONS=--max-old-space-size=1536` on Clever if OOM persists.
+
+Angular CLI / build-angular stay on **19.2.27** (latest 19.x). Clever `CC_BUILD_COMMAND` can keep calling `npm run build -- --configuration=production` — the env vars are baked into the script.
 
 ## Running unit tests
 
