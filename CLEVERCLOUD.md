@@ -44,7 +44,12 @@ Pour **chaque** app (back + front) :
 |----------|--------|
 | `CC_WEBROOT` | `frontend/www` |
 | `CC_BUILD_COMMAND` | `echo "prebuilt frontend/www — skip ng build"` |
-| `CC_STATIC_FLAGS` | `--page-fallback index.html` |
+| `CC_STATIC_FLAGS` | `--page-fallback index.html` *(optionnel, le SPA fallback est aussi assuré par `clevercloud/static-apache.conf` — ceinture et bretelles)* |
+
+Le SPA fallback (deep-links type `/reset-password?token=…`) est garanti côté dépôt par
+[`clevercloud/static-apache.conf`](./clevercloud/static-apache.conf) : la présence
+du fichier bascule Clever sur un backend Apache qui applique `FallbackResource /index.html`.
+Si Clever doit redevenir « pur static », il suffit de supprimer ce fichier.
 
 **Supprimer** si présentes : `APP_FOLDER`, `CC_PRE_RUN_HOOK`, `API_URL` (build), `NODE_OPTIONS`, `CC_OVERRIDE_BUILDCACHE`, tout `npm ci` / `ng build`.
 
