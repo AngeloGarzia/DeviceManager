@@ -19,7 +19,7 @@ GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
 
 /**
  * Affiche un PDF page par page en canvas (compatible mobile / iOS, sans iframe).
- * Haute densité (devicePixelRatio) + pinch-to-zoom / pan tactile.
+ * Affichage initial = largeur adaptée à l’écran ; pinch / molette pour zoomer ensuite.
  */
 @Component({
   selector: 'app-pdf-inline-viewer',
@@ -71,8 +71,8 @@ GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
       }
       .pdf-inline__pages {
         display: grid;
-        gap: 0.75rem;
-        padding: 0.75rem;
+        gap: 0.5rem;
+        padding: 0.5rem;
         justify-items: center;
         min-width: min-content;
         will-change: transform;
@@ -111,6 +111,7 @@ export class PdfInlineViewerComponent implements AfterViewInit, OnChanges, OnDes
   /** Active le pinch-zoom / pan (recommandé mobile plein écran). */
   @Input() zoomable = true;
 
+  @ViewChild('host', { static: true }) hostRef!: ElementRef<HTMLDivElement>;
   @ViewChild('pages', { static: true }) pagesRef!: ElementRef<HTMLDivElement>;
 
   readonly loading = signal(false);
@@ -120,7 +121,11 @@ export class PdfInlineViewerComponent implements AfterViewInit, OnChanges, OnDes
   private pdfDoc: PDFDocumentProxy | null = null;
   private renderToken = 0;
   private viewReady = false;
+  private lastFitWidth = 0;
+  private resizeObserver: ResizeObserver | null = null;
+  private resizeTimer: number | null = null;
 
+  /** 1 = largeur écran ; >1 = zoom utilisateur. */
   private scale = 1;
   private tx = 0;
   private ty = 0;
@@ -134,18 +139,32 @@ export class PdfInlineViewerComponent implements AfterViewInit, OnChanges, OnDes
 
   ngAfterViewInit(): void {
     this.viewReady = true;
-    void this.render();
+    const el = this.hostRef?.nativeElement;
+    if (typeof ResizeObserver !== 'undefined' && el) {
+      this.resizeObserver = new ResizeObserver(() => this.onHostResized());
+      this.resizeObserver.observe(el);
+    }
+    void this.render(true);
   }
 
   ngOnChanges(changes: SimpleChanges): void {
     if (changes['source'] && this.viewReady) {
+      this.renderToken++;
+      void this.pdfDoc?.destroy();
+      this.pdfDoc = null;
+      this.lastFitWidth = 0;
       this.resetView();
-      void this.render();
+      void this.render(true);
     }
   }
 
   ngOnDestroy(): void {
     this.renderToken++;
+    if (this.resizeTimer != null) {
+      window.clearTimeout(this.resizeTimer);
+    }
+    this.resizeObserver?.disconnect();
+    this.resizeObserver = null;
     void this.pdfDoc?.destroy();
     this.pdfDoc = null;
   }
@@ -156,9 +175,8 @@ export class PdfInlineViewerComponent implements AfterViewInit, OnChanges, OnDes
       return;
     }
     event.preventDefault();
-    const host = event.currentTarget as HTMLElement | null;
-    const rect = (host ?? (event.target as HTMLElement)).getBoundingClientRect?.()
-      ?? { left: 0, top: 0 };
+    const host = this.hostRef?.nativeElement;
+    const rect = host?.getBoundingClientRect() ?? { left: 0, top: 0 };
     const mx = event.clientX - rect.left;
     const my = event.clientY - rect.top;
     const factor = event.deltaY < 0 ? 1.08 : 1 / 1.08;
@@ -197,7 +215,7 @@ export class PdfInlineViewerComponent implements AfterViewInit, OnChanges, OnDes
         this.pointers.set(t.identifier, { x: t.clientX, y: t.clientY });
       }
     }
-    const hostEl = (event.currentTarget as HTMLElement) ?? null;
+    const hostEl = this.hostRef?.nativeElement ?? null;
     const rect = hostEl?.getBoundingClientRect();
 
     if (this.pointers.size >= 2 && rect) {
@@ -233,12 +251,39 @@ export class PdfInlineViewerComponent implements AfterViewInit, OnChanges, OnDes
     }
   }
 
+  private onHostResized(): void {
+    if (!this.source || this.loading()) {
+      return;
+    }
+    const width = this.measureFitWidth();
+    if (width < 80) {
+      return;
+    }
+    // Re-fit seulement si la largeur change vraiment (rotation / plein écran).
+    if (Math.abs(width - this.lastFitWidth) < 8) {
+      return;
+    }
+    if (this.resizeTimer != null) {
+      window.clearTimeout(this.resizeTimer);
+    }
+    this.resizeTimer = window.setTimeout(() => {
+      this.resizeTimer = null;
+      this.resetView();
+      void this.render(false);
+    }, 120);
+  }
+
   private zoomAt(mx: number, my: number, nextScale: number): void {
+    // 1 = ajusté à l’écran ; zoom uniquement vers le haut.
     const clamped = Math.min(5, Math.max(1, nextScale));
     const ratio = clamped / this.scale;
     this.tx = mx - (mx - this.tx) * ratio;
     this.ty = my - (my - this.ty) * ratio;
     this.scale = clamped;
+    if (clamped === 1) {
+      this.tx = 0;
+      this.ty = 0;
+    }
     this.applyTransform();
   }
 
@@ -254,40 +299,64 @@ export class PdfInlineViewerComponent implements AfterViewInit, OnChanges, OnDes
     this.transformCss.set(`translate(${this.tx}px, ${this.ty}px) scale(${this.scale})`);
   }
 
-  private async render(): Promise<void> {
+  /** Largeur utile pour coller la page au viewport (padding inclus). */
+  private measureFitWidth(): number {
+    const shell = this.hostRef?.nativeElement;
+    const pad = 16; // .pdf-inline__pages padding 0.5rem * 2
+    const raw = shell?.clientWidth || window.innerWidth || 360;
+    return Math.max(200, raw - pad);
+  }
+
+  private async render(showSpinner: boolean): Promise<void> {
     const token = ++this.renderToken;
     const host = this.pagesRef?.nativeElement;
     if (!host) {
       return;
     }
     host.innerHTML = '';
-    void this.pdfDoc?.destroy();
-    this.pdfDoc = null;
 
     if (!this.source) {
+      void this.pdfDoc?.destroy();
+      this.pdfDoc = null;
       this.loading.set(false);
       this.error.set(null);
       return;
     }
 
-    this.loading.set(true);
+    if (showSpinner) {
+      this.loading.set(true);
+    }
     this.error.set(null);
+
     try {
-      const data =
-        this.source instanceof Blob ? new Uint8Array(await this.source.arrayBuffer()) : new Uint8Array(this.source);
-      const task = getDocument({ data, disableAutoFetch: true, disableStream: true });
-      const pdf = await task.promise;
-      if (token !== this.renderToken) {
-        void pdf.destroy();
+      if (!this.pdfDoc) {
+        const data =
+          this.source instanceof Blob
+            ? new Uint8Array(await this.source.arrayBuffer())
+            : new Uint8Array(this.source);
+        const task = getDocument({ data, disableAutoFetch: true, disableStream: true });
+        const pdf = await task.promise;
+        if (token !== this.renderToken) {
+          void pdf.destroy();
+          return;
+        }
+        this.pdfDoc = pdf;
+      }
+
+      const pdf = this.pdfDoc;
+      if (!pdf) {
         return;
       }
-      this.pdfDoc = pdf;
-
-      const shell = host.parentElement;
-      const containerWidth = Math.max(
-        280,
-        (shell?.clientWidth || host.clientWidth || window.innerWidth || 360) - 16
-      );
+      // Attendre un frame si le conteneur n’a pas encore sa taille (plein écran).
+      let fitWidth = this.measureFitWidth();
+      if (fitWidth < 220 && typeof window !== 'undefined') {
+        await new Promise<void>((r) => requestAnimationFrame(() => r()));
+        if (token !== this.renderToken) {
+          return;
+        }
+        fitWidth = this.measureFitWidth();
+      }
+      this.lastFitWidth = fitWidth;
       const outputScale = Math.min(3, Math.max(1, window.devicePixelRatio || 1));
 
       for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
@@ -296,10 +365,9 @@ export class PdfInlineViewerComponent implements AfterViewInit, OnChanges, OnDes
         }
         const page = await pdf.getPage(pageNum);
         const unscaled = page.getViewport({ scale: 1 });
-        // Plein écran mobile : largeur ≈ écran, net via DPR ; zoom utilisateur ensuite.
-        const targetCssWidth = Math.min(unscaled.width * 2.4, containerWidth);
-        const scale = Math.min(2.5, Math.max(0.8, targetCssWidth / unscaled.width));
-        const viewport = page.getViewport({ scale });
+        // Largeur = écran ; le user zoome ensuite via le transform CSS.
+        const pageScale = fitWidth / unscaled.width;
+        const viewport = page.getViewport({ scale: pageScale });
 
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d', { alpha: false });
