@@ -1,1 +1,34 @@
-/* Material + Tailwind */
+/* Ligne / carte MAS sélectionnée */
+.mas-row {
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.mas-row:hover:not(.mas-row--selected) {
+  background-color: color-mix(in srgb, #2f5d7a 6%, transparent);
+}
+
+.mas-row--selected,
+.mas-row--selected:hover {
+  background-color: color-mix(in srgb, #2f5d7a 14%, #fff);
+  box-shadow: inset 3px 0 0 #2f5d7a;
+}
+
+.mas-row--selected:focus,
+.mas-row--selected:focus-visible,
+.mas-card--selected:focus,
+.mas-card--selected:focus-visible {
+  outline: 2px solid color-mix(in srgb, #2f5d7a 55%, transparent);
+  outline-offset: -2px;
+}
+
+.mas-card {
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+}
+
+.mas-card--selected {
+  border-color: color-mix(in srgb, #2f5d7a 45%, #cbd5e1) !important;
+  background-color: color-mix(in srgb, #2f5d7a 10%, #fff);
+  box-shadow: 0 0 0 1px color-mix(in srgb, #2f5d7a 35%, transparent);
+}

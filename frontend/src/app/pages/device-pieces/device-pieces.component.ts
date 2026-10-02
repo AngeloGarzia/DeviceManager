@@ -50,7 +50,7 @@ export class DevicePiecesComponent implements OnInit {
   pendingDelete: Device | null = null;
   query = '';
 
-  readonly displayedColumns: string[] = ['nom', 'reference', 'stock', 'statut', 'sfm', 'mas'];
+  readonly displayedColumns: string[] = ['photo', 'nom', 'reference', 'stock', 'statut', 'sfm', 'mas', 'actions'];
 
   readonly items = computed(() => {
     const all = this.allItems();
@@ -58,14 +58,6 @@ export class DevicePiecesComponent implements OnInit {
       return all;
     }
     return all.filter((d) => !d.obsolete);
-  });
-
-  readonly selected = computed(() => {
-    const id = this.selectedId();
-    if (id == null) {
-      return null;
-    }
-    return this.items().find((d) => d.id === id) ?? null;
   });
 
   get total(): number {
@@ -102,7 +94,10 @@ export class DevicePiecesComponent implements OnInit {
 
   onShowObsoleteChange(checked: boolean): void {
     this.showObsolete.set(checked);
-    this.syncSelection(this.items());
+    const id = this.selectedId();
+    if (id != null && !this.items().some((d) => d.id === id)) {
+      this.selectedId.set(null);
+    }
   }
 
   load(): void {
@@ -111,7 +106,10 @@ export class DevicePiecesComponent implements OnInit {
     this.deviceService.list(this.query).subscribe({
       next: (data) => {
         this.allItems.set(data);
-        this.syncSelection(this.items());
+        const id = this.selectedId();
+        if (id != null && !this.items().some((d) => d.id === id)) {
+          this.selectedId.set(null);
+        }
         this.loading.set(false);
       },
       error: () => {
@@ -150,17 +148,5 @@ export class DevicePiecesComponent implements OnInit {
         this.pendingDelete = null;
       }
     });
-  }
-
-  private syncSelection(data: Device[]): void {
-    if (data.length === 0) {
-      this.selectedId.set(null);
-      return;
-    }
-    const current = this.selectedId();
-    if (current != null && data.some((d) => d.id === current)) {
-      return;
-    }
-    this.selectedId.set(data[0].id);
   }
 }

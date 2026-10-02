@@ -296,14 +296,60 @@
 }
 
 .device-table-wrap {
+  max-height: min(70dvh, 40rem);
   overflow: auto;
+  -webkit-overflow-scrolling: touch;
   border: 1px solid #d9e2ec;
   border-radius: 0.75rem;
   background: #fff;
 }
 
 .device-table {
-  min-width: 36rem;
+  min-width: 40rem;
+}
+
+.device-table .mat-mdc-header-row,
+.device-table tr.mat-mdc-header-row {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #fff;
+  box-shadow: 0 1px 0 #d9e2ec;
+}
+
+.device-col-photo {
+  width: 3.5rem;
+  padding-left: 0.75rem !important;
+  padding-right: 0.35rem !important;
+}
+
+.device-col-actions {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.device-thumb {
+  display: block;
+  width: 2.75rem;
+  height: 2.75rem;
+  object-fit: cover;
+  object-position: center;
+  border-radius: 0.45rem;
+  background: #f0f4f8;
+  border: 1px solid #d9e2ec;
+}
+
+.device-thumb--empty {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #9aa5b1;
+}
+
+.device-thumb--empty mat-icon {
+  font-size: 1.25rem;
+  width: 1.25rem;
+  height: 1.25rem;
 }
 
 .device-table__row {
