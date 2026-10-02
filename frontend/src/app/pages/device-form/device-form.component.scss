@@ -47,6 +47,47 @@
   object-position: center;
 }
 
+/* Mobile : viseur plein largeur, hauteur calée sur l’écran (hors nav / boutons). */
+@media (max-width: 640px) {
+  .camera-block--hero {
+    margin-inline: -0.35rem;
+    padding: 0.65rem;
+    border-radius: 0.85rem;
+  }
+
+  .camera-block--hero .camera-viewport {
+    width: 100%;
+    max-width: none;
+    /* Remplit l’écran utile : barre shell + titre + boutons capture. */
+    height: min(68dvh, calc(100dvh - 11.5rem));
+    min-height: 14rem;
+    max-height: calc(100dvh - 10.5rem);
+    aspect-ratio: auto;
+  }
+
+  .camera-block--hero .camera-viewport__video {
+    /* Voir tout le cadre caméra sans crop agressif sur petit écran. */
+    object-fit: contain;
+    background: #0f172a;
+  }
+
+  .camera-actions--hero {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+  }
+
+  .camera-actions--hero .camera-actions__primary {
+    grid-column: 1 / -1;
+    width: 100%;
+    min-height: 3.15rem;
+  }
+
+  .camera-actions--hero .mat-mdc-button-base {
+    min-height: 2.75rem;
+  }
+}
+
 .photo-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(5.5rem, 1fr));

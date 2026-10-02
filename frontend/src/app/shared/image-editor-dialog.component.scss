@@ -77,5 +77,23 @@
 @media (max-width: 640px) {
   .editor-content {
     min-width: 0;
+    width: 100%;
+    max-width: none;
+    gap: 0.5rem;
+    padding-bottom: 0.25rem;
+  }
+
+  .cropper-wrap {
+    min-height: min(52dvh, calc(100dvh - 16rem));
+    max-height: min(62dvh, calc(100dvh - 14rem));
+    border-radius: 0.5rem;
+  }
+
+  :host ::ng-deep image-cropper {
+    max-height: min(62dvh, calc(100dvh - 14rem));
+  }
+
+  .hint {
+    font-size: 0.75rem;
   }
 }

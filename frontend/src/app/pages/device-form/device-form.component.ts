@@ -391,28 +391,39 @@ export class DeviceFormComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private async openCameraStream(deviceId: string | null): Promise<MediaStream> {
-    const aspect = { ideal: 4 / 3 } as const;
+    const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
+    const screenW =
+      typeof window !== 'undefined' ? Math.max(window.screen.width || 0, window.innerWidth || 0) : 1280;
+    // Demande une résolution adaptée à l’écran (4:3), sans forcer trop bas sur mobile.
+    const idealW = Math.min(1920, Math.max(960, Math.round(screenW * Math.min(dpr, 2))));
+    const idealH = Math.round((idealW * 3) / 4);
+    const videoBase: MediaTrackConstraints = {
+      aspectRatio: { ideal: 4 / 3 },
+      width: { ideal: idealW },
+      height: { ideal: idealH }
+    };
+
     if (deviceId) {
       return navigator.mediaDevices.getUserMedia({
-        video: { deviceId: { exact: deviceId }, aspectRatio: aspect },
+        video: { ...videoBase, deviceId: { exact: deviceId } },
         audio: false
       });
     }
 
     try {
       return await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { exact: 'environment' }, aspectRatio: aspect },
+        video: { ...videoBase, facingMode: { exact: 'environment' } },
         audio: false
       });
     } catch {
       try {
         return await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: { ideal: 'environment' }, aspectRatio: aspect },
+          video: { ...videoBase, facingMode: { ideal: 'environment' } },
           audio: false
         });
       } catch {
         return navigator.mediaDevices.getUserMedia({
-          video: { aspectRatio: aspect },
+          video: videoBase,
           audio: false
         });
       }
@@ -1129,10 +1140,15 @@ export class DeviceFormComponent implements OnInit, AfterViewInit, OnDestroy {
 
   /** Ouvre l'éditeur d'image (zoom, recadrage, rotation, miroir). */
   private async openImageEditor(file: File, title: string): Promise<File | null> {
+    const mobile =
+      typeof window !== 'undefined' && window.matchMedia('(max-width: 640px)').matches;
     const ref = this.dialog.open(ImageEditorDialogComponent, {
       data: { file, title },
-      width: 'min(960px, 96vw)',
-      maxHeight: '94vh',
+      width: mobile ? '100vw' : 'min(960px, 96vw)',
+      maxWidth: mobile ? '100vw' : '96vw',
+      height: mobile ? '100dvh' : undefined,
+      maxHeight: mobile ? '100dvh' : '94vh',
+      panelClass: mobile ? 'image-editor-dialog-mobile' : undefined,
       autoFocus: false,
       disableClose: true
     });
