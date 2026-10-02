@@ -26,6 +26,19 @@
       <p class="public-shell__error">{{ error() }}</p>
     }
 
+    @if (fileUrl(); as url) {
+      <div class="public-doc-actions">
+        <a mat-flat-button color="primary" [href]="url" target="_blank" rel="noopener noreferrer">
+          <mat-icon>open_in_new</mat-icon>
+          Ouvrir le document
+        </a>
+        <a mat-stroked-button [href]="url" [attr.download]="downloadName()" target="_blank" rel="noopener noreferrer">
+          <mat-icon>download</mat-icon>
+          Télécharger
+        </a>
+      </div>
+    }
+
     <mat-card class="regle-viewer-card !rounded-xl !border !border-line !shadow-soft">
       <mat-card-content class="!pt-4">
         <div class="regle-viewer-field__label">
@@ -33,23 +46,21 @@
           <span>Document — {{ isImage() ? 'Image' : 'PDF' }}</span>
         </div>
         <div class="regle-viewer-field" [attr.data-kind]="isImage() ? 'image' : 'pdf'">
-          @if (docLoading()) {
-            <div class="regle-viewer-field__loading">
-              <mat-spinner diameter="36"></mat-spinner>
-              <span>Chargement…</span>
-            </div>
-          } @else if (isImage() && objectUrl()) {
+          @if (isImage() && fileUrl()) {
             <img
               class="regle-viewer-field__image"
-              [src]="objectUrl()!"
+              [src]="fileUrl()!"
               [alt]="regle()!.originalName || regle()!.label"
             />
-          } @else if (safePdfUrl()) {
+          } @else if (safeEmbedUrl()) {
             <iframe
               class="regle-viewer-field__pdf"
-              [src]="safePdfUrl()"
+              [src]="safeEmbedUrl()"
               title="Document de la règle de jeux"
             ></iframe>
+            <p class="regle-viewer-field__mobile-hint">
+              Si le PDF ne s’affiche pas ici, utilisez « Ouvrir le document » ci-dessus.
+            </p>
           } @else {
             <p class="regle-viewer-field__empty">Aucun document à afficher.</p>
           }

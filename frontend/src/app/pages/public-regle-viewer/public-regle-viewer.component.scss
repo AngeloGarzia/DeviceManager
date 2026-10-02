@@ -54,6 +54,12 @@
   font-size: 0.9rem;
 }
 
+.public-doc-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
 .regle-viewer-field__label {
   display: inline-flex;
   align-items: center;
@@ -66,8 +72,9 @@
 
 .regle-viewer-field {
   display: flex;
-  align-items: center;
-  justify-content: center;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
   min-height: 28rem;
   max-height: min(75vh, 52rem);
   border: 1px dashed #9fb3c8;
@@ -97,23 +104,34 @@
   max-height: min(75vh, 52rem);
   object-fit: contain;
   background: #fff;
+  margin: 0 auto;
 }
 
 .regle-viewer-field__pdf {
   width: 100%;
-  min-height: 28rem;
-  height: min(75vh, 52rem);
+  flex: 1 1 auto;
+  min-height: 24rem;
+  height: min(68vh, 48rem);
   border: 0;
   background: #fff;
 }
 
+.regle-viewer-field__mobile-hint {
+  margin: 0;
+  padding: 0.55rem 0.75rem;
+  font-size: 0.78rem;
+  color: #cbd5e1;
+  background: #111827;
+  text-align: center;
+}
+
 @media (max-width: 640px) {
   .regle-viewer-field {
-    min-height: 20rem;
+    min-height: 16rem;
   }
 
   .regle-viewer-field__pdf {
-    min-height: 20rem;
-    height: 70vh;
+    min-height: 14rem;
+    height: 45vh;
   }
 }

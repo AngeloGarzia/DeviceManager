@@ -31,8 +31,13 @@ export class PublicMasReglesService {
     return this.http.get<PublicMasRegles>(`${this.base}/r/${encodeURIComponent(token)}`);
   }
 
+  /** URL directe du fichier (affichage iframe / ouverture onglet, sans auth). */
+  fileUrl(token: string, regleId: number): string {
+    return `${this.base}/r/${encodeURIComponent(token)}/regles/${regleId}/file`;
+  }
+
   downloadFile(token: string, regleId: number): Observable<Blob> {
-    return this.http.get(`${this.base}/r/${encodeURIComponent(token)}/regles/${regleId}/file`, {
+    return this.http.get(this.fileUrl(token, regleId), {
       responseType: 'blob'
     });
   }

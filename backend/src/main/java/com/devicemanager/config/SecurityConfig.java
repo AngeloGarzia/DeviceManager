@@ -76,7 +76,8 @@ public class SecurityConfig {
                         .accessDeniedHandler(apiAccessDeniedHandler))
                 .headers(headers -> {
                     headers.contentTypeOptions(Customizer.withDefaults());
-                    headers.frameOptions(frame -> frame.deny());
+                    // Géré par chemin ci-dessous (DENY partout sauf uploads + API publique QR).
+                    headers.frameOptions(frame -> frame.disable());
                     // Obligatoire pour afficher les photos depuis le Static Site Render (autre origine).
                     headers.crossOriginResourcePolicy(corp ->
                             corp.policy(CrossOriginResourcePolicy.CROSS_ORIGIN));
@@ -84,12 +85,18 @@ public class SecurityConfig {
                             referrer.policy(ReferrerPolicyHeaderWriter.ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN));
                     headers.permissionsPolicyHeader(permissions ->
                             permissions.policy("camera=(), microphone=(), geolocation=()"));
-                    // CSP stricte hors /uploads (évite de bloquer le contenu binaire des photos).
+                    // CSP / XFO : assouplir pour /uploads et /api/public (visionneuse QR anonymes).
                     headers.addHeaderWriter((request, response) -> {
                         String uri = request.getRequestURI();
-                        if (uri != null && uri.contains("/uploads/")) {
+                        boolean embeddable = uri != null
+                                && (uri.contains("/uploads/") || uri.contains("/api/public/"));
+                        if (embeddable) {
+                            response.setHeader(
+                                    "Content-Security-Policy",
+                                    "default-src 'none'; frame-ancestors *; base-uri 'none'");
                             return;
                         }
+                        response.setHeader("X-Frame-Options", "DENY");
                         response.setHeader(
                                 "Content-Security-Policy",
                                 "default-src 'none'; frame-ancestors 'none'; base-uri 'none'");
@@ -116,7 +123,7 @@ public class SecurityConfig {
                         .requestMatchers("/actuator/metrics", "/actuator/metrics/**").hasRole(Roles.SUPER_ADMIN)
                         .requestMatchers("/uploads/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/privacy").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/public/**").permitAll()
+                        .requestMatchers("/api/public/**").permitAll()
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/api/auth/change-password", "/api/auth/accept-privacy").authenticated()
                         .requestMatchers("/api/users", "/api/users/**").hasRole(Roles.ADMIN)
