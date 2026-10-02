@@ -5,7 +5,12 @@
       <p class="public-shell__hint">Consultation des règles de jeux — lecture seule</p>
     </header>
 
-    <a mat-button class="!justify-self-start !pl-0" [routerLink]="['/public/r', token()]">
+    <a
+      mat-button
+      class="!justify-self-start !pl-0"
+      [routerLink]="['/public/r', token()]"
+      [state]="{ showList: true }"
+    >
       <mat-icon>arrow_back</mat-icon>
       Retour aux règles
     </a>
@@ -82,16 +87,26 @@
 @if (fullscreen() && regle()) {
   <div class="regle-fs" role="dialog" aria-modal="true" [attr.aria-label]="regle()!.label">
     <header class="regle-fs__bar">
-      <button mat-icon-button type="button" (click)="closeFullscreen()" aria-label="Fermer le plein écran">
-        <mat-icon>close</mat-icon>
-      </button>
+      <a
+        mat-stroked-button
+        class="regle-fs__back"
+        [routerLink]="['/public/r', token()]"
+        [state]="{ showList: true }"
+      >
+        <mat-icon>arrow_back</mat-icon>
+        Retour aux règles
+      </a>
       <div class="regle-fs__meta">
         <span class="regle-fs__kicker">MAS {{ masNumero() }}</span>
         <span class="regle-fs__title">{{ regle()!.label }}</span>
       </div>
-      <a mat-icon-button [routerLink]="['/public/r', token()]" aria-label="Retour aux règles">
-        <mat-icon>arrow_back</mat-icon>
-      </a>
+      @if (!isMobile()) {
+        <button mat-icon-button type="button" (click)="closeFullscreen()" aria-label="Fermer le plein écran">
+          <mat-icon>close</mat-icon>
+        </button>
+      } @else {
+        <span class="regle-fs__bar-spacer" aria-hidden="true"></span>
+      }
     </header>
     <div class="regle-fs__stage" [attr.data-kind]="isImage() ? 'image' : 'pdf'">
       @if (docLoading()) {

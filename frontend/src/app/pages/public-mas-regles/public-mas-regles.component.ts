@@ -43,8 +43,12 @@ export class PublicMasReglesComponent implements OnInit {
     }
     this.publicApi.byToken(token).subscribe({
       next: (data) => {
-        // Une seule règle → ouverture directe (parcours QR téléphone).
-        if (data.regles?.length === 1) {
+        // Une seule règle → ouverture directe (parcours QR), sauf si l'utilisateur
+        // revient explicitement via « Retour aux règles ».
+        const showList = !!(this.router.lastSuccessfulNavigation?.extras?.state as { showList?: boolean } | undefined)
+          ?.showList
+          || !!(history.state as { showList?: boolean } | null)?.showList;
+        if (data.regles?.length === 1 && !showList) {
           void this.router.navigate(['/public/r', token, 'regles', data.regles[0].id], {
             replaceUrl: true
           });

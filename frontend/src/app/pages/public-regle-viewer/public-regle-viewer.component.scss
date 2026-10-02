@@ -149,9 +149,44 @@
   border-bottom: 1px solid #1e293b;
 }
 
+.regle-fs__back {
+  flex-shrink: 0;
+  white-space: nowrap;
+  font-size: 0.8rem !important;
+  line-height: 1.2 !important;
+  padding: 0 0.65rem !important;
+  min-height: 2.25rem !important;
+  color: #e2e8f0 !important;
+  border-color: #475569 !important;
+}
+
+.regle-fs__back mat-icon {
+  margin-right: 0.15rem;
+  font-size: 1.1rem;
+  width: 1.1rem;
+  height: 1.1rem;
+}
+
+.regle-fs__bar-spacer {
+  width: 2.5rem;
+  height: 2.5rem;
+}
+
 .regle-fs__meta {
   display: grid;
   min-width: 0;
+  text-align: center;
+}
+
+@media (max-width: 420px) {
+  .regle-fs__back .mat-mdc-button-label,
+  .regle-fs__back {
+    font-size: 0.72rem !important;
+  }
+
+  .regle-fs__title {
+    font-size: 0.85rem;
+  }
 }
 
 .regle-fs__kicker {
