@@ -2,8 +2,10 @@ import { bootstrapApplication } from '@angular/platform-browser';
 import { appConfig } from './app/app.config';
 import { AppComponent } from './app/app.component';
 import { installAppErrorRecovery } from './app/recovery/app-error-recovery';
+import { installStaleDeployWatcher } from './app/recovery/stale-deploy-watcher';
 
 installAppErrorRecovery();
+installStaleDeployWatcher();
 
 bootstrapApplication(AppComponent, appConfig)
   .catch((err) => console.error(err));

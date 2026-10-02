@@ -5,6 +5,9 @@ import { passwordChangeGuard, requirePasswordChangeGuard, privacyAcceptGuard, re
 
 export const routes: Routes = [
   { path: '', pathMatch: 'full', redirectTo: 'devices' },
+  // Anciennes URLs / favoris éventuels → inventaire pièces actuel
+  { path: 'pieces', pathMatch: 'full', redirectTo: 'devices/pieces' },
+  { path: 'piece', pathMatch: 'full', redirectTo: 'devices/pieces' },
   {
     path: 'login',
     loadComponent: () => import('./pages/login/login.component').then((m) => m.LoginComponent)
