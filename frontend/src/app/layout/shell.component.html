@@ -63,9 +63,8 @@
           mat-icon-button
           type="button"
           data-tour="shell-ai"
-          [class.admin-active]="ai.enabled() && router.url.startsWith('/ai')"
-          [disabled]="!ai.enabled()"
-          [matTooltip]="ai.enabled() ? 'Assistant IA' : (ai.disabledReason() || 'IA désactivée')"
+          [class.admin-active]="router.url.startsWith('/ai')"
+          [matTooltip]="ai.enabled() ? 'Assistant IA' : (ai.disabledReason() || 'Assistant IA')"
           (click)="openAiAssistant()"
           aria-label="Assistant IA"
         >

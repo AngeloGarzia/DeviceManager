@@ -163,11 +163,9 @@ export class ShellComponent implements OnInit, OnDestroy {
     return url.startsWith('/mas') || url.startsWith('/sfm');
   }
 
-  /** Ouvre l'assistant IA si le module est activé. */
+  /** Ouvre la page assistant IA (reteste le statut même après une panne API temporaire). */
   openAiAssistant(): void {
-    if (!this.ai.enabled()) {
-      return;
-    }
+    this.ai.refreshStatus();
     void this.router.navigate(['/ai']);
   }
 
