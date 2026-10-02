@@ -74,7 +74,7 @@ public class AiController {
     @PostMapping("/chat")
     @PreAuthorize("hasAnyRole('ADMIN', 'TECHNICIEN')")
     public ResponseEntity<AiChatResponse> chat(@Valid @RequestBody AiChatRequest request) {
-        return ResponseEntity.ok(aiAssistantService.chat(request.getMessage()));
+        return ResponseEntity.ok(aiAssistantService.chat(request.getMessage(), request.getHistory()));
     }
 
     /**

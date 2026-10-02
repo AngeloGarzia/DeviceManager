@@ -3,6 +3,7 @@ package com.devicemanager.service;
 import com.devicemanager.ai.AiApiKeyBattery;
 import com.devicemanager.ai.AiPromptDefaults;
 import com.devicemanager.ai.AiProviders;
+import com.devicemanager.dto.AiChatRequest;
 import com.devicemanager.dto.AiChatResponse;
 import com.devicemanager.dto.AiDevisOrderLineContext;
 import com.devicemanager.dto.AiDevisPrixScanResponse;
@@ -30,6 +31,9 @@ import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.text.PDFTextStripper;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.messages.AssistantMessage;
+import org.springframework.ai.chat.messages.Message;
+import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.content.Media;
 import org.springframework.ai.google.genai.GoogleGenAiChatModel;
 import org.springframework.ai.google.genai.GoogleGenAiChatOptions;
@@ -133,11 +137,12 @@ public class AiAssistantService {
      * Envoie un message utilisateur au modèle de chat configuré.
      *
      * @param message question ou consigne en langage naturel
+     * @param history tours précédents (user/assistant), hors message courant ; peut être null
      * @return réponse textuelle du modèle
      * @throws org.springframework.web.server.ResponseStatusException {@code 503} si IA désactivée ou clé absente ;
      *         {@code 502} en cas d'échec d'appel externe
      */
-    public AiChatResponse chat(String message) {
+    public AiChatResponse chat(String message, List<AiChatRequest.AiChatTurnDto> history) {
         requireEnabled();
         String provider = resolveProviderId();
         String apiKey = requireApiKey(provider);
@@ -145,8 +150,12 @@ public class AiAssistantService {
 
         try {
             ChatClient chatClient = buildChatClient(apiKey, provider, model, 0.3);
-            String reply = chatClient.prompt()
-                    .system(systemPromptForChat(message))
+            var prompt = chatClient.prompt().system(systemPromptForChat(message));
+            List<Message> prior = toChatMessages(history);
+            if (!prior.isEmpty()) {
+                prompt = prompt.messages(prior);
+            }
+            String reply = prompt
                     .user(message.trim())
                     .call()
                     .content();
@@ -161,6 +170,29 @@ public class AiAssistantService {
             log.error("Échec appel Spring AI (model={}): {}", model, ex.getMessage(), ex);
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, friendlyAiError(provider, ex));
         }
+    }
+
+    /** Convertit l'historique front en messages Spring AI (ignore les tours invalides). */
+    private static List<Message> toChatMessages(List<AiChatRequest.AiChatTurnDto> history) {
+        if (history == null || history.isEmpty()) {
+            return List.of();
+        }
+        List<Message> out = new ArrayList<>();
+        for (AiChatRequest.AiChatTurnDto turn : history) {
+            if (turn == null || turn.getRole() == null || turn.getText() == null) {
+                continue;
+            }
+            String text = turn.getText().trim();
+            if (text.isEmpty()) {
+                continue;
+            }
+            if ("assistant".equalsIgnoreCase(turn.getRole())) {
+                out.add(new AssistantMessage(text));
+            } else if ("user".equalsIgnoreCase(turn.getRole())) {
+                out.add(new UserMessage(text));
+            }
+        }
+        return out;
     }
 
     /**

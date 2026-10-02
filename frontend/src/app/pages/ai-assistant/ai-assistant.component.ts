@@ -7,13 +7,8 @@ import { MatInputModule } from '@angular/material/input';
 import { MatIconModule } from '@angular/material/icon';
 import { MatCardModule } from '@angular/material/card';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { AiService, MemoireSynaptiqueResponse } from '../../services/ai.service';
+import { AiService, AiChatTurn, MemoireSynaptiqueResponse } from '../../services/ai.service';
 import { apiErrorMessage } from '../../shared/api-error';
-
-interface ChatTurn {
-  role: 'user' | 'assistant';
-  text: string;
-}
 
 /**
  * Assistant conversationnel IA intégré à DeviceManager.
@@ -42,7 +37,7 @@ export class AiAssistantComponent implements OnInit {
   readonly loadingStatus = signal(true);
   readonly sending = signal(false);
   readonly error = signal<string | null>(null);
-  readonly turns = signal<ChatTurn[]>([]);
+  readonly turns = signal<AiChatTurn[]>([]);
 
   readonly memory = signal<MemoireSynaptiqueResponse | null>(null);
   readonly memoryLoading = signal(false);
@@ -50,8 +45,9 @@ export class AiAssistantComponent implements OnInit {
   readonly memoryError = signal<string | null>(null);
   readonly memoryExpanded = signal(true);
 
+  /** Champ toujours créé enabled ; l'effect gère seul le disabled (évite reset → bloqué). */
   readonly form = this.fb.group({
-    message: [{ value: '', disabled: true }, [Validators.required, Validators.maxLength(4000)]]
+    message: ['', [Validators.required, Validators.maxLength(4000)]]
   });
 
   constructor() {
@@ -59,8 +55,10 @@ export class AiAssistantComponent implements OnInit {
       const ctrl = this.form.controls.message;
       const allow = this.ai.enabled() && !this.sending();
       if (allow) {
-        ctrl.enable({ emitEvent: false });
-      } else {
+        if (ctrl.disabled) {
+          ctrl.enable({ emitEvent: false });
+        }
+      } else if (ctrl.enabled) {
         ctrl.disable({ emitEvent: false });
       }
     });
@@ -119,18 +117,22 @@ export class AiAssistantComponent implements OnInit {
     this.memoryExpanded.update((v) => !v);
   }
 
-  /** Envoie le message saisi et affiche la réponse de l'assistant. */
+  /** Envoie le message saisi et affiche la réponse de l'assistant (avec historique). */
   send(): void {
-    if (this.form.invalid || this.sending() || !this.ai.enabled()) {
-      this.form.markAllAsTouched();
+    if (this.sending() || !this.ai.enabled()) {
       return;
     }
     const message = (this.form.controls.message.getRawValue() || '').trim();
+    if (!message) {
+      this.form.markAllAsTouched();
+      return;
+    }
+    const history = this.turns();
     this.turns.update((list) => [...list, { role: 'user', text: message }]);
-    this.form.reset({ message: '' });
+    this.form.controls.message.setValue('', { emitEvent: false });
     this.sending.set(true);
     this.error.set(null);
-    this.ai.chat(message).subscribe({
+    this.ai.chat(message, history).subscribe({
       next: (res) => {
         this.turns.update((list) => [...list, { role: 'assistant', text: res.reply }]);
         this.sending.set(false);

@@ -9,6 +9,11 @@ export interface AiProviderAvailability {
   hasApiKey: boolean;
 }
 
+export interface AiChatTurn {
+  role: 'user' | 'assistant';
+  text: string;
+}
+
 export interface AiChatResponse {
   reply: string;
   enabled: boolean;
@@ -123,8 +128,11 @@ export class AiService {
     this.statusLoaded.set(false);
   }
 
-  chat(message: string): Observable<AiChatResponse> {
-    return this.http.post<AiChatResponse>(`${this.base}/chat`, { message });
+  chat(message: string, history: AiChatTurn[] = []): Observable<AiChatResponse> {
+    return this.http.post<AiChatResponse>(`${this.base}/chat`, {
+      message,
+      history: history.map((t) => ({ role: t.role, text: t.text }))
+    });
   }
 
   scanLabel(image: File | Blob): Observable<AiLabelScanResponse> {

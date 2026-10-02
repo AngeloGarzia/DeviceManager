@@ -53,7 +53,7 @@ class AiAssistantServiceTest {
     void chat_rejectsWhenDisabled() {
         when(appSettingsService.getBoolean(AppSettingsService.AI_ENABLED, false)).thenReturn(false);
 
-        assertThatThrownBy(() -> aiAssistantService.chat("Bonjour"))
+        assertThatThrownBy(() -> aiAssistantService.chat("Bonjour", java.util.List.of()))
                 .isInstanceOf(ResponseStatusException.class)
                 .extracting(ex -> ((ResponseStatusException) ex).getReason())
                 .asString()
@@ -66,7 +66,7 @@ class AiAssistantServiceTest {
         when(appSettingsService.get(AppSettingsService.AI_PROVIDER, "openai")).thenReturn("openai");
         when(aiApiKeyBattery.keyFor(anyString())).thenReturn("");
 
-        assertThatThrownBy(() -> aiAssistantService.chat("Bonjour"))
+        assertThatThrownBy(() -> aiAssistantService.chat("Bonjour", java.util.List.of()))
                 .isInstanceOf(ResponseStatusException.class)
                 .extracting(ex -> ((ResponseStatusException) ex).getReason())
                 .asString()

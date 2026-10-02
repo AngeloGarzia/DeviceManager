@@ -117,7 +117,7 @@
             mat-flat-button
             color="primary"
             type="submit"
-            [disabled]="!ai.enabled() || sending() || form.invalid"
+            [disabled]="!ai.enabled() || sending() || !(form.controls.message.getRawValue() || '').trim()"
           >
             <mat-icon>send</mat-icon>
             Envoyer
