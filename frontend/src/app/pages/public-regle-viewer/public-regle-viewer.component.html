@@ -44,12 +44,8 @@
               [src]="objectUrl()!"
               [alt]="regle()!.originalName || regle()!.label"
             />
-          } @else if (safePdfUrl()) {
-            <iframe
-              class="regle-viewer-field__pdf"
-              [src]="safePdfUrl()"
-              title="Document de la règle de jeux"
-            ></iframe>
+          } @else if (pdfBlob()) {
+            <app-pdf-inline-viewer [source]="pdfBlob()"></app-pdf-inline-viewer>
           } @else {
             <p class="regle-viewer-field__empty">Aucun document à afficher.</p>
           }

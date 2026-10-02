@@ -5,13 +5,14 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { RegleJeuxOption } from '../../models/models';
 import { MasService } from '../../services/mas.service';
 import { apiErrorMessage } from '../../shared/api-error';
+import { PdfInlineViewerComponent } from '../../shared/pdf-inline-viewer.component';
 
 /**
  * Page dédiée : affichage d'une règle de jeux dans un champ visionneuse (PDF ou image).
+ * PDF rendu en canvas (pdf.js) pour mobile.
  */
 @Component({
   selector: 'app-regle-jeux-viewer',
@@ -22,7 +23,8 @@ import { apiErrorMessage } from '../../shared/api-error';
     MatButtonModule,
     MatCardModule,
     MatIconModule,
-    MatProgressSpinnerModule
+    MatProgressSpinnerModule,
+    PdfInlineViewerComponent
   ],
   templateUrl: './regle-jeux-viewer.component.html',
   styleUrl: './regle-jeux-viewer.component.scss'
@@ -31,13 +33,13 @@ export class RegleJeuxViewerComponent implements OnInit, OnDestroy {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly masService = inject(MasService);
-  private readonly sanitizer = inject(DomSanitizer);
 
   readonly loading = signal(true);
   readonly docLoading = signal(false);
   readonly error = signal<string | null>(null);
   readonly item = signal<RegleJeuxOption | null>(null);
   readonly objectUrl = signal<string | null>(null);
+  readonly pdfBlob = signal<Blob | null>(null);
 
   readonly isImage = computed(() => {
     const it = this.item();
@@ -47,14 +49,6 @@ export class RegleJeuxViewerComponent implements OnInit, OnDestroy {
     const ct = (it.contentType || '').toLowerCase();
     const name = (it.originalName || '').toLowerCase();
     return ct.startsWith('image/') || /\.(png|jpe?g|webp|gif)$/.test(name);
-  });
-
-  readonly safePdfUrl = computed((): SafeResourceUrl | null => {
-    const url = this.objectUrl();
-    if (!url || this.isImage()) {
-      return null;
-    }
-    return this.sanitizer.bypassSecurityTrustResourceUrl(url);
   });
 
   ngOnInit(): void {
@@ -94,6 +88,7 @@ export class RegleJeuxViewerComponent implements OnInit, OnDestroy {
   private loadDocument(item: RegleJeuxOption): void {
     this.docLoading.set(true);
     this.revokeObjectUrl();
+    this.pdfBlob.set(null);
     this.masService.downloadRegleJeuxPdf(item.id).subscribe({
       next: (blob) => {
         this.docLoading.set(false);
@@ -105,17 +100,31 @@ export class RegleJeuxViewerComponent implements OnInit, OnDestroy {
           this.error.set('Document introuvable dans le stockage — remplacez le fichier.');
           return;
         }
-        // Si le contentType métier est manquant, le déduire du blob
         if (!item.contentType && blob.type) {
           this.item.update((cur) => (cur ? { ...cur, contentType: blob.type } : cur));
         }
-        this.objectUrl.set(URL.createObjectURL(blob));
+        const wantsImage = this.isImageContent(item, blob);
+        if (wantsImage) {
+          const mime = blob.type || item.contentType || 'image/jpeg';
+          const typed = blob.type === mime ? blob : new Blob([blob], { type: mime });
+          this.objectUrl.set(URL.createObjectURL(typed));
+        } else {
+          const typed =
+            blob.type === 'application/pdf' ? blob : new Blob([blob], { type: 'application/pdf' });
+          this.pdfBlob.set(typed);
+        }
       },
       error: (err) => {
         this.docLoading.set(false);
         this.error.set(apiErrorMessage(err, 'Document introuvable — remplacez le fichier.'));
       }
     });
+  }
+
+  private isImageContent(item: RegleJeuxOption, blob: Blob): boolean {
+    const ct = (item.contentType || blob.type || '').toLowerCase();
+    const name = (item.originalName || '').toLowerCase();
+    return ct.startsWith('image/') || /\.(png|jpe?g|webp|gif)$/.test(name);
   }
 
   private revokeObjectUrl(): void {

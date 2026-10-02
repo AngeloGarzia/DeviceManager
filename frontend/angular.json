@@ -34,6 +34,11 @@
                 "glob": ".htaccess",
                 "input": "src",
                 "output": "/"
+              },
+              {
+                "glob": "pdf.worker.min.mjs",
+                "input": "node_modules/pdfjs-dist/build",
+                "output": "/"
               }
             ],
             "styles": [
@@ -41,7 +46,8 @@
             ],
             "scripts": [],
             "allowedCommonJsDependencies": [
-              "html2canvas"
+              "html2canvas",
+              "pdfjs-dist"
             ]
           },
           "configurations": {

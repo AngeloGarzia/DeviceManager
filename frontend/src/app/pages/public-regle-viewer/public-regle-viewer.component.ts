@@ -5,28 +5,35 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import {
   PublicMasReglesService,
   PublicRegleJeux
 } from '../../services/public-mas-regles.service';
+import { PdfInlineViewerComponent } from '../../shared/pdf-inline-viewer.component';
 import { apiErrorMessage } from '../../shared/api-error';
 
 /**
  * Visionneuse publique PDF/image d'une règle (jeton QR, lecture seule).
- * Affiche le document dans le champ prévu — pas de téléchargement.
+ * PDF rendu en canvas (pdf.js) pour fonctionner aussi sur mobile.
  */
 @Component({
   selector: 'app-public-regle-viewer',
   standalone: true,
-  imports: [CommonModule, RouterLink, MatButtonModule, MatCardModule, MatIconModule, MatProgressSpinnerModule],
+  imports: [
+    CommonModule,
+    RouterLink,
+    MatButtonModule,
+    MatCardModule,
+    MatIconModule,
+    MatProgressSpinnerModule,
+    PdfInlineViewerComponent
+  ],
   templateUrl: './public-regle-viewer.component.html',
   styleUrl: './public-regle-viewer.component.scss'
 })
 export class PublicRegleViewerComponent implements OnInit, OnDestroy {
   private readonly route = inject(ActivatedRoute);
   private readonly publicApi = inject(PublicMasReglesService);
-  private readonly sanitizer = inject(DomSanitizer);
 
   readonly loading = signal(true);
   readonly docLoading = signal(false);
@@ -35,6 +42,7 @@ export class PublicRegleViewerComponent implements OnInit, OnDestroy {
   readonly regle = signal<PublicRegleJeux | null>(null);
   readonly masNumero = signal('');
   readonly objectUrl = signal<string | null>(null);
+  readonly pdfBlob = signal<Blob | null>(null);
 
   readonly isImage = computed(() => {
     const it = this.regle();
@@ -44,14 +52,6 @@ export class PublicRegleViewerComponent implements OnInit, OnDestroy {
     const ct = (it.contentType || '').toLowerCase();
     const name = (it.originalName || '').toLowerCase();
     return ct.startsWith('image/') || /\.(png|jpe?g|webp|gif)$/.test(name);
-  });
-
-  readonly safePdfUrl = computed((): SafeResourceUrl | null => {
-    const url = this.objectUrl();
-    if (!url || this.isImage()) {
-      return null;
-    }
-    return this.sanitizer.bypassSecurityTrustResourceUrl(url);
   });
 
   ngOnInit(): void {
@@ -89,6 +89,7 @@ export class PublicRegleViewerComponent implements OnInit, OnDestroy {
   private loadDocument(token: string, regleId: number, item: PublicRegleJeux): void {
     this.docLoading.set(true);
     this.revokeObjectUrl();
+    this.pdfBlob.set(null);
     this.publicApi.downloadFile(token, regleId).subscribe({
       next: (blob) => {
         this.docLoading.set(false);
@@ -104,7 +105,11 @@ export class PublicRegleViewerComponent implements OnInit, OnDestroy {
           this.regle.update((cur) => (cur ? { ...cur, contentType: mime } : cur));
         }
         const typed = blob.type === mime ? blob : new Blob([blob], { type: mime });
-        this.objectUrl.set(URL.createObjectURL(typed));
+        if (wantsImage) {
+          this.objectUrl.set(URL.createObjectURL(typed));
+        } else {
+          this.pdfBlob.set(typed);
+        }
       },
       error: (err) => {
         this.docLoading.set(false);

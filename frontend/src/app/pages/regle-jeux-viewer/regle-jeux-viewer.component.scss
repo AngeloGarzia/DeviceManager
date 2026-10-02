@@ -35,6 +35,14 @@
 .regle-viewer-field[data-kind='pdf'] {
   padding: 0;
   background: #1f2933;
+  align-items: stretch;
+  justify-content: stretch;
+}
+
+.regle-viewer-field[data-kind='pdf'] app-pdf-inline-viewer {
+  width: 100%;
+  min-height: 28rem;
+  height: min(75vh, 52rem);
 }
 
 .regle-viewer-field__loading {
@@ -63,20 +71,12 @@
   background: #fff;
 }
 
-.regle-viewer-field__pdf {
-  width: 100%;
-  min-height: 28rem;
-  height: min(75vh, 52rem);
-  border: 0;
-  background: #fff;
-}
-
 @media (max-width: 640px) {
   .regle-viewer-field {
     min-height: 20rem;
   }
 
-  .regle-viewer-field__pdf {
+  .regle-viewer-field[data-kind='pdf'] app-pdf-inline-viewer {
     min-height: 20rem;
     height: 70vh;
   }
