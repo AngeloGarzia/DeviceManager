@@ -18,6 +18,7 @@ GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
 
 /**
  * Affiche un PDF page par page en canvas (compatible mobile / iOS, sans iframe).
+ * Rendu haute densité (devicePixelRatio) pour un texte net sur mobile.
  */
 @Component({
   selector: 'app-pdf-inline-viewer',
@@ -50,6 +51,7 @@ GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
         min-height: inherit;
         overflow: auto;
         -webkit-overflow-scrolling: touch;
+        touch-action: pan-x pan-y;
         background: #111827;
       }
       .pdf-inline__pages {
@@ -57,10 +59,12 @@ GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
         gap: 0.75rem;
         padding: 0.75rem;
         justify-items: center;
+        min-width: min-content;
       }
       .pdf-inline__pages canvas {
         display: block;
-        max-width: 100%;
+        width: auto;
+        max-width: none;
         height: auto;
         background: #fff;
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
@@ -138,25 +142,41 @@ export class PdfInlineViewerComponent implements AfterViewInit, OnChanges, OnDes
         return;
       }
       this.pdfDoc = pdf;
-      const maxWidth = Math.max(280, (host.parentElement?.clientWidth || host.clientWidth || 360) - 24);
+
+      const containerWidth = Math.max(
+        280,
+        (host.parentElement?.clientWidth || host.clientWidth || window.innerWidth || 360) - 24
+      );
+      // Cap DPR à 3 pour limiter mémoire, mais assez pour écrans Retina.
+      const outputScale = Math.min(3, Math.max(1, window.devicePixelRatio || 1));
+
       for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
         if (token !== this.renderToken) {
           return;
         }
         const page = await pdf.getPage(pageNum);
         const unscaled = page.getViewport({ scale: 1 });
-        const scale = Math.min(2, maxWidth / unscaled.width);
+        // Largeur CSS cible : au moins le conteneur ; sur mobile, +35 % pour lisibilité (scroll horizontal).
+        const targetCssWidth =
+          containerWidth < 640
+            ? Math.min(unscaled.width * 2.2, Math.max(containerWidth, Math.round(containerWidth * 1.35)))
+            : containerWidth;
+        const scale = Math.min(2.5, targetCssWidth / unscaled.width);
         const viewport = page.getViewport({ scale });
+
         const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
+        const ctx = canvas.getContext('2d', { alpha: false });
         if (!ctx) {
           continue;
         }
-        canvas.width = Math.floor(viewport.width);
-        canvas.height = Math.floor(viewport.height);
-        canvas.style.width = '100%';
+        canvas.width = Math.floor(viewport.width * outputScale);
+        canvas.height = Math.floor(viewport.height * outputScale);
+        canvas.style.width = `${Math.floor(viewport.width)}px`;
+        canvas.style.height = `${Math.floor(viewport.height)}px`;
+
+        const transform = outputScale !== 1 ? [outputScale, 0, 0, outputScale, 0, 0] : undefined;
         host.appendChild(canvas);
-        await page.render({ canvasContext: ctx, viewport }).promise;
+        await page.render({ canvasContext: ctx, viewport, transform }).promise;
       }
       this.loading.set(false);
     } catch (e) {
