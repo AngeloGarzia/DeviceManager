@@ -1,0 +1,9 @@
+RewriteEngine On
+
+# Si le fichier ou dossier demandé existe, on le sert tel quel
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
+
+# Sinon, on renvoie index.html (Angular lit l'URL ensuite)
+RewriteRule ^ /index.html [L]
