@@ -140,13 +140,15 @@ export class ShellComponent implements OnInit, OnDestroy {
   }
 
   /** Indique si la section « Pièces détachées » est active dans la barre de navigation. */
-  isDevicesSectionActive(): boolean {
-    return this.router.url.startsWith('/devices');
+  /** Accueil = liste devices (racine métier). */
+  isHomeActive(): boolean {
+    const path = this.router.url.split('?')[0];
+    return path === '/devices' || path === '/';
   }
 
-  /** Ouvre /devices et déplie la tuile « Pièces détachées ». */
-  navigateToDevicesList(): void {
-    void this.router.navigate(['/devices'], { queryParams: { open: 'pieces' } });
+  isDevicesSectionActive(): boolean {
+    const path = this.router.url.split('?')[0];
+    return path.startsWith('/devices/');
   }
 
   /** Indique si la section « Demandes de commande » est active dans la barre de navigation. */
@@ -157,7 +159,8 @@ export class ShellComponent implements OnInit, OnDestroy {
 
   /** Indique si la section MAS est active. */
   isMasSectionActive(): boolean {
-    return this.router.url.startsWith('/mas');
+    const url = this.router.url;
+    return url.startsWith('/mas') || url.startsWith('/sfm');
   }
 
   /** Ouvre l'assistant IA si le module est activé. */

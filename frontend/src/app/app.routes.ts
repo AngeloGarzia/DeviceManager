@@ -53,6 +53,11 @@ export const routes: Routes = [
           import('./pages/device-list/device-list.component').then((m) => m.DeviceListComponent)
       },
       {
+        path: 'devices/pieces',
+        loadComponent: () =>
+          import('./pages/device-pieces/device-pieces.component').then((m) => m.DevicePiecesComponent)
+      },
+      {
         path: 'devices/stock',
         loadComponent: () =>
           import('./pages/device-stock/device-stock.component').then((m) => m.DeviceStockComponent)

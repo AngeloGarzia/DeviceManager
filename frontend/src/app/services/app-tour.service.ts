@@ -366,23 +366,17 @@ export class AppTourService {
         }
       },
       {
-        route: '/devices?open=pieces',
+        route: '/devices/pieces',
         element: '[data-tour="page-devices"]',
         title: 'Inventaire',
         description:
-          'Tuile « Pièces détachées » : total, obsolètes, stock à zéro (raccourci vers une demande de commande).',
-        before: async () => {
-          await this.expandDevicesTile();
-        }
+          'Page « Pièces détachées » : total, obsolètes, stock à zéro (raccourci vers une demande de commande).'
       },
       {
-        route: '/devices?open=pieces',
+        route: '/devices/pieces',
         element: '[data-tour="btn-new-device"]',
         title: 'Nouvelle pièce',
-        description: 'Ouvre la fiche : photos, SFM, MAS, stock, usage…',
-        before: async () => {
-          await this.expandDevicesTile();
-        }
+        description: 'Ouvre la fiche : photos, SFM, MAS, stock, usage…'
       },
       {
         route: '/devices/new',
@@ -588,18 +582,6 @@ export class AppTourService {
     const target = document.querySelector('[data-tour="setup-atelier-utilise"]');
     target?.scrollIntoView({ block: 'center', behavior: 'instant' as ScrollBehavior });
     await this.delay(120);
-  }
-
-  /** Déplie la tuile inventaire pièces. */
-  private async expandDevicesTile(): Promise<void> {
-    const btn = document.querySelector('[data-tour="page-devices"]') as HTMLElement | null;
-    if (!btn) {
-      return;
-    }
-    if (btn.getAttribute('aria-expanded') !== 'true') {
-      btn.click();
-      await this.delay(220);
-    }
   }
 
   /** Assure l’ouverture du panneau mémoire IA. */

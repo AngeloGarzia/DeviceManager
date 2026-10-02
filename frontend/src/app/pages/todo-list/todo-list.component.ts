@@ -27,6 +27,7 @@ import { apiErrorMessage } from '../../shared/api-error';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 
 type TodoFilter = 'ALL' | 'ACTIVE' | 'OVERDUE' | 'OPEN' | 'IN_PROGRESS' | 'DONE' | 'CANCELLED';
+type TodoMainTab = 'modeles' | 'overdue';
 
 /**
  * Page Todo : cycle de vie complet des tâches (création → clôture signée) + règles récurrentes.
@@ -81,6 +82,7 @@ export class TodoListComponent implements OnInit {
   readonly editingRecurrenceId = signal<number | null>(null);
   readonly linkingId = signal<number | null>(null);
   readonly closingId = signal<number | null>(null);
+  readonly mainTab = signal<TodoMainTab>('modeles');
   readonly filter = signal<TodoFilter>('ACTIVE');
   readonly dayFilter = signal<string | null>(null);
   readonly query = signal('');
@@ -171,10 +173,14 @@ export class TodoListComponent implements OnInit {
         || filterParam === 'IN_PROGRESS' || filterParam === 'DONE' || filterParam === 'CANCELLED'
         || filterParam === 'ALL') {
       this.filter.set(filterParam);
+      if (filterParam === 'OVERDUE') {
+        this.mainTab.set('overdue');
+      }
     }
     const day = params.get('day');
     if (day && /^\d{4}-\d{2}-\d{2}$/.test(day)) {
       this.dayFilter.set(day);
+      this.mainTab.set('overdue');
     }
     if (params.get('create') === '1') {
       this.openCreate();
@@ -191,7 +197,18 @@ export class TodoListComponent implements OnInit {
     this.loadMasses();
   }
 
+  setMainTab(tab: TodoMainTab): void {
+    this.mainTab.set(tab);
+    this.closingId.set(null);
+    this.linkingId.set(null);
+    if (tab === 'overdue') {
+      this.filter.set('OVERDUE');
+      this.dayFilter.set(null);
+    }
+  }
+
   setFilter(f: TodoFilter): void {
+    this.mainTab.set('overdue');
     this.filter.set(f);
     this.dayFilter.set(null);
     this.closingId.set(null);
@@ -299,6 +316,7 @@ export class TodoListComponent implements OnInit {
   }
 
   openCreate(): void {
+    this.mainTab.set('modeles');
     this.showCreate.set(true);
     this.showCustomCreate.set(false);
     this.cancelRecurrenceForm();
@@ -468,6 +486,7 @@ export class TodoListComponent implements OnInit {
     if (!this.auth.isAdmin()) {
       return;
     }
+    this.mainTab.set('modeles');
     this.editingRecurrenceId.set(null);
     this.showRecurrenceCreate.set(true);
     this.showCreate.set(false);
@@ -493,6 +512,7 @@ export class TodoListComponent implements OnInit {
     if (!this.auth.isAdmin()) {
       return;
     }
+    this.mainTab.set('modeles');
     this.editingRecurrenceId.set(rule.id);
     this.showRecurrenceCreate.set(true);
     this.showCreate.set(false);

@@ -32,29 +32,66 @@
   </header>
 
   <div class="todo-stats">
-    <div class="panel todo-stat" [class.todo-stat--warn]="counts().overdue > 0">
+    <button
+      type="button"
+      class="panel todo-stat"
+      [class.todo-stat--warn]="counts().overdue > 0"
+      (click)="setMainTab('overdue')"
+    >
       <div class="todo-stat__label">En retard</div>
       <div class="todo-stat__value">{{ counts().overdue }}</div>
-    </div>
-    <div class="panel todo-stat">
+    </button>
+    <button type="button" class="panel todo-stat" (click)="setFilter('ACTIVE')">
       <div class="todo-stat__label">Actives</div>
       <div class="todo-stat__value">{{ counts().active }}</div>
-    </div>
-    <div class="panel todo-stat">
+    </button>
+    <button type="button" class="panel todo-stat" (click)="setFilter('OPEN')">
       <div class="todo-stat__label">Ouvertes</div>
       <div class="todo-stat__value">{{ counts().open }}</div>
-    </div>
-    <div class="panel todo-stat">
+    </button>
+    <button type="button" class="panel todo-stat" (click)="setFilter('IN_PROGRESS')">
       <div class="todo-stat__label">En cours</div>
       <div class="todo-stat__value">{{ counts().inProgress }}</div>
-    </div>
-    <div class="panel todo-stat">
+    </button>
+    <button type="button" class="panel todo-stat" (click)="setFilter('DONE')">
       <div class="todo-stat__label">Clôturées</div>
       <div class="todo-stat__value">{{ counts().done }}</div>
-    </div>
+    </button>
   </div>
 
-  <div class="panel todo-modeles" id="todo-modeles">
+  <div class="todo-main-tabs" role="tablist" aria-label="Sections Todo">
+    <button
+      type="button"
+      role="tab"
+      class="todo-main-tab"
+      [class.todo-main-tab--active]="mainTab() === 'modeles'"
+      [attr.aria-selected]="mainTab() === 'modeles'"
+      (click)="setMainTab('modeles')"
+    >
+      <mat-icon aria-hidden="true">dashboard_customize</mat-icon>
+      Modèles &amp; récurrences
+    </button>
+    <button
+      type="button"
+      role="tab"
+      class="todo-main-tab"
+      [class.todo-main-tab--active]="mainTab() === 'overdue'"
+      [class.todo-main-tab--warn]="counts().overdue > 0"
+      [attr.aria-selected]="mainTab() === 'overdue'"
+      (click)="setMainTab('overdue')"
+    >
+      <mat-icon aria-hidden="true">warning_amber</mat-icon>
+      Tâches en retard
+      <span class="todo-main-tab__count">{{ counts().overdue }}</span>
+    </button>
+  </div>
+
+  @if (error()) {
+    <p class="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{{ error() }}</p>
+  }
+
+  @if (mainTab() === 'modeles') {
+  <div class="panel todo-modeles" id="todo-modeles" role="tabpanel">
     <div class="todo-modeles__header">
       <div>
         <h2 class="m-0 text-base font-semibold">Modèles de tâches simples</h2>
@@ -170,92 +207,6 @@
       </div>
     }
   </div>
-
-  <div class="todo-filters" role="tablist" aria-label="Filtrer les tâches">
-    <button
-      type="button"
-      class="todo-filter"
-      [class.todo-filter--active]="filter() === 'ACTIVE'"
-      (click)="setFilter('ACTIVE')"
-    >
-      Actives
-      <span class="todo-filter__count">{{ counts().active }}</span>
-    </button>
-    <button
-      type="button"
-      class="todo-filter"
-      [class.todo-filter--warn]="counts().overdue > 0"
-      [class.todo-filter--active]="filter() === 'OVERDUE'"
-      (click)="setFilter('OVERDUE')"
-    >
-      En retard
-      <span class="todo-filter__count">{{ counts().overdue }}</span>
-    </button>
-    <button
-      type="button"
-      class="todo-filter"
-      [class.todo-filter--active]="filter() === 'OPEN'"
-      (click)="setFilter('OPEN')"
-    >
-      Ouvertes
-      <span class="todo-filter__count">{{ counts().open }}</span>
-    </button>
-    <button
-      type="button"
-      class="todo-filter"
-      [class.todo-filter--active]="filter() === 'IN_PROGRESS'"
-      (click)="setFilter('IN_PROGRESS')"
-    >
-      En cours
-      <span class="todo-filter__count">{{ counts().inProgress }}</span>
-    </button>
-    <button
-      type="button"
-      class="todo-filter"
-      [class.todo-filter--active]="filter() === 'DONE'"
-      (click)="setFilter('DONE')"
-    >
-      Clôturées
-      <span class="todo-filter__count">{{ counts().done }}</span>
-    </button>
-    <button
-      type="button"
-      class="todo-filter"
-      [class.todo-filter--active]="filter() === 'CANCELLED'"
-      (click)="setFilter('CANCELLED')"
-    >
-      Annulées
-      <span class="todo-filter__count">{{ counts().cancelled }}</span>
-    </button>
-    <button
-      type="button"
-      class="todo-filter"
-      [class.todo-filter--active]="filter() === 'ALL'"
-      (click)="setFilter('ALL')"
-    >
-      Toutes
-      <span class="todo-filter__count">{{ counts().all }}</span>
-    </button>
-    <label class="todo-search">
-      <mat-icon class="todo-search__icon" aria-hidden="true">search</mat-icon>
-      <input
-        type="search"
-        [ngModel]="query()"
-        (ngModelChange)="onQueryChange($event)"
-        placeholder="Rechercher…"
-        aria-label="Rechercher dans les tâches"
-      />
-      @if (query()) {
-        <button type="button" class="todo-search__clear" aria-label="Effacer" (click)="clearQuery()">
-          <mat-icon>close</mat-icon>
-        </button>
-      }
-    </label>
-  </div>
-
-  @if (error()) {
-    <p class="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{{ error() }}</p>
-  }
 
   @if (showCreate()) {
     <div
@@ -492,6 +443,88 @@
       </ul>
     </div>
   }
+  } @else {
+  <div class="todo-filters" role="tablist" aria-label="Filtrer les tâches">
+    <button
+      type="button"
+      class="todo-filter"
+      [class.todo-filter--active]="filter() === 'ACTIVE'"
+      (click)="setFilter('ACTIVE')"
+    >
+      Actives
+      <span class="todo-filter__count">{{ counts().active }}</span>
+    </button>
+    <button
+      type="button"
+      class="todo-filter"
+      [class.todo-filter--warn]="counts().overdue > 0"
+      [class.todo-filter--active]="filter() === 'OVERDUE'"
+      (click)="setFilter('OVERDUE')"
+    >
+      En retard
+      <span class="todo-filter__count">{{ counts().overdue }}</span>
+    </button>
+    <button
+      type="button"
+      class="todo-filter"
+      [class.todo-filter--active]="filter() === 'OPEN'"
+      (click)="setFilter('OPEN')"
+    >
+      Ouvertes
+      <span class="todo-filter__count">{{ counts().open }}</span>
+    </button>
+    <button
+      type="button"
+      class="todo-filter"
+      [class.todo-filter--active]="filter() === 'IN_PROGRESS'"
+      (click)="setFilter('IN_PROGRESS')"
+    >
+      En cours
+      <span class="todo-filter__count">{{ counts().inProgress }}</span>
+    </button>
+    <button
+      type="button"
+      class="todo-filter"
+      [class.todo-filter--active]="filter() === 'DONE'"
+      (click)="setFilter('DONE')"
+    >
+      Clôturées
+      <span class="todo-filter__count">{{ counts().done }}</span>
+    </button>
+    <button
+      type="button"
+      class="todo-filter"
+      [class.todo-filter--active]="filter() === 'CANCELLED'"
+      (click)="setFilter('CANCELLED')"
+    >
+      Annulées
+      <span class="todo-filter__count">{{ counts().cancelled }}</span>
+    </button>
+    <button
+      type="button"
+      class="todo-filter"
+      [class.todo-filter--active]="filter() === 'ALL'"
+      (click)="setFilter('ALL')"
+    >
+      Toutes
+      <span class="todo-filter__count">{{ counts().all }}</span>
+    </button>
+    <label class="todo-search">
+      <mat-icon class="todo-search__icon" aria-hidden="true">search</mat-icon>
+      <input
+        type="search"
+        [ngModel]="query()"
+        (ngModelChange)="onQueryChange($event)"
+        placeholder="Rechercher…"
+        aria-label="Rechercher dans les tâches"
+      />
+      @if (query()) {
+        <button type="button" class="todo-search__clear" aria-label="Effacer" (click)="clearQuery()">
+          <mat-icon>close</mat-icon>
+        </button>
+      }
+    </label>
+  </div>
 
   @if (loading()) {
     <div class="flex justify-center py-10">
@@ -503,6 +536,8 @@
       <p class="mt-2 text-sm text-ink-soft">
         @if (query()) {
           Aucune tâche ne correspond à « {{ query() }} ».
+        } @else if (filter() === 'OVERDUE') {
+          Aucune tâche en retard.
         } @else if (filter() === 'ACTIVE') {
           Aucune tâche active. Créez-en une ou consultez les clôturées.
         } @else {
@@ -694,4 +729,6 @@
       }
     </ul>
   }
+  }
 </section>
+

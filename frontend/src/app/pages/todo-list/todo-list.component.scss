@@ -4,6 +4,78 @@
   gap: 0.65rem;
 }
 
+.todo-stats > .todo-stat {
+  text-align: left;
+  cursor: pointer;
+  border: 1px solid transparent;
+  width: 100%;
+  font: inherit;
+  color: inherit;
+  background: inherit;
+}
+
+.todo-stats > .todo-stat:hover {
+  border-color: color-mix(in srgb, currentColor 18%, transparent);
+}
+
+.todo-main-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.todo-main-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  border: 1px solid #d7dde5;
+  background: #fff;
+  color: #334155;
+  border-radius: 999px;
+  padding: 0.45rem 0.9rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.todo-main-tab mat-icon {
+  font-size: 1.1rem;
+  width: 1.1rem;
+  height: 1.1rem;
+}
+
+.todo-main-tab--active {
+  border-color: #2563eb;
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.todo-main-tab--warn:not(.todo-main-tab--active) {
+  border-color: #fecaca;
+  color: #b91c1c;
+}
+
+.todo-main-tab__count {
+  display: inline-flex;
+  min-width: 1.35rem;
+  justify-content: center;
+  border-radius: 999px;
+  padding: 0.05rem 0.4rem;
+  font-size: 0.75rem;
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+.todo-main-tab--active .todo-main-tab__count {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.todo-main-tab--warn .todo-main-tab__count {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
 @media (min-width: 640px) {
   .todo-stats {
     grid-template-columns: repeat(5, minmax(0, 1fr));
