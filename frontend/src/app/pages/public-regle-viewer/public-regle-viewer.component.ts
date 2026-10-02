@@ -1,4 +1,4 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
@@ -14,7 +14,7 @@ import { apiErrorMessage } from '../../shared/api-error';
 
 /**
  * Visionneuse publique PDF/image d'une règle (jeton QR, lecture seule).
- * Utilise l'URL API directe (mobile-friendly) + bouton Ouvrir.
+ * Affiche le document dans le champ prévu — pas de téléchargement.
  */
 @Component({
   selector: 'app-public-regle-viewer',
@@ -23,16 +23,18 @@ import { apiErrorMessage } from '../../shared/api-error';
   templateUrl: './public-regle-viewer.component.html',
   styleUrl: './public-regle-viewer.component.scss'
 })
-export class PublicRegleViewerComponent implements OnInit {
+export class PublicRegleViewerComponent implements OnInit, OnDestroy {
   private readonly route = inject(ActivatedRoute);
   private readonly publicApi = inject(PublicMasReglesService);
   private readonly sanitizer = inject(DomSanitizer);
 
   readonly loading = signal(true);
+  readonly docLoading = signal(false);
   readonly error = signal<string | null>(null);
   readonly token = signal('');
   readonly regle = signal<PublicRegleJeux | null>(null);
   readonly masNumero = signal('');
+  readonly objectUrl = signal<string | null>(null);
 
   readonly isImage = computed(() => {
     const it = this.regle();
@@ -44,17 +46,8 @@ export class PublicRegleViewerComponent implements OnInit {
     return ct.startsWith('image/') || /\.(png|jpe?g|webp|gif)$/.test(name);
   });
 
-  readonly fileUrl = computed((): string | null => {
-    const token = this.token();
-    const regle = this.regle();
-    if (!token || !regle) {
-      return null;
-    }
-    return this.publicApi.fileUrl(token, regle.id);
-  });
-
-  readonly safeEmbedUrl = computed((): SafeResourceUrl | null => {
-    const url = this.fileUrl();
+  readonly safePdfUrl = computed((): SafeResourceUrl | null => {
+    const url = this.objectUrl();
     if (!url || this.isImage()) {
       return null;
     }
@@ -78,7 +71,9 @@ export class PublicRegleViewerComponent implements OnInit {
         this.loading.set(false);
         if (!found) {
           this.error.set('Règle introuvable pour ce lien.');
+          return;
         }
+        this.loadDocument(token, regleId, found);
       },
       error: (err) => {
         this.loading.set(false);
@@ -87,8 +82,57 @@ export class PublicRegleViewerComponent implements OnInit {
     });
   }
 
-  downloadName(): string {
-    const r = this.regle();
-    return r?.originalName || r?.label || 'regle-jeux.pdf';
+  ngOnDestroy(): void {
+    this.revokeObjectUrl();
   }
+
+  private loadDocument(token: string, regleId: number, item: PublicRegleJeux): void {
+    this.docLoading.set(true);
+    this.revokeObjectUrl();
+    this.publicApi.downloadFile(token, regleId).subscribe({
+      next: (blob) => {
+        this.docLoading.set(false);
+        if (!blob || blob.size === 0 || (blob.type && blob.type.includes('json'))) {
+          this.error.set('Document indisponible.');
+          return;
+        }
+        const wantsImage = this.isImageContent(item, blob);
+        const mime = wantsImage
+          ? firstNonBlank(blob.type, item.contentType, 'image/jpeg')!
+          : 'application/pdf';
+        if (!item.contentType) {
+          this.regle.update((cur) => (cur ? { ...cur, contentType: mime } : cur));
+        }
+        const typed = blob.type === mime ? blob : new Blob([blob], { type: mime });
+        this.objectUrl.set(URL.createObjectURL(typed));
+      },
+      error: (err) => {
+        this.docLoading.set(false);
+        this.error.set(apiErrorMessage(err, 'Document indisponible.'));
+      }
+    });
+  }
+
+  private isImageContent(item: PublicRegleJeux, blob: Blob): boolean {
+    const ct = (item.contentType || blob.type || '').toLowerCase();
+    const name = (item.originalName || '').toLowerCase();
+    return ct.startsWith('image/') || /\.(png|jpe?g|webp|gif)$/.test(name);
+  }
+
+  private revokeObjectUrl(): void {
+    const url = this.objectUrl();
+    if (url) {
+      URL.revokeObjectURL(url);
+      this.objectUrl.set(null);
+    }
+  }
+}
+
+function firstNonBlank(...values: Array<string | null | undefined>): string | null {
+  for (const v of values) {
+    if (v && v.trim()) {
+      return v.trim();
+    }
+  }
+  return null;
 }
