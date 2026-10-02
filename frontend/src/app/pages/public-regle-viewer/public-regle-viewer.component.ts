@@ -14,7 +14,7 @@ import { apiErrorMessage } from '../../shared/api-error';
 
 /**
  * Visionneuse publique PDF/image d'une règle (jeton QR, lecture seule).
- * PDF rendu en canvas (pdf.js) pour fonctionner aussi sur mobile.
+ * Sur mobile : plein écran immersif + zoom (pinch / molette).
  */
 @Component({
   selector: 'app-public-regle-viewer',
@@ -43,6 +43,8 @@ export class PublicRegleViewerComponent implements OnInit, OnDestroy {
   readonly masNumero = signal('');
   readonly objectUrl = signal<string | null>(null);
   readonly pdfBlob = signal<Blob | null>(null);
+  /** Plein écran immersif (mobile ou ouverture manuelle). */
+  readonly fullscreen = signal(false);
 
   readonly isImage = computed(() => {
     const it = this.regle();
@@ -54,7 +56,26 @@ export class PublicRegleViewerComponent implements OnInit, OnDestroy {
     return ct.startsWith('image/') || /\.(png|jpe?g|webp|gif)$/.test(name);
   });
 
+  readonly isMobile = signal(
+    typeof window !== 'undefined' && window.matchMedia('(max-width: 768px)').matches
+  );
+
+  private mediaQuery: MediaQueryList | null = null;
+  private mediaListener: ((ev: MediaQueryListEvent) => void) | null = null;
+
   ngOnInit(): void {
+    if (typeof window !== 'undefined') {
+      this.mediaQuery = window.matchMedia('(max-width: 768px)');
+      this.isMobile.set(this.mediaQuery.matches);
+      this.mediaListener = (ev) => {
+        this.isMobile.set(ev.matches);
+        if (ev.matches && this.regle() && !this.docLoading()) {
+          this.fullscreen.set(true);
+        }
+      };
+      this.mediaQuery.addEventListener('change', this.mediaListener);
+    }
+
     const token = (this.route.snapshot.paramMap.get('token') || '').trim();
     const regleId = Number(this.route.snapshot.paramMap.get('regleId'));
     this.token.set(token);
@@ -84,6 +105,23 @@ export class PublicRegleViewerComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.revokeObjectUrl();
+    if (this.mediaQuery && this.mediaListener) {
+      this.mediaQuery.removeEventListener('change', this.mediaListener);
+    }
+    document.body.classList.remove('regle-fs-lock');
+    document.body.style.overflow = '';
+  }
+
+  openFullscreen(): void {
+    this.fullscreen.set(true);
+    document.body.classList.add('regle-fs-lock');
+    document.body.style.overflow = 'hidden';
+  }
+
+  closeFullscreen(): void {
+    this.fullscreen.set(false);
+    document.body.classList.remove('regle-fs-lock');
+    document.body.style.overflow = '';
   }
 
   private loadDocument(token: string, regleId: number, item: PublicRegleJeux): void {
@@ -109,6 +147,10 @@ export class PublicRegleViewerComponent implements OnInit, OnDestroy {
           this.objectUrl.set(URL.createObjectURL(typed));
         } else {
           this.pdfBlob.set(typed);
+        }
+        // Mobile QR : ouvrir directement en plein écran zoomable.
+        if (this.isMobile()) {
+          this.openFullscreen();
         }
       },
       error: (err) => {

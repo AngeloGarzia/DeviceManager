@@ -1,56 +1,118 @@
-<section class="public-shell">
-  <header class="public-shell__header">
-    <div class="public-shell__brand">DeviceManager</div>
-    <p class="public-shell__hint">Consultation des règles de jeux — lecture seule</p>
-  </header>
+<section class="public-shell" [class.public-shell--fs]="fullscreen()">
+  @if (!fullscreen()) {
+    <header class="public-shell__header">
+      <div class="public-shell__brand">DeviceManager</div>
+      <p class="public-shell__hint">Consultation des règles de jeux — lecture seule</p>
+    </header>
 
-  <a mat-button class="!justify-self-start !pl-0" [routerLink]="['/public/r', token()]">
-    <mat-icon>arrow_back</mat-icon>
-    Retour aux règles
-  </a>
+    <a mat-button class="!justify-self-start !pl-0" [routerLink]="['/public/r', token()]">
+      <mat-icon>arrow_back</mat-icon>
+      Retour aux règles
+    </a>
+  }
 
   @if (loading()) {
     <div class="flex justify-center py-12"><mat-spinner diameter="40"></mat-spinner></div>
   } @else if (!regle()) {
     <p class="public-shell__error">{{ error() || 'Règle introuvable.' }}</p>
   } @else {
-    <header class="public-shell__title-block">
-      <p class="public-shell__kicker">MAS {{ masNumero() }}</p>
-      <h1 class="public-shell__title">{{ regle()!.label }}</h1>
-      @if (regle()!.description) {
-        <p class="public-shell__subtitle">{{ regle()!.description }}</p>
-      }
-    </header>
+    @if (!fullscreen()) {
+      <header class="public-shell__title-block">
+        <p class="public-shell__kicker">MAS {{ masNumero() }}</p>
+        <h1 class="public-shell__title">{{ regle()!.label }}</h1>
+        @if (regle()!.description) {
+          <p class="public-shell__subtitle">{{ regle()!.description }}</p>
+        }
+      </header>
+    }
 
-    @if (error()) {
+    @if (error() && !fullscreen()) {
       <p class="public-shell__error">{{ error() }}</p>
     }
 
-    <mat-card class="regle-viewer-card !rounded-xl !border !border-line !shadow-soft">
-      <mat-card-content class="!pt-4">
-        <div class="regle-viewer-field__label">
-          <mat-icon>{{ isImage() ? 'image' : 'picture_as_pdf' }}</mat-icon>
-          <span>Document — {{ isImage() ? 'Image' : 'PDF' }}</span>
-        </div>
-        <div class="regle-viewer-field" [attr.data-kind]="isImage() ? 'image' : 'pdf'">
-          @if (docLoading()) {
-            <div class="regle-viewer-field__loading">
-              <mat-spinner diameter="36"></mat-spinner>
-              <span>Chargement…</span>
-            </div>
-          } @else if (isImage() && objectUrl()) {
-            <img
-              class="regle-viewer-field__image"
-              [src]="objectUrl()!"
-              [alt]="regle()!.originalName || regle()!.label"
-            />
-          } @else if (pdfBlob()) {
-            <app-pdf-inline-viewer [source]="pdfBlob()"></app-pdf-inline-viewer>
-          } @else {
-            <p class="regle-viewer-field__empty">Aucun document à afficher.</p>
-          }
-        </div>
-      </mat-card-content>
-    </mat-card>
+    @if (!fullscreen()) {
+      <mat-card class="regle-viewer-card !rounded-xl !border !border-line !shadow-soft">
+        <mat-card-content class="!pt-4">
+          <div class="regle-viewer-field__label">
+            <mat-icon>{{ isImage() ? 'image' : 'picture_as_pdf' }}</mat-icon>
+            <span>Document — {{ isImage() ? 'Image' : 'PDF' }}</span>
+            <button
+              mat-stroked-button
+              type="button"
+              class="regle-viewer-field__fs-btn"
+              (click)="openFullscreen()"
+              [disabled]="docLoading() || (!objectUrl() && !pdfBlob())"
+            >
+              <mat-icon>fullscreen</mat-icon>
+              Plein écran
+            </button>
+          </div>
+          <div
+            class="regle-viewer-field"
+            [attr.data-kind]="isImage() ? 'image' : 'pdf'"
+            role="button"
+            tabindex="0"
+            (click)="openFullscreen()"
+            (keydown.enter)="openFullscreen()"
+          >
+            @if (docLoading()) {
+              <div class="regle-viewer-field__loading">
+                <mat-spinner diameter="36"></mat-spinner>
+                <span>Chargement…</span>
+              </div>
+            } @else if (isImage() && objectUrl()) {
+              <img
+                class="regle-viewer-field__image"
+                [src]="objectUrl()!"
+                [alt]="regle()!.originalName || regle()!.label"
+              />
+            } @else if (pdfBlob()) {
+              <app-pdf-inline-viewer [source]="pdfBlob()" [zoomable]="false"></app-pdf-inline-viewer>
+            } @else {
+              <p class="regle-viewer-field__empty">Aucun document à afficher.</p>
+            }
+          </div>
+          <p class="regle-viewer-field__hint">Touchez le document pour l’ouvrir en plein écran (zoom possible).</p>
+        </mat-card-content>
+      </mat-card>
+    }
   }
 </section>
+
+@if (fullscreen() && regle()) {
+  <div class="regle-fs" role="dialog" aria-modal="true" [attr.aria-label]="regle()!.label">
+    <header class="regle-fs__bar">
+      <button mat-icon-button type="button" (click)="closeFullscreen()" aria-label="Fermer le plein écran">
+        <mat-icon>close</mat-icon>
+      </button>
+      <div class="regle-fs__meta">
+        <span class="regle-fs__kicker">MAS {{ masNumero() }}</span>
+        <span class="regle-fs__title">{{ regle()!.label }}</span>
+      </div>
+      <a mat-icon-button [routerLink]="['/public/r', token()]" aria-label="Retour aux règles">
+        <mat-icon>arrow_back</mat-icon>
+      </a>
+    </header>
+    <div class="regle-fs__stage" [attr.data-kind]="isImage() ? 'image' : 'pdf'">
+      @if (docLoading()) {
+        <div class="regle-fs__loading">
+          <mat-spinner diameter="40"></mat-spinner>
+          <span>Chargement…</span>
+        </div>
+      } @else if (error()) {
+        <p class="regle-fs__error">{{ error() }}</p>
+      } @else if (isImage() && objectUrl()) {
+        <div class="regle-fs__image-wrap">
+          <img
+            class="regle-fs__image"
+            [src]="objectUrl()!"
+            [alt]="regle()!.originalName || regle()!.label"
+          />
+        </div>
+      } @else if (pdfBlob()) {
+        <app-pdf-inline-viewer [source]="pdfBlob()" [zoomable]="true"></app-pdf-inline-viewer>
+      }
+    </div>
+    <p class="regle-fs__hint">Pincez pour zoomer · glissez pour déplacer</p>
+  </div>
+}
