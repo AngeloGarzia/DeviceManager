@@ -25,6 +25,20 @@ export const routes: Routes = [
       import('./pages/privacy/privacy.component').then((m) => m.PrivacyComponent)
   },
   {
+    path: 'public/r/:token',
+    loadComponent: () =>
+      import('./pages/public-mas-regles/public-mas-regles.component').then(
+        (m) => m.PublicMasReglesComponent
+      )
+  },
+  {
+    path: 'public/r/:token/regles/:regleId',
+    loadComponent: () =>
+      import('./pages/public-regle-viewer/public-regle-viewer.component').then(
+        (m) => m.PublicRegleViewerComponent
+      )
+  },
+  {
     path: 'change-password',
     canActivate: [requirePasswordChangeGuard],
     loadComponent: () =>
@@ -115,6 +129,11 @@ export const routes: Routes = [
         loadComponent: () => import('./pages/mas-list/mas-list.component').then((m) => m.MasListComponent)
       },
       {
+        path: 'mas/etiquettes-qr',
+        loadComponent: () =>
+          import('./pages/mas-qr-labels/mas-qr-labels.component').then((m) => m.MasQrLabelsComponent)
+      },
+      {
         path: 'mas/suivi',
         loadComponent: () =>
           import('./pages/mas-suivi/mas-suivi.component').then((m) => m.MasSuiviComponent)
@@ -130,6 +149,13 @@ export const routes: Routes = [
         path: 'mas/regles-jeux',
         loadComponent: () =>
           import('./pages/regles-jeux/regles-jeux.component').then((m) => m.ReglesJeuxComponent)
+      },
+      {
+        path: 'mas/regles-jeux/:id',
+        loadComponent: () =>
+          import('./pages/regle-jeux-viewer/regle-jeux-viewer.component').then(
+            (m) => m.RegleJeuxViewerComponent
+          )
       },
       {
         path: 'mas/visites-quadri',
@@ -218,7 +244,6 @@ export const routes: Routes = [
       },
       {
         path: 'setup',
-        canActivate: [adminGuard],
         loadComponent: () => import('./pages/setup/setup.component').then((m) => m.SetupComponent)
       },
       {

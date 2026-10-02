@@ -1,6 +1,7 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
+import { Router, RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -11,14 +12,14 @@ import { MatSelectModule } from '@angular/material/select';
 import { Mas, RegleJeuxOption } from '../../models/models';
 import { MasService } from '../../services/mas.service';
 import { apiErrorMessage } from '../../shared/api-error';
-import { isPdfFile, PDF_ACCEPT } from '../../shared/document-upload';
+import { isPdfOrImageFile, PDF_OR_IMAGE_ACCEPT } from '../../shared/document-upload';
 import {
   RegleJeuxAiDialogComponent,
   RegleJeuxAiDialogConfirm
 } from '../../shared/regle-jeux-ai-dialog.component';
 
 /**
- * Catalogue global des règles de jeux (PDF) — gestion depuis le menu MAS.
+ * Catalogue global des règles de jeux (PDF ou image) — gestion depuis le menu MAS.
  */
 @Component({
   selector: 'app-regles-jeux',
@@ -27,6 +28,7 @@ import {
     CommonModule,
     FormsModule,
     ReactiveFormsModule,
+    RouterLink,
     MatButtonModule,
     MatCardModule,
     MatFormFieldModule,
@@ -42,6 +44,7 @@ import {
 export class ReglesJeuxComponent implements OnInit {
   private readonly fb = inject(FormBuilder);
   private readonly masService = inject(MasService);
+  private readonly router = inject(Router);
 
   readonly items = signal<RegleJeuxOption[]>([]);
   readonly searchQuery = signal('');
@@ -61,7 +64,7 @@ export class ReglesJeuxComponent implements OnInit {
   readonly linkingRegleId = signal<number | null>(null);
   readonly masses = signal<Mas[]>([]);
   readonly loadingMasLinks = signal(false);
-  readonly pdfAccept = PDF_ACCEPT;
+  readonly fileAccept = PDF_OR_IMAGE_ACCEPT;
 
   readonly aiDialogOpen = signal(false);
   readonly aiScanning = signal(false);
@@ -124,8 +127,8 @@ export class ReglesJeuxComponent implements OnInit {
     if (!file) {
       return;
     }
-    if (!isPdfFile(file)) {
-      this.error.set('La règle de jeux doit être un fichier PDF.');
+    if (!isPdfOrImageFile(file)) {
+      this.error.set('La règle de jeux doit être un PDF ou une image.');
       return;
     }
     this.pendingCreateFile = file;
@@ -177,7 +180,7 @@ export class ReglesJeuxComponent implements OnInit {
 
   confirmAiDialog(payload: RegleJeuxAiDialogConfirm): void {
     if (!this.pendingCreateFile) {
-      this.error.set('Fichier PDF manquant.');
+      this.error.set('Fichier manquant.');
       this.cancelAiDialog();
       return;
     }
@@ -299,8 +302,8 @@ export class ReglesJeuxComponent implements OnInit {
     if (!file || id == null) {
       return;
     }
-    if (!isPdfFile(file)) {
-      this.error.set('Le document doit être un fichier PDF.');
+    if (!isPdfOrImageFile(file)) {
+      this.error.set('Le document doit être un PDF ou une image.');
       return;
     }
     this.saving.set(true);
@@ -309,12 +312,12 @@ export class ReglesJeuxComponent implements OnInit {
     this.masService.replaceRegleJeuxDocument(id, file).subscribe({
       next: () => {
         this.saving.set(false);
-        this.success.set('PDF remplacé.');
+        this.success.set('Document remplacé.');
         this.reload();
       },
       error: (err) => {
         this.saving.set(false);
-        this.error.set(apiErrorMessage(err, 'Remplacement du PDF impossible.'));
+        this.error.set(apiErrorMessage(err, 'Remplacement du document impossible.'));
       }
     });
   }
@@ -342,32 +345,14 @@ export class ReglesJeuxComponent implements OnInit {
     });
   }
 
-  openPdf(item: RegleJeuxOption): void {
-    this.error.set(null);
-    this.masService.downloadRegleJeuxPdf(item.id).subscribe({
-      next: (blob) => {
-        if (!blob || blob.size === 0) {
-          this.error.set('PDF vide ou introuvable — remplacez le document.');
-          return;
-        }
-        if (blob.type && blob.type.includes('json')) {
-          this.error.set('PDF introuvable dans le stockage — remplacez le document.');
-          return;
-        }
-        const url = URL.createObjectURL(blob);
-        const opened = window.open(url, '_blank', 'noopener');
-        if (!opened) {
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = item.originalName || 'regle-jeux.pdf';
-          a.click();
-        }
-        setTimeout(() => URL.revokeObjectURL(url), 60_000);
-      },
-      error: (err) => {
-        this.error.set(apiErrorMessage(err, 'PDF introuvable dans le stockage — remplacez le document.'));
-      }
-    });
+  openDocument(item: RegleJeuxOption): void {
+    void this.router.navigate(['/mas/regles-jeux', item.id]);
+  }
+
+  isImageDoc(item: RegleJeuxOption): boolean {
+    const ct = (item.contentType || '').toLowerCase();
+    const name = (item.originalName || '').toLowerCase();
+    return ct.startsWith('image/') || /\.(png|jpe?g|webp|gif)$/.test(name);
   }
 
   canDelete(item: RegleJeuxOption): boolean {

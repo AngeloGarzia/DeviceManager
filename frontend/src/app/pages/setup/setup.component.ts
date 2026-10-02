@@ -34,14 +34,14 @@ import { AuthService } from '../../services/auth.service';
 import { AiModelOption, AiService } from '../../services/ai.service';
 import { AdminLogEntry, AdminLogService } from '../../services/admin-log.service';
 import { AppTourService } from '../../services/app-tour.service';
+import { CameraPreferencesService } from '../../services/camera-preferences.service';
 import { ConfirmDialogComponent } from '../../shared/confirm-dialog.component';
 import { apiErrorMessage } from '../../shared/api-error';
 import { MasExcelImportComponent } from './mas-excel-import.component';
 
 /**
- * Page d'administration initiale et des paramètres applicatifs.
- * Permet la configuration mail, S3, IA, la gestion des ateliers,
- * la consultation des logs SLF4J en base, et l'accès réservé aux administrateurs.
+ * Page des paramètres : préférences caméra (tous les utilisateurs) et
+ * administration (ateliers, mail, S3, IA, logs) réservée aux administrateurs.
  * Les tuiles sont repliées par défaut.
  */
 @Component({
@@ -74,9 +74,16 @@ export class SetupComponent implements OnInit, OnDestroy {
   readonly auth = inject(AuthService);
   private readonly fb = inject(FormBuilder);
   private readonly tour = inject(AppTourService);
+  private readonly cameraPrefs = inject(CameraPreferencesService);
 
   /** Tuiles ouvertes (vide = toutes fermées par défaut). */
   private readonly openTiles = signal<Set<string>>(new Set());
+
+  readonly cameras = signal<MediaDeviceInfo[]>([]);
+  readonly selectedCameraId = signal<string | null>(null);
+  readonly camerasLoading = signal(false);
+  readonly camerasError = signal<string | null>(null);
+  readonly cameraSaved = signal(false);
 
   readonly loading = signal(false);
   readonly saving = signal(false);
@@ -251,23 +258,28 @@ export class SetupComponent implements OnInit, OnDestroy {
     return this.atelierForm.get('reseauxSociaux') as FormArray;
   }
 
-  /** Charge les paramètres applicatifs (super-admin) et les ateliers (tout admin). */
+  /** Charge les paramètres admin (si admin) — la caméra est locale pour tous. */
   ngOnInit(): void {
-    if (this.auth.isSuperAdmin()) {
-      this.aiService.status().subscribe({
-        next: () => {
-          const provider = (this.form.get('AI_PROVIDER')?.value || this.selectedAiProvider() || 'openai').toString();
-          this.loadOnlineAiModels(provider, false);
-        },
-        error: () => {
-          /* statut déjà géré dans AiService */
-        }
-      });
-      this.load();
+    this.selectedCameraId.set(this.cameraPrefs.getPreferredDeviceId());
+    if (this.auth.isAdmin()) {
+      if (this.auth.isSuperAdmin()) {
+        this.aiService.status().subscribe({
+          next: () => {
+            const provider = (this.form.get('AI_PROVIDER')?.value || this.selectedAiProvider() || 'openai').toString();
+            this.loadOnlineAiModels(provider, false);
+          },
+          error: () => {
+            /* statut déjà géré dans AiService */
+          }
+        });
+        this.load();
+      } else {
+        this.loading.set(false);
+      }
+      this.loadAteliers();
     } else {
       this.loading.set(false);
     }
-    this.loadAteliers();
   }
 
   ngOnDestroy(): void {
@@ -289,9 +301,62 @@ export class SetupComponent implements OnInit, OnDestroy {
         if (id === 'logs' && !this.logsLoadedOnce) {
           this.reloadLogs();
         }
+        if (id === 'camera') {
+          void this.refreshCameras();
+        }
       }
       return next;
     });
+  }
+
+  cameraLabel(device: MediaDeviceInfo, index: number): string {
+    return this.cameraPrefs.cameraLabel(device, index);
+  }
+
+  async refreshCameras(): Promise<void> {
+    if (!navigator.mediaDevices?.enumerateDevices) {
+      this.camerasError.set('Ce navigateur ne permet pas de lister les caméras.');
+      return;
+    }
+    this.camerasLoading.set(true);
+    this.camerasError.set(null);
+    this.cameraSaved.set(false);
+    try {
+      // Débloque les labels (permission) sans garder le flux ouvert.
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+      stream.getTracks().forEach((t) => t.stop());
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const videoInputs = devices.filter((d) => d.kind === 'videoinput');
+      this.cameras.set(videoInputs);
+      const preferred = this.cameraPrefs.getPreferredDeviceId();
+      if (preferred && videoInputs.some((d) => d.deviceId === preferred)) {
+        this.selectedCameraId.set(preferred);
+      } else if (!this.selectedCameraId() && videoInputs.length > 0) {
+        const rear = videoInputs.find((d) =>
+          /back|rear|environment|arri[eè]re|world/i.test(d.label)
+        );
+        this.selectedCameraId.set(rear?.deviceId ?? videoInputs[0].deviceId);
+      }
+      if (videoInputs.length === 0) {
+        this.camerasError.set('Aucune caméra détectée sur cet appareil.');
+      }
+    } catch {
+      this.camerasError.set(
+        "Impossible d'accéder à la caméra. Autorisez l'accès dans le navigateur, puis réessayez."
+      );
+    } finally {
+      this.camerasLoading.set(false);
+    }
+  }
+
+  onCameraSelectionChange(deviceId: string): void {
+    this.selectedCameraId.set(deviceId || null);
+    this.cameraSaved.set(false);
+  }
+
+  saveCameraPreference(): void {
+    this.cameraPrefs.setPreferredDeviceId(this.selectedCameraId());
+    this.cameraSaved.set(true);
   }
 
   /** Relance le parcours guidé multi-pages. */

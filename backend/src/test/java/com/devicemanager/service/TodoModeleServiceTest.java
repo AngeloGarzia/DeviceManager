@@ -64,12 +64,12 @@ class TodoModeleServiceTest {
                 .build();
         when(atelierService.requireCurrentAtelier()).thenReturn(atelier);
         when(todoModeleRepository.findByIdAndAtelierId(5L, atelier.getId())).thenReturn(Optional.of(modele));
-        when(todoService.create(any(), any())).thenReturn(
+        when(todoService.create(any(), any(), any())).thenReturn(
                 TodoTacheResponse.builder().id(99L).titre("Nettoyage filtres").statut("OPEN").build());
 
         TodoTacheResponse created = todoModeleService.utiliser(5L, "tech");
 
         assertThat(created.getId()).isEqualTo(99L);
-        verify(todoService).create(any(), org.mockito.ArgumentMatchers.eq("tech"));
+        verify(todoService).create(any(), any(), org.mockito.ArgumentMatchers.eq("tech"));
     }
 }

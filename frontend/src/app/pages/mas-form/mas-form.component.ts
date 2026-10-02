@@ -21,7 +21,7 @@ import {
   RegleJeuxOption
 } from '../../models/models';
 import { apiErrorMessage } from '../../shared/api-error';
-import { isPdfFile, PDF_ACCEPT } from '../../shared/document-upload';
+import { isPdfOrImageFile, PDF_OR_IMAGE_ACCEPT } from '../../shared/document-upload';
 import {
   RegleJeuxAiDialogComponent,
   RegleJeuxAiDialogConfirm
@@ -95,7 +95,7 @@ export class MasFormComponent implements OnInit {
   readonly reglesJeux = signal<RegleJeuxOption[]>([]);
   readonly statutOptions = MAS_STATUT_OPTIONS;
   readonly typeOptions = MAS_TYPE_OPTIONS;
-  readonly pdfAccept = PDF_ACCEPT;
+  readonly fileAccept = PDF_OR_IMAGE_ACCEPT;
   readonly aiDialogOpen = signal(false);
   readonly aiScanning = signal(false);
   readonly aiScanNotes = signal<string | null>(null);
@@ -401,8 +401,8 @@ export class MasFormComponent implements OnInit {
     if (!file) {
       return;
     }
-    if (!isPdfFile(file)) {
-      this.error.set('La règle de jeux doit être un fichier PDF.');
+    if (!isPdfOrImageFile(file)) {
+      this.error.set('La règle de jeux doit être un PDF ou une image.');
       return;
     }
     this.pendingRegleJeuxFile = file;
@@ -450,7 +450,7 @@ export class MasFormComponent implements OnInit {
 
   confirmRegleJeuxDialog(payload: RegleJeuxAiDialogConfirm): void {
     if (!this.pendingRegleJeuxFile) {
-      this.error.set('Fichier PDF manquant.');
+      this.error.set('Fichier manquant.');
       this.cancelRegleJeuxDialog();
       return;
     }

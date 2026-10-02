@@ -1,0 +1,60 @@
+<section class="public-shell">
+  <header class="public-shell__header">
+    <div class="public-shell__brand">DeviceManager</div>
+    <p class="public-shell__hint">Consultation des règles de jeux — lecture seule</p>
+  </header>
+
+  <a mat-button class="!justify-self-start !pl-0" [routerLink]="['/public/r', token()]">
+    <mat-icon>arrow_back</mat-icon>
+    Retour aux règles
+  </a>
+
+  @if (loading()) {
+    <div class="flex justify-center py-12"><mat-spinner diameter="40"></mat-spinner></div>
+  } @else if (!regle()) {
+    <p class="public-shell__error">{{ error() || 'Règle introuvable.' }}</p>
+  } @else {
+    <header class="public-shell__title-block">
+      <p class="public-shell__kicker">MAS {{ masNumero() }}</p>
+      <h1 class="public-shell__title">{{ regle()!.label }}</h1>
+      @if (regle()!.description) {
+        <p class="public-shell__subtitle">{{ regle()!.description }}</p>
+      }
+    </header>
+
+    @if (error()) {
+      <p class="public-shell__error">{{ error() }}</p>
+    }
+
+    <mat-card class="regle-viewer-card !rounded-xl !border !border-line !shadow-soft">
+      <mat-card-content class="!pt-4">
+        <div class="regle-viewer-field__label">
+          <mat-icon>{{ isImage() ? 'image' : 'picture_as_pdf' }}</mat-icon>
+          <span>Document — {{ isImage() ? 'Image' : 'PDF' }}</span>
+        </div>
+        <div class="regle-viewer-field" [attr.data-kind]="isImage() ? 'image' : 'pdf'">
+          @if (docLoading()) {
+            <div class="regle-viewer-field__loading">
+              <mat-spinner diameter="36"></mat-spinner>
+              <span>Chargement…</span>
+            </div>
+          } @else if (isImage() && objectUrl()) {
+            <img
+              class="regle-viewer-field__image"
+              [src]="objectUrl()!"
+              [alt]="regle()!.originalName || regle()!.label"
+            />
+          } @else if (safePdfUrl()) {
+            <iframe
+              class="regle-viewer-field__pdf"
+              [src]="safePdfUrl()"
+              title="Document de la règle de jeux"
+            ></iframe>
+          } @else {
+            <p class="regle-viewer-field__empty">Aucun document à afficher.</p>
+          }
+        </div>
+      </mat-card-content>
+    </mat-card>
+  }
+</section>

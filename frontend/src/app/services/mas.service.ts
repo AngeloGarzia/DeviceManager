@@ -113,6 +113,20 @@ export class MasService {
     return this.http.post<Mas>(`${this.base}/${id}/bon-destruction`, form);
   }
 
+  ensurePublicAccessToken(id: number): Observable<{ token: string; publicPath: string }> {
+    return this.http.post<{ token: string; publicPath: string }>(
+      `${this.base}/${id}/public-access-token`,
+      {}
+    );
+  }
+
+  rotatePublicAccessToken(id: number): Observable<{ token: string; publicPath: string }> {
+    return this.http.post<{ token: string; publicPath: string }>(
+      `${this.base}/${id}/public-access-token/rotate`,
+      {}
+    );
+  }
+
   resolveFileUrl(fileUrl?: string | null): string {
     if (!fileUrl) {
       return '';

@@ -75,4 +75,14 @@ public interface MasRepository extends JpaRepository<Mas, Long> {
             ORDER BY m.numero
             """)
     List<Mas> findAllByRegleJeuxIdAndAtelierId(@Param("regleId") Long regleId, @Param("atelierId") Long atelierId);
+
+    @Query("""
+            SELECT DISTINCT m FROM Mas m
+            JOIN FETCH m.marque
+            LEFT JOIN FETCH m.reglesJeux
+            WHERE m.publicAccessToken = :token
+            """)
+    Optional<Mas> findByPublicAccessTokenWithRegles(@Param("token") String token);
+
+    boolean existsByPublicAccessToken(String publicAccessToken);
 }

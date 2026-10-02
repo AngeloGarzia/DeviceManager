@@ -116,6 +116,7 @@ public class SecurityConfig {
                         .requestMatchers("/actuator/metrics", "/actuator/metrics/**").hasRole(Roles.SUPER_ADMIN)
                         .requestMatchers("/uploads/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/privacy").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/public/**").permitAll()
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/api/auth/change-password", "/api/auth/accept-privacy").authenticated()
                         .requestMatchers("/api/users", "/api/users/**").hasRole(Roles.ADMIN)

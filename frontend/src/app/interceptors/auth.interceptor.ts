@@ -10,10 +10,15 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
     req.url.includes('/api/auth/refresh') ||
     req.url.includes('/api/auth/logout') ||
     req.url.includes('/api/auth/forgot-password') ||
-    req.url.includes('/api/auth/reset-password');
+    req.url.includes('/api/auth/reset-password') ||
+    req.url.includes('/api/public/') ||
+    req.url.includes('/api/privacy');
 
   const buildHeaders = (): Record<string, string> => {
     const headers: Record<string, string> = {};
+    if (isAuthPublic || req.url.includes('/api/public/')) {
+      return headers;
+    }
     const token = auth.getToken();
     const atelierId = auth.getAtelierId();
     if (token && !auth.isTokenExpired(token)) {
@@ -27,7 +32,7 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
 
   const authReq = req.clone({
     setHeaders: buildHeaders(),
-    withCredentials: true
+    withCredentials: !req.url.includes('/api/public/')
   });
 
   return next(authReq).pipe(

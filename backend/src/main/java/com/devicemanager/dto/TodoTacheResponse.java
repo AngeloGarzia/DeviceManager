@@ -4,6 +4,7 @@ import lombok.Builder;
 import lombok.Data;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 /**
  * Tâche « À faire » exposée par l'API.
@@ -56,4 +57,7 @@ public class TodoTacheResponse {
     private String occurrenceKey;
     /** true si due_at dépassée et statut encore ouvert. */
     private boolean overdue;
+
+    /** Captures caméra (0 à 5), optionnelles. */
+    private List<TodoTachePhotoResponse> photos;
 }

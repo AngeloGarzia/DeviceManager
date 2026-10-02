@@ -1,0 +1,25 @@
+.qr-label-table {
+  border-collapse: collapse;
+
+  th,
+  td {
+    padding: 0.55rem 0.75rem;
+    border-bottom: 1px solid #e2e8f0;
+    text-align: left;
+  }
+
+  th {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #829ab1;
+    background: #f8fafc;
+  }
+}
+
+.qr-label-repeats {
+  width: 4rem;
+  padding: 0.35rem 0.45rem;
+  border: 1px solid #d9e2ec;
+  border-radius: 0.4rem;
+}

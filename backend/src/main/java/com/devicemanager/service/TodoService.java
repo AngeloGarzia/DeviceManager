@@ -2,6 +2,7 @@ package com.devicemanager.service;
 
 import com.devicemanager.dto.TodoListResponse;
 import com.devicemanager.dto.TodoTacheLinkRequest;
+import com.devicemanager.dto.TodoTachePhotoResponse;
 import com.devicemanager.dto.TodoTacheRequest;
 import com.devicemanager.dto.TodoTacheResponse;
 import com.devicemanager.dto.TodoTacheStatusRequest;
@@ -10,6 +11,7 @@ import com.devicemanager.entity.Intervention;
 import com.devicemanager.entity.InterventionTechnique;
 import com.devicemanager.entity.Mas;
 import com.devicemanager.entity.TodoTache;
+import com.devicemanager.entity.TodoTachePhoto;
 import com.devicemanager.entity.TodoTacheStatut;
 import com.devicemanager.entity.User;
 import com.devicemanager.repository.InterventionRepository;
@@ -22,15 +24,18 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.Set;
 
 /**
@@ -42,6 +47,7 @@ import java.util.Set;
 @Slf4j
 public class TodoService {
 
+    public static final int MAX_PHOTOS = 5;
     private static final int MIN_SIGNATURE_LENGTH = 80;
 
     private static final Set<TodoTacheStatut> ACTIVE = EnumSet.of(
@@ -56,6 +62,8 @@ public class TodoService {
     private final AtelierMemoirePublisher atelierMemoirePublisher;
     private final TodoRecurrenceService todoRecurrenceService;
     private final MissingRegleJeuxTodoService missingRegleJeuxTodoService;
+    private final StorageService storageService;
+    private final ImageOptimizationService imageOptimizationService;
     private final Clock clock;
 
     public TodoListResponse listPending() {
@@ -107,7 +115,10 @@ public class TodoService {
         return todoTacheRepository.findOverdueAcrossAteliers(ACTIVE, now);
     }
 
-    public TodoTacheResponse create(TodoTacheRequest request, String username) {
+    public TodoTacheResponse create(
+            TodoTacheRequest request,
+            List<MultipartFile> photos,
+            String username) {
         Atelier atelier = atelierService.requireCurrentAtelier();
         User actor = requireUser(username);
         String titre = requireTitre(request.getTitre());
@@ -115,7 +126,11 @@ public class TodoService {
         String severite = normalizeSeverite(request.getSeverite());
         Mas mas = resolveMas(request.getMasId(), atelier.getId());
 
-        TodoTache saved = todoTacheRepository.save(TodoTache.builder()
+        List<MultipartFile> files = normalizeFiles(photos);
+        ensurePhotoCount(files.size());
+        files.forEach(this::validateImageFile);
+
+        TodoTache entity = TodoTache.builder()
                 .atelier(atelier)
                 .titre(titre)
                 .description(description)
@@ -124,9 +139,13 @@ public class TodoService {
                 .createdByUsername(actor.getUsername())
                 .createdByDisplayName(displayName(actor))
                 .mas(mas)
-                .build());
-        log.info("Création en base — Tâche À faire id={} titre={} par={}",
-                saved.getId(), saved.getTitre(), username);
+                .photos(new ArrayList<>())
+                .build();
+        addNewPhotos(entity, files);
+
+        TodoTache saved = todoTacheRepository.save(entity);
+        log.info("Création en base — Tâche À faire id={} titre={} photos={} par={}",
+                saved.getId(), saved.getTitre(), saved.getPhotos().size(), username);
         atelierMemoirePublisher.publish("TODO_CREATED",
                 "Tâche À faire créée : « " + saved.getTitre() + " » (" + saved.getSeverite() + ")");
         return toResponse(saved, LocalDateTime.now(clock));
@@ -238,8 +257,77 @@ public class TodoService {
 
     public void delete(Long id, String username) {
         TodoTache entity = getEntity(id);
+        if (entity.getPhotos() != null) {
+            for (TodoTachePhoto photo : entity.getPhotos()) {
+                if (photo.getPhotoKey() != null) {
+                    storageService.delete(photo.getPhotoKey());
+                }
+            }
+        }
         todoTacheRepository.delete(entity);
         log.info("Suppression en base — Tâche À faire id={} par={}", id, username);
+    }
+
+    private void addNewPhotos(TodoTache entity, List<MultipartFile> files) {
+        if (entity.getPhotos() == null) {
+            entity.setPhotos(new ArrayList<>());
+        }
+        int position = entity.getPhotos().size();
+        for (MultipartFile file : files) {
+            MultipartFile optimized = imageOptimizationService.optimize(file);
+            StorageService.StoredObject stored = storageService.store(optimized);
+            TodoTachePhoto photo = TodoTachePhoto.builder()
+                    .todoTache(entity)
+                    .photoKey(stored.key())
+                    .photoUrl(stored.url())
+                    .contentType(stored.contentType())
+                    .fileSize(stored.size())
+                    .position(position++)
+                    .build();
+            entity.getPhotos().add(photo);
+        }
+    }
+
+    private List<MultipartFile> normalizeFiles(List<MultipartFile> photos) {
+        if (photos == null) {
+            return List.of();
+        }
+        return photos.stream()
+                .filter(Objects::nonNull)
+                .filter(f -> !f.isEmpty())
+                .toList();
+    }
+
+    private void ensurePhotoCount(int count) {
+        if (count > MAX_PHOTOS) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Maximum " + MAX_PHOTOS + " images par tâche simple");
+        }
+    }
+
+    private void validateImageFile(MultipartFile photo) {
+        String contentType = photo.getContentType();
+        if (contentType == null || !contentType.startsWith("image/")) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Le fichier doit être une photo (JPEG, PNG…)");
+        }
+    }
+
+    private List<TodoTachePhotoResponse> mapPhotos(TodoTache t) {
+        if (t.getPhotos() == null || t.getPhotos().isEmpty()) {
+            return List.of();
+        }
+        return t.getPhotos().stream()
+                .sorted((a, b) -> Integer.compare(a.getPosition(), b.getPosition()))
+                .map(p -> TodoTachePhotoResponse.builder()
+                        .id(p.getId())
+                        .photoUrl(storageService.resolveAccessUrl(
+                                p.getPhotoKey(), p.getPhotoUrl(), StorageService.AccessKind.MEDIA))
+                        .contentType(p.getContentType())
+                        .fileSize(p.getFileSize())
+                        .position(p.getPosition())
+                        .build())
+                .toList();
     }
 
     private TodoTache getEntity(Long id) {
@@ -425,6 +513,7 @@ public class TodoService {
                 .dueAt(t.getDueAt())
                 .occurrenceKey(t.getOccurrenceKey())
                 .overdue(overdue)
+                .photos(mapPhotos(t))
                 .build();
     }
 

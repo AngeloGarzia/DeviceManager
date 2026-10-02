@@ -6,7 +6,7 @@ import lombok.*;
 import java.time.LocalDateTime;
 
 /**
- * Règle de jeux du catalogue global, avec document PDF associé.
+ * Règle de jeux du catalogue global, avec document PDF ou image associé.
  * Peut exister sans MAS rattachée ; chaque MAS doit en référencer au moins une.
  */
 @Entity
