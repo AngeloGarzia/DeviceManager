@@ -313,6 +313,6 @@ class UserServiceTest {
         assertThat(ctx.getValue().temporaryPassword()).hasSize(12);
         assertThat(ctx.getValue().appUrl()).isEqualTo("http://localhost:4200");
         assertThat(ctx.getValue().resetUrl())
-                .isEqualTo("http://localhost:4200/reset-password?token=welcome-token");
+                .isEqualTo("http://localhost:4200/#/reset-password?token=welcome-token");
     }
 }

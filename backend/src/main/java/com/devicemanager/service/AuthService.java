@@ -210,7 +210,7 @@ public class AuthService {
                 .build();
         passwordResetTokenRepository.save(entity);
 
-        String resetUrl = baseUrl + "/reset-password?token=" + rawToken;
+        String resetUrl = baseUrl + "/#/reset-password?token=" + rawToken;
         transactionalMail.sendPasswordReset(
                 user.getEmail(),
                 new PasswordResetEmail.Context(user.getPrenom(), resetUrl));

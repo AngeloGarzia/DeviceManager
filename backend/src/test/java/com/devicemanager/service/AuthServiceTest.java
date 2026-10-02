@@ -234,7 +234,7 @@ class AuthServiceTest {
                 ArgumentCaptor.forClass(PasswordResetEmail.Context.class);
         verify(transactionalMail).sendPasswordReset(eq("tech@test.local"), ctx.capture());
         assertThat(ctx.getValue().resetUrl())
-                .isEqualTo("http://localhost:4200/reset-password?token=reset-raw");
+                .isEqualTo("http://localhost:4200/#/reset-password?token=reset-raw");
     }
 
     @Test
