@@ -79,6 +79,8 @@ export class TodoListComponent implements OnInit, OnDestroy {
   private readonly createPanel = viewChild<ElementRef<HTMLElement>>('todoCreatePanel');
   private readonly createTitreInput = viewChild<ElementRef<HTMLInputElement>>('createTitreInput');
   private readonly captureVideo = viewChild<ElementRef<HTMLVideoElement>>('todoCaptureVideo');
+  private readonly overdueTabBtn = viewChild<ElementRef<HTMLButtonElement>>('overdueTabBtn');
+  private readonly overdueListEl = viewChild<ElementRef<HTMLElement>>('overdueList');
 
   readonly items = signal<TodoItem[]>([]);
   readonly recurrences = signal<TodoRecurrence[]>([]);
@@ -96,8 +98,8 @@ export class TodoListComponent implements OnInit, OnDestroy {
   readonly editingRecurrenceId = signal<number | null>(null);
   readonly linkingId = signal<number | null>(null);
   readonly closingId = signal<number | null>(null);
-  readonly mainTab = signal<TodoMainTab>('modeles');
-  readonly filter = signal<TodoFilter>('ACTIVE');
+  readonly mainTab = signal<TodoMainTab>('overdue');
+  readonly filter = signal<TodoFilter>('OVERDUE');
   readonly dayFilter = signal<string | null>(null);
   readonly query = signal('');
   readonly masses = signal<Mas[]>([]);
@@ -113,6 +115,7 @@ export class TodoListComponent implements OnInit, OnDestroy {
   readonly maxPhotos = TodoListComponent.MAX_PHOTOS;
 
   private mediaStream: MediaStream | null = null;
+  private overdueFocusDone = false;
 
   readonly filteredItems = computed(() => {
     const f = this.filter();
@@ -129,10 +132,13 @@ export class TodoListComponent implements OnInit, OnDestroy {
     if (day) {
       list = list.filter((t) => (t.dueAt || '').startsWith(day));
     }
-    if (!q) {
-      return list;
+    if (q) {
+      list = list.filter((t) => this.matchesQuery(t, q));
     }
-    return list.filter((t) => this.matchesQuery(t, q));
+    if (f === 'OVERDUE') {
+      return [...list].sort((a, b) => this.overdueUrgencyScore(b) - this.overdueUrgencyScore(a));
+    }
+    return list;
   });
 
   readonly counts = computed(() => {
@@ -232,7 +238,76 @@ export class TodoListComponent implements OnInit, OnDestroy {
     if (tab === 'overdue') {
       this.filter.set('OVERDUE');
       this.dayFilter.set(null);
+      this.overdueFocusDone = false;
+      afterNextRender(() => this.focusOverdueOnOpen(), { injector: this.injector });
     }
+  }
+
+  /**
+   * Score d'urgence (plus élevé = plus urgent) : jours de retard + sévérité.
+   */
+  overdueUrgencyScore(item: TodoItem): number {
+    const days = this.daysOverdue(item);
+    const sev = (item.severite || item.severity || 'MEDIUM').toUpperCase();
+    let score = Math.min(20, Math.max(0, days));
+    if (sev === 'HIGH') {
+      score += 6;
+    } else if (sev === 'LOW') {
+      score -= 2;
+    }
+    return score;
+  }
+
+  /** Durée du clignotement (ms) : plus l'urgence est haute, plus c'est rapide. */
+  overdueBlinkMs(item: TodoItem): number {
+    if (!item.overdue) {
+      return 1400;
+    }
+    const score = this.overdueUrgencyScore(item);
+    return Math.round(Math.max(380, 1200 - score * 40));
+  }
+
+  private daysOverdue(item: TodoItem): number {
+    const raw = item.dueAt;
+    if (!raw) {
+      return 1;
+    }
+    const due = new Date(raw);
+    if (Number.isNaN(due.getTime())) {
+      return 1;
+    }
+    const now = new Date();
+    const diffMs = now.getTime() - due.getTime();
+    return Math.max(0, Math.floor(diffMs / (24 * 60 * 60 * 1000)));
+  }
+
+  /** À l'ouverture : focus onglet « Tâches en retard », puis première tuile en retard. */
+  private focusOverdueOnOpen(): void {
+    if (this.overdueFocusDone || this.mainTab() !== 'overdue' || this.showCreate()) {
+      return;
+    }
+    afterNextRender(
+      () => {
+        if (this.overdueFocusDone || this.mainTab() !== 'overdue') {
+          return;
+        }
+        this.overdueFocusDone = true;
+        const tab = this.overdueTabBtn()?.nativeElement;
+        tab?.focus({ preventScroll: true });
+        tab?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+        window.setTimeout(() => {
+          const list = this.overdueListEl()?.nativeElement;
+          if (!list) {
+            return;
+          }
+          list.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          const first = list.querySelector<HTMLElement>('.todo-item--overdue');
+          first?.focus({ preventScroll: true });
+        }, 280);
+      },
+      { injector: this.injector }
+    );
   }
 
   setFilter(f: TodoFilter): void {
@@ -298,6 +373,7 @@ export class TodoListComponent implements OnInit, OnDestroy {
       next: (data) => {
         this.items.set(data.items ?? []);
         this.loading.set(false);
+        this.focusOverdueOnOpen();
       },
       error: (err) => {
         this.loading.set(false);

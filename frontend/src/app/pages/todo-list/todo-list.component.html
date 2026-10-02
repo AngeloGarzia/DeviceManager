@@ -74,6 +74,7 @@
     <button
       type="button"
       role="tab"
+      #overdueTabBtn
       class="todo-main-tab"
       [class.todo-main-tab--active]="mainTab() === 'overdue'"
       [class.todo-main-tab--warn]="counts().overdue > 0"
@@ -611,13 +612,16 @@
       </p>
     </div>
   } @else {
-    <ul class="todo-list">
+    <ul class="todo-list" #overdueList tabindex="-1" aria-label="Liste des tâches">
       @for (item of filteredItems(); track item.id) {
         <li
           class="todo-item"
           [class.todo-item--overdue]="item.overdue"
+          [class.todo-item--overdue-blink]="item.overdue"
+          [style.--todo-blink-ms]="overdueBlinkMs(item) + 'ms'"
           [attr.data-severity]="item.severite || item.severity"
           [attr.data-statut]="item.statut"
+          [attr.tabindex]="item.overdue ? 0 : null"
         >
           <mat-icon class="todo-item__icon">{{ item.recurrenceId ? 'event_repeat' : 'task_alt' }}</mat-icon>
           <div class="todo-item__body min-w-0 flex-1">

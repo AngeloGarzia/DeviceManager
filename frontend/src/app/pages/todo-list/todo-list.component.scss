@@ -97,6 +97,16 @@
   box-shadow: 0 0 0 1px color-mix(in srgb, #ef4444 25%, transparent);
 }
 
+.todo-item--overdue-blink {
+  outline: none;
+  animation: todo-overdue-tile-blink var(--todo-blink-ms, 1.2s) ease-in-out infinite;
+}
+
+.todo-item--overdue:focus-visible {
+  outline: 2px solid #b91c1c;
+  outline-offset: 2px;
+}
+
 .todo-overdue-badge {
   display: inline-block;
   border-radius: 999px;
@@ -105,7 +115,7 @@
   font-weight: 700;
   background: #fee2e2;
   color: #b91c1c;
-  animation: todo-overdue-pulse 1.4s ease-in-out infinite;
+  animation: todo-overdue-pulse var(--todo-blink-ms, 1.4s) ease-in-out infinite;
 }
 
 @keyframes todo-overdue-pulse {
@@ -115,6 +125,32 @@
   }
   50% {
     opacity: 0.55;
+  }
+}
+
+@keyframes todo-overdue-tile-blink {
+  0%,
+  100% {
+    border-color: #f87171;
+    box-shadow: 0 0 0 1px color-mix(in srgb, #ef4444 25%, transparent);
+    background: #fff1f2;
+  }
+  50% {
+    border-color: #dc2626;
+    box-shadow: 0 0 0 3px color-mix(in srgb, #ef4444 40%, transparent);
+    background: #fecaca;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .todo-item--overdue-blink,
+  .todo-overdue-badge {
+    animation: none;
+  }
+
+  .todo-item--overdue-blink {
+    border-color: #dc2626;
+    box-shadow: 0 0 0 2px color-mix(in srgb, #ef4444 35%, transparent);
   }
 }
 
