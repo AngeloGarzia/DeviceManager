@@ -128,6 +128,13 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      # Remplace entièrement www : sinon d'anciens main-*.js / chunks restent
+      # joignables et un index.html mis en cache peut resservir l'ancien menu.
+      - name: Wipe frontend/www
+        run: |
+          rm -rf frontend/www
+          mkdir -p frontend/www
+
       - name: Download static bundle
         uses: actions/download-artifact@v4
         with:

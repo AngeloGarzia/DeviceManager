@@ -21,7 +21,7 @@ app.use(
     setHeaders(res, filePath) {
       const base = path.basename(filePath);
       if (base === 'index.html') {
-        res.setHeader('Cache-Control', 'no-cache');
+        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
         return;
       }
       if (/\.(?:js|css)$/i.test(base)) {
@@ -37,7 +37,7 @@ app.get('*', (req, res) => {
     res.status(404).type('text/plain').send('Not Found');
     return;
   }
-  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
   res.sendFile(INDEX_HTML);
 });
 
