@@ -127,6 +127,13 @@ public class Mas {
     @Builder.Default
     private Set<RegleJeux> reglesJeux = new HashSet<>();
 
+    /**
+     * Jeton opaque pour accès public en lecture seule aux règles de jeux (QR code).
+     * Jamais égal au numéro MAS.
+     */
+    @Column(name = "public_access_token", length = 64, unique = true)
+    private String publicAccessToken;
+
     public void applyStatut(MasStatut next) {
         this.statut = next != null ? next : MasStatut.UTILISEE;
         this.utilise = this.statut.isUtilisee();

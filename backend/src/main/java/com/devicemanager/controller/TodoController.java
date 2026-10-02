@@ -17,10 +17,13 @@ import com.devicemanager.service.TodoService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -119,12 +122,14 @@ public class TodoController {
         return ResponseEntity.noContent().build();
     }
 
-    @PostMapping
+    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<TodoTacheResponse> create(
-            @Valid @RequestBody TodoTacheRequest request,
+            @Valid @RequestPart("data") TodoTacheRequest data,
+            @RequestPart(value = "photos", required = false) MultipartFile[] photos,
             Authentication authentication) {
+        List<MultipartFile> photoList = photos == null ? List.of() : Arrays.asList(photos);
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(todoService.create(request, authentication.getName()));
+                .body(todoService.create(data, photoList, authentication.getName()));
     }
 
     @PutMapping("/{id}")

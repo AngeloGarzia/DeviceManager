@@ -7,6 +7,7 @@ import com.devicemanager.dto.MarqueMasRequest;
 import com.devicemanager.dto.MarqueMasResponse;
 import com.devicemanager.dto.MasRequest;
 import com.devicemanager.dto.MasResponse;
+import com.devicemanager.dto.MasPublicAccessTokenResponse;
 import com.devicemanager.dto.MasStatutChangeRequest;
 import com.devicemanager.dto.RegleJeuxMasLinkRequest;
 import com.devicemanager.dto.RegleJeuxMasSummary;
@@ -215,13 +216,13 @@ public class MasService {
     }
 
     /**
-     * Crée une règle de jeux dans le catalogue global avec son PDF.
+     * Crée une règle de jeux dans le catalogue global avec son document (PDF ou image).
      */
     public RegleJeuxResponse createRegleJeux(String labelRaw, String descriptionRaw, MultipartFile file) {
         if (labelRaw == null || labelRaw.isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Le libellé de la règle de jeux est obligatoire");
         }
-        DocumentUploadValidator.validatePdf(file, "règle de jeux");
+        DocumentUploadValidator.validatePdfOrImage(file, "règle de jeux");
         String label = labelRaw.trim();
         if (label.length() > 200) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
@@ -261,10 +262,17 @@ public class MasService {
 
     /**
      * Analyse un PDF de règle de jeux via l'IA (libellé + description proposés).
+     * Les images sont acceptées pour le catalogue mais sans extraction IA automatique.
      * Si l'IA est indisponible, renvoie {@code enabled=false} pour saisie manuelle.
      */
     public AiRegleJeuxScanResponse analyzeRegleJeuxPdf(MultipartFile file) {
-        DocumentUploadValidator.validatePdf(file, "règle de jeux");
+        DocumentUploadValidator.Kind kind = DocumentUploadValidator.validatePdfOrImage(file, "règle de jeux");
+        if (kind == DocumentUploadValidator.Kind.IMAGE) {
+            return AiRegleJeuxScanResponse.builder()
+                    .enabled(false)
+                    .notes("Document image — saisissez le libellé et la description manuellement.")
+                    .build();
+        }
         try {
             return aiAssistantService.analyzeRegleJeuxPdf(file);
         } catch (ResponseStatusException ex) {
@@ -297,7 +305,7 @@ public class MasService {
     }
 
     public RegleJeuxResponse replaceRegleJeuxDocument(Long id, MultipartFile file) {
-        DocumentUploadValidator.validatePdf(file, "règle de jeux");
+        DocumentUploadValidator.validatePdfOrImage(file, "règle de jeux");
         RegleJeux entity = getRegleJeuxEntity(id);
         String previousKey = entity.getFileKey();
         StorageService.StoredObject stored = storageService.store(file);
@@ -313,23 +321,23 @@ public class MasService {
             try {
                 storageService.delete(previousKey);
             } catch (Exception ex) {
-                log.warn("Ancien PDF règle de jeux non supprimé (id={}, key={}): {}",
+                log.warn("Ancien document règle de jeux non supprimé (id={}, key={}): {}",
                         id, previousKey, ex.getMessage());
             }
         }
-        log.info("PDF règle de jeux remplacé — id={} file={}", id, original);
+        log.info("Document règle de jeux remplacé — id={} file={}", id, original);
         return toRegleJeuxResponse(saved);
     }
 
     /**
-     * Sert le PDF d'une règle de jeux (R2 ou repli upload_blob) pour ouverture authentifiée.
+     * Sert le document (PDF ou image) d'une règle de jeux pour affichage authentifié.
      */
     @Transactional(readOnly = true)
     public ResponseEntity<byte[]> downloadRegleJeuxPdf(Long id) {
         RegleJeux entity = getRegleJeuxEntity(id);
         String key = firstNonBlank(entity.getFileKey(), StorageService.extractObjectKey(entity.getFileUrl()));
         if (key == null || key.isBlank()) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Aucun fichier PDF associé à cette règle");
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Aucun document associé à cette règle");
         }
         var loaded = storageService.load(key);
         if (loaded.isEmpty() && entity.getFileUrl() != null && !entity.getFileUrl().equals(key)) {
@@ -337,13 +345,14 @@ public class MasService {
         }
         if (loaded.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND,
-                    "PDF introuvable dans le stockage — remplacez le document");
+                    "Document introuvable dans le stockage — remplacez le fichier");
         }
         StorageService.StoredObjectBytes obj = loaded.get();
         MediaType mediaType = MediaType.APPLICATION_PDF;
-        if (obj.contentType() != null && !obj.contentType().isBlank()) {
+        String declared = firstNonBlank(obj.contentType(), entity.getContentType());
+        if (declared != null) {
             try {
-                mediaType = MediaType.parseMediaType(obj.contentType());
+                mediaType = MediaType.parseMediaType(declared);
             } catch (Exception ignored) {
                 // keep application/pdf
             }
@@ -411,6 +420,7 @@ public class MasService {
         applyReglesJeux(entity, request.getRegleJeuxIds());
         entity.applyStatut(resolveStatut(request));
         applyIdentificationRules(entity, entity.getStatut());
+        entity.setPublicAccessToken(generateUniquePublicToken());
         Mas saved = masRepository.save(entity);
         log.info("Création en base — MAS id={} numero={} marque={} atelier={}",
                 saved.getId(),
@@ -628,7 +638,56 @@ public class MasService {
                 .utilise(entity.isUtilise())
                 .regleJeuxIds(regles.stream().map(RegleJeuxResponse::getId).collect(Collectors.toList()))
                 .reglesJeux(regles)
+                .publicAccessToken(entity.getPublicAccessToken())
                 .build();
+    }
+
+    /**
+     * Garantit un jeton public (création si absent) pour le QR règles de jeux.
+     */
+    public MasPublicAccessTokenResponse ensurePublicAccessToken(Long id) {
+        Mas entity = getEntity(id);
+        if (entity.getPublicAccessToken() == null || entity.getPublicAccessToken().isBlank()) {
+            entity.setPublicAccessToken(generateUniquePublicToken());
+            entity = masRepository.save(entity);
+            log.info("Jeton public créé — MAS id={}", entity.getId());
+        }
+        return toPublicTokenResponse(entity.getPublicAccessToken());
+    }
+
+    /**
+     * Régénère le jeton public (invalide les QR déjà imprimés).
+     */
+    public MasPublicAccessTokenResponse rotatePublicAccessToken(Long id) {
+        Mas entity = getEntity(id);
+        entity.setPublicAccessToken(generateUniquePublicToken());
+        Mas saved = masRepository.save(entity);
+        log.info("Jeton public régénéré — MAS id={}", saved.getId());
+        return toPublicTokenResponse(saved.getPublicAccessToken());
+    }
+
+    private MasPublicAccessTokenResponse toPublicTokenResponse(String token) {
+        return MasPublicAccessTokenResponse.builder()
+                .token(token)
+                .publicPath("/public/r/" + token)
+                .build();
+    }
+
+    private String generateUniquePublicToken() {
+        for (int attempt = 0; attempt < 8; attempt++) {
+            String token = newPublicToken();
+            if (!masRepository.existsByPublicAccessToken(token)) {
+                return token;
+            }
+        }
+        throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
+                "Impossible de générer un jeton public unique");
+    }
+
+    private static String newPublicToken() {
+        byte[] bytes = new byte[24];
+        new java.security.SecureRandom().nextBytes(bytes);
+        return java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
     }
 
     private MasStatut resolveStatut(MasRequest request) {

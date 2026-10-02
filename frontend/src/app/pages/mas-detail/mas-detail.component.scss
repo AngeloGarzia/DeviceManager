@@ -1,1 +1,23 @@
 /* Material + Tailwind */
+
+.mas-public-qr {
+  display: grid;
+  justify-items: start;
+  gap: 0.65rem;
+}
+
+.mas-public-qr__canvas {
+  display: block;
+  border: 1px solid #d9e2ec;
+  border-radius: 0.75rem;
+  background: #fff;
+  padding: 0.5rem;
+}
+
+.mas-public-qr__url {
+  margin: 0;
+  max-width: 100%;
+  word-break: break-all;
+  font-size: 0.75rem;
+  color: #829ab1;
+}

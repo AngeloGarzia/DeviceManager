@@ -52,7 +52,7 @@ public class AtelierContextFilter extends OncePerRequestFilter {
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String path = request.getRequestURI();
-        return path.startsWith("/api/auth/") || path.startsWith("/uploads/");
+        return path.startsWith("/api/auth/") || path.startsWith("/uploads/") || path.startsWith("/api/public/");
     }
 
     @Override

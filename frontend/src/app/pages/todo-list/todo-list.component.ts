@@ -1,4 +1,4 @@
-import { Component, ElementRef, Injector, OnInit, afterNextRender, computed, inject, signal, viewChild } from '@angular/core';
+import { Component, ElementRef, Injector, OnDestroy, OnInit, afterNextRender, computed, inject, signal, viewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -9,6 +9,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatCardModule } from '@angular/material/card';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import {
   Intervention,
   InterventionTechnique,
@@ -22,12 +23,19 @@ import { MasService } from '../../services/mas.service';
 import { InterventionTechniqueService } from '../../services/intervention-technique.service';
 import { InterventionService } from '../../services/intervention.service';
 import { AuthService } from '../../services/auth.service';
+import { CameraPreferencesService } from '../../services/camera-preferences.service';
 import { SignaturePadComponent } from '../../shared/signature-pad.component';
+import { ImageEditorDialogComponent } from '../../shared/image-editor-dialog.component';
 import { apiErrorMessage } from '../../shared/api-error';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 
 type TodoFilter = 'ALL' | 'ACTIVE' | 'OVERDUE' | 'OPEN' | 'IN_PROGRESS' | 'DONE' | 'CANCELLED';
 type TodoMainTab = 'modeles' | 'overdue';
+
+interface NewTodoPhoto {
+  file: File;
+  previewUrl: string;
+}
 
 /**
  * Page Todo : cycle de vie complet des tâches (création → clôture signée) + règles récurrentes.
@@ -47,12 +55,15 @@ type TodoMainTab = 'modeles' | 'overdue';
     MatCardModule,
     MatProgressSpinnerModule,
     MatCheckboxModule,
+    MatDialogModule,
     SignaturePadComponent
   ],
   templateUrl: './todo-list.component.html',
   styleUrl: './todo-list.component.scss'
 })
-export class TodoListComponent implements OnInit {
+export class TodoListComponent implements OnInit, OnDestroy {
+  static readonly MAX_PHOTOS = 5;
+
   readonly auth = inject(AuthService);
   private readonly fb = inject(FormBuilder);
   private readonly route = inject(ActivatedRoute);
@@ -61,10 +72,13 @@ export class TodoListComponent implements OnInit {
   private readonly masService = inject(MasService);
   private readonly interventionTechniqueService = inject(InterventionTechniqueService);
   private readonly interventionService = inject(InterventionService);
+  private readonly cameraPrefs = inject(CameraPreferencesService);
+  private readonly dialog = inject(MatDialog);
   private readonly injector = inject(Injector);
 
   private readonly createPanel = viewChild<ElementRef<HTMLElement>>('todoCreatePanel');
   private readonly createTitreInput = viewChild<ElementRef<HTMLInputElement>>('createTitreInput');
+  private readonly captureVideo = viewChild<ElementRef<HTMLVideoElement>>('todoCaptureVideo');
 
   readonly items = signal<TodoItem[]>([]);
   readonly recurrences = signal<TodoRecurrence[]>([]);
@@ -90,6 +104,15 @@ export class TodoListComponent implements OnInit {
   readonly massesLoading = signal(false);
   readonly interventionsTech = signal<InterventionTechnique[]>([]);
   readonly bonsIntervention = signal<Intervention[]>([]);
+
+  readonly newPhotos = signal<NewTodoPhoto[]>([]);
+  readonly showCamera = signal(false);
+  readonly cameraReady = signal(false);
+  readonly cameraError = signal<string | null>(null);
+  readonly canAddPhoto = computed(() => this.newPhotos().length < TodoListComponent.MAX_PHOTOS);
+  readonly maxPhotos = TodoListComponent.MAX_PHOTOS;
+
+  private mediaStream: MediaStream | null = null;
 
   readonly filteredItems = computed(() => {
     const f = this.filter();
@@ -195,6 +218,11 @@ export class TodoListComponent implements OnInit {
     this.loadRecurrences();
     this.loadModeles();
     this.loadMasses();
+  }
+
+  ngOnDestroy(): void {
+    this.stopCamera();
+    this.clearNewPhotos();
   }
 
   setMainTab(tab: TodoMainTab): void {
@@ -320,6 +348,9 @@ export class TodoListComponent implements OnInit {
     this.showCreate.set(true);
     this.showCustomCreate.set(false);
     this.cancelRecurrenceForm();
+    this.clearNewPhotos();
+    this.stopCamera();
+    this.showCamera.set(false);
     this.todoForm.reset({ titre: '', description: '', severite: 'MEDIUM', masId: null });
     this.loadMasses();
     this.loadModeles();
@@ -329,11 +360,17 @@ export class TodoListComponent implements OnInit {
   cancelCreate(): void {
     this.showCreate.set(false);
     this.showCustomCreate.set(false);
+    this.stopCamera();
+    this.showCamera.set(false);
+    this.clearNewPhotos();
   }
 
   openCustomCreate(): void {
     this.showCreate.set(true);
     this.showCustomCreate.set(true);
+    this.clearNewPhotos();
+    this.stopCamera();
+    this.showCamera.set(false);
     this.todoForm.reset({ titre: '', description: '', severite: 'MEDIUM', masId: null });
     this.loadMasses();
     this.focusCreatePanel(true);
@@ -671,20 +708,32 @@ export class TodoListComponent implements OnInit {
       this.todoForm.markAllAsTouched();
       return;
     }
+    if (this.newPhotos().length > TodoListComponent.MAX_PHOTOS) {
+      this.error.set(`Maximum ${TodoListComponent.MAX_PHOTOS} images par tâche.`);
+      return;
+    }
     this.saving.set(true);
     this.error.set(null);
     const raw = this.todoForm.getRawValue();
+    const photos = this.newPhotos().map((p) => p.file);
     this.todoService
-      .create({
-        titre: raw.titre,
-        description: raw.description || null,
-        severite: raw.severite,
-        masId: raw.masId
-      })
+      .create(
+        {
+          titre: raw.titre,
+          description: raw.description || null,
+          severite: raw.severite,
+          masId: raw.masId
+        },
+        photos
+      )
       .subscribe({
         next: () => {
           this.saving.set(false);
+          this.stopCamera();
+          this.showCamera.set(false);
+          this.clearNewPhotos();
           this.showCreate.set(false);
+          this.showCustomCreate.set(false);
           this.filter.set('ACTIVE');
           this.load();
         },
@@ -693,6 +742,174 @@ export class TodoListComponent implements OnInit {
           this.error.set(apiErrorMessage(err, 'Création de la tâche impossible.'));
         }
       });
+  }
+
+  async openCapture(): Promise<void> {
+    if (!this.canAddPhoto()) {
+      this.error.set(`Maximum ${TodoListComponent.MAX_PHOTOS} images par tâche.`);
+      return;
+    }
+    this.error.set(null);
+    this.cameraError.set(null);
+    this.showCamera.set(true);
+    afterNextRender(
+      () => {
+        void this.startCamera();
+      },
+      { injector: this.injector }
+    );
+  }
+
+  closeCapture(): void {
+    this.stopCamera();
+    this.showCamera.set(false);
+  }
+
+  async capturePhoto(): Promise<void> {
+    if (!this.canAddPhoto()) {
+      this.error.set(`Maximum ${TodoListComponent.MAX_PHOTOS} images par tâche.`);
+      return;
+    }
+    const file = await this.captureBlobAsFile();
+    if (!file) {
+      this.error.set(
+        this.cameraReady() ? "Impossible d'acquérir l'image." : "La caméra n'est pas prête."
+      );
+      return;
+    }
+    const edited = await this.openImageEditor(file);
+    if (edited) {
+      this.addNewPhoto(edited);
+    }
+  }
+
+  removeNewPhoto(index: number): void {
+    const list = [...this.newPhotos()];
+    const [removed] = list.splice(index, 1);
+    if (removed) {
+      URL.revokeObjectURL(removed.previewUrl);
+    }
+    this.newPhotos.set(list);
+  }
+
+  resolvePhotoUrl(url?: string | null): string {
+    return this.todoService.resolvePhotoUrl(url);
+  }
+
+  private addNewPhoto(file: File): void {
+    if (!this.canAddPhoto()) {
+      return;
+    }
+    this.newPhotos.update((list) => [
+      ...list,
+      { file, previewUrl: URL.createObjectURL(file) }
+    ]);
+  }
+
+  private clearNewPhotos(): void {
+    for (const photo of this.newPhotos()) {
+      URL.revokeObjectURL(photo.previewUrl);
+    }
+    this.newPhotos.set([]);
+  }
+
+  private async startCamera(): Promise<void> {
+    this.cameraError.set(null);
+    this.stopCamera(false);
+    try {
+      this.mediaStream = await this.openCameraStream(this.cameraPrefs.getPreferredDeviceId());
+      let videoEl = this.captureVideo()?.nativeElement;
+      if (!videoEl) {
+        await new Promise<void>((resolve) => setTimeout(resolve, 80));
+        videoEl = this.captureVideo()?.nativeElement;
+      }
+      if (!videoEl) {
+        this.cameraReady.set(false);
+        this.cameraError.set('Aperçu caméra indisponible.');
+        return;
+      }
+      videoEl.srcObject = this.mediaStream;
+      await videoEl.play();
+      this.cameraReady.set(true);
+    } catch {
+      this.cameraReady.set(false);
+      this.cameraError.set(
+        "Caméra inaccessible. Autorisez l'accès ou choisissez la source dans Paramètres → Caméra."
+      );
+    }
+  }
+
+  private async openCameraStream(deviceId: string | null): Promise<MediaStream> {
+    const aspect = { ideal: 4 / 3 } as const;
+    if (deviceId) {
+      return navigator.mediaDevices.getUserMedia({
+        video: { deviceId: { exact: deviceId }, aspectRatio: aspect },
+        audio: false
+      });
+    }
+    try {
+      return await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: 'environment' }, aspectRatio: aspect },
+        audio: false
+      });
+    } catch {
+      return navigator.mediaDevices.getUserMedia({
+        video: { aspectRatio: aspect },
+        audio: false
+      });
+    }
+  }
+
+  private async captureBlobAsFile(): Promise<File | null> {
+    const video = this.captureVideo()?.nativeElement;
+    if (!video || !this.cameraReady() || video.videoWidth < 2) {
+      return null;
+    }
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      return null;
+    }
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const blob = await new Promise<Blob | null>((resolve) =>
+      canvas.toBlob((b) => resolve(b), 'image/jpeg', 0.85)
+    );
+    if (!blob) {
+      return null;
+    }
+    return new File([blob], `todo-capture-${Date.now()}.jpg`, { type: 'image/jpeg' });
+  }
+
+  private openImageEditor(file: File): Promise<File | null> {
+    const ref = this.dialog.open(ImageEditorDialogComponent, {
+      width: 'min(960px, 96vw)',
+      maxHeight: '92vh',
+      data: { file, title: 'Recadrer la capture' },
+      autoFocus: false
+    });
+    return new Promise((resolve) => {
+      ref.afterClosed().subscribe((result: File | null | undefined) => {
+        resolve(result ?? null);
+      });
+    });
+  }
+
+  private stopCamera(clearReady = true): void {
+    if (this.mediaStream) {
+      for (const track of this.mediaStream.getTracks()) {
+        track.stop();
+      }
+      this.mediaStream = null;
+    }
+    const video = this.captureVideo()?.nativeElement;
+    if (video) {
+      video.srcObject = null;
+    }
+    if (clearReady) {
+      this.cameraReady.set(false);
+    }
   }
 
   setStatus(item: TodoItem, statut: string): void {

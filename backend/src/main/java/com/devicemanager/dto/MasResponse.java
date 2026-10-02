@@ -49,4 +49,6 @@ public class MasResponse {
     /** Règles de jeux rattachées (catalogue global + PDF). */
     private List<Long> regleJeuxIds;
     private List<RegleJeuxResponse> reglesJeux;
+    /** Jeton opaque pour QR public (règles de jeux). */
+    private String publicAccessToken;
 }

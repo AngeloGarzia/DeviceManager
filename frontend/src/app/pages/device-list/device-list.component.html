@@ -15,7 +15,7 @@
     <a routerLink="/todos" class="todo-summary-link">
       <div class="devices-tile-toggle">
         <div class="min-w-0 text-left">
-          <h1 class="page-title">À faire</h1>
+          <h1 class="page-title">Calendrier</h1>
           <p class="page-subtitle">
             @if (todosLoading()) {
               Chargement des tâches…
@@ -76,6 +76,61 @@
           </a>
         }
       </div>
+    }
+  </mat-card>
+
+  <mat-card class="home-simple-todos !rounded-xl !border !border-line !shadow-soft">
+    <div class="home-simple-todos__header">
+      <div class="min-w-0">
+        <h2 class="home-simple-todos__title">Tâches simples</h2>
+        <p class="home-simple-todos__subtitle">
+          Tri : urgence, puis date
+          @if (dateSortDesc()) {
+            (plus récentes d’abord)
+          } @else {
+            (plus anciennes d’abord)
+          }
+        </p>
+      </div>
+      <button
+        mat-stroked-button
+        type="button"
+        class="home-simple-todos__sort"
+        (click)="toggleDateSort()"
+        [attr.aria-label]="
+          dateSortDesc() ? 'Trier la date du plus ancien au plus récent' : 'Trier la date du plus récent au plus ancien'
+        "
+      >
+        <mat-icon>{{ dateSortDesc() ? 'arrow_upward' : 'arrow_downward' }}</mat-icon>
+        Date
+      </button>
+    </div>
+
+    @if (todosLoading()) {
+      <p class="home-simple-todos__empty">Chargement…</p>
+    } @else if (simpleTodosSorted().length === 0) {
+      <p class="home-simple-todos__empty">Aucune tâche simple active.</p>
+    } @else {
+      <ul class="home-simple-todos__list">
+        @for (item of simpleTodosSorted(); track item.id) {
+          <li>
+            <a routerLink="/todos" class="home-simple-todos__item" [attr.data-severity]="item.severite || item.severity">
+              <div class="home-simple-todos__item-main">
+                <span class="home-simple-todos__item-title">{{ item.titre || item.title }}</span>
+                <span class="home-simple-todos__sev" [attr.data-severity]="item.severite || item.severity">
+                  {{ severityLabel(item.severite || item.severity) }}
+                </span>
+              </div>
+              <div class="home-simple-todos__item-meta">
+                <span>{{ formatDate(taskDisplayDate(item)) }}</span>
+                @if (item.masNumero) {
+                  <span>MAS {{ item.masNumero }}</span>
+                }
+              </div>
+            </a>
+          </li>
+        }
+      </ul>
     }
   </mat-card>
 </section>

@@ -2,7 +2,11 @@
   <header>
     <h1 class="page-title">Paramètres</h1>
     <p class="page-subtitle">
-      Structure organisationnelle : casino → atelier → pièces détachées — tuiles repliées par défaut
+      @if (auth.isAdmin()) {
+        Caméra, organisation (casino → atelier) et configuration applicative
+      } @else {
+        Préférences caméra utilisées lors de la création de pièces
+      }
     </p>
   </header>
 
@@ -23,6 +27,68 @@
     </mat-card-content>
   </mat-card>
 
+  <mat-card class="setup-tile !rounded-xl !border !border-line !shadow-soft" data-tour="setup-camera">
+    <button
+      type="button"
+      class="setup-tile-toggle"
+      (click)="toggleTile('camera')"
+      [attr.aria-expanded]="isTileOpen('camera')"
+    >
+      <div class="min-w-0 text-left">
+        <h2 class="m-0 text-base font-semibold text-ink">Caméra</h2>
+        <p class="mt-0.5 text-sm text-ink-soft">
+          Source utilisée pour photographier les pièces — préférences enregistrées sur cet appareil.
+        </p>
+      </div>
+      <mat-icon>{{ isTileOpen('camera') ? 'expand_less' : 'expand_more' }}</mat-icon>
+    </button>
+    @if (isTileOpen('camera')) {
+      <mat-card-content class="!pt-0 grid gap-3">
+        @if (camerasError()) {
+          <p class="m-0 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{{ camerasError() }}</p>
+        }
+        @if (cameraSaved()) {
+          <p class="m-0 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+            Préférence caméra enregistrée.
+          </p>
+        }
+        @if (camerasLoading()) {
+          <div class="flex justify-center py-6"><mat-spinner diameter="32"></mat-spinner></div>
+        } @else {
+          <mat-form-field appearance="outline" class="w-full sm:max-w-md">
+            <mat-label>Source caméra</mat-label>
+            <mat-select
+              [value]="selectedCameraId()"
+              (selectionChange)="onCameraSelectionChange($event.value)"
+              [disabled]="cameras().length === 0"
+            >
+              @for (cam of cameras(); track cam.deviceId; let i = $index) {
+                <mat-option [value]="cam.deviceId">{{ cameraLabel(cam, i) }}</mat-option>
+              }
+            </mat-select>
+            <mat-hint>Par défaut : caméra arrière si disponible</mat-hint>
+          </mat-form-field>
+          <div class="flex flex-wrap gap-2">
+            <button mat-stroked-button type="button" (click)="refreshCameras()" [disabled]="camerasLoading()">
+              <mat-icon>refresh</mat-icon>
+              Détecter les caméras
+            </button>
+            <button
+              mat-flat-button
+              color="primary"
+              type="button"
+              (click)="saveCameraPreference()"
+              [disabled]="!selectedCameraId()"
+            >
+              Enregistrer
+            </button>
+          </div>
+        }
+      </mat-card-content>
+    }
+  </mat-card>
+
+  @if (auth.isAdmin()) {
   <mat-card class="setup-tile !rounded-xl !border !border-line !shadow-soft" data-tour="setup-integration">
     <button
       type="button"
@@ -746,4 +812,5 @@
     (confirmed)="doClearLogs()"
     (dismissed)="confirmClearLogs.set(false)"
   />
+  }
 </section>

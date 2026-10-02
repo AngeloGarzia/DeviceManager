@@ -71,13 +71,20 @@
         >
           <mat-icon>smart_toy</mat-icon>
         </button>
+        <button
+          mat-icon-button
+          type="button"
+          routerLink="/setup"
+          routerLinkActive="admin-active"
+          matTooltip="Paramètres"
+          aria-label="Paramètres"
+        >
+          <mat-icon>settings</mat-icon>
+        </button>
         @if (auth.isAdmin()) {
           <span data-tour="shell-admin" class="shell-admin-group">
             <a mat-icon-button routerLink="/users" routerLinkActive="admin-active" matTooltip="Comptes">
               <mat-icon>manage_accounts</mat-icon>
-            </a>
-            <a mat-icon-button routerLink="/setup" routerLinkActive="admin-active" matTooltip="Paramètres">
-              <mat-icon>settings</mat-icon>
             </a>
           </span>
         }
@@ -135,6 +142,10 @@
         <span>Pièces</span>
       </button>
       <mat-menu #devicesMenu="matMenu" class="devices-nav-menu">
+        <a mat-menu-item routerLink="/devices/new" routerLinkActive="devices-menu-active">
+          <mat-icon>add_circle</mat-icon>
+          <span>Créer une nouvelle pièce</span>
+        </a>
         <a
           mat-menu-item
           routerLink="/devices/pieces"
@@ -143,10 +154,6 @@
         >
           <mat-icon>list</mat-icon>
           <span>Liste des pièces</span>
-        </a>
-        <a mat-menu-item routerLink="/devices/new" routerLinkActive="devices-menu-active">
-          <mat-icon>add_circle</mat-icon>
-          <span>Créer une nouvelle pièce</span>
         </a>
         <a
           mat-menu-item
@@ -248,13 +255,13 @@
         </span>
       </button>
       <mat-menu #masMenu="matMenu" class="devices-nav-menu">
-        <a mat-menu-item routerLink="/mas" routerLinkActive="devices-menu-active" [routerLinkActiveOptions]="{ exact: true }">
-          <mat-icon>list</mat-icon>
-          <span>Liste des MAS</span>
-        </a>
         <a mat-menu-item routerLink="/mas/new" routerLinkActive="devices-menu-active">
           <mat-icon>add_circle</mat-icon>
           <span>Nouvelle MAS</span>
+        </a>
+        <a mat-menu-item routerLink="/mas" routerLinkActive="devices-menu-active" [routerLinkActiveOptions]="{ exact: true }">
+          <mat-icon>list</mat-icon>
+          <span>Liste des MAS</span>
         </a>
         <a
           mat-menu-item

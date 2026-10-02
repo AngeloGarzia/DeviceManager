@@ -6,13 +6,11 @@
 
   <header>
     <h1 class="page-title" data-tour="page-device-form">{{ isEdit ? 'Modifier la pièce' : 'Nouvelle pièce' }}</h1>
-    <p class="page-subtitle">
-      {{
-        forOrderRequest
-          ? 'Création pour une demande de commande — jusqu’à 5 images, infos et rattachement SFM / MAS'
-          : 'Jusqu’à 5 images, informations et rattachement SFM / MAS'
-      }}
-    </p>
+    @if (forOrderRequest) {
+      <p class="page-subtitle">
+        Création pour une demande de commande — jusqu’à 5 images, infos et rattachement SFM / MAS
+      </p>
+    }
   </header>
 
   @if (loading()) {
@@ -21,10 +19,15 @@
     <mat-card class="!rounded-xl !border !border-line !shadow-soft">
       <mat-card-content class="!pt-5">
         <form class="grid gap-3 sm:grid-cols-2 sm:gap-x-4" [formGroup]="form" (ngSubmit)="submit()">
-          <div class="camera-block sm:col-span-2 mb-3">
+          <div
+            #cameraBlock
+            class="camera-block sm:col-span-2 mb-3"
+            [class.camera-block--hero]="!isEdit"
+            tabindex="-1"
+          >
             <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
               <h2 class="m-0 text-base font-semibold text-ink">
-                Images
+                {{ isEdit ? 'Images' : 'Caméra' }}
                 <span class="ml-2 text-sm font-normal text-ink-soft">
                   {{ photoCount() }} / {{ maxPhotos }}
                 </span>
@@ -35,19 +38,10 @@
               </button>
             </div>
 
-            @if (cameras().length > 0) {
-              <mat-form-field appearance="outline" class="mb-3 w-full sm:max-w-md">
-                <mat-label>Source caméra</mat-label>
-                <mat-select
-                  [value]="selectedCameraId()"
-                  (selectionChange)="onCameraSourceChange($event.value)"
-                >
-                  @for (cam of cameras(); track cam.deviceId; let i = $index) {
-                    <mat-option [value]="cam.deviceId">{{ cameraLabel(cam, i) }}</mat-option>
-                  }
-                </mat-select>
-                <mat-hint>Par défaut : caméra arrière</mat-hint>
-              </mat-form-field>
+            @if (!isEdit) {
+              <p class="m-0 mb-3 text-sm text-ink-soft">
+                Cadrez la pièce, puis utilisez <strong>Acquisition image</strong> (ou un scan IA).
+              </p>
             }
 
             <div class="camera-viewport relative overflow-hidden rounded-xl border border-line bg-slate-900">
@@ -67,11 +61,13 @@
               }
             </div>
 
-            <div class="mt-3 flex flex-wrap gap-2">
+            <div class="camera-actions mt-3 flex flex-wrap gap-2" [class.camera-actions--hero]="!isEdit">
               <button
+                #captureBtn
                 mat-flat-button
                 color="primary"
                 type="button"
+                class="camera-actions__primary"
                 (click)="capturePhoto()"
                 [disabled]="!cameraReady() || !canAddPhoto() || scanningLabel() || scanningFacture()"
               >

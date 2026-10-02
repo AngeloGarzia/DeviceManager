@@ -222,6 +222,8 @@ export interface Mas {
   utilise: boolean;
   regleJeuxIds?: number[];
   reglesJeux?: RegleJeuxOption[];
+  /** Jeton opaque pour QR public (règles de jeux). */
+  publicAccessToken?: string | null;
 }
 
 /** Bloc obligatoire lors d'un changement de statut MAS (signatures FIT + champs métier). */
@@ -731,6 +733,15 @@ export interface TodoItem {
   dueAt?: string | null;
   occurrenceKey?: string | null;
   overdue?: boolean;
+  photos?: TodoTachePhoto[] | null;
+}
+
+export interface TodoTachePhoto {
+  id: number;
+  photoUrl: string;
+  contentType?: string | null;
+  fileSize?: number | null;
+  position: number;
 }
 
 export interface TodoList {

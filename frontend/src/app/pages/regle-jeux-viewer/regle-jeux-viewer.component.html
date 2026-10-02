@@ -1,0 +1,77 @@
+<section class="grid gap-4">
+  <button mat-button type="button" class="!justify-self-start !pl-0" (click)="back()">
+    <mat-icon>arrow_back</mat-icon>
+    Retour aux règles
+  </button>
+
+  @if (loading()) {
+    <div class="flex justify-center py-10"><mat-spinner diameter="36"></mat-spinner></div>
+  } @else if (!item()) {
+    <p class="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">
+      {{ error() || 'Règle de jeux introuvable.' }}
+    </p>
+  } @else {
+    <header>
+      <h1 class="page-title">{{ item()!.label }}</h1>
+      @if (item()!.description) {
+        <p class="page-subtitle">{{ item()!.description }}</p>
+      }
+      <div class="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-sm text-ink-soft">
+        <span>{{ item()!.masCount ?? item()!.masses?.length ?? 0 }} MAS rattachée(s)</span>
+        @if (item()!.uploadedAt) {
+          <span>Document du {{ item()!.uploadedAt | date: 'dd/MM/yyyy HH:mm' }}</span>
+        }
+        @if (item()!.originalName) {
+          <span>{{ item()!.originalName }}</span>
+        }
+      </div>
+      @if (item()!.masses?.length) {
+        <ul class="m-0 mt-2 list-none space-y-1 p-0 text-sm text-ink-soft">
+          @for (m of item()!.masses!; track m.id) {
+            <li>
+              <a class="text-brand underline-offset-2 hover:underline" [routerLink]="['/mas', m.id]">
+                {{ m.numero }}@if (m.marqueLabel) { — {{ m.marqueLabel }} }
+              </a>
+            </li>
+          }
+        </ul>
+      }
+    </header>
+
+    @if (error()) {
+      <p class="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{{ error() }}</p>
+    }
+
+    <mat-card class="regle-viewer-card !rounded-xl !border !border-line !shadow-soft">
+      <mat-card-content class="!pt-4">
+        <div class="regle-viewer-field__label">
+          <mat-icon>{{ isImage() ? 'image' : 'picture_as_pdf' }}</mat-icon>
+          <span>Document de la règle — {{ isImage() ? 'Image' : 'PDF' }}</span>
+        </div>
+
+        <div class="regle-viewer-field" [attr.data-kind]="isImage() ? 'image' : 'pdf'">
+          @if (docLoading()) {
+            <div class="regle-viewer-field__loading">
+              <mat-spinner diameter="36"></mat-spinner>
+              <span>Chargement du document…</span>
+            </div>
+          } @else if (isImage() && objectUrl()) {
+            <img
+              class="regle-viewer-field__image"
+              [src]="objectUrl()!"
+              [alt]="item()!.originalName || item()!.label"
+            />
+          } @else if (safePdfUrl()) {
+            <iframe
+              class="regle-viewer-field__pdf"
+              [src]="safePdfUrl()"
+              title="Document PDF de la règle de jeux"
+            ></iframe>
+          } @else {
+            <p class="regle-viewer-field__empty">Aucun document à afficher.</p>
+          }
+        </div>
+      </mat-card-content>
+    </mat-card>
+  }
+</section>

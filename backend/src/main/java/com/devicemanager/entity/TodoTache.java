@@ -2,8 +2,11 @@ package com.devicemanager.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.BatchSize;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Tâche « À faire » de l'atelier — créable par tout utilisateur authentifié.
@@ -103,6 +106,13 @@ public class TodoTache {
     /** Clé anti-doublon de période (ex. 2026-09-16). */
     @Column(name = "occurrence_key", length = 32)
     private String occurrenceKey;
+
+    /** Captures caméra optionnelles (0 à 5). */
+    @OneToMany(mappedBy = "todoTache", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("position ASC")
+    @BatchSize(size = 16)
+    @Builder.Default
+    private List<TodoTachePhoto> photos = new ArrayList<>();
 
     @PrePersist
     void onCreate() {

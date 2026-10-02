@@ -1,3 +1,34 @@
+.camera-block--hero {
+  padding: 1rem;
+  border: 1px solid #d7e0ea;
+  border-radius: 1rem;
+  background: linear-gradient(180deg, #f8fafc 0%, #ffffff 55%);
+  box-shadow: 0 8px 24px color-mix(in srgb, #0f172a 8%, transparent);
+}
+
+.camera-block--hero .camera-viewport {
+  max-width: none;
+  width: 100%;
+  min-height: min(58vh, 28rem);
+  aspect-ratio: 4 / 3;
+}
+
+.camera-actions--hero {
+  gap: 0.65rem;
+}
+
+.camera-actions--hero .camera-actions__primary {
+  min-height: 3rem;
+  padding-inline: 1.25rem;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.camera-actions--hero .camera-actions__primary:focus-visible {
+  outline: 3px solid color-mix(in srgb, #2563eb 55%, transparent);
+  outline-offset: 2px;
+}
+
 .camera-viewport {
   position: relative;
   width: 100%;

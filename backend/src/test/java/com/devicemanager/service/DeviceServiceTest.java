@@ -153,11 +153,22 @@ class DeviceServiceTest {
     }
 
     @Test
-    void create_requiresPhoto() {
-        assertThatThrownBy(() -> deviceService.create(request(), List.of(), List.of(), "tech"))
-                .isInstanceOf(ResponseStatusException.class)
-                .extracting(ex -> ((ResponseStatusException) ex).getReason())
-                .isEqualTo("Ajoutez au moins une photo de la pièce");
+    void create_allowsZeroPhotos() {
+        when(deviceRepository.existsByNomIgnoreCaseAndAtelierId("Carte mère", 100L)).thenReturn(false);
+        when(deviceRepository.existsByReferenceIgnoreCaseAndAtelierId("REF-100", 100L)).thenReturn(false);
+        when(sfmService.getEntity(30L)).thenReturn(TestFixtures.sfm());
+        when(masService.getEntity(20L)).thenReturn(TestFixtures.mas());
+        when(deviceRepository.save(any(Device.class))).thenAnswer(inv -> {
+            Device d = inv.getArgument(0);
+            d.setId(44L);
+            return d;
+        });
+
+        DeviceResponse response = deviceService.create(request(), List.of(), List.of(), "tech");
+
+        assertThat(response.getId()).isEqualTo(44L);
+        assertThat(response.getPhotos()).isEmpty();
+        verify(storageService, never()).store(any());
     }
 
     @Test

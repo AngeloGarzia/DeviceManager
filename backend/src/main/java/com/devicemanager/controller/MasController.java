@@ -6,6 +6,7 @@ import com.devicemanager.dto.MarqueMasRequest;
 import com.devicemanager.dto.MarqueMasResponse;
 import com.devicemanager.dto.MasRequest;
 import com.devicemanager.dto.MasResponse;
+import com.devicemanager.dto.MasPublicAccessTokenResponse;
 import com.devicemanager.dto.RegleJeuxMasLinkRequest;
 import com.devicemanager.dto.RegleJeuxRequest;
 import com.devicemanager.dto.RegleJeuxResponse;
@@ -177,6 +178,22 @@ public class MasController {
     @GetMapping("/{id}")
     public ResponseEntity<MasResponse> get(@PathVariable Long id) {
         return ResponseEntity.ok(masService.findById(id));
+    }
+
+    /**
+     * Garantit un jeton public pour le QR règles de jeux (crée s'il n'existe pas).
+     */
+    @PostMapping("/{id}/public-access-token")
+    public ResponseEntity<MasPublicAccessTokenResponse> ensurePublicAccessToken(@PathVariable Long id) {
+        return ResponseEntity.ok(masService.ensurePublicAccessToken(id));
+    }
+
+    /**
+     * Régénère le jeton public (invalide les QR déjà diffusés).
+     */
+    @PostMapping("/{id}/public-access-token/rotate")
+    public ResponseEntity<MasPublicAccessTokenResponse> rotatePublicAccessToken(@PathVariable Long id) {
+        return ResponseEntity.ok(masService.rotatePublicAccessToken(id));
     }
 
     /**

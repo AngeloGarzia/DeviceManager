@@ -131,7 +131,7 @@ public class DeviceService {
      * Crée une pièce avec photos et documents PDF optionnels dans l'atelier courant.
      *
      * @param request   métadonnées (nom, usage, MAS/SFM, types des nouveaux PDF, etc.)
-     * @param photos    images (1 à {@link #MAX_PHOTOS})
+     * @param photos    images optionnelles (0 à {@link #MAX_PHOTOS}), prises à la caméra
      * @param documents PDF (manuel / datasheet / notice), types dans {@code request.newDocumentTypes}
      * @param username  acteur authentifié (historique prix saisie)
      * @return pièce persistée
@@ -142,7 +142,7 @@ public class DeviceService {
             List<MultipartFile> documents,
             String username) {
         List<MultipartFile> files = normalizeFiles(photos);
-        ensurePhotoCount(files.size(), true);
+        ensurePhotoCount(files.size(), false);
         files.forEach(this::validateImageFile);
 
         List<MultipartFile> docs = normalizeFiles(documents);
@@ -350,7 +350,7 @@ public class DeviceService {
         }
 
         int total = kept.size() + newFiles.size();
-        ensurePhotoCount(total, true);
+        ensurePhotoCount(total, false);
 
         for (DevicePhoto photo : List.copyOf(entity.getPhotos())) {
             if (!keepIds.contains(photo.getId())) {

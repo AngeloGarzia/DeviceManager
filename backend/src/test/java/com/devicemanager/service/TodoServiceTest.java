@@ -52,6 +52,8 @@ class TodoServiceTest {
     @Mock private AtelierMemoirePublisher atelierMemoirePublisher;
     @Mock private TodoRecurrenceService todoRecurrenceService;
     @Mock private MissingRegleJeuxTodoService missingRegleJeuxTodoService;
+    @Mock private StorageService storageService;
+    @Mock private ImageOptimizationService imageOptimizationService;
     @Mock private Clock clock;
     @InjectMocks private TodoService todoService;
 
@@ -78,7 +80,7 @@ class TodoServiceTest {
         request.setDescription("Bruit anormal");
         request.setSeverite("HIGH");
 
-        TodoTacheResponse response = todoService.create(request, "tech");
+        TodoTacheResponse response = todoService.create(request, List.of(), "tech");
 
         assertThat(response.getId()).isEqualTo(11L);
         assertThat(response.getStatut()).isEqualTo("OPEN");

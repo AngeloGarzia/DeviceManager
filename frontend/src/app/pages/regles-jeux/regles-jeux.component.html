@@ -3,8 +3,8 @@
     <div>
       <h1 class="page-title">Règles de jeux</h1>
       <p class="page-subtitle">
-        Catalogue global des règles (PDF). À l’ajout, l’IA lit le document et propose libellé et description.
-        Chaque PDF existant est contrôlé (validité et lisibilité).
+        Catalogue global des règles (PDF ou image). À l’ajout, l’IA lit le PDF et propose libellé et description.
+        Chaque document s’affiche dans une page dédiée.
       </p>
     </div>
     <button mat-stroked-button color="primary" type="button" (click)="openCreate()" [disabled]="saving()">
@@ -17,7 +17,7 @@
     id="regle-jeux-create-file"
     type="file"
     class="sr-only"
-    [accept]="pdfAccept"
+    [accept]="fileAccept"
     (change)="onCreateFileSelected($event)"
   />
 
@@ -47,7 +47,7 @@
           matInput
           [ngModel]="searchQuery()"
           (ngModelChange)="searchQuery.set($event)"
-          placeholder="Libellé, description, MAS, PDF…"
+          placeholder="Libellé, description, MAS, document…"
         />
         <mat-icon matSuffix>search</mat-icon>
       </mat-form-field>
@@ -58,7 +58,7 @@
     id="regle-jeux-replace-file"
     type="file"
     class="sr-only"
-    [accept]="pdfAccept"
+    [accept]="fileAccept"
     (change)="onReplaceFileSelected($event)"
   />
 
@@ -66,7 +66,7 @@
     <div class="flex justify-center py-8"><mat-spinner diameter="36"></mat-spinner></div>
   } @else if (items().length === 0) {
     <p class="rounded-lg border border-dashed border-line px-3 py-6 text-sm text-ink-soft">
-      Aucune règle de jeux. Cliquez sur « Nouvelle règle » et choisissez un PDF.
+      Aucune règle de jeux. Cliquez sur « Nouvelle règle » et choisissez un PDF ou une image.
     </p>
   } @else if (filteredItems().length === 0) {
     <p class="rounded-lg border border-dashed border-line px-3 py-6 text-sm text-ink-soft">
@@ -129,7 +129,7 @@
                   <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-soft">
                     <span>{{ item.masCount ?? item.masses?.length ?? 0 }} MAS rattachée(s)</span>
                     @if (item.uploadedAt) {
-                      <span>PDF du {{ item.uploadedAt | date: 'dd/MM/yyyy HH:mm' }}</span>
+                      <span>Document du {{ item.uploadedAt | date: 'dd/MM/yyyy HH:mm' }}</span>
                     }
                   </div>
                   @if (item.masses?.length) {
@@ -140,16 +140,14 @@
                     </ul>
                   }
                   <div class="mt-2 flex flex-wrap items-center gap-2">
-                    <button
+                    <a
                       mat-button
-                      type="button"
                       class="!min-w-0 inline-flex items-center gap-1 !px-2 text-sm text-brand"
-                      (click)="openPdf(item)"
-                      [disabled]="saving()"
+                      [routerLink]="['/mas/regles-jeux', item.id]"
                     >
-                      <mat-icon class="!text-base">picture_as_pdf</mat-icon>
-                      {{ item.originalName || 'Ouvrir le PDF' }}
-                    </button>
+                      <mat-icon class="!text-base">{{ isImageDoc(item) ? 'image' : 'picture_as_pdf' }}</mat-icon>
+                      {{ item.originalName || (isImageDoc(item) ? 'Voir l’image' : 'Voir le PDF') }}
+                    </a>
                   </div>
                 </div>
                 <div class="flex flex-wrap gap-2 shrink-0">
@@ -163,7 +161,7 @@
                   </button>
                   <button mat-stroked-button type="button" (click)="pickReplaceFile(item.id)" [disabled]="saving()">
                     <mat-icon>upload_file</mat-icon>
-                    Remplacer PDF
+                    Remplacer document
                   </button>
                   <button
                     mat-stroked-button

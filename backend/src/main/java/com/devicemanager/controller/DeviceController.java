@@ -56,7 +56,7 @@ public class DeviceController {
      * Crée une pièce détachée avec photos dans l'atelier courant.
      *
      * @param data métadonnées de la pièce (JSON multipart)
-     * @param photos images associées (au moins une requise)
+     * @param photos images associées (optionnelles, 0 à 5)
      * @return pièce créée
      * @throws org.springframework.web.server.ResponseStatusException {@code 400} si validation ou photos invalides ;
      *         {@code 409} en cas de doublon nom/référence

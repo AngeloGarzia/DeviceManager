@@ -52,15 +52,38 @@ export class TodoService {
     } });
   }
 
-  create(payload: TodoTacheForm): Observable<TodoItem> {
+  create(payload: TodoTacheForm, photos: File[] = []): Observable<TodoItem> {
+    const formData = new FormData();
+    formData.append(
+      'data',
+      new Blob(
+        [
+          JSON.stringify({
+            titre: payload.titre.trim(),
+            description: payload.description?.trim() || null,
+            severite: payload.severite || 'MEDIUM',
+            masId: payload.masId ?? null
+          })
+        ],
+        { type: 'application/json' }
+      )
+    );
+    for (const photo of photos) {
+      formData.append('photos', photo, photo.name || 'capture.jpg');
+    }
     return this.http
-      .post<TodoItem>(`${this.base}`, {
-        titre: payload.titre.trim(),
-        description: payload.description?.trim() || null,
-        severite: payload.severite || 'MEDIUM',
-        masId: payload.masId ?? null
-      })
+      .post<TodoItem>(`${this.base}`, formData)
       .pipe(tap(() => this.refreshPendingCount()));
+  }
+
+  resolvePhotoUrl(photoUrl?: string | null): string {
+    if (!photoUrl) {
+      return '';
+    }
+    if (photoUrl.startsWith('http') || photoUrl.startsWith('blob:')) {
+      return photoUrl;
+    }
+    return `${environment.apiUrl}${photoUrl}`;
   }
 
   updateStatus(

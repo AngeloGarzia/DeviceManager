@@ -254,6 +254,71 @@
             <mat-label>Description</mat-label>
             <textarea matInput rows="3" formControlName="description" maxlength="2000"></textarea>
           </mat-form-field>
+
+          <div class="todo-capture">
+            <div class="flex flex-wrap items-center gap-2">
+              <button
+                mat-stroked-button
+                type="button"
+                [disabled]="!canAddPhoto() || saving()"
+                (click)="openCapture()"
+              >
+                <mat-icon>photo_camera</mat-icon>
+                Ajouter une capture
+              </button>
+              <span class="text-sm text-ink-soft">
+                {{ newPhotos().length }} / {{ maxPhotos }} — optionnel
+              </span>
+            </div>
+
+            @if (showCamera()) {
+              <div class="todo-capture__panel">
+                <video
+                  #todoCaptureVideo
+                  class="todo-capture__video"
+                  playsinline
+                  muted
+                  autoplay
+                ></video>
+                @if (cameraError()) {
+                  <p class="m-0 text-sm" style="color: #b45309">{{ cameraError() }}</p>
+                }
+                <div class="flex flex-wrap gap-2">
+                  <button
+                    mat-flat-button
+                    color="primary"
+                    type="button"
+                    [disabled]="!cameraReady() || !canAddPhoto()"
+                    (click)="capturePhoto()"
+                  >
+                    <mat-icon>camera</mat-icon>
+                    Capturer
+                  </button>
+                  <button mat-button type="button" (click)="closeCapture()">Fermer</button>
+                </div>
+              </div>
+            }
+
+            @if (newPhotos().length > 0) {
+              <ul class="todo-capture__thumbs">
+                @for (photo of newPhotos(); track photo.previewUrl; let i = $index) {
+                  <li class="todo-capture__thumb">
+                    <img [src]="photo.previewUrl" alt="Capture {{ i + 1 }}" />
+                    <button
+                      mat-icon-button
+                      type="button"
+                      class="todo-capture__remove"
+                      aria-label="Retirer la capture"
+                      (click)="removeNewPhoto(i)"
+                    >
+                      <mat-icon>close</mat-icon>
+                    </button>
+                  </li>
+                }
+              </ul>
+            }
+          </div>
+
           <div class="grid gap-3 sm:grid-cols-2">
             <mat-form-field appearance="outline" class="w-full">
               <mat-label>Priorité</mat-label>
@@ -571,6 +636,20 @@
             </div>
             @if (item.description) {
               <p class="todo-item__desc">{{ item.description }}</p>
+            }
+            @if (item.photos?.length) {
+              <div class="todo-item__photos">
+                @for (photo of item.photos; track photo.id) {
+                  <a
+                    class="todo-item__photo"
+                    [href]="resolvePhotoUrl(photo.photoUrl)"
+                    target="_blank"
+                    rel="noopener"
+                  >
+                    <img [src]="resolvePhotoUrl(photo.photoUrl)" [alt]="'Photo ' + (photo.position + 1)" />
+                  </a>
+                }
+              </div>
             }
             <p class="todo-item__meta">
               Créée le {{ formatDateTime(item.dateCreation || item.createdAt) }}

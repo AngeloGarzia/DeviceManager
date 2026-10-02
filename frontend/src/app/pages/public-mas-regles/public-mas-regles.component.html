@@ -1,0 +1,43 @@
+<section class="public-shell">
+  <header class="public-shell__header">
+    <div class="public-shell__brand">DeviceManager</div>
+    <p class="public-shell__hint">Consultation des règles de jeux — lecture seule</p>
+  </header>
+
+  @if (loading()) {
+    <div class="flex justify-center py-12"><mat-spinner diameter="40"></mat-spinner></div>
+  } @else if (error()) {
+    <p class="public-shell__error">{{ error() }}</p>
+  } @else if (data()) {
+    <header class="public-shell__title-block">
+      <h1 class="public-shell__title">MAS {{ data()!.masNumero }}</h1>
+      @if (data()!.marqueLabel) {
+        <p class="public-shell__subtitle">{{ data()!.marqueLabel }}</p>
+      }
+    </header>
+
+    @if (data()!.regles.length === 0) {
+      <p class="public-shell__empty">Aucune règle de jeux associée à cette machine.</p>
+    } @else {
+      <ul class="public-regle-list">
+        @for (regle of data()!.regles; track regle.id) {
+          <li>
+            <a
+              class="public-regle-card"
+              [routerLink]="['/public/r', token(), 'regles', regle.id]"
+            >
+              <mat-icon>{{ isImage(regle) ? 'image' : 'picture_as_pdf' }}</mat-icon>
+              <div class="min-w-0 flex-1">
+                <div class="public-regle-card__label">{{ regle.label }}</div>
+                @if (regle.description) {
+                  <p class="public-regle-card__desc">{{ regle.description }}</p>
+                }
+              </div>
+              <mat-icon class="public-regle-card__chevron">chevron_right</mat-icon>
+            </a>
+          </li>
+        }
+      </ul>
+    }
+  }
+</section>

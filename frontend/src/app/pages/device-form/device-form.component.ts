@@ -27,6 +27,7 @@ import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { firstValueFrom } from 'rxjs';
 import { DeviceService } from '../../services/device.service';
 import { DeviceFormDraftService } from '../../services/device-form-draft.service';
+import { CameraPreferencesService } from '../../services/camera-preferences.service';
 import { SfmService } from '../../services/sfm.service';
 import { MasService } from '../../services/mas.service';
 import { AiService, AiFactureScanResponse } from '../../services/ai.service';
@@ -81,11 +82,14 @@ export class DeviceFormComponent implements OnInit, AfterViewInit, OnDestroy {
   @ViewChild('canvasEl') canvasEl?: ElementRef<HTMLCanvasElement>;
   @ViewChild('fileInput') fileInput?: ElementRef<HTMLInputElement>;
   @ViewChild('factureInput') factureInput?: ElementRef<HTMLInputElement>;
+  @ViewChild('cameraBlock') cameraBlock?: ElementRef<HTMLElement>;
+  @ViewChild('captureBtn') captureBtn?: ElementRef<HTMLButtonElement>;
 
   private readonly fb = inject(FormBuilder);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly deviceService = inject(DeviceService);
+  private readonly cameraPrefs = inject(CameraPreferencesService);
   private readonly draftService = inject(DeviceFormDraftService);
   private readonly sfmService = inject(SfmService);
   private readonly masService = inject(MasService);
@@ -341,26 +345,9 @@ export class DeviceFormComponent implements OnInit, AfterViewInit, OnDestroy {
     this.router.navigate(['/mas/new'], { queryParams: this.returnDeviceQuery() });
   }
 
-  /** Libellé affiché pour une source caméra dans la liste déroulante. */
-  cameraLabel(device: MediaDeviceInfo, index: number): string {
-    if (device.label?.trim()) {
-      return device.label;
-    }
-    return `Caméra ${index + 1}`;
-  }
-
   /** URL absolue d'une photo déjà enregistrée. */
   resolveExistingUrl(photo: DevicePhoto): string {
     return this.deviceService.resolvePhotoUrl(photo.photoUrl);
-  }
-
-  /** Change la caméra active et redémarre le flux vidéo. */
-  async onCameraSourceChange(deviceId: string): Promise<void> {
-    if (!deviceId || deviceId === this.selectedCameraId()) {
-      return;
-    }
-    this.selectedCameraId.set(deviceId);
-    await this.startCamera(deviceId);
   }
 
   /** Démarre ou redémarre le flux caméra pour la capture photo. */
@@ -371,7 +358,8 @@ export class DeviceFormComponent implements OnInit, AfterViewInit, OnDestroy {
     }
     this.cameraError.set(null);
     this.stopCamera(false);
-    const preferredId = deviceId ?? this.selectedCameraId();
+    const preferredId =
+      deviceId ?? this.selectedCameraId() ?? this.cameraPrefs.getPreferredDeviceId();
     try {
       this.mediaStream = await this.openCameraStream(preferredId);
       const video = this.videoEl.nativeElement;
@@ -379,12 +367,27 @@ export class DeviceFormComponent implements OnInit, AfterViewInit, OnDestroy {
       await video.play();
       this.cameraReady.set(true);
       await this.refreshCameraList();
+      this.focusCameraUi();
     } catch {
       this.cameraReady.set(false);
       this.cameraError.set(
-        "Caméra inaccessible. Autorisez l'accès ou utilisez le bouton galerie."
+        "Caméra inaccessible. Autorisez l'accès ou utilisez le bouton galerie. " +
+          'Vous pouvez choisir la source dans Paramètres → Caméra.'
       );
     }
+  }
+
+  /** Sur « Nouvelle pièce », amène le viewport caméra et le bouton Acquisition au premier plan. */
+  private focusCameraUi(): void {
+    if (this.isEdit) {
+      return;
+    }
+    requestAnimationFrame(() => {
+      this.cameraBlock?.nativeElement?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      setTimeout(() => {
+        this.captureBtn?.nativeElement?.focus({ preventScroll: true });
+      }, 280);
+    });
   }
 
   private async openCameraStream(deviceId: string | null): Promise<MediaStream> {
@@ -431,6 +434,11 @@ export class DeviceFormComponent implements OnInit, AfterViewInit, OnDestroy {
     }
 
     if (!this.selectedCameraId() && videoInputs.length > 0) {
+      const preferred = this.cameraPrefs.getPreferredDeviceId();
+      if (preferred && videoInputs.some((d) => d.deviceId === preferred)) {
+        this.selectedCameraId.set(preferred);
+        return;
+      }
       const rear = videoInputs.find((d) =>
         /back|rear|environment|arri[eè]re|world/i.test(d.label)
       );
@@ -875,10 +883,6 @@ export class DeviceFormComponent implements OnInit, AfterViewInit, OnDestroy {
   submit(): void {
     if (this.form.invalid) {
       this.form.markAllAsTouched();
-      return;
-    }
-    if (this.photoCount() < 1) {
-      this.error.set("Ajoutez au moins une image avant d'enregistrer.");
       return;
     }
     if (this.photoCount() > this.maxPhotos) {

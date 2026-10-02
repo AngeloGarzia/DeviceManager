@@ -344,3 +344,124 @@
   background: #fff1f2;
   color: #be123c;
 }
+
+.home-simple-todos {
+  padding: 0.85rem 1rem 1rem;
+}
+
+.home-simple-todos__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.home-simple-todos__title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #1f2933;
+}
+
+.home-simple-todos__subtitle {
+  margin: 0.2rem 0 0;
+  font-size: 0.8rem;
+  color: #829ab1;
+}
+
+.home-simple-todos__sort {
+  flex-shrink: 0;
+}
+
+.home-simple-todos__empty {
+  margin: 0;
+  padding: 0.5rem 0;
+  font-size: 0.9rem;
+  color: #829ab1;
+}
+
+.home-simple-todos__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.45rem;
+}
+
+.home-simple-todos__item {
+  display: grid;
+  gap: 0.25rem;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid #d9e2ec;
+  border-radius: 0.75rem;
+  background: #fff;
+  text-decoration: none;
+  color: inherit;
+  border-left-width: 3px;
+  border-left-color: #94a3b8;
+  transition: background 0.15s ease;
+}
+
+.home-simple-todos__item:hover {
+  background: #f8fafc;
+}
+
+.home-simple-todos__item[data-severity='HIGH'] {
+  border-left-color: #dc2626;
+}
+
+.home-simple-todos__item[data-severity='MEDIUM'] {
+  border-left-color: #0284c7;
+}
+
+.home-simple-todos__item[data-severity='LOW'] {
+  border-left-color: #059669;
+}
+
+.home-simple-todos__item-main {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.home-simple-todos__item-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #1f2933;
+}
+
+.home-simple-todos__sev {
+  display: inline-block;
+  border-radius: 999px;
+  padding: 0.1rem 0.5rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.home-simple-todos__sev[data-severity='HIGH'] {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.home-simple-todos__sev[data-severity='MEDIUM'] {
+  background: #e0f2fe;
+  color: #075985;
+}
+
+.home-simple-todos__sev[data-severity='LOW'] {
+  background: #ecfdf5;
+  color: #047857;
+}
+
+.home-simple-todos__item-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  font-size: 0.75rem;
+  color: #829ab1;
+}
+

@@ -124,6 +124,64 @@
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
+.todo-capture {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.todo-capture__panel {
+  display: grid;
+  gap: 0.65rem;
+  padding: 0.75rem;
+  border: 1px solid #d9e2ec;
+  border-radius: 0.75rem;
+  background: #f8fafc;
+}
+
+.todo-capture__video {
+  width: 100%;
+  max-height: 240px;
+  object-fit: cover;
+  border-radius: 0.5rem;
+  background: #0f172a;
+}
+
+.todo-capture__thumbs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.todo-capture__thumb {
+  position: relative;
+  width: 4.5rem;
+  height: 4.5rem;
+  border-radius: 0.45rem;
+  overflow: hidden;
+  border: 1px solid #d9e2ec;
+  background: #e2e8f0;
+
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+}
+
+.todo-capture__remove {
+  position: absolute !important;
+  top: -0.2rem;
+  right: -0.2rem;
+  width: 1.6rem !important;
+  height: 1.6rem !important;
+  background: color-mix(in srgb, #0f172a 72%, transparent) !important;
+  color: #fff !important;
+}
+
 .todo-create-panel:focus-visible {
   border-color: #0f4c81;
 }
@@ -482,6 +540,30 @@
   margin: 0.25rem 0 0;
   font-size: 0.85rem;
   color: #52606d;
+}
+
+.todo-item__photos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.45rem;
+}
+
+.todo-item__photo {
+  display: block;
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: 0.4rem;
+  overflow: hidden;
+  border: 1px solid #d9e2ec;
+  background: #e2e8f0;
+
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
 }
 
 .todo-item__meta {

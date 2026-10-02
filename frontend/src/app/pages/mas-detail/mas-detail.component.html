@@ -66,15 +66,14 @@
                   <ul class="m-0 list-none space-y-2 p-0">
                     @for (r of mas.reglesJeux; track r.id) {
                       <li>
-                        <button
+                        <a
                           mat-button
-                          type="button"
                           class="!min-w-0 inline-flex items-center gap-1 !px-2 text-sm text-brand"
-                          (click)="openRegleJeuxPdf(r)"
+                          [routerLink]="['/mas/regles-jeux', r.id]"
                         >
-                          <mat-icon class="!text-base">picture_as_pdf</mat-icon>
+                          <mat-icon class="!text-base">{{ isRegleImage(r) ? 'image' : 'picture_as_pdf' }}</mat-icon>
                           {{ r.label }}
-                        </button>
+                        </a>
                         @if (r.originalName) {
                           <span class="ml-1 text-xs text-ink-soft">({{ r.originalName }})</span>
                         }
@@ -87,6 +86,42 @@
               </dd>
             </div>
           </dl>
+        </mat-card-content>
+      </mat-card>
+
+      <mat-card class="!rounded-xl !border !border-line !shadow-soft">
+        <mat-card-content class="!pt-5">
+          <h2 class="m-0 text-base font-semibold text-ink">QR code — règles de jeux (public)</h2>
+          <p class="mt-1 mb-3 text-sm text-ink-soft">
+            Scannez ce QR avec l’appareil photo du téléphone (sans installer DeviceManager) :
+            le navigateur ouvre directement la règle de jeux en lecture seule.
+          </p>
+          <div class="flex flex-wrap gap-2">
+            <button mat-stroked-button type="button" (click)="showPublicQr()" [disabled]="qrLoading()">
+              <mat-icon>qr_code_2</mat-icon>
+              {{ qrVisible() ? 'Actualiser le QR' : 'Afficher le QR' }}
+            </button>
+            @if (qrVisible()) {
+              <button mat-stroked-button type="button" (click)="copyPublicUrl()" [disabled]="!qrUrl()">
+                <mat-icon>link</mat-icon>
+                Copier le lien
+              </button>
+              <button mat-stroked-button color="warn" type="button" (click)="rotatePublicQr()" [disabled]="qrLoading()">
+                <mat-icon>autorenew</mat-icon>
+                Régénérer
+              </button>
+            }
+          </div>
+          @if (qrLoading()) {
+            <div class="mt-4 flex justify-center"><mat-spinner diameter="28"></mat-spinner></div>
+          } @else if (qrVisible()) {
+            <div class="mas-public-qr mt-4">
+              <canvas #qrCanvas class="mas-public-qr__canvas" aria-label="QR code règles de jeux"></canvas>
+              @if (qrUrl()) {
+                <p class="mas-public-qr__url">{{ qrUrl() }}</p>
+              }
+            </div>
+          }
         </mat-card-content>
       </mat-card>
 

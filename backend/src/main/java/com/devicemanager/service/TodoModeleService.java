@@ -75,7 +75,7 @@ public class TodoModeleService {
         request.setDescription(modele.getDescription());
         request.setSeverite(modele.getSeverite());
         request.setMasId(modele.getMas() != null ? modele.getMas().getId() : null);
-        return todoService.create(request, username);
+        return todoService.create(request, List.of(), username);
     }
 
     private TodoModele applyRequest(TodoModele entity, TodoModeleRequest request, Atelier atelier, User actor) {

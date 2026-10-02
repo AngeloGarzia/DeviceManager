@@ -61,6 +61,7 @@ function isSilentUrl(url: string): boolean {
     url.includes('/actuator/health') ||
     url.includes('/actuator/info') ||
     url.includes('/api/auth/refresh') ||
-    url.includes('/api/auth/logout')
+    url.includes('/api/auth/logout') ||
+    url.includes('/api/public/')
   );
 }
