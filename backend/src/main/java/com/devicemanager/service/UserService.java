@@ -258,7 +258,7 @@ public class UserService {
                 .used(false)
                 .build());
 
-        String resetUrl = baseUrl + "/#/reset-password?token=" + rawToken;
+        String resetUrl = baseUrl + "/reset-password?token=" + rawToken;
         transactionalMail.sendUserWelcome(
                 email,
                 new PasswordWelcomeEmail.Context(

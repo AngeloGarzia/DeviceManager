@@ -9,6 +9,9 @@ backend/.env.development
 backend/.env.production
 backend/.env.local
 
+# Node (serveur SPA racine / Clever Node.js)
+node_modules/
+
 # Frontend — pas de fichiers .env secrets
 frontend/node_modules/
 frontend/dist/
