@@ -219,7 +219,7 @@ export class AppTourService {
         title: 'Bienvenue dans DeviceManager',
         description:
           'Petit parcours métier : votre atelier, les référentiels (SFM / MAS), les pièces au quotidien, ' +
-          'les commandes, le suivi terrain, puis l’assistant IA et sa mémoire synaptique. ' +
+          'les commandes, le suivi terrain, puis Dévi (assistant IA) et sa mémoire synaptique. ' +
           'Vous pourrez le relancer à tout moment depuis le pied de page.'
       },
       {
@@ -516,19 +516,19 @@ export class AppTourService {
         description: 'Créez, assignez et clôturez vos tâches. Raccourci aussi depuis la tuile « À faire » sur l’accueil pièces.'
       },
 
-      // ── IA ───────────────────────────────────────────────────────
+      // ── IA (Dévi) ───────────────────────────────────────────────
       {
-        title: 'Assistant IA & mémoire',
+        title: 'Dévi & mémoire synaptique',
         description:
-          'L’IA s’appuie sur la mémoire synaptique de l’atelier (événements pièces, stock, commandes, interventions…) pour répondre au contexte.'
+          'Dévi, votre assistant IA, s’appuie sur la mémoire synaptique de l’atelier (pièces, stock, commandes, interventions…) pour répondre au contexte.'
       },
       {
         element: '[data-tour="shell-ai"]',
         side: 'bottom',
         align: 'end',
-        title: 'Ouvrir l’assistant',
+        title: 'Ouvrir Dévi',
         description:
-          'Icône en haut à droite (activable dans Paramètres). Utile pour rédiger, questionner le stock ou le statut des commandes.'
+          'Mascotte Dévi en haut à droite (activable dans Paramètres). Utile pour rédiger, questionner le stock ou le statut des commandes.'
       },
       {
         route: '/ai',
@@ -543,9 +543,9 @@ export class AppTourService {
       {
         route: '/ai',
         element: '[data-tour="page-ai"]',
-        title: 'Chat métier',
+        title: 'Discuter avec Dévi',
         description:
-          'Posez une question (« pièces en rupture ? », « todos ouvertes ? »…). L’assistant lit la mémoire avant de répondre.'
+          'Posez une question (« pièces en rupture ? », « todos ouvertes ? »…). Dévi lit la mémoire avant de répondre.'
       },
 
       {

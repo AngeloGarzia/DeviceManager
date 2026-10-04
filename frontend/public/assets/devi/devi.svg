@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-3 -2 106 104" width="512" height="512" role="img" aria-label="Dévi, la mascotte DeviceManager">
+  <line x1="50" y1="26" x2="50" y2="12" stroke="#14213d" stroke-width="4" stroke-linecap="round"/>
+  <circle cx="50" cy="9" r="6" fill="#f59e0b" stroke="#14213d" stroke-width="3"/>
+  <rect x="6" y="46" width="11" height="18" rx="5" fill="#f59e0b" stroke="#14213d" stroke-width="3"/>
+  <rect x="83" y="46" width="11" height="18" rx="5" fill="#f59e0b" stroke="#14213d" stroke-width="3"/>
+  <rect x="14" y="26" width="72" height="58" rx="20" fill="#2563eb" stroke="#14213d" stroke-width="4"/>
+  <rect x="23" y="35" width="54" height="40" rx="14" fill="#eaf2ff" stroke="#14213d" stroke-width="3"/>
+  <circle cx="39" cy="53" r="6" fill="#14213d"/><circle cx="61" cy="53" r="6" fill="#14213d"/>
+  <circle cx="41" cy="51" r="2" fill="#fff"/><circle cx="63" cy="51" r="2" fill="#fff"/>
+  <path d="M40 63 Q50 72 60 63" fill="none" stroke="#14213d" stroke-width="3.4" stroke-linecap="round"/>
+  <circle cx="30" cy="62" r="3.6" fill="#fda4af"/><circle cx="70" cy="62" r="3.6" fill="#fda4af"/>
+  <rect x="28" y="84" width="16" height="9" rx="4" fill="#14213d"/><rect x="56" y="84" width="16" height="9" rx="4" fill="#14213d"/>
+</svg>

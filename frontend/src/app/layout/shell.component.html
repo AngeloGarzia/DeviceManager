@@ -63,12 +63,20 @@
           mat-icon-button
           type="button"
           data-tour="shell-ai"
+          class="shell-devi-btn"
           [class.admin-active]="router.url.startsWith('/ai')"
-          [matTooltip]="ai.enabled() ? 'Assistant IA' : (ai.disabledReason() || 'Assistant IA')"
+          [matTooltip]="ai.enabled() ? 'Dévi — assistant IA' : (ai.disabledReason() || 'Dévi — assistant IA')"
           (click)="openAiAssistant()"
-          aria-label="Assistant IA"
+          aria-label="Dévi, assistant IA"
         >
-          <mat-icon>smart_toy</mat-icon>
+          <img
+            class="shell-devi-avatar"
+            src="assets/devi/devi.svg"
+            width="28"
+            height="28"
+            alt=""
+            aria-hidden="true"
+          />
         </button>
         <button
           mat-icon-button

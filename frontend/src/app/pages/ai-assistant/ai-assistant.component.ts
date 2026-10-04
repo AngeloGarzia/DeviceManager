@@ -74,7 +74,7 @@ export class AiAssistantComponent implements OnInit {
       },
       error: () => {
         this.loadingStatus.set(false);
-        this.error.set('Impossible de contacter l’assistant IA.');
+        this.error.set('Impossible de contacter Dévi.');
       }
     });
     this.loadMemory();

@@ -308,6 +308,18 @@ button.admin-active mat-icon {
   color: #0b6bcb;
 }
 
+.shell-devi-btn.admin-active {
+  background: color-mix(in srgb, #2563eb 14%, transparent);
+}
+
+.shell-devi-avatar {
+  display: block;
+  width: 1.75rem;
+  height: 1.75rem;
+  object-fit: contain;
+  pointer-events: none;
+}
+
 @media (min-width: 640px) {
   .nav-link {
     min-height: 3.5rem;

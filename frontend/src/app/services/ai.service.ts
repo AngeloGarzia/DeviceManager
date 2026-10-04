@@ -106,7 +106,7 @@ export class AiService {
     this.status().subscribe({
       error: () => {
         this.enabled.set(false);
-        this.statusMessage.set('Impossible de contacter l’assistant IA.');
+        this.statusMessage.set('Impossible de contacter Dévi.');
         this.providerKeyStatus.set({});
         this.providers.set([]);
         this.statusLoaded.set(true);

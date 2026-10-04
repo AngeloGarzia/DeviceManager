@@ -163,7 +163,7 @@ export class ShellComponent implements OnInit, OnDestroy {
     return url.startsWith('/mas') || url.startsWith('/sfm');
   }
 
-  /** Ouvre la page assistant IA (reteste le statut même après une panne API temporaire). */
+  /** Ouvre la page Dévi (reteste le statut même après une panne API temporaire). */
   openAiAssistant(): void {
     this.ai.refreshStatus();
     void this.router.navigate(['/ai']);

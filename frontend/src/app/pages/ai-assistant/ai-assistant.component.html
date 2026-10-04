@@ -1,7 +1,18 @@
 <section class="grid gap-4">
-  <header>
-    <h1 class="page-title" data-tour="page-ai">Assistant IA</h1>
-    <p class="page-subtitle">Spring AI · aide rédaction demandes, pièces, MAS / SFM · mémoire synaptique atelier</p>
+  <header class="devi-hero">
+    <img
+      class="devi-hero__avatar"
+      src="assets/devi/devi-256.png"
+      width="88"
+      height="88"
+      alt="Dévi"
+    />
+    <div class="devi-hero__text">
+      <h1 class="page-title" data-tour="page-ai">Dévi</h1>
+      <p class="page-subtitle">
+        Votre assistant IA DeviceManager — aide rédaction demandes, pièces, MAS / SFM · mémoire synaptique atelier
+      </p>
+    </div>
   </header>
 
   @if (loadingStatus()) {
@@ -89,28 +100,60 @@
 
         <div class="chat-log mb-4 grid gap-3">
           @if (turns().length === 0) {
-            <p class="m-0 text-sm text-ink-soft">
-              L’assistant consulte la mémoire synaptique de l’atelier pour répondre.
-              Exemples : « Combien de pièces en rupture ? », « Quelles tâches À faire sont ouvertes ? »
-            </p>
+            <div class="devi-empty">
+              <img
+                class="devi-empty__avatar"
+                src="assets/devi/devi-128.png"
+                width="56"
+                height="56"
+                alt=""
+                aria-hidden="true"
+              />
+              <p class="m-0 text-sm text-ink-soft">
+                Bonjour, je suis <strong>Dévi</strong>. Je consulte la mémoire synaptique de l’atelier pour vous
+                répondre. Exemples : « Combien de pièces en rupture ? », « Quelles tâches À faire sont ouvertes ? »
+              </p>
+            </div>
           }
           @for (turn of turns(); track $index) {
             <div class="chat-bubble" [class.user]="turn.role === 'user'" [class.assistant]="turn.role === 'assistant'">
-              <div class="chat-role">{{ turn.role === 'user' ? 'Vous' : 'Assistant' }}</div>
+              <div class="chat-role">
+                @if (turn.role === 'assistant') {
+                  <img
+                    class="chat-role__avatar"
+                    src="assets/devi/devi-64.png"
+                    width="20"
+                    height="20"
+                    alt=""
+                    aria-hidden="true"
+                  />
+                  Dévi
+                } @else {
+                  Vous
+                }
+              </div>
               <pre class="chat-text">{{ turn.text }}</pre>
             </div>
           }
           @if (sending()) {
             <div class="flex items-center gap-2 text-sm text-ink-soft">
+              <img
+                class="devi-thinking"
+                src="assets/devi/devi-64.png"
+                width="22"
+                height="22"
+                alt=""
+                aria-hidden="true"
+              />
               <mat-spinner diameter="18"></mat-spinner>
-              Réflexion…
+              Dévi réfléchit…
             </div>
           }
         </div>
 
         <form class="grid gap-3" [formGroup]="form" (ngSubmit)="send()">
           <mat-form-field appearance="outline" class="w-full">
-            <mat-label>Votre question</mat-label>
+            <mat-label>Votre question à Dévi</mat-label>
             <textarea matInput rows="3" formControlName="message"></textarea>
           </mat-form-field>
           <button
