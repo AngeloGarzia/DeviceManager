@@ -17,4 +17,10 @@ public interface DevicePrixAlerteRepository extends JpaRepository<DevicePrixAler
 
     List<DevicePrixAlerte> findByDeviceIdAndAtelierIdAndStatusOrderByCreatedAtDesc(
             Long deviceId, Long atelierId, PrixAlerteStatus status);
+
+    List<DevicePrixAlerte> findByDeviceId(Long deviceId);
+
+    long countByDeviceId(Long deviceId);
+
+    void deleteByDeviceId(Long deviceId);
 }

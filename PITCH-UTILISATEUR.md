@@ -481,6 +481,7 @@ Les destinataires admin respectent en général la préférence **« Recevoir le
 | **Règle de jeux** | Document PDF/image associé à une MAS ; consultable via QR. |
 | **Mémoire synaptique** | Snapshot IA de la situation d’un atelier. |
 | **Todo** | Tâche atelier (ponctuelle, modèle ou occurrence récurrente). |
+| **Purge en chaîne** | Super Admin : supprimer une pièce en archivant les bons liés et en conservant l’historique stock. |
 
 ---
 

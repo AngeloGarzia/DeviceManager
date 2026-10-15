@@ -38,4 +38,8 @@ public interface StockMouvementRepository extends JpaRepository<StockMouvement, 
             @Param("sourceType") String sourceType,
             @Param("from") LocalDateTime from,
             @Param("to") LocalDateTime to);
+
+    List<StockMouvement> findByDeviceId(Long deviceId);
+
+    long countByDeviceId(Long deviceId);
 }

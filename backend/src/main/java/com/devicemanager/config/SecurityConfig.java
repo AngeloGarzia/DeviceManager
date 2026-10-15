@@ -129,6 +129,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/users", "/api/users/**").hasRole(Roles.ADMIN)
                         .requestMatchers("/api/setup", "/api/setup/**").hasRole(Roles.SUPER_ADMIN)
                         .requestMatchers("/api/logs", "/api/logs/**").hasRole(Roles.SUPER_ADMIN)
+                        .requestMatchers("/api/admin/purge", "/api/admin/purge/**").hasRole(Roles.SUPER_ADMIN)
                         .requestMatchers("/api/ateliers", "/api/ateliers/**")
                             .hasAnyRole(Roles.ADMIN, Roles.TECHNICIEN)
                         .requestMatchers("/api/devices", "/api/devices/**")

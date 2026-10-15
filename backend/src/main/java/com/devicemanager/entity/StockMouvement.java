@@ -26,8 +26,9 @@ public class StockMouvement {
             foreignKey = @ForeignKey(name = "fk_stock_mouvement_atelier"))
     private Atelier atelier;
 
-    @ManyToOne(optional = false, fetch = FetchType.LAZY)
-    @JoinColumn(name = "device_id", nullable = false,
+    /** Nullable après purge pièce (snapshot piece_nom conservé). */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "device_id",
             foreignKey = @ForeignKey(name = "fk_stock_mouvement_device"))
     private Device device;
 

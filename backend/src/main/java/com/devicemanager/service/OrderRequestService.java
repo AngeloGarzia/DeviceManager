@@ -112,6 +112,8 @@ public class OrderRequestService {
                             HttpStatus.BAD_REQUEST, "Pièce détachée introuvable dans cet atelier."));
             CommandeLigne ligne = CommandeLigne.builder()
                     .device(device)
+                    .pieceNom(device.getNom())
+                    .pieceReference(device.getReference())
                     .quantite(entry.getValue())
                     .build();
             commande.addLigne(ligne);
@@ -531,6 +533,8 @@ public class OrderRequestService {
                             HttpStatus.BAD_REQUEST, "Pièce détachée introuvable dans cet atelier."));
             commande.addLigne(CommandeLigne.builder()
                     .device(device)
+                    .pieceNom(device.getNom())
+                    .pieceReference(device.getReference())
                     .quantite(entry.getValue())
                     .build());
         }
@@ -655,6 +659,8 @@ public class OrderRequestService {
         for (Device device : devices) {
             draft.addLigne(CommandeLigne.builder()
                     .device(device)
+                    .pieceNom(device.getNom())
+                    .pieceReference(device.getReference())
                     .quantite(quantities.getOrDefault(device.getId(), 1))
                     .build());
         }
@@ -868,11 +874,13 @@ public class OrderRequestService {
     private OrderRequestLineResponse toLineResponse(CommandeLigne ligne) {
         Device device = ligne.getDevice();
         Sfm sfm = device != null ? device.getSfm() : null;
+        String pieceNom = device != null ? device.getNom() : ligne.getPieceNom();
+        String reference = device != null ? device.getReference() : ligne.getPieceReference();
         return OrderRequestLineResponse.builder()
                 .id(ligne.getId())
                 .deviceId(device != null ? device.getId() : null)
-                .pieceNom(device != null ? device.getNom() : null)
-                .reference(device != null ? device.getReference() : null)
+                .pieceNom(pieceNom)
+                .reference(reference)
                 .quantite(ligne.getQuantite())
                 .photoUrl(device != null
                         ? storageService.resolveAccessUrl(

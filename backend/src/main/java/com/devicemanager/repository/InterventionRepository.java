@@ -21,13 +21,25 @@ public interface InterventionRepository extends JpaRepository<Intervention, Long
             left join fetch l.device d
             join fetch i.technicien
             where i.atelier.id = :atelierId
+              and i.archived = false
             order by i.dateIntervention desc, i.id desc
             """)
     List<Intervention> findAllWithRelationsByAtelierId(@Param("atelierId") Long atelierId);
 
     @Query("""
+            select distinct i from Intervention i
+            left join fetch i.lignes l
+            left join fetch l.device d
+            join fetch i.technicien
+            where i.atelier.id = :atelierId
+            order by i.dateIntervention desc, i.id desc
+            """)
+    List<Intervention> findAllWithRelationsByAtelierIdIncludingArchived(@Param("atelierId") Long atelierId);
+
+    @Query("""
             select i.id from Intervention i
             where i.atelier.id = :atelierId
+              and i.archived = false
             order by i.dateIntervention desc, i.id desc
             """)
     List<Long> findIdsByAtelierIdOrderByDateDesc(@Param("atelierId") Long atelierId, Pageable pageable);
@@ -58,6 +70,7 @@ public interface InterventionRepository extends JpaRepository<Intervention, Long
             join fetch i.technicien
             left join fetch i.mas
             where i.atelier.id = :atelierId
+              and i.archived = false
               and (
                    (i.mas is not null and i.mas.id = :masId)
                 or (

@@ -79,3 +79,32 @@
   background: #f1f5f9;
   color: #475569;
 }
+
+.purge-action {
+  display: inline-block;
+  border-radius: 0.35rem;
+  padding: 0.1rem 0.45rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.purge-action--delete {
+  background: #ffe4e6;
+  color: #9f1239;
+}
+
+.purge-action--archive {
+  background: #ffedd5;
+  color: #9a3412;
+}
+
+.purge-action--detach {
+  background: #e0f2fe;
+  color: #075985;
+}
+
+.purge-action--skip {
+  background: #f1f5f9;
+  color: #64748b;
+}

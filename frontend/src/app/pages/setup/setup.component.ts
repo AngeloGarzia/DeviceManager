@@ -33,11 +33,18 @@ import { AtelierService } from '../../services/atelier.service';
 import { AuthService } from '../../services/auth.service';
 import { AiModelOption, AiService } from '../../services/ai.service';
 import { AdminLogEntry, AdminLogService } from '../../services/admin-log.service';
+import {
+  AdminPurgePlan,
+  AdminPurgeResult,
+  AdminPurgeService
+} from '../../services/admin-purge.service';
 import { AppTourService } from '../../services/app-tour.service';
 import { CameraPreferencesService } from '../../services/camera-preferences.service';
+import { DeviceService } from '../../services/device.service';
 import { ConfirmDialogComponent } from '../../shared/confirm-dialog.component';
 import { apiErrorMessage } from '../../shared/api-error';
 import { MasExcelImportComponent } from './mas-excel-import.component';
+import { Device } from '../../models/models';
 
 /**
  * Page des paramètres : préférences caméra (tous les utilisateurs) et
@@ -70,6 +77,8 @@ export class SetupComponent implements OnInit, OnDestroy {
   private readonly setupService = inject(SetupService);
   private readonly atelierService = inject(AtelierService);
   private readonly adminLogService = inject(AdminLogService);
+  private readonly adminPurgeService = inject(AdminPurgeService);
+  private readonly deviceService = inject(DeviceService);
   readonly aiService = inject(AiService);
   readonly auth = inject(AuthService);
   private readonly fb = inject(FormBuilder);
@@ -153,6 +162,15 @@ export class SetupComponent implements OnInit, OnDestroy {
     }
     return groups;
   });
+
+  readonly purgeDevices = signal<Device[]>([]);
+  readonly purgeDeviceId = signal<number | null>(null);
+  readonly purgePlan = signal<AdminPurgePlan | null>(null);
+  readonly purgeResult = signal<AdminPurgeResult | null>(null);
+  readonly purgeConfirm = signal('');
+  readonly purgeLoading = signal(false);
+  readonly purgeError = signal<string | null>(null);
+  readonly purgeSuccess = signal<string | null>(null);
 
   readonly logsLoading = signal(false);
   readonly logsError = signal<string | null>(null);
@@ -301,6 +319,9 @@ export class SetupComponent implements OnInit, OnDestroy {
         if (id === 'logs' && !this.logsLoadedOnce) {
           this.reloadLogs();
         }
+        if (id === 'purge') {
+          this.loadPurgeDevices();
+        }
         if (id === 'camera') {
           void this.refreshCameras();
         }
@@ -387,6 +408,87 @@ export class SetupComponent implements OnInit, OnDestroy {
           this.logsLoading.set(false);
         }
       });
+  }
+
+  loadPurgeDevices(): void {
+    this.deviceService.list('').subscribe({
+      next: (list) => this.purgeDevices.set(list ?? []),
+      error: () => this.purgeDevices.set([])
+    });
+  }
+
+  onPurgeDeviceChange(id: number | null): void {
+    this.purgeDeviceId.set(id);
+    this.purgePlan.set(null);
+    this.purgeResult.set(null);
+    this.purgeConfirm.set('');
+    this.purgeError.set(null);
+    this.purgeSuccess.set(null);
+  }
+
+  previewPurge(): void {
+    const id = this.purgeDeviceId();
+    if (id == null) {
+      this.purgeError.set('Choisissez une pièce.');
+      return;
+    }
+    this.purgeLoading.set(true);
+    this.purgeError.set(null);
+    this.purgeSuccess.set(null);
+    this.purgeResult.set(null);
+    this.purgeConfirm.set('');
+    this.adminPurgeService.preview('DEVICE', id).subscribe({
+      next: (plan) => {
+        this.purgePlan.set(plan);
+        this.purgeLoading.set(false);
+      },
+      error: (err) => {
+        this.purgeLoading.set(false);
+        this.purgeError.set(apiErrorMessage(err, 'Prévisualisation impossible.'));
+      }
+    });
+  }
+
+  executePurge(): void {
+    const plan = this.purgePlan();
+    const id = this.purgeDeviceId();
+    if (!plan || id == null) {
+      return;
+    }
+    if (this.purgeConfirm().trim() !== plan.confirmPhrase) {
+      this.purgeError.set(`Retapez exactement : ${plan.confirmPhrase}`);
+      return;
+    }
+    this.purgeLoading.set(true);
+    this.purgeError.set(null);
+    this.adminPurgeService.execute('DEVICE', id, this.purgeConfirm().trim()).subscribe({
+      next: (res) => {
+        this.purgeResult.set(res);
+        this.purgePlan.set(null);
+        this.purgeDeviceId.set(null);
+        this.purgeConfirm.set('');
+        this.purgeLoading.set(false);
+        this.purgeSuccess.set(res.message);
+        this.loadPurgeDevices();
+      },
+      error: (err) => {
+        this.purgeLoading.set(false);
+        this.purgeError.set(apiErrorMessage(err, 'Purge impossible.'));
+      }
+    });
+  }
+
+  purgeActionClass(action: string): string {
+    switch (action) {
+      case 'DELETE':
+        return 'purge-action--delete';
+      case 'ARCHIVE':
+        return 'purge-action--archive';
+      case 'DETACH':
+        return 'purge-action--detach';
+      default:
+        return 'purge-action--skip';
+    }
   }
 
   askClearLogs(): void {

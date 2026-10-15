@@ -12,4 +12,10 @@ public interface DevicePrixObservationRepository extends JpaRepository<DevicePri
 
     List<DevicePrixObservation> findTop20ByDeviceIdAndAtelierIdAndInvalidatedFalseOrderByObservedAtDesc(
             Long deviceId, Long atelierId);
+
+    List<DevicePrixObservation> findByDeviceId(Long deviceId);
+
+    long countByDeviceId(Long deviceId);
+
+    void deleteByDeviceId(Long deviceId);
 }

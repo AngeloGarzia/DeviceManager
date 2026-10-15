@@ -706,6 +706,112 @@
     </form>
     }
 
+    <mat-card class="setup-tile !rounded-xl !border !border-line !shadow-soft" data-tour="setup-purge">
+      <button type="button" class="setup-tile-toggle" (click)="toggleTile('purge')" [attr.aria-expanded]="isTileOpen('purge')">
+        <div class="min-w-0 text-left">
+          <h2 class="m-0 text-base font-semibold text-ink">Purge en chaîne</h2>
+          <p class="mt-0.5 text-sm text-ink-soft">
+            Supprimer une pièce : bons archivés, historique stock conservé — Super Admin
+          </p>
+        </div>
+        <mat-icon>{{ isTileOpen('purge') ? 'expand_less' : 'expand_more' }}</mat-icon>
+      </button>
+      @if (isTileOpen('purge')) {
+        <mat-card-content class="!pt-0">
+          <p class="mb-3 text-sm text-ink-soft">
+            Les bons d’intervention liés sont <strong>archivés</strong> (pas effacés). Les mouvements de stock
+            restent en base (pièce détachée). Les lignes de commandes non reçues sont retirées.
+          </p>
+          @if (purgeError()) {
+            <p class="mb-3 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{{ purgeError() }}</p>
+          }
+          @if (purgeSuccess()) {
+            <p class="mb-3 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800">{{ purgeSuccess() }}</p>
+          }
+          <div class="mb-3 flex flex-wrap items-end gap-2">
+            <mat-form-field appearance="outline" class="min-w-[16rem] flex-1" subscriptSizing="dynamic">
+              <mat-label>Pièce (atelier courant)</mat-label>
+              <mat-select
+                [value]="purgeDeviceId()"
+                (selectionChange)="onPurgeDeviceChange($event.value)"
+              >
+                @for (d of purgeDevices(); track d.id) {
+                  <mat-option [value]="d.id">
+                    {{ d.nom }}@if (d.reference) { · {{ d.reference }}}
+                  </mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+            <button
+              mat-stroked-button
+              type="button"
+              (click)="previewPurge()"
+              [disabled]="purgeLoading() || purgeDeviceId() == null"
+            >
+              <mat-icon>preview</mat-icon>
+              Prévisualiser
+            </button>
+          </div>
+
+          @if (purgeLoading() && !purgePlan()) {
+            <div class="flex justify-center py-4"><mat-spinner diameter="28"></mat-spinner></div>
+          }
+
+          @if (purgePlan(); as plan) {
+            <div class="mb-3 rounded-lg border border-line bg-surface-muted/40 p-3">
+              <p class="m-0 mb-2 text-sm font-semibold text-ink">
+                Plan · {{ plan.rootLabel }}
+              </p>
+              @if (plan.warnings?.length) {
+                <ul class="mb-2 mt-0 list-disc pl-5 text-xs text-amber-800">
+                  @for (w of plan.warnings; track w) {
+                    <li>{{ w }}</li>
+                  }
+                </ul>
+              }
+              @if (plan.blockers?.length) {
+                <ul class="mb-2 mt-0 list-disc pl-5 text-xs text-rose-700">
+                  @for (b of plan.blockers; track b) {
+                    <li>{{ b }}</li>
+                  }
+                </ul>
+              }
+              <ul class="m-0 grid gap-1.5 p-0 list-none text-sm">
+                @for (n of plan.nodes; track (n.entityType + '-' + (n.entityId || n.label))) {
+                  <li class="flex flex-wrap items-baseline gap-2">
+                    <span class="purge-action {{ purgeActionClass(n.action) }}">{{ n.action }}</span>
+                    <span class="font-medium">{{ n.label }}</span>
+                    <span class="text-xs text-ink-soft">{{ n.entityType }}@if (n.detail) { — {{ n.detail }}}</span>
+                  </li>
+                }
+              </ul>
+            </div>
+            @if (plan.executable) {
+              <mat-form-field appearance="outline" class="w-full" subscriptSizing="dynamic">
+                <mat-label>Confirmation — retaper {{ plan.confirmPhrase }}</mat-label>
+                <input matInput [ngModel]="purgeConfirm()" (ngModelChange)="purgeConfirm.set($event)" [ngModelOptions]="{standalone: true}" />
+              </mat-form-field>
+              <button
+                mat-flat-button
+                color="warn"
+                type="button"
+                class="mt-1"
+                (click)="executePurge()"
+                [disabled]="purgeLoading() || purgeConfirm().trim() !== plan.confirmPhrase"
+              >
+                <mat-icon>delete_forever</mat-icon>
+                Exécuter la purge
+              </button>
+            }
+          }
+
+          @if (purgeResult(); as res) {
+            <p class="mt-3 text-sm text-ink-soft">{{ res.applied?.length || 0 }} opération(s) appliquée(s).</p>
+          }
+        </mat-card-content>
+      }
+    </mat-card>
+
     <mat-card class="setup-tile !rounded-xl !border !border-line !shadow-soft">
       <button type="button" class="setup-tile-toggle" (click)="toggleTile('logs')" [attr.aria-expanded]="isTileOpen('logs')">
         <div class="min-w-0 text-left">

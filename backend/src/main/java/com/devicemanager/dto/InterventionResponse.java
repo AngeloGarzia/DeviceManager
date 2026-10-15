@@ -25,6 +25,9 @@ public class InterventionResponse {
     private String travaux;
     private String observations;
     private LocalDateTime createdAt;
+    private boolean archived;
+    private LocalDateTime archivedAt;
+    private String archivedReason;
     private int totalPieces;
     private int totalQuantite;
     private List<InterventionLineResponse> lignes;

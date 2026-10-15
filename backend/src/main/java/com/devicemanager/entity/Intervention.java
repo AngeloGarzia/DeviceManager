@@ -72,6 +72,19 @@ public class Intervention {
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
+    /**
+     * Bon hors cycle actif (ex. pièce purgée) — conservé pour l'historique.
+     */
+    @Column(nullable = false)
+    @Builder.Default
+    private boolean archived = false;
+
+    @Column(name = "archived_at")
+    private LocalDateTime archivedAt;
+
+    @Column(name = "archived_reason", length = 255)
+    private String archivedReason;
+
     @OneToMany(mappedBy = "intervention", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<InterventionLigne> lignes = new ArrayList<>();

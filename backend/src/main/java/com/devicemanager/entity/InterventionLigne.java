@@ -24,8 +24,9 @@ public class InterventionLigne {
             foreignKey = @ForeignKey(name = "fk_intervention_ligne_intervention"))
     private Intervention intervention;
 
-    @ManyToOne(optional = false, fetch = FetchType.LAZY)
-    @JoinColumn(name = "device_id", nullable = false,
+    /** Nullable après purge pièce (snapshot piece_nom conservé). */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "device_id",
             foreignKey = @ForeignKey(name = "fk_intervention_ligne_device"))
     private Device device;
 
