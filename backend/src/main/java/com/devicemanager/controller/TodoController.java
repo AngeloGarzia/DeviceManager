@@ -3,6 +3,9 @@ package com.devicemanager.controller;
 import com.devicemanager.dto.TodoListResponse;
 import com.devicemanager.dto.TodoModeleRequest;
 import com.devicemanager.dto.TodoModeleResponse;
+import com.devicemanager.dto.TodoNettoyageAnalyseResponse;
+import com.devicemanager.dto.TodoNettoyageCocheRequest;
+import com.devicemanager.dto.TodoNettoyageHistoriqueItem;
 import com.devicemanager.dto.TodoRecurrenceRequest;
 import com.devicemanager.dto.TodoRecurrenceResponse;
 import com.devicemanager.dto.TodoRecurrenceToggleRequest;
@@ -48,6 +51,30 @@ public class TodoController {
     @GetMapping("/week-calendar")
     public ResponseEntity<TodoWeekCalendarResponse> weekCalendar() {
         return ResponseEntity.ok(todoRecurrenceService.weekCalendar());
+    }
+
+    /** Historique des nettoyages cochés pour une MAS. */
+    @GetMapping("/nettoyage/historique")
+    public ResponseEntity<List<TodoNettoyageHistoriqueItem>> historiqueNettoyage(
+            @RequestParam Long masId) {
+        return ResponseEntity.ok(todoService.historiqueNettoyage(masId));
+    }
+
+    /** Tableau de bord nettoyage MAS (fraîcheur + pourcentages atelier). */
+    @GetMapping("/nettoyage/analyse")
+    public ResponseEntity<TodoNettoyageAnalyseResponse> analyseNettoyage() {
+        return ResponseEntity.ok(todoService.analyseNettoyage());
+    }
+
+    /** Coche / décoche une MAS dans une tâche de nettoyage. */
+    @PatchMapping("/{id}/nettoyage/{masId}")
+    public ResponseEntity<TodoTacheResponse> setNettoyageCoche(
+            @PathVariable Long id,
+            @PathVariable Long masId,
+            @Valid @RequestBody TodoNettoyageCocheRequest request,
+            Authentication authentication) {
+        return ResponseEntity.ok(
+                todoService.setNettoyageCoche(id, masId, request, authentication.getName()));
     }
 
     @GetMapping("/recurrences")

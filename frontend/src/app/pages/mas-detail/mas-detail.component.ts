@@ -6,8 +6,9 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatCardModule } from '@angular/material/card';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import QRCode from 'qrcode';
-import { Mas } from '../../models/models';
+import { Mas, TodoNettoyageHistoriqueItem } from '../../models/models';
 import { MasService } from '../../services/mas.service';
+import { TodoService } from '../../services/todo.service';
 import { AuthService } from '../../services/auth.service';
 import { apiErrorMessage } from '../../shared/api-error';
 import { isPdfOrImageFile, PDF_OR_IMAGE_ACCEPT } from '../../shared/document-upload';
@@ -30,6 +31,7 @@ export class MasDetailComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly masService = inject(MasService);
+  private readonly todoService = inject(TodoService);
   readonly auth = inject(AuthService);
   readonly item = signal<Mas | null>(null);
   readonly statutLabel = masStatutLabel;
@@ -44,15 +46,34 @@ export class MasDetailComponent implements OnInit {
   readonly qrUrl = signal<string | null>(null);
   readonly qrVisible = signal(false);
 
+  readonly nettoyageHistorique = signal<TodoNettoyageHistoriqueItem[]>([]);
+  readonly nettoyageHistoriqueLoading = signal(false);
+
   ngOnInit(): void {
-    this.masService.get(Number(this.route.snapshot.paramMap.get('id'))).subscribe({
+    const id = Number(this.route.snapshot.paramMap.get('id'));
+    this.masService.get(id).subscribe({
       next: (data) => {
         this.item.set(data);
         this.loading.set(false);
+        this.loadNettoyageHistorique(data.id);
       },
       error: () => {
         this.error.set('MAS introuvable.');
         this.loading.set(false);
+      }
+    });
+  }
+
+  private loadNettoyageHistorique(masId: number): void {
+    this.nettoyageHistoriqueLoading.set(true);
+    this.todoService.historiqueNettoyage(masId).subscribe({
+      next: (items) => {
+        this.nettoyageHistorique.set(items ?? []);
+        this.nettoyageHistoriqueLoading.set(false);
+      },
+      error: () => {
+        this.nettoyageHistorique.set([]);
+        this.nettoyageHistoriqueLoading.set(false);
       }
     });
   }

@@ -1,0 +1,228 @@
+<section class="nettoyage-page">
+  <header class="nettoyage-header">
+    <div>
+      <h1 class="page-title" data-tour="page-mas-nettoyage">Nettoyage MAS</h1>
+      <p class="page-subtitle">
+        Vue d’ensemble : plus le dernier nettoyage est ancien, plus la tuile vire au rouge écarlate ;
+        plus il est récent, plus elle vire au vert.
+      </p>
+    </div>
+    <div class="nettoyage-header__actions">
+      <a mat-stroked-button routerLink="/todos" [queryParams]="{ filter: 'NETTOYAGE' }">
+        <mat-icon>checklist</mat-icon>
+        Tâches nettoyage
+      </a>
+      <button mat-flat-button color="primary" type="button" (click)="reload()" [disabled]="loading()">
+        <mat-icon>refresh</mat-icon>
+        Actualiser
+      </button>
+    </div>
+  </header>
+
+  @if (error()) {
+    <p class="nettoyage-alert nettoyage-alert--error">{{ error() }}</p>
+  }
+
+  @if (loading() && !data()) {
+    <div class="nettoyage-loading"><mat-spinner diameter="40"></mat-spinner></div>
+  } @else if (data()) {
+    @if (data(); as d) {
+    <div class="nettoyage-legend" aria-hidden="true">
+      <span class="nettoyage-legend__label">Récent</span>
+      <div class="nettoyage-legend__bar"></div>
+      <span class="nettoyage-legend__label">Ancien / jamais</span>
+    </div>
+
+    <div class="nettoyage-stats">
+      <article class="nettoyage-stat">
+        <p class="nettoyage-stat__value">{{ d.totalMas }}</p>
+        <p class="nettoyage-stat__label">MAS suivies</p>
+      </article>
+      <article class="nettoyage-stat">
+        <p class="nettoyage-stat__value">{{ d.pct7j }}%</p>
+        <p class="nettoyage-stat__label">Nettoyées ≤ 7 j</p>
+        <p class="nettoyage-stat__hint">{{ d.nettoyees7j }} / {{ d.totalMas }}</p>
+      </article>
+      <article class="nettoyage-stat">
+        <p class="nettoyage-stat__value">{{ d.pct30j }}%</p>
+        <p class="nettoyage-stat__label">Nettoyées ≤ 30 j</p>
+        <p class="nettoyage-stat__hint">{{ d.nettoyees30j }} / {{ d.totalMas }}</p>
+      </article>
+      <article class="nettoyage-stat">
+        <p class="nettoyage-stat__value">{{ d.pct90j }}%</p>
+        <p class="nettoyage-stat__label">Nettoyées ≤ 90 j</p>
+        <p class="nettoyage-stat__hint">{{ d.nettoyees90j }} / {{ d.totalMas }}</p>
+      </article>
+      <article class="nettoyage-stat nettoyage-stat--warn">
+        <p class="nettoyage-stat__value">{{ d.pctJamais }}%</p>
+        <p class="nettoyage-stat__label">Jamais nettoyées</p>
+        <p class="nettoyage-stat__hint">{{ d.jamaisNettoyees }} / {{ d.totalMas }}</p>
+      </article>
+      <article class="nettoyage-stat">
+        <p class="nettoyage-stat__value">
+          {{ d.moyenneJoursDepuis != null ? d.moyenneJoursDepuis : '—' }}
+        </p>
+        <p class="nettoyage-stat__label">Moyenne jours depuis</p>
+        <p class="nettoyage-stat__hint">parmi les MAS déjà nettoyées</p>
+      </article>
+    </div>
+
+    <div class="nettoyage-buckets panel">
+      <h2 class="nettoyage-section-title">Répartition</h2>
+      <div class="nettoyage-bucket-bars" role="list">
+        <button
+          type="button"
+          class="nettoyage-bucket"
+          role="listitem"
+          [class.nettoyage-bucket--active]="niveauFilter() === 'RECENT'"
+          (click)="setNiveau(niveauFilter() === 'RECENT' ? 'ALL' : 'RECENT')"
+        >
+          <span class="nettoyage-bucket__swatch nettoyage-bucket__swatch--recent"></span>
+          <span class="nettoyage-bucket__meta">
+            <strong>Récent</strong>
+            <span>≤ 7 j · {{ d.bucketRecent }} ({{ bucketPct(d.bucketRecent) }}%)</span>
+          </span>
+          <span class="nettoyage-bucket__bar" [style.width.%]="bucketPct(d.bucketRecent)"></span>
+        </button>
+        <button
+          type="button"
+          class="nettoyage-bucket"
+          role="listitem"
+          [class.nettoyage-bucket--active]="niveauFilter() === 'OK'"
+          (click)="setNiveau(niveauFilter() === 'OK' ? 'ALL' : 'OK')"
+        >
+          <span class="nettoyage-bucket__swatch nettoyage-bucket__swatch--ok"></span>
+          <span class="nettoyage-bucket__meta">
+            <strong>OK</strong>
+            <span>8–30 j · {{ d.bucketOk }} ({{ bucketPct(d.bucketOk) }}%)</span>
+          </span>
+          <span class="nettoyage-bucket__bar" [style.width.%]="bucketPct(d.bucketOk)"></span>
+        </button>
+        <button
+          type="button"
+          class="nettoyage-bucket"
+          role="listitem"
+          [class.nettoyage-bucket--active]="niveauFilter() === 'ATTENTION'"
+          (click)="setNiveau(niveauFilter() === 'ATTENTION' ? 'ALL' : 'ATTENTION')"
+        >
+          <span class="nettoyage-bucket__swatch nettoyage-bucket__swatch--attention"></span>
+          <span class="nettoyage-bucket__meta">
+            <strong>Attention</strong>
+            <span>31–60 j · {{ d.bucketAttention }} ({{ bucketPct(d.bucketAttention) }}%)</span>
+          </span>
+          <span class="nettoyage-bucket__bar" [style.width.%]="bucketPct(d.bucketAttention)"></span>
+        </button>
+        <button
+          type="button"
+          class="nettoyage-bucket"
+          role="listitem"
+          [class.nettoyage-bucket--active]="niveauFilter() === 'URGENT'"
+          (click)="setNiveau(niveauFilter() === 'URGENT' ? 'ALL' : 'URGENT')"
+        >
+          <span class="nettoyage-bucket__swatch nettoyage-bucket__swatch--urgent"></span>
+          <span class="nettoyage-bucket__meta">
+            <strong>Urgent</strong>
+            <span
+              >61–{{ d.seuilJoursCritique }} j · {{ d.bucketUrgent }} ({{ bucketPct(d.bucketUrgent) }}%)</span
+            >
+          </span>
+          <span class="nettoyage-bucket__bar" [style.width.%]="bucketPct(d.bucketUrgent)"></span>
+        </button>
+        <button
+          type="button"
+          class="nettoyage-bucket"
+          role="listitem"
+          [class.nettoyage-bucket--active]="niveauFilter() === 'CRITIQUE'"
+          (click)="setNiveau(niveauFilter() === 'CRITIQUE' ? 'ALL' : 'CRITIQUE')"
+        >
+          <span class="nettoyage-bucket__swatch nettoyage-bucket__swatch--urgent"></span>
+          <span class="nettoyage-bucket__meta">
+            <strong>Critique</strong>
+            <span
+              >&gt; {{ d.seuilJoursCritique }} j · {{ d.bucketCritique }} ({{
+                bucketPct(d.bucketCritique)
+              }}%)</span
+            >
+          </span>
+          <span class="nettoyage-bucket__bar" [style.width.%]="bucketPct(d.bucketCritique)"></span>
+        </button>
+        <button
+          type="button"
+          class="nettoyage-bucket"
+          role="listitem"
+          [class.nettoyage-bucket--active]="niveauFilter() === 'JAMAIS'"
+          (click)="setNiveau(niveauFilter() === 'JAMAIS' ? 'ALL' : 'JAMAIS')"
+        >
+          <span class="nettoyage-bucket__swatch nettoyage-bucket__swatch--jamais"></span>
+          <span class="nettoyage-bucket__meta">
+            <strong>Jamais</strong>
+            <span>{{ d.bucketJamais }} ({{ bucketPct(d.bucketJamais) }}%)</span>
+          </span>
+          <span class="nettoyage-bucket__bar" [style.width.%]="bucketPct(d.bucketJamais)"></span>
+        </button>
+      </div>
+      @if (niveauFilter() !== 'ALL') {
+        <button type="button" class="nettoyage-clear-filter" (click)="setNiveau('ALL')">
+          Afficher toutes les MAS
+        </button>
+      }
+    </div>
+
+    <div class="nettoyage-toolbar">
+      <label class="nettoyage-search">
+        <mat-icon aria-hidden="true">search</mat-icon>
+        <input
+          type="search"
+          [ngModel]="query()"
+          (ngModelChange)="query.set($event)"
+          placeholder="Rechercher numéro ou marque…"
+          aria-label="Rechercher une MAS"
+        />
+      </label>
+      <div class="nettoyage-sort" role="group" aria-label="Tri">
+        <button
+          type="button"
+          [class.active]="sortMode() === 'urgence'"
+          (click)="setSort('urgence')"
+        >
+          Urgence
+        </button>
+        <button type="button" [class.active]="sortMode() === 'recent'" (click)="setSort('recent')">
+          Plus récentes
+        </button>
+        <button type="button" [class.active]="sortMode() === 'numero'" (click)="setSort('numero')">
+          N° MAS
+        </button>
+      </div>
+    </div>
+
+    @if (filteredItems().length === 0) {
+      <p class="nettoyage-empty">Aucune MAS ne correspond au filtre.</p>
+    } @else {
+      <div class="nettoyage-grid" role="list">
+        @for (item of filteredItems(); track item.masId) {
+          <a
+            class="nettoyage-tile"
+            role="listitem"
+            [routerLink]="['/mas', item.masId]"
+            [ngStyle]="tileStyle(item)"
+          >
+            <span class="nettoyage-tile__numero">{{ item.masNumero }}</span>
+            <span class="nettoyage-tile__marque">{{ item.marqueLabel || '—' }}</span>
+            <span class="nettoyage-tile__jours">{{ joursLabel(item) }}</span>
+            <span class="nettoyage-tile__meta">
+              {{ niveauLabel(item.niveau) }}
+              · {{ item.nettoyageCount }} nettoyage{{ item.nettoyageCount > 1 ? 's' : '' }}
+            </span>
+            @if (item.dernierNettoyageAt) {
+              <span class="nettoyage-tile__date">
+                {{ item.dernierNettoyageAt | date: 'dd/MM/yyyy HH:mm' }}
+              </span>
+            }
+          </a>
+        }
+      </div>
+    }
+    }
+  }
+</section>

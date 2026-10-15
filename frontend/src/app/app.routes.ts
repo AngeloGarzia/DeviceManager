@@ -142,6 +142,11 @@ export const routes: Routes = [
           import('./pages/mas-suivi/mas-suivi.component').then((m) => m.MasSuiviComponent)
       },
       {
+        path: 'mas/nettoyage',
+        loadComponent: () =>
+          import('./pages/mas-nettoyage/mas-nettoyage.component').then((m) => m.MasNettoyageComponent)
+      },
+      {
         path: 'mas/arrets-maintenance',
         loadComponent: () =>
           import('./pages/arret-maintenance/arret-maintenance.component').then(

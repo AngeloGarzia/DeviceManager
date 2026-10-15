@@ -40,6 +40,11 @@ public class TodoTache {
     @Builder.Default
     private TodoTacheStatut statut = TodoTacheStatut.OPEN;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "type_tache", nullable = false, length = 40)
+    @Builder.Default
+    private TodoTacheType typeTache = TodoTacheType.STANDARD;
+
     @Column(nullable = false, length = 20)
     @Builder.Default
     private String severite = "MEDIUM";
@@ -114,6 +119,13 @@ public class TodoTache {
     @Builder.Default
     private List<TodoTachePhoto> photos = new ArrayList<>();
 
+    /** Checklist multi-MAS pour {@link TodoTacheType#NETTOYAGE_MAS}. */
+    @OneToMany(mappedBy = "todoTache", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("id ASC")
+    @BatchSize(size = 32)
+    @Builder.Default
+    private List<TodoNettoyageMasLigne> nettoyageLignes = new ArrayList<>();
+
     @PrePersist
     void onCreate() {
         LocalDateTime now = LocalDateTime.now();
@@ -123,6 +135,9 @@ public class TodoTache {
         updatedAt = now;
         if (statut == null) {
             statut = TodoTacheStatut.OPEN;
+        }
+        if (typeTache == null) {
+            typeTache = TodoTacheType.STANDARD;
         }
         if (severite == null || severite.isBlank()) {
             severite = "MEDIUM";

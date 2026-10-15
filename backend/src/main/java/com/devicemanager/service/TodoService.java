@@ -1,6 +1,11 @@
 package com.devicemanager.service;
 
 import com.devicemanager.dto.TodoListResponse;
+import com.devicemanager.dto.TodoNettoyageAnalyseResponse;
+import com.devicemanager.dto.TodoNettoyageCocheRequest;
+import com.devicemanager.dto.TodoNettoyageHistoriqueItem;
+import com.devicemanager.dto.TodoNettoyageLigneResponse;
+import com.devicemanager.dto.TodoNettoyageMasStatut;
 import com.devicemanager.dto.TodoTacheLinkRequest;
 import com.devicemanager.dto.TodoTachePhotoResponse;
 import com.devicemanager.dto.TodoTacheRequest;
@@ -10,13 +15,17 @@ import com.devicemanager.entity.Atelier;
 import com.devicemanager.entity.Intervention;
 import com.devicemanager.entity.InterventionTechnique;
 import com.devicemanager.entity.Mas;
+import com.devicemanager.entity.MasStatut;
+import com.devicemanager.entity.TodoNettoyageMasLigne;
 import com.devicemanager.entity.TodoTache;
 import com.devicemanager.entity.TodoTachePhoto;
 import com.devicemanager.entity.TodoTacheStatut;
+import com.devicemanager.entity.TodoTacheType;
 import com.devicemanager.entity.User;
 import com.devicemanager.repository.InterventionRepository;
 import com.devicemanager.repository.InterventionTechniqueRepository;
 import com.devicemanager.repository.MasRepository;
+import com.devicemanager.repository.TodoNettoyageMasLigneRepository;
 import com.devicemanager.repository.TodoTacheRepository;
 import com.devicemanager.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -32,9 +41,12 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.EnumSet;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
@@ -48,12 +60,15 @@ import java.util.Set;
 public class TodoService {
 
     public static final int MAX_PHOTOS = 5;
+    /** Au-delà de ce délai, freshnessScore = 0 (rouge écarlate). */
+    public static final int NETTOYAGE_SEUIL_JOURS_CRITIQUE = 90;
     private static final int MIN_SIGNATURE_LENGTH = 80;
 
     private static final Set<TodoTacheStatut> ACTIVE = EnumSet.of(
             TodoTacheStatut.OPEN, TodoTacheStatut.IN_PROGRESS);
 
     private final TodoTacheRepository todoTacheRepository;
+    private final TodoNettoyageMasLigneRepository todoNettoyageMasLigneRepository;
     private final MasRepository masRepository;
     private final InterventionTechniqueRepository interventionTechniqueRepository;
     private final InterventionRepository interventionRepository;
@@ -124,28 +139,52 @@ public class TodoService {
         String titre = requireTitre(request.getTitre());
         String description = trimToNull(request.getDescription());
         String severite = normalizeSeverite(request.getSeverite());
-        Mas mas = resolveMas(request.getMasId(), atelier.getId());
+        TodoTacheType typeTache = parseTypeTache(request.getTypeTache());
 
         List<MultipartFile> files = normalizeFiles(photos);
         ensurePhotoCount(files.size());
         files.forEach(this::validateImageFile);
+
+        Mas mas = null;
+        List<Mas> nettoyageMas = List.of();
+        if (typeTache == TodoTacheType.NETTOYAGE_MAS) {
+            nettoyageMas = resolveMasList(request.getMasIds(), atelier.getId());
+            if (nettoyageMas.isEmpty()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "Sélectionnez au moins une MAS à nettoyer.");
+            }
+            // Parent sans mas_id unique : la checklist porte les machines.
+            mas = null;
+        } else {
+            mas = resolveMas(request.getMasId(), atelier.getId());
+        }
 
         TodoTache entity = TodoTache.builder()
                 .atelier(atelier)
                 .titre(titre)
                 .description(description)
                 .statut(TodoTacheStatut.OPEN)
+                .typeTache(typeTache)
                 .severite(severite)
                 .createdByUsername(actor.getUsername())
                 .createdByDisplayName(displayName(actor))
                 .mas(mas)
                 .photos(new ArrayList<>())
+                .nettoyageLignes(new ArrayList<>())
                 .build();
         addNewPhotos(entity, files);
+        for (Mas m : nettoyageMas) {
+            entity.getNettoyageLignes().add(TodoNettoyageMasLigne.builder()
+                    .todoTache(entity)
+                    .mas(m)
+                    .coche(false)
+                    .build());
+        }
 
         TodoTache saved = todoTacheRepository.save(entity);
-        log.info("Création en base — Tâche À faire id={} titre={} photos={} par={}",
-                saved.getId(), saved.getTitre(), saved.getPhotos().size(), username);
+        log.info("Création en base — Tâche À faire id={} type={} titre={} photos={} masNettoyage={} par={}",
+                saved.getId(), saved.getTypeTache(), saved.getTitre(),
+                saved.getPhotos().size(), nettoyageMas.size(), username);
         atelierMemoirePublisher.publish("TODO_CREATED",
                 "Tâche À faire créée : « " + saved.getTitre() + " » (" + saved.getSeverite() + ")");
         return toResponse(saved, LocalDateTime.now(clock));
@@ -160,10 +199,228 @@ public class TodoService {
         entity.setTitre(requireTitre(request.getTitre()));
         entity.setDescription(trimToNull(request.getDescription()));
         entity.setSeverite(normalizeSeverite(request.getSeverite()));
-        entity.setMas(resolveMas(request.getMasId(), entity.getAtelier().getId()));
+        if (entity.getTypeTache() != TodoTacheType.NETTOYAGE_MAS) {
+            entity.setMas(resolveMas(request.getMasId(), entity.getAtelier().getId()));
+        }
         TodoTache saved = todoTacheRepository.save(entity);
         log.info("Modification en base — Tâche À faire id={} par={}", id, username);
         return toResponse(saved, LocalDateTime.now(clock));
+    }
+
+    /**
+     * Coche / décoche une MAS dans une tâche de nettoyage (OPEN / IN_PROGRESS uniquement).
+     */
+    public TodoTacheResponse setNettoyageCoche(
+            Long todoId,
+            Long masId,
+            TodoNettoyageCocheRequest request,
+            String username) {
+        TodoTache entity = getEntity(todoId);
+        if (entity.getTypeTache() != TodoTacheType.NETTOYAGE_MAS) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Cette tâche n'est pas un nettoyage MAS.");
+        }
+        if (!entity.getStatut().isOpen()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Impossible de modifier la checklist d'une tâche clôturée.");
+        }
+        boolean coche = Boolean.TRUE.equals(request.getCoche());
+        TodoNettoyageMasLigne ligne = todoNettoyageMasLigneRepository
+                .findByTodoTacheIdAndMasId(todoId, masId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "MAS absente de cette tâche de nettoyage."));
+        User actor = requireUser(username);
+        ligne.setCoche(coche);
+        if (coche) {
+            ligne.setCocheAt(LocalDateTime.now(clock));
+            ligne.setCocheByUsername(actor.getUsername());
+            ligne.setCocheByDisplayName(displayName(actor));
+            if (entity.getStatut() == TodoTacheStatut.OPEN) {
+                entity.setStatut(TodoTacheStatut.IN_PROGRESS);
+            }
+        } else {
+            ligne.setCocheAt(null);
+            ligne.setCocheByUsername(null);
+            ligne.setCocheByDisplayName(null);
+        }
+        todoNettoyageMasLigneRepository.save(ligne);
+        TodoTache saved = todoTacheRepository.save(entity);
+        return toResponse(saved, LocalDateTime.now(clock));
+    }
+
+    @Transactional(readOnly = true)
+    public List<TodoNettoyageHistoriqueItem> historiqueNettoyage(Long masId) {
+        Atelier atelier = atelierService.requireCurrentAtelier();
+        if (masId == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "masId obligatoire");
+        }
+        masRepository.findByIdAndAtelierId(masId, atelier.getId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "MAS introuvable"));
+        return todoNettoyageMasLigneRepository
+                .findHistoriqueByAtelierAndMas(atelier.getId(), masId)
+                .stream()
+                .map(l -> {
+                    TodoTache t = l.getTodoTache();
+                    Mas m = l.getMas();
+                    return TodoNettoyageHistoriqueItem.builder()
+                            .todoId(t.getId())
+                            .todoTitre(t.getTitre())
+                            .todoStatut(t.getStatut().name())
+                            .masId(m.getId())
+                            .masNumero(m.getNumero())
+                            .cocheAt(l.getCocheAt())
+                            .cocheByDisplayName(l.getCocheByDisplayName() != null
+                                    ? l.getCocheByDisplayName()
+                                    : l.getCocheByUsername())
+                            .completedAt(t.getCompletedAt())
+                            .signataireClotureNom(t.getSignataireClotureNom())
+                            .build();
+                })
+                .toList();
+    }
+
+    /**
+     * Tableau de bord nettoyage : toutes les MAS actives (utilisées / réserve)
+     * avec fraîcheur 0–100 et pourcentages atelier.
+     */
+    @Transactional(readOnly = true)
+    public TodoNettoyageAnalyseResponse analyseNettoyage() {
+        Atelier atelier = atelierService.requireCurrentAtelier();
+        LocalDateTime now = LocalDateTime.now(clock);
+        LocalDate today = now.toLocalDate();
+
+        List<Mas> masses = masRepository.findAllByAtelierId(atelier.getId()).stream()
+                .filter(m -> m.getStatut() == MasStatut.UTILISEE || m.getStatut() == MasStatut.EN_RESERVE)
+                .sorted(Comparator.comparing(Mas::getNumero, String.CASE_INSENSITIVE_ORDER))
+                .toList();
+
+        Map<Long, LocalDateTime> dernierByMas = new HashMap<>();
+        Map<Long, Long> countByMas = new HashMap<>();
+        for (Object[] row : todoNettoyageMasLigneRepository.aggregateDernierParMas(atelier.getId())) {
+            Long masId = (Long) row[0];
+            LocalDateTime maxAt = (LocalDateTime) row[1];
+            Long cnt = (Long) row[2];
+            dernierByMas.put(masId, maxAt);
+            countByMas.put(masId, cnt != null ? cnt : 0L);
+        }
+
+        int jamais = 0;
+        int n7 = 0;
+        int n30 = 0;
+        int n90 = 0;
+        int bucketRecent = 0;
+        int bucketOk = 0;
+        int bucketAttention = 0;
+        int bucketUrgent = 0;
+        int bucketCritique = 0;
+        int bucketJamais = 0;
+        long sumJours = 0;
+        int withDate = 0;
+
+        List<TodoNettoyageMasStatut> items = new ArrayList<>();
+        for (Mas m : masses) {
+            LocalDateTime dernier = dernierByMas.get(m.getId());
+            long count = countByMas.getOrDefault(m.getId(), 0L);
+            Integer jours = null;
+            int score;
+            String niveau;
+            if (dernier == null) {
+                jamais++;
+                bucketJamais++;
+                score = 0;
+                niveau = "JAMAIS";
+            } else {
+                jours = (int) ChronoUnit.DAYS.between(dernier.toLocalDate(), today);
+                if (jours < 0) {
+                    jours = 0;
+                }
+                sumJours += jours;
+                withDate++;
+                if (jours <= 7) {
+                    n7++;
+                }
+                if (jours <= 30) {
+                    n30++;
+                }
+                if (jours <= 90) {
+                    n90++;
+                }
+                score = freshnessScore(jours, NETTOYAGE_SEUIL_JOURS_CRITIQUE);
+                if (jours <= 7) {
+                    niveau = "RECENT";
+                    bucketRecent++;
+                } else if (jours <= 30) {
+                    niveau = "OK";
+                    bucketOk++;
+                } else if (jours <= 60) {
+                    niveau = "ATTENTION";
+                    bucketAttention++;
+                } else if (jours <= NETTOYAGE_SEUIL_JOURS_CRITIQUE) {
+                    niveau = "URGENT";
+                    bucketUrgent++;
+                } else {
+                    niveau = "CRITIQUE";
+                    bucketCritique++;
+                }
+            }
+            String marque = m.getMarque() != null ? m.getMarque().getLabel() : null;
+            items.add(TodoNettoyageMasStatut.builder()
+                    .masId(m.getId())
+                    .masNumero(m.getNumero())
+                    .marqueLabel(marque)
+                    .masStatut(m.getStatut() != null ? m.getStatut().name() : null)
+                    .dernierNettoyageAt(dernier)
+                    .joursDepuis(jours)
+                    .nettoyageCount(count)
+                    .freshnessScore(score)
+                    .niveau(niveau)
+                    .build());
+        }
+
+        // Plus rouge = plus ancien (score bas d'abord).
+        items.sort(Comparator
+                .comparingInt(TodoNettoyageMasStatut::getFreshnessScore)
+                .thenComparing(TodoNettoyageMasStatut::getMasNumero, String.CASE_INSENSITIVE_ORDER));
+
+        int total = items.size();
+        return TodoNettoyageAnalyseResponse.builder()
+                .seuilJoursCritique(NETTOYAGE_SEUIL_JOURS_CRITIQUE)
+                .totalMas(total)
+                .jamaisNettoyees(jamais)
+                .nettoyees7j(n7)
+                .nettoyees30j(n30)
+                .nettoyees90j(n90)
+                .pctJamais(pct(jamais, total))
+                .pct7j(pct(n7, total))
+                .pct30j(pct(n30, total))
+                .pct90j(pct(n90, total))
+                .moyenneJoursDepuis(withDate == 0 ? null : Math.round((sumJours * 10.0) / withDate) / 10.0)
+                .bucketRecent(bucketRecent)
+                .bucketOk(bucketOk)
+                .bucketAttention(bucketAttention)
+                .bucketUrgent(bucketUrgent)
+                .bucketCritique(bucketCritique)
+                .bucketJamais(bucketJamais)
+                .items(items)
+                .build();
+    }
+
+    static int freshnessScore(int joursDepuis, int seuilCritique) {
+        if (joursDepuis <= 0) {
+            return 100;
+        }
+        if (joursDepuis >= seuilCritique) {
+            return 0;
+        }
+        return Math.max(0, Math.min(100,
+                (int) Math.round(100.0 * (seuilCritique - joursDepuis) / (double) seuilCritique)));
+    }
+
+    private static double pct(int part, int total) {
+        if (total <= 0) {
+            return 0;
+        }
+        return Math.round(part * 1000.0 / total) / 10.0;
     }
 
     public TodoTacheResponse changeStatus(Long id, TodoTacheStatusRequest request, String username) {
@@ -180,6 +437,7 @@ public class TodoService {
         if (next == TodoTacheStatut.DONE) {
             validateEarlyCompletionWindow(entity);
             validateDrawnSignature(request.getSignatureCloture());
+            validateNettoyageDone(entity);
             LocalDateTime clotureAt = request.getDateHeureCloture() != null
                     ? request.getDateHeureCloture()
                     : LocalDateTime.now();
@@ -349,6 +607,44 @@ public class TodoService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "MAS introuvable"));
     }
 
+    private List<Mas> resolveMasList(List<Long> masIds, Long atelierId) {
+        if (masIds == null || masIds.isEmpty()) {
+            return List.of();
+        }
+        List<Mas> result = new ArrayList<>();
+        for (Long id : masIds.stream().filter(Objects::nonNull).distinct().toList()) {
+            result.add(resolveMas(id, atelierId));
+        }
+        return result;
+    }
+
+    private static TodoTacheType parseTypeTache(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return TodoTacheType.STANDARD;
+        }
+        try {
+            return TodoTacheType.valueOf(raw.trim().toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException ex) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Type de tâche inconnu : " + raw);
+        }
+    }
+
+    private static void validateNettoyageDone(TodoTache entity) {
+        if (entity.getTypeTache() != TodoTacheType.NETTOYAGE_MAS) {
+            return;
+        }
+        List<TodoNettoyageMasLigne> lignes = entity.getNettoyageLignes();
+        if (lignes == null || lignes.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Aucune MAS associée à ce nettoyage.");
+        }
+        boolean any = lignes.stream().anyMatch(TodoNettoyageMasLigne::isCoche);
+        if (!any) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Cochez au moins une MAS nettoyée avant de clôturer.");
+        }
+    }
+
     private static void validateTransition(TodoTacheStatut from, TodoTacheStatut to) {
         boolean ok = switch (from) {
             case OPEN -> to == TodoTacheStatut.IN_PROGRESS
@@ -477,6 +773,17 @@ public class TodoService {
                 && t.getStatut().isOpen()
                 && t.getDueAt().isBefore(now);
         Long recurrenceId = t.getRecurrence() != null ? t.getRecurrence().getId() : null;
+        TodoTacheType typeTache = t.getTypeTache() != null ? t.getTypeTache() : TodoTacheType.STANDARD;
+        List<TodoNettoyageLigneResponse> nettoyageLignes = mapNettoyageLignes(t);
+        int cocheCount = (int) nettoyageLignes.stream().filter(TodoNettoyageLigneResponse::isCoche).count();
+        String listType;
+        if (typeTache == TodoTacheType.NETTOYAGE_MAS) {
+            listType = "NETTOYAGE_MAS";
+        } else if (recurrenceId != null) {
+            listType = "RECURRING";
+        } else {
+            listType = "USER";
+        }
         return TodoTacheResponse.builder()
                 .id(t.getId())
                 .titre(t.getTitre())
@@ -499,11 +806,15 @@ public class TodoService {
                 .responsableCloture(responsableCloture)
                 .masId(mas != null ? mas.getId() : null)
                 .masNumero(mas != null ? mas.getNumero() : null)
+                .typeTache(typeTache.name())
+                .nettoyageLignes(nettoyageLignes)
+                .nettoyageCocheCount(cocheCount)
+                .nettoyageTotalCount(nettoyageLignes.size())
                 .interventionTechniqueId(it != null ? it.getId() : null)
                 .interventionTechniqueLabel(itLabel)
                 .interventionId(bon != null ? bon.getId() : null)
                 .interventionNumero(bon != null ? bon.getNumero() : null)
-                .type(recurrenceId != null ? "RECURRING" : "USER")
+                .type(listType)
                 .severity(t.getSeverite())
                 .title(t.getTitre())
                 .link("/devices")
@@ -515,6 +826,24 @@ public class TodoService {
                 .overdue(overdue)
                 .photos(mapPhotos(t))
                 .build();
+    }
+
+    private static List<TodoNettoyageLigneResponse> mapNettoyageLignes(TodoTache t) {
+        if (t.getTypeTache() != TodoTacheType.NETTOYAGE_MAS
+                || t.getNettoyageLignes() == null
+                || t.getNettoyageLignes().isEmpty()) {
+            return List.of();
+        }
+        return t.getNettoyageLignes().stream()
+                .map(l -> TodoNettoyageLigneResponse.builder()
+                        .masId(l.getMas() != null ? l.getMas().getId() : null)
+                        .masNumero(l.getMas() != null ? l.getMas().getNumero() : null)
+                        .coche(l.isCoche())
+                        .cocheAt(l.getCocheAt())
+                        .cocheByUsername(l.getCocheByUsername())
+                        .cocheByDisplayName(l.getCocheByDisplayName())
+                        .build())
+                .toList();
     }
 
     private static String abbreviate(String value, int max) {

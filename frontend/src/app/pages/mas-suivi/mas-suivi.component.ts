@@ -136,7 +136,7 @@ export class MasSuiviComponent implements OnInit {
     this.timelineService
       .list({
         masId,
-        types: ['INTERVENTION', 'INTERVENTION_TECHNIQUE', 'FIT', 'TODO_TACHE']
+        types: ['INTERVENTION', 'INTERVENTION_TECHNIQUE', 'FIT', 'TODO_TACHE', 'NETTOYAGE_MAS']
       })
       .subscribe({
         next: (data) => {
@@ -189,6 +189,7 @@ export class MasSuiviComponent implements OnInit {
       case 'FIT':
         return 'FIT';
       case 'TODO_TACHE':
+      case 'NETTOYAGE_MAS':
         return 'TODOS';
       default:
         return 'BONS';
@@ -219,6 +220,7 @@ export class MasSuiviComponent implements OnInit {
       case 'FIT':
         return 'type-fit';
       case 'TODO_TACHE':
+      case 'NETTOYAGE_MAS':
         return 'type-todo';
       default:
         return 'type-default';
@@ -235,6 +237,8 @@ export class MasSuiviComponent implements OnInit {
         return 'FIT';
       case 'TODO_TACHE':
         return 'À faire';
+      case 'NETTOYAGE_MAS':
+        return 'Nettoyage';
       default:
         return type;
     }

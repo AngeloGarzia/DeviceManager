@@ -686,3 +686,26 @@
   background: #ecfdf5;
   color: #047857;
 }
+
+.todo-nettoyage-list {
+  list-style: none;
+  margin: 0.65rem 0 0;
+  padding: 0.55rem 0.65rem;
+  display: grid;
+  gap: 0.35rem;
+  border-radius: 0.65rem;
+  border: 1px solid #dbeafe;
+  background: #f8fbff;
+}
+
+.todo-nettoyage-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.75rem;
+}
+
+.todo-nettoyage-meta {
+  font-size: 0.75rem;
+  color: #64748b;
+}

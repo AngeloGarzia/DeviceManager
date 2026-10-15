@@ -12,6 +12,7 @@ import com.devicemanager.entity.InterventionLigne;
 import com.devicemanager.entity.InterventionTechnique;
 import com.devicemanager.entity.Mas;
 import com.devicemanager.entity.StockMouvement;
+import com.devicemanager.entity.TodoNettoyageMasLigne;
 import com.devicemanager.entity.TodoTache;
 import com.devicemanager.entity.TodoTacheStatut;
 import com.devicemanager.repository.CommandeRepository;
@@ -20,6 +21,7 @@ import com.devicemanager.repository.InterventionRepository;
 import com.devicemanager.repository.InterventionTechniqueRepository;
 import com.devicemanager.repository.MasRepository;
 import com.devicemanager.repository.StockMouvementRepository;
+import com.devicemanager.repository.TodoNettoyageMasLigneRepository;
 import com.devicemanager.repository.TodoTacheRepository;
 import com.devicemanager.security.StockMouvementSources;
 import com.devicemanager.security.TimelineEventTypes;
@@ -63,6 +65,7 @@ public class TimelineService {
     private final MasRepository masRepository;
     private final StockMouvementRepository stockMouvementRepository;
     private final TodoTacheRepository todoTacheRepository;
+    private final TodoNettoyageMasLigneRepository todoNettoyageMasLigneRepository;
     private final AtelierService atelierService;
 
     /**
@@ -339,26 +342,77 @@ public class TimelineService {
             LocalDateTime to,
             Set<String> typeFilter,
             Long masId) {
-        if (!include(typeFilter, TimelineEventTypes.TODO_TACHE)) {
+        if (include(typeFilter, TimelineEventTypes.TODO_TACHE)) {
+            List<TodoTache> list = masId != null
+                    ? todoTacheRepository.findByAtelierIdAndMasId(atelierId, masId)
+                    : loadRecentTodos(atelierId);
+            for (TodoTache todo : list) {
+                LocalDateTime at = todoEventAt(todo);
+                if (!inRange(at, from, to)) {
+                    continue;
+                }
+                Mas mas = todo.getMas();
+                events.add(event(
+                        TimelineEventTypes.TODO_TACHE,
+                        at,
+                        "À faire — " + todo.getTitre(),
+                        todoSubtitle(todo),
+                        todo.getCreatedByDisplayName() != null
+                                ? todo.getCreatedByDisplayName()
+                                : todo.getCreatedByUsername(),
+                        "TODO",
+                        todo.getId(),
+                        mas != null ? mas.getId() : null,
+                        mas != null ? mas.getNumero() : null,
+                        null,
+                        List.of()));
+            }
+        }
+        appendNettoyageEvents(events, atelierId, from, to, typeFilter, masId);
+    }
+
+    private void appendNettoyageEvents(
+            List<TimelineEventResponse> events,
+            Long atelierId,
+            LocalDateTime from,
+            LocalDateTime to,
+            Set<String> typeFilter,
+            Long masId) {
+        // Affiché sur la fiche MAS (masId requis) ; inclus avec TODO_TACHE ou NETTOYAGE_MAS.
+        if (masId == null) {
             return;
         }
-        List<TodoTache> list = masId != null
-                ? todoTacheRepository.findByAtelierIdAndMasId(atelierId, masId)
-                : loadRecentTodos(atelierId);
-        for (TodoTache todo : list) {
-            LocalDateTime at = todoEventAt(todo);
+        if (!include(typeFilter, TimelineEventTypes.NETTOYAGE_MAS)
+                && !include(typeFilter, TimelineEventTypes.TODO_TACHE)) {
+            return;
+        }
+        List<TodoNettoyageMasLigne> lignes =
+                todoNettoyageMasLigneRepository.findCocheesByAtelierAndMas(atelierId, masId);
+        for (TodoNettoyageMasLigne ligne : lignes) {
+            LocalDateTime at = ligne.getCocheAt() != null
+                    ? ligne.getCocheAt()
+                    : (ligne.getTodoTache().getCompletedAt() != null
+                            ? ligne.getTodoTache().getCompletedAt()
+                            : ligne.getTodoTache().getCreatedAt());
             if (!inRange(at, from, to)) {
                 continue;
             }
-            Mas mas = todo.getMas();
+            TodoTache todo = ligne.getTodoTache();
+            Mas mas = ligne.getMas();
+            String actor = ligne.getCocheByDisplayName() != null
+                    ? ligne.getCocheByDisplayName()
+                    : ligne.getCocheByUsername();
+            String subtitle = "Nettoyage MAS"
+                    + (todo.getStatut() == TodoTacheStatut.DONE && todo.getSignataireClotureNom() != null
+                            ? " · signé " + todo.getSignataireClotureNom()
+                            : "")
+                    + " · " + statutLabel(todo.getStatut());
             events.add(event(
-                    TimelineEventTypes.TODO_TACHE,
+                    TimelineEventTypes.NETTOYAGE_MAS,
                     at,
-                    "À faire — " + todo.getTitre(),
-                    todoSubtitle(todo),
-                    todo.getCreatedByDisplayName() != null
-                            ? todo.getCreatedByDisplayName()
-                            : todo.getCreatedByUsername(),
+                    "Nettoyage — " + todo.getTitre(),
+                    subtitle,
+                    actor,
                     "TODO",
                     todo.getId(),
                     mas != null ? mas.getId() : null,

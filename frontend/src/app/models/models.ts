@@ -377,6 +377,7 @@ export type TimelineEventType =
   | 'INTERVENTION_TECHNIQUE'
   | 'FIT'
   | 'TODO_TACHE'
+  | 'NETTOYAGE_MAS'
   | 'STOCK_ADJUSTMENT';
 
 /** Colonnes d'abscisse (swimlanes). */
@@ -697,6 +698,61 @@ export interface ArretMaintenanceRepriseForm {
   signataireRedemarrageNom?: string | null;
 }
 
+export interface TodoNettoyageLigne {
+  masId: number;
+  masNumero?: string | null;
+  coche: boolean;
+  cocheAt?: string | null;
+  cocheByUsername?: string | null;
+  cocheByDisplayName?: string | null;
+}
+
+export interface TodoNettoyageHistoriqueItem {
+  todoId: number;
+  todoTitre: string;
+  todoStatut: string;
+  masId: number;
+  masNumero?: string | null;
+  cocheAt?: string | null;
+  cocheByDisplayName?: string | null;
+  completedAt?: string | null;
+  signataireClotureNom?: string | null;
+}
+
+export interface TodoNettoyageMasStatut {
+  masId: number;
+  masNumero: string;
+  marqueLabel?: string | null;
+  masStatut?: string | null;
+  dernierNettoyageAt?: string | null;
+  joursDepuis?: number | null;
+  nettoyageCount: number;
+  /** 100 = aujourd'hui ; 0 = jamais / critique */
+  freshnessScore: number;
+  niveau: 'RECENT' | 'OK' | 'ATTENTION' | 'URGENT' | 'CRITIQUE' | 'JAMAIS' | string;
+}
+
+export interface TodoNettoyageAnalyse {
+  seuilJoursCritique: number;
+  totalMas: number;
+  jamaisNettoyees: number;
+  nettoyees7j: number;
+  nettoyees30j: number;
+  nettoyees90j: number;
+  pctJamais: number;
+  pct7j: number;
+  pct30j: number;
+  pct90j: number;
+  moyenneJoursDepuis?: number | null;
+  bucketRecent: number;
+  bucketOk: number;
+  bucketAttention: number;
+  bucketUrgent: number;
+  bucketCritique: number;
+  bucketJamais: number;
+  items: TodoNettoyageMasStatut[];
+}
+
 export interface TodoItem {
   id: number;
   titre: string;
@@ -719,6 +775,11 @@ export interface TodoItem {
   responsableCloture?: string | null;
   masId?: number | null;
   masNumero?: string | null;
+  /** STANDARD | NETTOYAGE_MAS */
+  typeTache?: string | null;
+  nettoyageLignes?: TodoNettoyageLigne[] | null;
+  nettoyageCocheCount?: number;
+  nettoyageTotalCount?: number;
   interventionTechniqueId?: number | null;
   interventionTechniqueLabel?: string | null;
   interventionId?: number | null;
@@ -754,7 +815,9 @@ export interface TodoTacheForm {
   titre: string;
   description?: string | null;
   severite?: string | null;
+  typeTache?: string | null;
   masId?: number | null;
+  masIds?: number[] | null;
 }
 
 /** Modèle de tâche simple (création rapide). */

@@ -217,9 +217,9 @@
       tabindex="-1"
       aria-labelledby="todo-create-title"
     >
-      <h2 id="todo-create-title" class="m-0 text-base font-semibold">Nouvelle tâche simple</h2>
+      <h2 id="todo-create-title" class="m-0 text-base font-semibold">Nouvelle tâche</h2>
       <p class="m-0 text-sm text-ink-soft">
-        Choisissez un modèle ci-dessus pour créer la tâche en un clic, ou saisissez une tâche personnalisée.
+        Choisissez un modèle, une saisie personnalisée, ou un <strong>nettoyage MAS</strong> multi-machines.
       </p>
 
       @if (modeles().length > 0) {
@@ -247,6 +247,13 @@
         </div>
       } @else {
         <form class="grid gap-3" [formGroup]="todoForm" (ngSubmit)="submitCreate()">
+          <mat-form-field appearance="outline" class="w-full">
+            <mat-label>Type de tâche</mat-label>
+            <mat-select formControlName="typeTache">
+              <mat-option value="STANDARD">Tâche simple</mat-option>
+              <mat-option value="NETTOYAGE_MAS">Nettoyage MAS</mat-option>
+            </mat-select>
+          </mat-form-field>
           <mat-form-field appearance="outline" class="w-full">
             <mat-label>Titre</mat-label>
             <input #createTitreInput matInput formControlName="titre" maxlength="200" />
@@ -329,10 +336,26 @@
                 <mat-option value="LOW">Faible</mat-option>
               </mat-select>
             </mat-form-field>
+            @if (!isNettoyageType()) {
+              <mat-form-field appearance="outline" class="w-full">
+                <mat-label>MAS de l'atelier</mat-label>
+                <mat-select formControlName="masId">
+                  <mat-option [value]="null">Aucune</mat-option>
+                  @if (massesLoading()) {
+                    <mat-option disabled>Chargement des MAS…</mat-option>
+                  } @else {
+                    @for (m of masses(); track m.id) {
+                      <mat-option [value]="m.id">{{ masOptionLabel(m) }}</mat-option>
+                    }
+                  }
+                </mat-select>
+              </mat-form-field>
+            }
+          </div>
+          @if (isNettoyageType()) {
             <mat-form-field appearance="outline" class="w-full">
-              <mat-label>MAS de l'atelier</mat-label>
-              <mat-select formControlName="masId">
-                <mat-option [value]="null">Aucune</mat-option>
+              <mat-label>MAS à nettoyer</mat-label>
+              <mat-select formControlName="masIds" multiple>
                 @if (massesLoading()) {
                   <mat-option disabled>Chargement des MAS…</mat-option>
                 } @else {
@@ -341,8 +364,9 @@
                   }
                 }
               </mat-select>
+              <mat-hint>Sélectionnez une ou plusieurs machines de l’atelier</mat-hint>
             </mat-form-field>
-          </div>
+          }
           <div class="flex flex-wrap gap-2">
             <button mat-button type="button" (click)="cancelCreate()">Annuler</button>
             <button mat-flat-button color="primary" type="submit" [disabled]="saving()">
@@ -569,6 +593,15 @@
     <button
       type="button"
       class="todo-filter"
+      [class.todo-filter--active]="filter() === 'NETTOYAGE'"
+      (click)="setFilter('NETTOYAGE')"
+    >
+      Nettoyage MAS
+      <span class="todo-filter__count">{{ counts().nettoyage }}</span>
+    </button>
+    <button
+      type="button"
+      class="todo-filter"
       [class.todo-filter--active]="filter() === 'ALL'"
       (click)="setFilter('ALL')"
     >
@@ -623,7 +656,9 @@
           [attr.data-statut]="item.statut"
           [attr.tabindex]="item.overdue ? 0 : null"
         >
-          <mat-icon class="todo-item__icon">{{ item.recurrenceId ? 'event_repeat' : 'task_alt' }}</mat-icon>
+          <mat-icon class="todo-item__icon">{{
+            isNettoyageItem(item) ? 'cleaning_services' : item.recurrenceId ? 'event_repeat' : 'task_alt'
+          }}</mat-icon>
           <div class="todo-item__body min-w-0 flex-1">
             <div class="flex flex-wrap items-center gap-2">
               <span class="todo-item__title">{{ item.titre || item.title }}</span>
@@ -631,6 +666,12 @@
                 severityLabel(item.severite || item.severity || 'MEDIUM')
               }}</span>
               <span class="todo-statut" [attr.data-statut]="item.statut">{{ statutLabel(item.statut) }}</span>
+              @if (isNettoyageItem(item)) {
+                <span class="todo-statut" data-statut="IN_PROGRESS">Nettoyage MAS</span>
+                <span class="todo-statut">
+                  {{ item.nettoyageCocheCount || 0 }} / {{ item.nettoyageTotalCount || 0 }}
+                </span>
+              }
               @if (item.recurrenceId) {
                 <span class="todo-statut">Récurrente</span>
               }
@@ -638,6 +679,29 @@
                 <span class="todo-overdue-badge">En retard</span>
               }
             </div>
+            @if (isNettoyageItem(item) && item.nettoyageLignes?.length) {
+              <ul class="todo-nettoyage-list">
+                @for (ligne of item.nettoyageLignes; track ligne.masId) {
+                  <li class="todo-nettoyage-line">
+                    <mat-checkbox
+                      [checked]="ligne.coche"
+                      [disabled]="saving() || item.statut === 'DONE' || item.statut === 'CANCELLED'"
+                      (change)="toggleNettoyageCoche(item, ligne.masId, $event.checked)"
+                    >
+                      MAS {{ ligne.masNumero || ligne.masId }}
+                    </mat-checkbox>
+                    @if (ligne.coche && ligne.cocheAt) {
+                      <span class="todo-nettoyage-meta">
+                        {{ formatDateTime(ligne.cocheAt) }}
+                        @if (ligne.cocheByDisplayName) {
+                          · {{ ligne.cocheByDisplayName }}
+                        }
+                      </span>
+                    }
+                  </li>
+                }
+              </ul>
+            }
             @if (item.description) {
               <p class="todo-item__desc">{{ item.description }}</p>
             }
@@ -779,14 +843,21 @@
                   color="primary"
                   type="button"
                   (click)="setStatus(item, 'DONE')"
-                  [disabled]="saving()"
+                  [disabled]="saving() || !canCloseNettoyage(item)"
+                  [matTooltip]="
+                    isNettoyageItem(item) && !canCloseNettoyage(item)
+                      ? 'Cochez au moins une MAS nettoyée'
+                      : ''
+                  "
                 >
                   Terminer
                 </button>
-                <button mat-stroked-button type="button" (click)="startLink(item)" [disabled]="saving()">
-                  <mat-icon>link</mat-icon>
-                  Intervention
-                </button>
+                @if (!isNettoyageItem(item)) {
+                  <button mat-stroked-button type="button" (click)="startLink(item)" [disabled]="saving()">
+                    <mat-icon>link</mat-icon>
+                    Intervention
+                  </button>
+                }
                 <button
                   mat-button
                   color="warn"

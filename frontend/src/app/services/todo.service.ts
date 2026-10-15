@@ -7,6 +7,8 @@ import {
   TodoList,
   TodoModele,
   TodoModeleForm,
+  TodoNettoyageAnalyse,
+  TodoNettoyageHistoriqueItem,
   TodoRecurrence,
   TodoRecurrenceForm,
   TodoTacheForm,
@@ -53,6 +55,7 @@ export class TodoService {
   }
 
   create(payload: TodoTacheForm, photos: File[] = []): Observable<TodoItem> {
+    const typeTache = payload.typeTache || 'STANDARD';
     const formData = new FormData();
     formData.append(
       'data',
@@ -62,7 +65,9 @@ export class TodoService {
             titre: payload.titre.trim(),
             description: payload.description?.trim() || null,
             severite: payload.severite || 'MEDIUM',
-            masId: payload.masId ?? null
+            typeTache,
+            masId: typeTache === 'NETTOYAGE_MAS' ? null : (payload.masId ?? null),
+            masIds: typeTache === 'NETTOYAGE_MAS' ? (payload.masIds ?? []) : null
           })
         ],
         { type: 'application/json' }
@@ -74,6 +79,22 @@ export class TodoService {
     return this.http
       .post<TodoItem>(`${this.base}`, formData)
       .pipe(tap(() => this.refreshPendingCount()));
+  }
+
+  setNettoyageCoche(todoId: number, masId: number, coche: boolean): Observable<TodoItem> {
+    return this.http
+      .patch<TodoItem>(`${this.base}/${todoId}/nettoyage/${masId}`, { coche })
+      .pipe(tap(() => this.refreshPendingCount()));
+  }
+
+  historiqueNettoyage(masId: number): Observable<TodoNettoyageHistoriqueItem[]> {
+    return this.http.get<TodoNettoyageHistoriqueItem[]>(`${this.base}/nettoyage/historique`, {
+      params: new HttpParams().set('masId', String(masId))
+    });
+  }
+
+  analyseNettoyage(): Observable<TodoNettoyageAnalyse> {
+    return this.http.get<TodoNettoyageAnalyse>(`${this.base}/nettoyage/analyse`);
   }
 
   resolvePhotoUrl(photoUrl?: string | null): string {

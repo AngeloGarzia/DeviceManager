@@ -1,19 +1,25 @@
 package com.devicemanager.service;
 
+import com.devicemanager.dto.TodoNettoyageCocheRequest;
+import com.devicemanager.dto.TodoNettoyageHistoriqueItem;
 import com.devicemanager.dto.TodoTacheLinkRequest;
 import com.devicemanager.dto.TodoTacheRequest;
 import com.devicemanager.dto.TodoTacheResponse;
 import com.devicemanager.dto.TodoTacheStatusRequest;
 import com.devicemanager.entity.Atelier;
 import com.devicemanager.entity.InterventionTechnique;
+import com.devicemanager.entity.Mas;
+import com.devicemanager.entity.TodoNettoyageMasLigne;
 import com.devicemanager.entity.TodoRecurrence;
 import com.devicemanager.entity.TodoRecurrenceFrequence;
 import com.devicemanager.entity.TodoTache;
 import com.devicemanager.entity.TodoTacheStatut;
+import com.devicemanager.entity.TodoTacheType;
 import com.devicemanager.entity.User;
 import com.devicemanager.repository.InterventionRepository;
 import com.devicemanager.repository.InterventionTechniqueRepository;
 import com.devicemanager.repository.MasRepository;
+import com.devicemanager.repository.TodoNettoyageMasLigneRepository;
 import com.devicemanager.repository.TodoTacheRepository;
 import com.devicemanager.repository.UserRepository;
 import com.devicemanager.support.TestFixtures;
@@ -27,6 +33,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -44,6 +51,7 @@ import org.springframework.web.server.ResponseStatusException;
 class TodoServiceTest {
 
     @Mock private TodoTacheRepository todoTacheRepository;
+    @Mock private TodoNettoyageMasLigneRepository todoNettoyageMasLigneRepository;
     @Mock private MasRepository masRepository;
     @Mock private InterventionTechniqueRepository interventionTechniqueRepository;
     @Mock private InterventionRepository interventionRepository;
@@ -272,5 +280,230 @@ class TodoServiceTest {
 
         assertThat(todoService.listOverdueForReminder(now)).containsExactly(overdue);
         verify(todoTacheRepository).findOverdueAcrossAteliers(any(), eq(now));
+    }
+
+    @Test
+    void create_nettoyageMas_persistsChecklist() {
+        stubClock();
+        Atelier atelier = TestFixtures.atelier();
+        User user = TestFixtures.user("tech", "TECHNICIEN");
+        Mas mas1 = TestFixtures.mas();
+        Mas mas2 = Mas.builder()
+                .id(21L)
+                .numero("MAS-002")
+                .marque(TestFixtures.marque())
+                .statut(mas1.getStatut())
+                .utilise(true)
+                .atelier(atelier)
+                .build();
+        when(atelierService.requireCurrentAtelier()).thenReturn(atelier);
+        when(userRepository.findByUsername("tech")).thenReturn(Optional.of(user));
+        when(masRepository.findByIdAndAtelierId(20L, atelier.getId())).thenReturn(Optional.of(mas1));
+        when(masRepository.findByIdAndAtelierId(21L, atelier.getId())).thenReturn(Optional.of(mas2));
+        when(todoTacheRepository.save(any(TodoTache.class))).thenAnswer(inv -> {
+            TodoTache t = inv.getArgument(0);
+            t.setId(40L);
+            return t;
+        });
+
+        TodoTacheRequest request = new TodoTacheRequest();
+        request.setTitre("Nettoyage salle");
+        request.setTypeTache("NETTOYAGE_MAS");
+        request.setMasIds(List.of(20L, 21L));
+        request.setSeverite("MEDIUM");
+
+        TodoTacheResponse response = todoService.create(request, List.of(), "tech");
+
+        assertThat(response.getId()).isEqualTo(40L);
+        assertThat(response.getTypeTache()).isEqualTo("NETTOYAGE_MAS");
+        assertThat(response.getMasId()).isNull();
+        assertThat(response.getNettoyageTotalCount()).isEqualTo(2);
+        assertThat(response.getNettoyageCocheCount()).isEqualTo(0);
+        assertThat(response.getNettoyageLignes()).hasSize(2);
+    }
+
+    @Test
+    void setNettoyageCoche_marksLineAndProgress() {
+        stubClock();
+        Atelier atelier = TestFixtures.atelier();
+        User user = TestFixtures.user("tech", "TECHNICIEN");
+        Mas mas = TestFixtures.mas();
+        TodoTache entity = TodoTache.builder()
+                .id(40L)
+                .atelier(atelier)
+                .titre("Nettoyage")
+                .statut(TodoTacheStatut.OPEN)
+                .typeTache(TodoTacheType.NETTOYAGE_MAS)
+                .severite("MEDIUM")
+                .createdByUsername("tech")
+                .nettoyageLignes(new ArrayList<>())
+                .build();
+        TodoNettoyageMasLigne ligne = TodoNettoyageMasLigne.builder()
+                .id(1L)
+                .todoTache(entity)
+                .mas(mas)
+                .coche(false)
+                .build();
+        entity.getNettoyageLignes().add(ligne);
+
+        when(atelierService.requireCurrentAtelier()).thenReturn(atelier);
+        when(todoTacheRepository.findByIdAndAtelierId(40L, atelier.getId())).thenReturn(Optional.of(entity));
+        when(todoNettoyageMasLigneRepository.findByTodoTacheIdAndMasId(40L, 20L))
+                .thenReturn(Optional.of(ligne));
+        when(userRepository.findByUsername("tech")).thenReturn(Optional.of(user));
+        when(todoNettoyageMasLigneRepository.save(any(TodoNettoyageMasLigne.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+        when(todoTacheRepository.save(any(TodoTache.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        TodoNettoyageCocheRequest req = new TodoNettoyageCocheRequest();
+        req.setCoche(true);
+
+        TodoTacheResponse response = todoService.setNettoyageCoche(40L, 20L, req, "tech");
+
+        assertThat(ligne.isCoche()).isTrue();
+        assertThat(ligne.getCocheAt()).isNotNull();
+        assertThat(entity.getStatut()).isEqualTo(TodoTacheStatut.IN_PROGRESS);
+        assertThat(response.getNettoyageCocheCount()).isEqualTo(1);
+    }
+
+    @Test
+    void changeStatus_nettoyageDone_requiresAtLeastOneChecked() {
+        Atelier atelier = TestFixtures.atelier();
+        User admin = TestFixtures.user("admin", "ADMIN");
+        Mas mas = TestFixtures.mas();
+        TodoTache entity = TodoTache.builder()
+                .id(40L)
+                .atelier(atelier)
+                .titre("Nettoyage")
+                .statut(TodoTacheStatut.IN_PROGRESS)
+                .typeTache(TodoTacheType.NETTOYAGE_MAS)
+                .severite("MEDIUM")
+                .createdByUsername("tech")
+                .nettoyageLignes(new ArrayList<>())
+                .build();
+        entity.getNettoyageLignes().add(TodoNettoyageMasLigne.builder()
+                .todoTache(entity)
+                .mas(mas)
+                .coche(false)
+                .build());
+
+        when(atelierService.requireCurrentAtelier()).thenReturn(atelier);
+        when(todoTacheRepository.findByIdAndAtelierId(40L, atelier.getId())).thenReturn(Optional.of(entity));
+        when(userRepository.findByUsername("admin")).thenReturn(Optional.of(admin));
+
+        TodoTacheStatusRequest request = new TodoTacheStatusRequest();
+        request.setStatut("DONE");
+        request.setSignatureCloture(
+                "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==");
+        request.setSignataireClotureNom("Admin");
+
+        assertThatThrownBy(() -> todoService.changeStatus(40L, request, "admin"))
+                .isInstanceOf(ResponseStatusException.class)
+                .satisfies(ex -> {
+                    ResponseStatusException rse = (ResponseStatusException) ex;
+                    assertThat(rse.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+                    assertThat(rse.getReason()).contains("au moins une MAS");
+                });
+        verify(todoTacheRepository, never()).save(any());
+    }
+
+    @Test
+    void changeStatus_nettoyageDone_partialOkWithSignature() {
+        stubClock();
+        Atelier atelier = TestFixtures.atelier();
+        User admin = TestFixtures.user("admin", "ADMIN");
+        Mas mas1 = TestFixtures.mas();
+        Mas mas2 = Mas.builder()
+                .id(21L)
+                .numero("MAS-002")
+                .marque(TestFixtures.marque())
+                .statut(mas1.getStatut())
+                .utilise(true)
+                .atelier(atelier)
+                .build();
+        TodoTache entity = TodoTache.builder()
+                .id(40L)
+                .atelier(atelier)
+                .titre("Nettoyage")
+                .statut(TodoTacheStatut.IN_PROGRESS)
+                .typeTache(TodoTacheType.NETTOYAGE_MAS)
+                .severite("MEDIUM")
+                .createdByUsername("tech")
+                .nettoyageLignes(new ArrayList<>())
+                .build();
+        entity.getNettoyageLignes().add(TodoNettoyageMasLigne.builder()
+                .todoTache(entity)
+                .mas(mas1)
+                .coche(true)
+                .cocheAt(LocalDateTime.of(2026, 9, 16, 9, 0))
+                .cocheByUsername("tech")
+                .build());
+        entity.getNettoyageLignes().add(TodoNettoyageMasLigne.builder()
+                .todoTache(entity)
+                .mas(mas2)
+                .coche(false)
+                .build());
+
+        when(atelierService.requireCurrentAtelier()).thenReturn(atelier);
+        when(todoTacheRepository.findByIdAndAtelierId(40L, atelier.getId())).thenReturn(Optional.of(entity));
+        when(userRepository.findByUsername("admin")).thenReturn(Optional.of(admin));
+        when(todoTacheRepository.save(any(TodoTache.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        TodoTacheStatusRequest request = new TodoTacheStatusRequest();
+        request.setStatut("DONE");
+        request.setSignatureCloture(
+                "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==");
+        request.setSignataireClotureNom("Admin Test");
+
+        TodoTacheResponse response = todoService.changeStatus(40L, request, "admin");
+
+        assertThat(response.getStatut()).isEqualTo("DONE");
+        assertThat(response.getSignataireClotureNom()).isEqualTo("Admin Test");
+        assertThat(response.getNettoyageCocheCount()).isEqualTo(1);
+        assertThat(response.getNettoyageTotalCount()).isEqualTo(2);
+    }
+
+    @Test
+    void freshnessScore_mapsDaysToZeroHundred() {
+        assertThat(TodoService.freshnessScore(0, 90)).isEqualTo(100);
+        assertThat(TodoService.freshnessScore(45, 90)).isEqualTo(50);
+        assertThat(TodoService.freshnessScore(90, 90)).isEqualTo(0);
+        assertThat(TodoService.freshnessScore(120, 90)).isEqualTo(0);
+    }
+
+    @Test
+    void historiqueNettoyage_returnsCheckedLines() {
+        Atelier atelier = TestFixtures.atelier();
+        Mas mas = TestFixtures.mas();
+        TodoTache tache = TodoTache.builder()
+                .id(40L)
+                .atelier(atelier)
+                .titre("Nettoyage salle")
+                .statut(TodoTacheStatut.DONE)
+                .typeTache(TodoTacheType.NETTOYAGE_MAS)
+                .severite("MEDIUM")
+                .createdByUsername("tech")
+                .completedAt(LocalDateTime.of(2026, 9, 16, 11, 0))
+                .signataireClotureNom("Admin")
+                .build();
+        TodoNettoyageMasLigne ligne = TodoNettoyageMasLigne.builder()
+                .todoTache(tache)
+                .mas(mas)
+                .coche(true)
+                .cocheAt(LocalDateTime.of(2026, 9, 16, 10, 0))
+                .cocheByDisplayName("Tech User")
+                .build();
+
+        when(atelierService.requireCurrentAtelier()).thenReturn(atelier);
+        when(masRepository.findByIdAndAtelierId(20L, atelier.getId())).thenReturn(Optional.of(mas));
+        when(todoNettoyageMasLigneRepository.findHistoriqueByAtelierAndMas(atelier.getId(), 20L))
+                .thenReturn(List.of(ligne));
+
+        List<TodoNettoyageHistoriqueItem> items = todoService.historiqueNettoyage(20L);
+
+        assertThat(items).hasSize(1);
+        assertThat(items.get(0).getTodoTitre()).isEqualTo("Nettoyage salle");
+        assertThat(items.get(0).getCocheByDisplayName()).isEqualTo("Tech User");
+        assertThat(items.get(0).getSignataireClotureNom()).isEqualTo("Admin");
     }
 }

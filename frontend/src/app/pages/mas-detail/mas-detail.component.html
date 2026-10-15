@@ -186,6 +186,41 @@
           </mat-card-content>
         </mat-card>
       }
+
+      <mat-card class="!rounded-xl !border !border-line !shadow-soft">
+        <mat-card-content class="!pt-5">
+          <h2 class="mb-3 text-base font-semibold text-ink">Nettoyages</h2>
+          @if (nettoyageHistoriqueLoading()) {
+            <div class="flex justify-center py-4"><mat-spinner diameter="28"></mat-spinner></div>
+          } @else if (nettoyageHistorique().length === 0) {
+            <p class="m-0 text-sm text-ink-soft">Aucun nettoyage enregistré pour cette MAS.</p>
+          } @else {
+            <ul class="m-0 list-none space-y-3 p-0">
+              @for (h of nettoyageHistorique(); track h.todoId + '-' + (h.cocheAt || '')) {
+                <li class="rounded-lg border border-line bg-surface-muted/40 px-3 py-2.5">
+                  <div class="flex flex-wrap items-baseline justify-between gap-2">
+                    <span class="font-medium text-ink">{{ h.todoTitre }}</span>
+                    <span class="text-xs text-ink-faint">
+                      {{ h.cocheAt ? (h.cocheAt | date: 'dd/MM/yyyy HH:mm') : '—' }}
+                    </span>
+                  </div>
+                  <p class="mt-1 mb-0 text-sm text-ink-soft">
+                    @if (h.cocheByDisplayName) {
+                      Coché par {{ h.cocheByDisplayName }}
+                    }
+                    @if (h.signataireClotureNom) {
+                      · Signataire {{ h.signataireClotureNom }}
+                    }
+                    @if (h.todoStatut) {
+                      · {{ h.todoStatut }}
+                    }
+                  </p>
+                </li>
+              }
+            </ul>
+          }
+        </mat-card-content>
+      </mat-card>
     }
   }
 </section>

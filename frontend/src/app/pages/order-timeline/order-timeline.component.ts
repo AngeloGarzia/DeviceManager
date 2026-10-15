@@ -49,7 +49,7 @@ export class OrderTimelineComponent implements OnInit {
       types: ['INTERVENTION_TECHNIQUE']
     },
     { id: 'FIT', label: 'FIT', icon: 'description', types: ['FIT'] },
-    { id: 'TODOS', label: 'À faire', icon: 'task_alt', types: ['TODO_TACHE'] },
+    { id: 'TODOS', label: 'À faire', icon: 'task_alt', types: ['TODO_TACHE', 'NETTOYAGE_MAS'] },
     { id: 'STOCK', label: 'Stock', icon: 'tune', types: ['STOCK_ADJUSTMENT'] }
   ];
 
@@ -140,6 +140,7 @@ export class OrderTimelineComponent implements OnInit {
       case 'FIT':
         return 'FIT';
       case 'TODO_TACHE':
+      case 'NETTOYAGE_MAS':
         return 'TODOS';
       default:
         return 'STOCK';
@@ -162,6 +163,8 @@ export class OrderTimelineComponent implements OnInit {
         return 'FIT';
       case 'TODO_TACHE':
         return 'À faire';
+      case 'NETTOYAGE_MAS':
+        return 'Nettoyage';
       case 'STOCK_ADJUSTMENT':
         return 'Ajustement';
       default:
@@ -192,6 +195,7 @@ export class OrderTimelineComponent implements OnInit {
       case 'FIT':
         return 'type-fit';
       case 'TODO_TACHE':
+      case 'NETTOYAGE_MAS':
         return 'type-todo';
       case 'STOCK_ADJUSTMENT':
         return 'type-stock';

@@ -38,6 +38,14 @@ public class TodoTacheResponse {
     private Long masId;
     private String masNumero;
 
+    /** STANDARD | NETTOYAGE_MAS */
+    private String typeTache;
+
+    /** Checklist multi-MAS (nettoyage uniquement). */
+    private List<TodoNettoyageLigneResponse> nettoyageLignes;
+    private int nettoyageCocheCount;
+    private int nettoyageTotalCount;
+
     private Long interventionTechniqueId;
     private String interventionTechniqueLabel;
     private Long interventionId;

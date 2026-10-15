@@ -28,8 +28,17 @@ import { SignaturePadComponent } from '../../shared/signature-pad.component';
 import { ImageEditorDialogComponent } from '../../shared/image-editor-dialog.component';
 import { apiErrorMessage } from '../../shared/api-error';
 import { MatCheckboxModule } from '@angular/material/checkbox';
+import { MatTooltipModule } from '@angular/material/tooltip';
 
-type TodoFilter = 'ALL' | 'ACTIVE' | 'OVERDUE' | 'OPEN' | 'IN_PROGRESS' | 'DONE' | 'CANCELLED';
+type TodoFilter =
+  | 'ALL'
+  | 'ACTIVE'
+  | 'OVERDUE'
+  | 'OPEN'
+  | 'IN_PROGRESS'
+  | 'DONE'
+  | 'CANCELLED'
+  | 'NETTOYAGE';
 type TodoMainTab = 'modeles' | 'overdue';
 
 interface NewTodoPhoto {
@@ -55,6 +64,7 @@ interface NewTodoPhoto {
     MatCardModule,
     MatProgressSpinnerModule,
     MatCheckboxModule,
+    MatTooltipModule,
     MatDialogModule,
     SignaturePadComponent
   ],
@@ -126,6 +136,8 @@ export class TodoListComponent implements OnInit, OnDestroy {
       list = list.filter((t) => t.statut === 'OPEN' || t.statut === 'IN_PROGRESS');
     } else if (f === 'OVERDUE') {
       list = list.filter((t) => !!t.overdue);
+    } else if (f === 'NETTOYAGE') {
+      list = list.filter((t) => this.isNettoyageItem(t));
     } else if (f !== 'ALL') {
       list = list.filter((t) => t.statut === f);
     }
@@ -150,7 +162,8 @@ export class TodoListComponent implements OnInit, OnDestroy {
       open: list.filter((t) => t.statut === 'OPEN').length,
       inProgress: list.filter((t) => t.statut === 'IN_PROGRESS').length,
       done: list.filter((t) => t.statut === 'DONE').length,
-      cancelled: list.filter((t) => t.statut === 'CANCELLED').length
+      cancelled: list.filter((t) => t.statut === 'CANCELLED').length,
+      nettoyage: list.filter((t) => this.isNettoyageItem(t)).length
     };
   });
 
@@ -158,7 +171,9 @@ export class TodoListComponent implements OnInit, OnDestroy {
     titre: ['', [Validators.required, Validators.maxLength(200)]],
     description: ['', Validators.maxLength(2000)],
     severite: ['MEDIUM'],
-    masId: [null as number | null]
+    typeTache: ['STANDARD'],
+    masId: [null as number | null],
+    masIds: [[] as number[]]
   });
 
   readonly modeleForm = this.fb.nonNullable.group({
@@ -200,7 +215,7 @@ export class TodoListComponent implements OnInit, OnDestroy {
     const filterParam = params.get('filter');
     if (filterParam === 'OVERDUE' || filterParam === 'ACTIVE' || filterParam === 'OPEN'
         || filterParam === 'IN_PROGRESS' || filterParam === 'DONE' || filterParam === 'CANCELLED'
-        || filterParam === 'ALL') {
+        || filterParam === 'ALL' || filterParam === 'NETTOYAGE') {
       this.filter.set(filterParam);
       if (filterParam === 'OVERDUE') {
         this.mainTab.set('overdue');
@@ -427,7 +442,14 @@ export class TodoListComponent implements OnInit, OnDestroy {
     this.clearNewPhotos();
     this.stopCamera();
     this.showCamera.set(false);
-    this.todoForm.reset({ titre: '', description: '', severite: 'MEDIUM', masId: null });
+    this.todoForm.reset({
+      titre: '',
+      description: '',
+      severite: 'MEDIUM',
+      typeTache: 'STANDARD',
+      masId: null,
+      masIds: []
+    });
     this.loadMasses();
     this.loadModeles();
     this.focusCreatePanel();
@@ -447,9 +469,50 @@ export class TodoListComponent implements OnInit, OnDestroy {
     this.clearNewPhotos();
     this.stopCamera();
     this.showCamera.set(false);
-    this.todoForm.reset({ titre: '', description: '', severite: 'MEDIUM', masId: null });
+    this.todoForm.reset({
+      titre: '',
+      description: '',
+      severite: 'MEDIUM',
+      typeTache: 'STANDARD',
+      masId: null,
+      masIds: []
+    });
     this.loadMasses();
     this.focusCreatePanel(true);
+  }
+
+  isNettoyageType(): boolean {
+    return this.todoForm.controls.typeTache.value === 'NETTOYAGE_MAS';
+  }
+
+  isNettoyageItem(item: TodoItem): boolean {
+    return item.typeTache === 'NETTOYAGE_MAS' || item.type === 'NETTOYAGE_MAS';
+  }
+
+  canCloseNettoyage(item: TodoItem): boolean {
+    if (!this.isNettoyageItem(item)) {
+      return true;
+    }
+    return (item.nettoyageCocheCount ?? 0) > 0;
+  }
+
+  toggleNettoyageCoche(item: TodoItem, masId: number, coche: boolean): void {
+    if (!this.isNettoyageItem(item) || item.statut === 'DONE' || item.statut === 'CANCELLED') {
+      return;
+    }
+    this.saving.set(true);
+    this.error.set(null);
+    this.todoService.setNettoyageCoche(item.id, masId, coche).subscribe({
+      next: (updated) => {
+        this.saving.set(false);
+        this.items.update((list) => list.map((t) => (t.id === updated.id ? updated : t)));
+      },
+      error: (err) => {
+        this.saving.set(false);
+        this.error.set(apiErrorMessage(err, 'Mise à jour du nettoyage impossible.'));
+        this.load();
+      }
+    });
   }
 
   /** Scroll + focus sur le panneau de création (tuile clignotante). */
@@ -788,9 +851,13 @@ export class TodoListComponent implements OnInit, OnDestroy {
       this.error.set(`Maximum ${TodoListComponent.MAX_PHOTOS} images par tâche.`);
       return;
     }
+    const raw = this.todoForm.getRawValue();
+    if (raw.typeTache === 'NETTOYAGE_MAS' && (!raw.masIds || raw.masIds.length === 0)) {
+      this.error.set('Sélectionnez au moins une MAS à nettoyer.');
+      return;
+    }
     this.saving.set(true);
     this.error.set(null);
-    const raw = this.todoForm.getRawValue();
     const photos = this.newPhotos().map((p) => p.file);
     this.todoService
       .create(
@@ -798,7 +865,9 @@ export class TodoListComponent implements OnInit, OnDestroy {
           titre: raw.titre,
           description: raw.description || null,
           severite: raw.severite,
-          masId: raw.masId
+          typeTache: raw.typeTache,
+          masId: raw.typeTache === 'NETTOYAGE_MAS' ? null : raw.masId,
+          masIds: raw.typeTache === 'NETTOYAGE_MAS' ? raw.masIds : null
         },
         photos
       )

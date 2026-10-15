@@ -17,6 +17,8 @@ public final class TimelineEventTypes {
     public static final String STOCK_ADJUSTMENT = "STOCK_ADJUSTMENT";
     /** Tâche « À faire » rattachée à une MAS. */
     public static final String TODO_TACHE = "TODO_TACHE";
+    /** Nettoyage MAS (ligne cochée d'une tâche NETTOYAGE_MAS). */
+    public static final String NETTOYAGE_MAS = "NETTOYAGE_MAS";
 
     /** Colonnes d'abscisse (swimlane). */
     public static final String COL_COMMANDES = "COMMANDES";
@@ -38,7 +40,7 @@ public final class TimelineEventTypes {
             case INTERVENTION -> COL_BONS;
             case INTERVENTION_TECHNIQUE -> COL_INTERVENTIONS;
             case FIT -> COL_FIT;
-            case TODO_TACHE -> COL_TODOS;
+            case TODO_TACHE, NETTOYAGE_MAS -> COL_TODOS;
             case STOCK_ADJUSTMENT -> COL_STOCK;
             default -> COL_STOCK;
         };
