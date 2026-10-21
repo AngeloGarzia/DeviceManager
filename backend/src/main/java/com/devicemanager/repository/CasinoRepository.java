@@ -2,6 +2,7 @@ package com.devicemanager.repository;
 
 import com.devicemanager.entity.Casino;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -46,4 +47,8 @@ public interface CasinoRepository extends JpaRepository<Casino, Long> {
     boolean existsByNomIgnoreCaseAndGroupeId(String nom, Long groupeId);
 
     boolean existsByNomIgnoreCaseAndGroupeIdAndIdNot(String nom, Long groupeId, Long id);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("UPDATE Casino c SET c.utilise = :utilise WHERE c.id = :id")
+    int updateUtilise(@Param("id") Long id, @Param("utilise") boolean utilise);
 }

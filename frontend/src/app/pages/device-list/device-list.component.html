@@ -114,7 +114,12 @@
       <ul class="home-simple-todos__list">
         @for (item of simpleTodosSorted(); track item.id) {
           <li>
-            <a routerLink="/todos" class="home-simple-todos__item" [attr.data-severity]="item.severite || item.severity">
+            <button
+              type="button"
+              class="home-simple-todos__item"
+              [attr.data-severity]="item.severite || item.severity"
+              (click)="openTodoModal(item)"
+            >
               <div class="home-simple-todos__item-main">
                 <span class="home-simple-todos__item-title">{{ item.titre || item.title }}</span>
                 <span class="home-simple-todos__sev" [attr.data-severity]="item.severite || item.severity">
@@ -126,11 +131,20 @@
                 @if (item.masNumero) {
                   <span>MAS {{ item.masNumero }}</span>
                 }
+                <span class="home-simple-todos__statut">{{ item.statut === 'IN_PROGRESS' ? 'En cours' : 'Ouverte' }}</span>
               </div>
-            </a>
+            </button>
           </li>
         }
       </ul>
     }
   </mat-card>
+
+  @if (selectedTodo(); as todo) {
+    <app-todo-quick-modal
+      [todo]="todo"
+      (closed)="closeTodoModal()"
+      (updated)="onTodoUpdated($event)"
+    />
+  }
 </section>

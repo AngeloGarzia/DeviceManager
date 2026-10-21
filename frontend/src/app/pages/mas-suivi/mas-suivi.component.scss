@@ -85,6 +85,12 @@
   color: #047857;
 }
 
+.filter-chip.active.col-nettoyage {
+  background: #eff6ff;
+  border-color: #93c5fd;
+  color: #1d4ed8;
+}
+
 .swim-scroll {
   overflow-x: auto;
   padding-bottom: 0.25rem;
@@ -145,6 +151,12 @@
   color: #047857;
 }
 
+.swim-col-title.col-nettoyage {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+  color: #1d4ed8;
+}
+
 .swim-body {
   display: grid;
   gap: 0.55rem;
@@ -172,6 +184,10 @@
   border-left-color: #a7f3d0;
 }
 
+.swim-cell.col-nettoyage {
+  border-left-color: #bfdbfe;
+}
+
 .timeline-card {
   padding: 0.75rem 0.85rem;
   border: 1px solid #d7e0ea;
@@ -193,6 +209,10 @@
 
 .timeline-card.type-todo {
   border-color: #a7f3d0;
+}
+
+.timeline-card.type-nettoyage {
+  border-color: #bfdbfe;
 }
 
 .timeline-actions {
@@ -230,6 +250,11 @@
 .type-badge.type-todo {
   background: #d1fae5;
   color: #047857;
+}
+
+.type-badge.type-nettoyage {
+  background: #dbeafe;
+  color: #1d4ed8;
 }
 
 .delta-badge {

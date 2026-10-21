@@ -13,4 +13,10 @@ public class CasinoRequest {
     @NotBlank(message = "Le nom du casino est obligatoire")
     @Size(max = 120, message = "Le nom du casino ne doit pas dépasser 120 caractères")
     private String nom;
+
+    /**
+     * Activation du casino (Super Admin uniquement via PATCH dédié).
+     * Ignoré sur create/update nom classique.
+     */
+    private Boolean utilise;
 }

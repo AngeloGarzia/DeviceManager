@@ -4,7 +4,7 @@
       <a routerLink="/mas/fit" class="text-sm text-ink-soft no-underline hover:underline">← Fiches FIT</a>
       <h1 class="page-title mt-1" data-tour="page-fit-feuille">Suivi FIT</h1>
       <p class="page-subtitle">
-        Fiche inventaire technique (modèle n° 34) — lignes chronologiques
+        Timeline des opérations FIT MAS + fiche inventaire technique (modèle n° 34)
       </p>
     </div>
     <div class="flex flex-wrap gap-2">
@@ -65,6 +65,74 @@
   } @else {
     @let f = fit()!;
     @let h = headerDisplay()!;
+
+    <section class="no-print fit-timeline" aria-label="Timeline des opérations FIT">
+      <div class="fit-timeline__head">
+        <div>
+          <h2 class="fit-timeline__title">Timeline FIT</h2>
+          <p class="fit-timeline__subtitle">
+            Opérations enregistrées sur la fiche FIT de
+            {{ f.masNumero || f.numeroMachineCasino || 'cette MAS' }}
+            — {{ timelineLignes().length }} opération(s)
+          </p>
+        </div>
+        <a mat-stroked-button [routerLink]="['/mas/fit', f.id]">
+          <mat-icon>open_in_new</mat-icon>
+          Ouvrir la FIT
+        </a>
+      </div>
+
+      @if (timelineLignes().length === 0) {
+        <p class="fit-timeline__empty">Aucune opération FIT enregistrée pour cette machine.</p>
+      } @else {
+        <ol class="fit-timeline__list">
+          @for (ligne of timelineLignes(); track ligne.id; let first = $first) {
+            <li class="fit-timeline__item" [class.fit-timeline__item--first]="first">
+              <div class="fit-timeline__rail" aria-hidden="true">
+                <span class="fit-timeline__dot"></span>
+                <span class="fit-timeline__line"></span>
+              </div>
+              <article class="fit-timeline__card">
+                <div class="fit-timeline__card-top">
+                  <time class="fit-timeline__date" [attr.datetime]="ligne.dateOperation">
+                    {{ formatDate(ligne.dateOperation) || '—' }}
+                  </time>
+                  <span class="fit-timeline__badge">FIT</span>
+                </div>
+                <h3 class="fit-timeline__motif">{{ ligne.motifNatureOperations }}</h3>
+                <div class="fit-timeline__meta">
+                  @if (ligne.signataireAdminNom) {
+                    <span>Dir. {{ ligne.signataireAdminNom }}</span>
+                  }
+                  @if (ligne.signataireTechnicienNom) {
+                    <span>Tech. {{ ligne.signataireTechnicienNom }}</span>
+                  }
+                  @if (ligne.interventionNumero) {
+                    <span>Bon {{ ligne.interventionNumero }}</span>
+                  }
+                  @if (ligne.numeroSocle) {
+                    <span>Socle {{ ligne.numeroSocle }}</span>
+                  }
+                  @if (ligne.numeroEmplacement) {
+                    <span>Empl. {{ ligne.numeroEmplacement }}</span>
+                  }
+                </div>
+                @if (ligne.signatureAdmin || ligne.signatureTechnicien) {
+                  <div class="fit-timeline__sigs">
+                    @if (ligne.signatureAdmin) {
+                      <img [src]="ligne.signatureAdmin" alt="Signature directeur" class="fit-timeline__sig" />
+                    }
+                    @if (ligne.signatureTechnicien) {
+                      <img [src]="ligne.signatureTechnicien" alt="Signature technicien" class="fit-timeline__sig" />
+                    }
+                  </div>
+                }
+              </article>
+            </li>
+          }
+        </ol>
+      }
+    </section>
 
     <article class="fit-sheet" aria-label="Fiche inventaire technique machine à sous">
       <div class="sheet-top">

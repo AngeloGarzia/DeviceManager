@@ -622,6 +622,35 @@ export class SetupComponent implements OnInit, OnDestroy {
     this.casinoForm.reset({ nom: '' });
   }
 
+  /**
+   * Super Admin : active / désactive un casino.
+   * Désactivation → tous les ateliers du casino passent en « non utilisé » (alertes coupées).
+   */
+  onCasinoUtiliseChange(casino: CasinoSummary, checked: boolean): void {
+    if (!this.auth.isSuperAdmin() || this.casinoSaving()) {
+      return;
+    }
+    this.casinoSaving.set(true);
+    this.casinoError.set(null);
+    this.casinoSuccess.set(null);
+    this.atelierService.setCasinoUtilise(casino.id, checked).subscribe({
+      next: (updated) => {
+        this.casinoSaving.set(false);
+        this.casinoSuccess.set(
+          updated.utilise === false
+            ? `Casino « ${updated.nom} » désactivé — ateliers et alertes associés désactivés.`
+            : `Casino « ${updated.nom} » réactivé — réactivez les ateliers au besoin.`
+        );
+        this.loadAteliers();
+      },
+      error: (err) => {
+        this.casinoSaving.set(false);
+        this.casinoError.set(apiErrorMessage(err, 'Impossible de modifier l’activation du casino.'));
+        this.loadAteliers();
+      }
+    });
+  }
+
   saveCasino(): void {
     if (this.casinoForm.invalid) {
       this.casinoForm.markAllAsTouched();

@@ -59,7 +59,7 @@ export class FitFeuilleComponent implements OnInit {
 
   readonly masCtrl = new FormControl<number | null>(null);
 
-  /** Lignes triées chronologiquement (plus anciennes en haut). */
+  /** Lignes triées chronologiquement (plus anciennes en haut — feuille réglementaire). */
   readonly chronologicalLignes = computed(() => {
     const lignes = this.fit()?.lignes ?? [];
     return [...lignes].sort((a, b) => {
@@ -71,6 +71,9 @@ export class FitFeuilleComponent implements OnInit {
       return (a.id ?? 0) - (b.id ?? 0);
     });
   });
+
+  /** Timeline : opérations FIT, plus récentes en haut. */
+  readonly timelineLignes = computed(() => [...this.chronologicalLignes()].reverse());
 
   readonly emptyRows = computed(() => {
     const filled = this.chronologicalLignes().length;

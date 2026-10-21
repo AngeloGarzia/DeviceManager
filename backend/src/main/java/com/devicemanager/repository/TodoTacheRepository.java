@@ -132,6 +132,7 @@ public interface TodoTacheRepository extends JpaRepository<TodoTache, Long> {
               AND t.dueAt < :now
               AND t.interventionTechnique IS NULL
               AND a.utilise = true
+              AND cas.utilise = true
             ORDER BY t.dueAt ASC
             """)
     List<TodoTache> findOverdueAcrossAteliers(

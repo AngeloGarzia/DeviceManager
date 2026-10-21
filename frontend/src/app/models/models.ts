@@ -45,10 +45,13 @@ export interface CasinoSummary {
   groupeNom: string;
   /** Nombre d'ateliers rattachés (casino → atelier). */
   atelierCount?: number;
+  /** Si false, casino désactivé (ateliers et alertes exclus). */
+  utilise?: boolean;
 }
 
 export interface CasinoRequest {
   nom: string;
+  utilise?: boolean;
 }
 
 export interface AtelierResponsable {
@@ -387,6 +390,7 @@ export type TimelineColumn =
   | 'INTERVENTIONS'
   | 'FIT'
   | 'TODOS'
+  | 'NETTOYAGE'
   | 'STOCK';
 
 export interface TimelineLine {
@@ -401,7 +405,7 @@ export interface TimelineLine {
 
 export interface TimelineEvent {
   type: TimelineEventType | string;
-  /** Colonne d'abscisse : COMMANDES | BONS | INTERVENTIONS | FIT | TODOS | STOCK. */
+  /** Colonne d'abscisse : COMMANDES | BONS | INTERVENTIONS | FIT | TODOS | NETTOYAGE | STOCK. */
   column?: TimelineColumn | string | null;
   at: string;
   title: string;

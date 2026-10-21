@@ -1,5 +1,6 @@
 package com.devicemanager.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Builder;
 import lombok.Data;
 
@@ -15,4 +16,8 @@ public class CasinoSummary {
     private String groupeNom;
     /** Nombre d'ateliers rattachés (structure casino → atelier). */
     private long atelierCount;
+    /** Si {@code false}, casino désactivé (ateliers et alertes exclus). */
+    @Builder.Default
+    @JsonProperty("utilise")
+    private boolean utilise = true;
 }

@@ -55,6 +55,12 @@
   color: #047857;
 }
 
+.filter-chip.active.col-nettoyage {
+  background: #f0f9ff;
+  border-color: #7dd3fc;
+  color: #0369a9;
+}
+
 .filter-chip.active.col-stock {
   background: #f8fafc;
   border-color: #cbd5e1;
@@ -132,6 +138,12 @@
   color: #047857;
 }
 
+.swim-col-title.col-nettoyage {
+  background: #f0f9ff;
+  border-color: #bae6fd;
+  color: #0369a9;
+}
+
 .swim-col-title.col-stock {
   background: #f8fafc;
   border-color: #cbd5e1;
@@ -169,6 +181,10 @@
   border-left-color: #a7f3d0;
 }
 
+.swim-cell.col-nettoyage {
+  border-left-color: #bae6fd;
+}
+
 .swim-cell.col-stock {
   border-left-color: #cbd5e1;
 }
@@ -201,6 +217,10 @@
 
 .timeline-card.type-todo {
   border-color: #a7f3d0;
+}
+
+.timeline-card.type-nettoyage {
+  border-color: #bae6fd;
 }
 
 .timeline-card.type-stock {
@@ -265,6 +285,11 @@
 .type-badge.type-todo {
   background: #d1fae5;
   color: #047857;
+}
+
+.type-badge.type-nettoyage {
+  background: #e0f2fe;
+  color: #0369a9;
 }
 
 .type-badge.type-stock {

@@ -32,6 +32,11 @@ export class AtelierService {
     return this.http.put<CasinoSummary>(`${this.base}/casinos/${id}`, payload);
   }
 
+  /** Super Admin : active / désactive un casino (cascade ateliers si désactivation). */
+  setCasinoUtilise(id: number, utilise: boolean): Observable<CasinoSummary> {
+    return this.http.patch<CasinoSummary>(`${this.base}/casinos/${id}/utilise`, { utilise });
+  }
+
   deleteCasino(id: number): Observable<void> {
     return this.http.delete<void>(`${this.base}/casinos/${id}`);
   }

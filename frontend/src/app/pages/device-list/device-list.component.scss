@@ -438,12 +438,16 @@
 .home-simple-todos__item {
   display: grid;
   gap: 0.25rem;
+  width: 100%;
   padding: 0.7rem 0.8rem;
   border: 1px solid #d9e2ec;
   border-radius: 0.75rem;
   background: #fff;
   text-decoration: none;
+  text-align: left;
   color: inherit;
+  font: inherit;
+  cursor: pointer;
   border-left-width: 3px;
   border-left-color: #94a3b8;
   transition: background 0.15s ease;
@@ -509,5 +513,11 @@
   gap: 0.65rem;
   font-size: 0.75rem;
   color: #829ab1;
+}
+
+.home-simple-todos__statut {
+  margin-left: auto;
+  font-weight: 600;
+  color: #64748b;
 }
 

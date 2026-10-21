@@ -6,6 +6,7 @@ import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
 import { TodoItem, TodoWeekCalendar, TodoWeekCalendarDay } from '../../models/models';
 import { TodoService } from '../../services/todo.service';
+import { TodoQuickModalComponent } from '../../shared/todo-quick-modal.component';
 
 /**
  * Accueil : raccourci Signaler + calendrier hebdo + liste des tâches simples.
@@ -14,7 +15,14 @@ import { TodoService } from '../../services/todo.service';
 @Component({
   selector: 'app-device-list',
   standalone: true,
-  imports: [CommonModule, RouterLink, MatIconModule, MatCardModule, MatButtonModule],
+  imports: [
+    CommonModule,
+    RouterLink,
+    MatIconModule,
+    MatCardModule,
+    MatButtonModule,
+    TodoQuickModalComponent
+  ],
   templateUrl: './device-list.component.html',
   styleUrl: './device-list.component.scss'
 })
@@ -27,6 +35,7 @@ export class DeviceListComponent implements OnInit {
   readonly weekCalendarLoading = signal(false);
   /** false = date croissante (plus ancienne d’abord), true = décroissante. */
   readonly dateSortDesc = signal(false);
+  readonly selectedTodo = signal<TodoItem | null>(null);
 
   readonly todayIso = computed(() => {
     const d = new Date();
@@ -38,11 +47,13 @@ export class DeviceListComponent implements OnInit {
 
   readonly weekDays = computed(() => this.weekCalendar()?.days ?? []);
 
-  /** Tâches simples (ponctuelles) triées : urgence puis date. */
+  /**
+   * Tâches simples (ponctuelles, hors nettoyage multi-MAS) triées : urgence puis date.
+   */
   readonly simpleTodosSorted = computed(() => {
     const desc = this.dateSortDesc();
     return [...this.todos()]
-      .filter((t) => !t.recurrenceId)
+      .filter((t) => !t.recurrenceId && t.typeTache !== 'NETTOYAGE_MAS' && t.type !== 'NETTOYAGE_MAS')
       .sort((a, b) => {
         const sev = this.severityRank(a.severite || a.severity) - this.severityRank(b.severite || b.severity);
         if (sev !== 0) {
@@ -89,6 +100,26 @@ export class DeviceListComponent implements OnInit {
         this.weekCalendarLoading.set(false);
       }
     });
+  }
+
+  openTodoModal(item: TodoItem): void {
+    this.selectedTodo.set(item);
+  }
+
+  closeTodoModal(): void {
+    this.selectedTodo.set(null);
+  }
+
+  onTodoUpdated(updated: TodoItem): void {
+    this.todos.update((list) =>
+      list.map((t) => (t.id === updated.id ? { ...t, ...updated } : t))
+    );
+    if (updated.statut === 'DONE' || updated.statut === 'CANCELLED') {
+      this.todos.update((list) => list.filter((t) => t.id !== updated.id));
+      this.selectedTodo.set(null);
+    } else {
+      this.selectedTodo.set(updated);
+    }
   }
 
   dayQueryParams(day: TodoWeekCalendarDay): Record<string, string> {

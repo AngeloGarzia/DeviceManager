@@ -1,18 +1,23 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
+import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
+import { forkJoin, of, switchMap } from 'rxjs';
 import { TodoNettoyageAnalyse, TodoNettoyageMasStatut } from '../../models/models';
 import { TodoService } from '../../services/todo.service';
+import { AuthService } from '../../services/auth.service';
+import { SignaturePadComponent } from '../../shared/signature-pad.component';
 import { apiErrorMessage } from '../../shared/api-error';
 
 type SortMode = 'urgence' | 'numero' | 'recent';
 
 /**
- * Tableau de bord nettoyage MAS : grille colorée (vert → rouge écarlate) + analyse %.
+ * Tableau de bord nettoyage MAS : grille colorée + sélection multi-MAS → tâche clôturée.
  */
 @Component({
   selector: 'app-mas-nettoyage',
@@ -20,23 +25,44 @@ type SortMode = 'urgence' | 'numero' | 'recent';
   imports: [
     CommonModule,
     FormsModule,
+    ReactiveFormsModule,
     RouterLink,
     MatButtonModule,
     MatIconModule,
-    MatProgressSpinnerModule
+    MatProgressSpinnerModule,
+    MatFormFieldModule,
+    MatInputModule,
+    SignaturePadComponent
   ],
   templateUrl: './mas-nettoyage.component.html',
   styleUrl: './mas-nettoyage.component.scss'
 })
 export class MasNettoyageComponent implements OnInit {
   private readonly todoService = inject(TodoService);
+  private readonly auth = inject(AuthService);
+  private readonly fb = inject(FormBuilder);
 
   readonly loading = signal(false);
+  readonly saving = signal(false);
   readonly error = signal<string | null>(null);
+  readonly modalError = signal<string | null>(null);
+  readonly success = signal<string | null>(null);
   readonly data = signal<TodoNettoyageAnalyse | null>(null);
   readonly query = signal('');
   readonly sortMode = signal<SortMode>('urgence');
   readonly niveauFilter = signal<string | 'ALL'>('ALL');
+
+  /** MAS sélectionnées pour création rapide de tâche nettoyage. */
+  readonly selectedIds = signal<Set<number>>(new Set());
+  readonly modalOpen = signal(false);
+
+  readonly selectedItems = computed(() => {
+    const ids = this.selectedIds();
+    const items = this.data()?.items ?? [];
+    return items.filter((i) => ids.has(i.masId));
+  });
+
+  readonly selectedCount = computed(() => this.selectedIds().size);
 
   readonly filteredItems = computed(() => {
     const d = this.data();
@@ -68,6 +94,13 @@ export class MasNettoyageComponent implements OnInit {
     return sorted;
   });
 
+  readonly closeForm = this.fb.nonNullable.group({
+    titre: ['', [Validators.required, Validators.maxLength(200)]],
+    signataireClotureNom: ['', [Validators.required, Validators.maxLength(120)]],
+    commentaireCloture: ['', Validators.maxLength(2000)],
+    signatureCloture: [null as string | null, Validators.required]
+  });
+
   ngOnInit(): void {
     this.reload();
   }
@@ -79,6 +112,9 @@ export class MasNettoyageComponent implements OnInit {
       next: (res) => {
         this.data.set(res);
         this.loading.set(false);
+        // Retirer de la sélection les MAS disparues.
+        const valid = new Set((res.items ?? []).map((i) => i.masId));
+        this.selectedIds.update((cur) => new Set([...cur].filter((id) => valid.has(id))));
       },
       error: (err) => {
         this.loading.set(false);
@@ -87,9 +123,118 @@ export class MasNettoyageComponent implements OnInit {
     });
   }
 
+  isSelected(masId: number): boolean {
+    return this.selectedIds().has(masId);
+  }
+
+  toggleSelect(item: TodoNettoyageMasStatut, event?: Event): void {
+    event?.preventDefault();
+    this.selectedIds.update((cur) => {
+      const next = new Set(cur);
+      if (next.has(item.masId)) {
+        next.delete(item.masId);
+      } else {
+        next.add(item.masId);
+      }
+      return next;
+    });
+    this.success.set(null);
+  }
+
+  clearSelection(): void {
+    this.selectedIds.set(new Set());
+  }
+
+  openCreateModal(): void {
+    const items = this.selectedItems();
+    if (items.length === 0) {
+      return;
+    }
+    const numeros = items.map((i) => i.masNumero).join(', ');
+    const titre =
+      items.length === 1
+        ? `Nettoyage MAS ${items[0].masNumero}`
+        : `Nettoyage MAS (${items.length}) — ${numeros}`;
+    this.closeForm.reset({
+      titre: titre.slice(0, 200),
+      signataireClotureNom: this.auth.displayName() || '',
+      commentaireCloture: '',
+      signatureCloture: null
+    });
+    this.modalError.set(null);
+    this.modalOpen.set(true);
+  }
+
+  closeModal(): void {
+    if (this.saving()) {
+      return;
+    }
+    this.modalOpen.set(false);
+    this.modalError.set(null);
+  }
+
+  /**
+   * Crée la tâche NETTOYAGE_MAS, coche toutes les MAS, clôture DONE + signature.
+   */
+  submitSignedNettoyage(): void {
+    if (this.closeForm.invalid) {
+      this.closeForm.markAllAsTouched();
+      return;
+    }
+    const items = this.selectedItems();
+    if (items.length === 0) {
+      this.modalError.set('Sélectionnez au moins une MAS.');
+      return;
+    }
+    const raw = this.closeForm.getRawValue();
+    const masIds = items.map((i) => i.masId);
+    this.saving.set(true);
+    this.modalError.set(null);
+
+    this.todoService
+      .create({
+        titre: raw.titre.trim(),
+        description: null,
+        severite: 'MEDIUM',
+        typeTache: 'NETTOYAGE_MAS',
+        masIds
+      })
+      .pipe(
+        switchMap((todo) => {
+          const coches = masIds.map((masId) =>
+            this.todoService.setNettoyageCoche(todo.id, masId, true)
+          );
+          return (coches.length ? forkJoin(coches) : of([todo])).pipe(switchMap(() => of(todo)));
+        }),
+        switchMap((todo) =>
+          this.todoService.updateStatus(todo.id, 'DONE', {
+            signatureCloture: raw.signatureCloture,
+            signataireClotureNom: raw.signataireClotureNom.trim(),
+            commentaireCloture: raw.commentaireCloture?.trim() || null
+          })
+        )
+      )
+      .subscribe({
+        next: () => {
+          this.saving.set(false);
+          this.modalOpen.set(false);
+          this.clearSelection();
+          this.success.set(
+            `Nettoyage enregistré et clôturé pour ${masIds.length} MAS.`
+          );
+          this.reload();
+        },
+        error: (err) => {
+          this.saving.set(false);
+          this.modalError.set(
+            apiErrorMessage(err, 'Impossible de créer / clôturer la tâche de nettoyage.')
+          );
+        }
+      });
+  }
+
   /**
    * Vert (récent) → rouge écarlate (ancien / jamais).
-   * score 100 → hue 120 (vert) ; score 0 → hue 0 (écarlate).
    */
   tileStyle(item: TodoNettoyageMasStatut): Record<string, string> {
     const score = Math.max(0, Math.min(100, item.freshnessScore ?? 0));
@@ -102,25 +247,6 @@ export class MasNettoyageComponent implements OnInit {
       color: fg,
       'border-color': `hsl(${hue} 80% ${Math.max(22, lightness - 12)}%)`
     };
-  }
-
-  niveauLabel(niveau: string): string {
-    switch (niveau) {
-      case 'RECENT':
-        return 'Récent (≤ 7 j)';
-      case 'OK':
-        return 'OK (≤ 30 j)';
-      case 'ATTENTION':
-        return 'Attention (≤ 60 j)';
-      case 'URGENT':
-        return 'Urgent';
-      case 'CRITIQUE':
-        return 'Critique';
-      case 'JAMAIS':
-        return 'Jamais nettoyée';
-      default:
-        return niveau;
-    }
   }
 
   joursLabel(item: TodoNettoyageMasStatut): string {

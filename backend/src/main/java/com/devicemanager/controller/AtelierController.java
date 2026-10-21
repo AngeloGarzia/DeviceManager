@@ -15,6 +15,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -110,6 +111,29 @@ public class AtelierController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteCasino(Authentication authentication, @PathVariable Long id) {
         atelierService.deleteCasino(authentication.getName(), id);
+    }
+
+    /**
+     * Active ou désactive un casino (Super Admin).
+     * Désactivation : cascade sur les ateliers et exclusion des alertes planifiées.
+     *
+     * @param authentication super-administrateur
+     * @param id             casino
+     * @param request        {@code utilise} requis
+     * @return casino mis à jour
+     */
+    @PatchMapping("/casinos/{id}/utilise")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public ResponseEntity<CasinoSummary> setCasinoUtilise(
+            Authentication authentication,
+            @PathVariable Long id,
+            @RequestBody CasinoRequest request) {
+        if (request.getUtilise() == null) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    HttpStatus.BAD_REQUEST, "Le champ utilise est obligatoire.");
+        }
+        return ResponseEntity.ok(
+                atelierService.setCasinoUtilise(authentication.getName(), id, request.getUtilise()));
     }
 
     /**

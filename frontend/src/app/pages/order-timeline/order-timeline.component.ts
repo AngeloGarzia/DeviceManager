@@ -15,8 +15,16 @@ interface ColumnDef {
   types: TimelineEventType[];
 }
 
+const ORDER_TIMELINE_TYPES: TimelineEventType[] = [
+  'ORDER_REQUEST',
+  'ORDER_VALIDATED',
+  'ORDER_RECEIVED',
+  'INTERVENTION',
+  'STOCK_ADJUSTMENT'
+];
+
 /**
- * Timeline en colonnes (swimlanes) : Commandes | Bons | Interventions | FIT | Stock.
+ * Timeline atelier : parcours commandes, bons d'intervention et stock.
  */
 @Component({
   selector: 'app-order-timeline',
@@ -42,14 +50,6 @@ export class OrderTimelineComponent implements OnInit {
       types: ['ORDER_REQUEST', 'ORDER_VALIDATED', 'ORDER_RECEIVED']
     },
     { id: 'BONS', label: "Bons d'intervention", icon: 'receipt_long', types: ['INTERVENTION'] },
-    {
-      id: 'INTERVENTIONS',
-      label: 'Interventions techniques',
-      icon: 'engineering',
-      types: ['INTERVENTION_TECHNIQUE']
-    },
-    { id: 'FIT', label: 'FIT', icon: 'description', types: ['FIT'] },
-    { id: 'TODOS', label: 'À faire', icon: 'task_alt', types: ['TODO_TACHE', 'NETTOYAGE_MAS'] },
     { id: 'STOCK', label: 'Stock', icon: 'tune', types: ['STOCK_ADJUSTMENT'] }
   ];
 
@@ -88,7 +88,8 @@ export class OrderTimelineComponent implements OnInit {
     this.timelineService
       .list({
         from: from.toISOString().slice(0, 19),
-        to: to.toISOString().slice(0, 19)
+        to: to.toISOString().slice(0, 19),
+        types: [...ORDER_TIMELINE_TYPES]
       })
       .subscribe({
         next: (data) => {
@@ -125,24 +126,19 @@ export class OrderTimelineComponent implements OnInit {
   }
 
   columnOf(event: TimelineEvent): TimelineColumn {
-    if (event.column) {
-      return event.column as TimelineColumn;
-    }
-    switch (event.type) {
+    switch (event.type as TimelineEventType) {
       case 'ORDER_REQUEST':
       case 'ORDER_VALIDATED':
       case 'ORDER_RECEIVED':
         return 'COMMANDES';
       case 'INTERVENTION':
         return 'BONS';
-      case 'INTERVENTION_TECHNIQUE':
-        return 'INTERVENTIONS';
-      case 'FIT':
-        return 'FIT';
-      case 'TODO_TACHE':
-      case 'NETTOYAGE_MAS':
-        return 'TODOS';
+      case 'STOCK_ADJUSTMENT':
+        return 'STOCK';
       default:
+        if (event.column === 'COMMANDES' || event.column === 'BONS' || event.column === 'STOCK') {
+          return event.column;
+        }
         return 'STOCK';
     }
   }
@@ -157,14 +153,6 @@ export class OrderTimelineComponent implements OnInit {
         return 'Réception';
       case 'INTERVENTION':
         return 'Bon';
-      case 'INTERVENTION_TECHNIQUE':
-        return 'Intervention';
-      case 'FIT':
-        return 'FIT';
-      case 'TODO_TACHE':
-        return 'À faire';
-      case 'NETTOYAGE_MAS':
-        return 'Nettoyage';
       case 'STOCK_ADJUSTMENT':
         return 'Ajustement';
       default:
@@ -190,13 +178,6 @@ export class OrderTimelineComponent implements OnInit {
         return 'type-received';
       case 'INTERVENTION':
         return 'type-bon';
-      case 'INTERVENTION_TECHNIQUE':
-        return 'type-technique';
-      case 'FIT':
-        return 'type-fit';
-      case 'TODO_TACHE':
-      case 'NETTOYAGE_MAS':
-        return 'type-todo';
       case 'STOCK_ADJUSTMENT':
         return 'type-stock';
       default:
@@ -210,12 +191,6 @@ export class OrderTimelineComponent implements OnInit {
         return 'col-commandes';
       case 'BONS':
         return 'col-bons';
-      case 'INTERVENTIONS':
-        return 'col-interventions';
-      case 'FIT':
-        return 'col-fit';
-      case 'TODOS':
-        return 'col-todos';
       case 'STOCK':
         return 'col-stock';
       default:
@@ -229,15 +204,6 @@ export class OrderTimelineComponent implements OnInit {
     }
     if (event.refType === 'INTERVENTION') {
       return '/devices/interventions';
-    }
-    if (event.refType === 'INTERVENTION_TECHNIQUE') {
-      return '/mas/interventions';
-    }
-    if (event.refType === 'FIT' && event.refId != null) {
-      return `/mas/fit/${event.refId}`;
-    }
-    if (event.refType === 'TODO') {
-      return '/todos';
     }
     if (event.refType === 'DEVICE' && event.refId != null) {
       return `/devices/${event.refId}`;

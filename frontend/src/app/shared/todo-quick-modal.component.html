@@ -1,0 +1,118 @@
+<div class="tqm-backdrop" (click)="onBackdropClick()"></div>
+<div
+  class="tqm"
+  role="dialog"
+  aria-modal="true"
+  [attr.aria-labelledby]="'tqm-title-' + item().id"
+  (click)="$event.stopPropagation()"
+>
+  <header class="tqm__head">
+    <div class="tqm__head-main min-w-0">
+      <h2 class="tqm__title" [id]="'tqm-title-' + item().id">{{ item().titre || item().title }}</h2>
+      <div class="tqm__badges">
+        <span class="tqm__sev" [attr.data-severity]="item().severite || item().severity">
+          {{ severityLabel(item().severite || item().severity) }}
+        </span>
+        <span class="tqm__statut" [attr.data-statut]="item().statut">
+          {{ statutLabel(item().statut) }}
+        </span>
+        @if (item().overdue) {
+          <span class="tqm__overdue">En retard</span>
+        }
+      </div>
+    </div>
+    <button mat-icon-button type="button" (click)="close()" [disabled]="saving()" aria-label="Fermer">
+      <mat-icon>close</mat-icon>
+    </button>
+  </header>
+
+  <div class="tqm__body">
+    @if (item().description) {
+      <p class="tqm__desc">{{ item().description }}</p>
+    }
+
+    <dl class="tqm__meta">
+      <div>
+        <dt>Date</dt>
+        <dd>{{ formatDate(item().dueAt || item().createdAt || item().dateCreation) }}</dd>
+      </div>
+      @if (item().masNumero) {
+        <div>
+          <dt>MAS</dt>
+          <dd>
+            <a [routerLink]="['/mas', item().masId]" (click)="close()">{{ item().masNumero }}</a>
+          </dd>
+        </div>
+      }
+      <div>
+        <dt>Créée par</dt>
+        <dd>{{ item().createdByDisplayName || item().responsableCreation || item().createdByUsername || '—' }}</dd>
+      </div>
+    </dl>
+
+    @if (item().photos?.length) {
+      <div class="tqm__photos">
+        @for (p of item().photos!; track p.id) {
+          <img [src]="photoUrl(p.photoUrl)" [alt]="'Photo tâche ' + item().id" />
+        }
+      </div>
+    }
+
+    @if (error()) {
+      <p class="tqm__error">{{ error() }}</p>
+    }
+
+    @if (closingMode()) {
+      <form class="tqm__close" [formGroup]="closeForm" (ngSubmit)="submitClose()">
+        <mat-form-field appearance="outline" class="w-full" subscriptSizing="dynamic">
+          <mat-label>Nom du signataire</mat-label>
+          <input matInput formControlName="signataireClotureNom" maxlength="120" />
+        </mat-form-field>
+        <mat-form-field appearance="outline" class="w-full" subscriptSizing="dynamic">
+          <mat-label>Commentaire (optionnel)</mat-label>
+          <textarea matInput rows="2" formControlName="commentaireCloture" maxlength="2000"></textarea>
+        </mat-form-field>
+        <app-signature-pad formControlName="signatureCloture" label="Signature de clôture" />
+        <div class="tqm__actions">
+          <button mat-button type="button" (click)="cancelClosing()" [disabled]="saving()">Annuler</button>
+          <button mat-flat-button color="primary" type="submit" [disabled]="saving() || closeForm.invalid">
+            {{ saving() ? 'Enregistrement…' : 'Signer et clôturer' }}
+          </button>
+        </div>
+      </form>
+    } @else if (item().statut !== 'DONE' && item().statut !== 'CANCELLED') {
+      <div class="tqm__actions">
+        @if (item().statut === 'OPEN') {
+          <button
+            mat-flat-button
+            color="primary"
+            type="button"
+            [disabled]="saving()"
+            (click)="setStatus('IN_PROGRESS')"
+          >
+            <mat-icon>play_arrow</mat-icon>
+            Démarrer
+          </button>
+        }
+        @if (item().statut === 'IN_PROGRESS') {
+          <button mat-stroked-button type="button" [disabled]="saving()" (click)="setStatus('OPEN')">
+            Remettre ouverte
+          </button>
+          <button mat-flat-button color="primary" type="button" [disabled]="saving()" (click)="startClosing()">
+            <mat-icon>task_alt</mat-icon>
+            Terminer
+          </button>
+        }
+        <a mat-stroked-button [routerLink]="['/todos']" (click)="close()">Voir dans Todo</a>
+        <button mat-button type="button" (click)="close()" [disabled]="saving()">Fermer</button>
+      </div>
+    } @else {
+      <div class="tqm__actions">
+        <a mat-stroked-button [routerLink]="['/todos']" [queryParams]="{ filter: 'DONE' }" (click)="close()">
+          Voir dans Todo
+        </a>
+        <button mat-button type="button" (click)="close()">Fermer</button>
+      </div>
+    }
+  </div>
+</div>

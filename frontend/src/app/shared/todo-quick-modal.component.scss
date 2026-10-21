@@ -1,0 +1,173 @@
+:host {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: block;
+}
+
+.tqm-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgb(15 23 42 / 45%);
+}
+
+.tqm {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(28rem, calc(100vw - 1.5rem));
+  max-height: calc(100vh - 2rem);
+  overflow: auto;
+  border-radius: 1rem;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 24px 60px rgb(15 23 42 / 28%);
+  padding: 1rem 1.1rem 1.15rem;
+}
+
+.tqm__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.tqm__title {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #0f172a;
+  line-height: 1.25;
+  word-break: break-word;
+}
+
+.tqm__badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.45rem;
+}
+
+.tqm__sev,
+.tqm__statut,
+.tqm__overdue {
+  display: inline-block;
+  border-radius: 999px;
+  padding: 0.1rem 0.5rem;
+  font-size: 0.7rem;
+  font-weight: 650;
+}
+
+.tqm__sev[data-severity='HIGH'] {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+.tqm__sev[data-severity='MEDIUM'] {
+  background: #e0f2fe;
+  color: #075985;
+}
+.tqm__sev[data-severity='LOW'] {
+  background: #ecfdf5;
+  color: #047857;
+}
+
+.tqm__statut[data-statut='OPEN'] {
+  background: #f1f5f9;
+  color: #475569;
+}
+.tqm__statut[data-statut='IN_PROGRESS'] {
+  background: #fef3c7;
+  color: #92400e;
+}
+.tqm__statut[data-statut='DONE'] {
+  background: #d1fae5;
+  color: #065f46;
+}
+.tqm__statut[data-statut='CANCELLED'] {
+  background: #e2e8f0;
+  color: #475569;
+}
+
+.tqm__overdue {
+  background: #ffe4e6;
+  color: #9f1239;
+}
+
+.tqm__body {
+  margin-top: 0.85rem;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.tqm__desc {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #334155;
+  white-space: pre-wrap;
+}
+
+.tqm__meta {
+  display: grid;
+  gap: 0.45rem;
+  margin: 0;
+  font-size: 0.85rem;
+
+  div {
+    display: grid;
+    grid-template-columns: 6rem 1fr;
+    gap: 0.35rem;
+  }
+
+  dt {
+    margin: 0;
+    color: #64748b;
+    font-weight: 600;
+  }
+
+  dd {
+    margin: 0;
+    color: #0f172a;
+  }
+
+  a {
+    color: #0369a1;
+    text-decoration: none;
+    font-weight: 650;
+  }
+}
+
+.tqm__photos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+
+  img {
+    width: 4.5rem;
+    height: 4.5rem;
+    object-fit: cover;
+    border-radius: 0.45rem;
+    border: 1px solid #e2e8f0;
+  }
+}
+
+.tqm__error {
+  margin: 0;
+  border-radius: 0.55rem;
+  padding: 0.55rem 0.7rem;
+  background: #fff1f2;
+  color: #9f1239;
+  font-size: 0.85rem;
+}
+
+.tqm__close {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.tqm__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  align-items: center;
+}

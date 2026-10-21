@@ -161,7 +161,10 @@
         } @else {
           <div class="grid gap-3">
             @for (group of ateliersByCasino(); track group.casino.id) {
-              <mat-card class="setup-tile !rounded-xl !border !border-line !shadow-none">
+              <mat-card
+                class="setup-tile !rounded-xl !border !border-line !shadow-none"
+                [class.opacity-60]="group.casino.utilise === false"
+              >
                 <button
                   type="button"
                   class="setup-tile-toggle"
@@ -170,7 +173,14 @@
                   [attr.aria-expanded]="isTileOpen(casinoAtelierTileId(group.casino.id))"
                 >
                   <div class="min-w-0 text-left">
-                    <h3 class="m-0 text-sm font-semibold text-ink">{{ group.casino.nom }}</h3>
+                    <div class="flex flex-wrap items-center gap-2">
+                      <h3 class="m-0 text-sm font-semibold text-ink">{{ group.casino.nom }}</h3>
+                      @if (group.casino.utilise === false) {
+                        <span class="rounded-full bg-slate-100 px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wide text-slate-600">
+                          Casino désactivé
+                        </span>
+                      }
+                    </div>
                     <p class="mt-0.5 text-xs text-ink-soft">
                       {{ group.ateliers.length }} atelier{{ group.ateliers.length > 1 ? 's' : '' }}
                     </p>
@@ -185,6 +195,7 @@
                         type="button"
                         color="primary"
                         data-tour="setup-new-atelier"
+                        [disabled]="group.casino.utilise === false"
                         (click)="startCreateAtelier(group.casino.id)"
                       >
                         <mat-icon>add</mat-icon>
@@ -282,7 +293,9 @@
             <mat-label>Casino</mat-label>
             <mat-select formControlName="casinoId">
               @for (c of casinos(); track c.id) {
-                <mat-option [value]="c.id">{{ c.nom }}</mat-option>
+                <mat-option [value]="c.id" [disabled]="c.utilise === false">
+                  {{ c.nom }}{{ c.utilise === false ? ' (désactivé)' : '' }}
+                </mat-option>
               }
             </mat-select>
           </mat-form-field>
@@ -490,14 +503,35 @@
                 <p class="m-0 text-sm text-ink-soft">Aucun casino pour le moment.</p>
               } @else {
                 @for (c of casinos(); track c.id) {
-                  <div class="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-line px-3 py-2.5">
+                  <div
+                    class="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-line px-3 py-2.5"
+                    [class.opacity-60]="c.utilise === false"
+                  >
                     <div class="min-w-0">
-                      <div class="font-medium text-ink">{{ c.nom }}</div>
+                      <div class="flex flex-wrap items-center gap-2">
+                        <div class="font-medium text-ink">{{ c.nom }}</div>
+                        @if (c.utilise === false) {
+                          <span class="rounded-full bg-slate-100 px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wide text-slate-600">
+                            Désactivé
+                          </span>
+                        }
+                      </div>
                       <div class="text-xs text-ink-soft">
                         {{ c.atelierCount ?? 0 }} atelier{{ (c.atelierCount ?? 0) > 1 ? 's' : '' }}
                       </div>
                     </div>
-                    <div class="flex shrink-0 gap-1">
+                    <div class="flex shrink-0 flex-wrap items-center gap-2">
+                      @if (auth.isSuperAdmin()) {
+                        <mat-slide-toggle
+                          color="primary"
+                          data-tour="setup-casino-utilise"
+                          [checked]="c.utilise !== false"
+                          [disabled]="casinoSaving()"
+                          (change)="onCasinoUtiliseChange(c, $event.checked)"
+                        >
+                          {{ c.utilise === false ? 'Désactivé' : 'Actif' }}
+                        </mat-slide-toggle>
+                      }
                       <button mat-button type="button" (click)="startEditCasino(c)">Éditer</button>
                       <button
                         mat-button

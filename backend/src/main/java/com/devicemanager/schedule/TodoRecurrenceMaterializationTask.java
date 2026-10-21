@@ -54,10 +54,7 @@ public class TodoRecurrenceMaterializationTask {
         LocalDateTime now = scheduledJobSupport.now();
         int ateliers = 0;
         int failures = 0;
-        for (Atelier atelier : atelierRepository.findAll()) {
-            if (!atelier.isUtilise()) {
-                continue;
-            }
+        for (Atelier atelier : atelierRepository.findAllActiveWithCasino()) {
             try {
                 todoRecurrenceService.generateDueOccurrences(atelier, now);
                 ateliers++;

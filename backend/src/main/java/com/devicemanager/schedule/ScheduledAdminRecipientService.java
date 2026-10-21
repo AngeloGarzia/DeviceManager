@@ -39,6 +39,9 @@ public class ScheduledAdminRecipientService {
                 || casino.getGroupe().getId() == null) {
             return List.of();
         }
+        if (!casino.isUtilise()) {
+            return List.of();
+        }
         Long groupeId = casino.getGroupe().getId();
         Long casinoId = casino.getId();
         List<User> admins = userRepository.findAdminLikeByGroupeId(groupeId);
@@ -61,7 +64,7 @@ public class ScheduledAdminRecipientService {
     /** Raccourci depuis un atelier (charge casino + groupe). */
     @Transactional(readOnly = true)
     public List<String> emailsForAtelier(Atelier atelier) {
-        if (atelier == null || atelier.getCasino() == null) {
+        if (atelier == null || !atelier.isUtilise() || atelier.getCasino() == null) {
             return List.of();
         }
         return emailsForCasino(atelier.getCasino());

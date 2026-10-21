@@ -111,6 +111,7 @@ public interface CommandeRepository extends JpaRepository<Commande, Long> {
             where c.status in :statuses
               and c.dateDemande < :cutoff
               and a.utilise = true
+              and cas.utilise = true
             order by c.dateDemande asc
             """)
     List<Commande> findStalePendingAcrossAteliers(

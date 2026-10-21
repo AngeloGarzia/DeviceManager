@@ -27,6 +27,8 @@ public final class TimelineEventTypes {
     public static final String COL_FIT = "FIT";
     public static final String COL_STOCK = "STOCK";
     public static final String COL_TODOS = "TODOS";
+    /** Opérations de nettoyage MAS. */
+    public static final String COL_NETTOYAGE = "NETTOYAGE";
 
     private TimelineEventTypes() {
     }
@@ -40,7 +42,8 @@ public final class TimelineEventTypes {
             case INTERVENTION -> COL_BONS;
             case INTERVENTION_TECHNIQUE -> COL_INTERVENTIONS;
             case FIT -> COL_FIT;
-            case TODO_TACHE, NETTOYAGE_MAS -> COL_TODOS;
+            case TODO_TACHE -> COL_TODOS;
+            case NETTOYAGE_MAS -> COL_NETTOYAGE;
             case STOCK_ADJUSTMENT -> COL_STOCK;
             default -> COL_STOCK;
         };

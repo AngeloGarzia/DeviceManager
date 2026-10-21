@@ -68,14 +68,20 @@ public interface AtelierRepository extends JpaRepository<Atelier, Long> {
     @Query("UPDATE Atelier a SET a.utilise = :utilise WHERE a.id = :id")
     int updateUtilise(@Param("id") Long id, @Param("utilise") boolean utilise);
 
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("UPDATE Atelier a SET a.utilise = :utilise WHERE a.casino.id = :casinoId")
+    int updateUtiliseByCasinoId(@Param("casinoId") Long casinoId, @Param("utilise") boolean utilise);
+
     /**
      * Ateliers actifs avec casino + groupe (rappels planifiés multi-casino).
+     * Exclut les ateliers et casinos désactivés.
      */
     @Query("""
             SELECT DISTINCT a FROM Atelier a
             JOIN FETCH a.casino c
             JOIN FETCH c.groupe
             WHERE a.utilise = true
+              AND c.utilise = true
             ORDER BY c.nom, a.nom
             """)
     List<Atelier> findAllActiveWithCasino();

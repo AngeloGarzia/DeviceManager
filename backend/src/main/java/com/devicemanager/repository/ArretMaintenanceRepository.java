@@ -53,6 +53,7 @@ public interface ArretMaintenanceRepository extends JpaRepository<ArretMaintenan
             where a.dateHeureReprise is null
               and a.dateHeureArret < :cutoff
               and at.utilise = true
+              and cas.utilise = true
             order by a.dateHeureArret asc, a.id asc
             """)
     List<ArretMaintenance> findStaleOpenAcrossAteliers(

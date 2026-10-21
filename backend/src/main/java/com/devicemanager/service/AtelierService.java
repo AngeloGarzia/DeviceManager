@@ -92,17 +92,21 @@ public class AtelierService {
         if (user.getGroupe() == null) {
             return List.of();
         }
-        // Technicien : uniquement son atelier préféré s'il est encore utilisé.
+        // Technicien : uniquement son atelier préféré s'il est encore utilisé (casino inclus).
         if (isTechnicien(user.getRole())) {
             Atelier preferred = user.getPreferredAtelier();
             if (preferred == null || !preferred.isUtilise()) {
                 return List.of();
             }
-            return List.of(toSummary(requireAtelierInUserGroupe(user, preferred.getId())));
+            Atelier atelier = requireAtelierInUserGroupe(user, preferred.getId());
+            if (!isAtelierSelectable(atelier)) {
+                return List.of();
+            }
+            return List.of(toSummary(atelier));
         }
         boolean showInactive = includeInactive && Roles.isAdminLike(user.getRole());
         return atelierRepository.findAllByGroupeId(user.getGroupe().getId()).stream()
-                .filter(a -> showInactive || a.isUtilise())
+                .filter(a -> showInactive || isAtelierSelectable(a))
                 .map(this::toSummary)
                 .toList();
     }
@@ -158,6 +162,7 @@ public class AtelierService {
         Casino saved = casinoRepository.saveAndFlush(Casino.builder()
                 .nom(nom)
                 .groupe(user.getGroupe())
+                .utilise(true)
                 .build());
         log.info("Création en base — Casino id={} nom={} groupe={} par={}",
                 saved.getId(), saved.getNom(), user.getGroupe().getNom(), username);
@@ -185,6 +190,38 @@ public class AtelierService {
         Casino saved = casinoRepository.saveAndFlush(casino);
         log.info("Modification en base — Casino id={} nom={} par={}", saved.getId(), saved.getNom(), username);
         return toCasinoSummary(saved);
+    }
+
+    /**
+     * Active ou désactive un casino (Super Admin uniquement).
+     * Désactivation : cascade {@code utilise=false} sur tous les ateliers du casino
+     * (exclut sélecteurs et alertes mail planifiées).
+     * Réactivation : casino seul ; les ateliers restent à réactiver individuellement.
+     *
+     * @param username super-administrateur
+     * @param id       casino
+     * @param utilise  {@code true} actif, {@code false} désactivé
+     * @return casino mis à jour
+     */
+    @Transactional
+    public CasinoSummary setCasinoUtilise(String username, Long id, boolean utilise) {
+        User user = requireUser(username);
+        if (!Roles.isSuperAdmin(user.getRole())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "Seul un Super Admin peut activer ou désactiver un casino.");
+        }
+        Casino casino = requireCasinoInUserGroupe(user, id);
+        casinoRepository.updateUtilise(id, utilise);
+        casino.setUtilise(utilise);
+        if (!utilise) {
+            int deactivated = atelierRepository.updateUtiliseByCasinoId(id, false);
+            log.info("Désactivation casino id={} nom={} — {} atelier(s) désactivés par={}",
+                    id, casino.getNom(), deactivated, username);
+        } else {
+            log.info("Réactivation casino id={} nom={} par={} (ateliers à réactiver au besoin)",
+                    id, casino.getNom(), username);
+        }
+        return toCasinoSummary(casino);
     }
 
     /**
@@ -255,9 +292,9 @@ public class AtelierService {
                     "Seuls les administrateurs peuvent changer d'atelier");
         }
         Atelier atelier = requireAtelierInUserGroupe(user, atelierId);
-        if (!atelier.isUtilise()) {
+        if (!isAtelierSelectable(atelier)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "Cet atelier est marqué « non utilisé » et ne peut pas être sélectionné.");
+                    "Cet atelier (ou son casino) est désactivé et ne peut pas être sélectionné.");
         }
         user.setPreferredAtelier(atelier);
         userRepository.saveAndFlush(user);
@@ -276,9 +313,13 @@ public class AtelierService {
     public AtelierSummary create(String username, AtelierRequest request) {
         User user = requireUser(username);
         Casino casino = requireCasinoInUserGroupe(user, request.getCasinoId());
+        ensureCasinoActiveForAtelierWrite(casino);
         String nom = normalizeNom(request.getNom());
         ensureUniqueNom(nom, casino.getId(), null);
         boolean utilise = request.getUtilise() == null || Boolean.TRUE.equals(request.getUtilise());
+        if (utilise && !casino.isUtilise()) {
+            utilise = false;
+        }
         Atelier atelier = Atelier.builder()
                 .nom(nom)
                 .casino(casino)
@@ -317,6 +358,10 @@ public class AtelierService {
         atelier.setNom(nom);
         atelier.setCasino(casino);
         boolean utilise = request.getUtilise() == null || Boolean.TRUE.equals(request.getUtilise());
+        if (utilise && !casino.isUtilise()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Impossible d'activer un atelier : le casino parent est désactivé.");
+        }
         atelier.setUtilise(utilise);
         applyCoordonnees(atelier, request);
         applyResponsables(atelier, user, request.getResponsableIds());
@@ -430,7 +475,24 @@ public class AtelierService {
                 .groupeId(casino.getGroupe() != null ? casino.getGroupe().getId() : null)
                 .groupeNom(casino.getGroupe() != null ? casino.getGroupe().getNom() : "")
                 .atelierCount(atelierCount)
+                .utilise(casino.isUtilise())
                 .build();
+    }
+
+    /** Atelier sélectionnable si lui et son casino sont actifs. */
+    private static boolean isAtelierSelectable(Atelier atelier) {
+        if (atelier == null || !atelier.isUtilise()) {
+            return false;
+        }
+        Casino casino = atelier.getCasino();
+        return casino != null && casino.isUtilise();
+    }
+
+    private static void ensureCasinoActiveForAtelierWrite(Casino casino) {
+        if (casino != null && !casino.isUtilise()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Ce casino est désactivé : impossible d'y rattacher un nouvel atelier actif.");
+        }
     }
 
     private void applyCoordonnees(Atelier atelier, AtelierRequest request) {

@@ -32,6 +32,14 @@ public class Casino {
             foreignKey = @ForeignKey(name = "fk_casino_groupe"))
     private Groupe groupe;
 
+    /**
+     * Si {@code false}, le casino et ses ateliers ne sont plus proposés aux utilisateurs
+     * et les alertes planifiées (mails, etc.) liées à ce casino sont ignorées.
+     */
+    @Column(name = "utilise", nullable = false)
+    @Builder.Default
+    private boolean utilise = true;
+
     /** Ateliers de maintenance rattachés à ce casino. */
     @OneToMany(mappedBy = "casino")
     @Builder.Default

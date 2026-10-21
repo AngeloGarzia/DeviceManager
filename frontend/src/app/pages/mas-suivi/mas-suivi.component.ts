@@ -21,7 +21,7 @@ interface ColumnDef {
 }
 
 /**
- * Suivi MAS : timeline multi-colonnes (bons, interventions techniques, FIT, À faire).
+ * Suivi MAS : timeline multi-colonnes (bons, interventions, FIT, À faire, nettoyages).
  */
 @Component({
   selector: 'app-mas-suivi',
@@ -49,7 +49,8 @@ export class MasSuiviComponent implements OnInit {
     { id: 'BONS', label: "Bons d'intervention", icon: 'receipt_long' },
     { id: 'INTERVENTIONS', label: 'Interventions techniques', icon: 'engineering' },
     { id: 'FIT', label: 'FIT', icon: 'description' },
-    { id: 'TODOS', label: 'À faire', icon: 'task_alt' }
+    { id: 'TODOS', label: 'À faire', icon: 'task_alt' },
+    { id: 'NETTOYAGE', label: 'Nettoyages', icon: 'cleaning_services' }
   ];
 
   readonly masses = signal<Mas[]>([]);
@@ -178,7 +179,10 @@ export class MasSuiviComponent implements OnInit {
   }
 
   columnOf(event: TimelineEvent): TimelineColumn {
-    if (event.column) {
+    if ((event.type as TimelineEventType) === 'NETTOYAGE_MAS') {
+      return 'NETTOYAGE';
+    }
+    if (event.column && event.column !== 'NETTOYAGE') {
       return event.column as TimelineColumn;
     }
     switch (event.type as TimelineEventType) {
@@ -189,8 +193,9 @@ export class MasSuiviComponent implements OnInit {
       case 'FIT':
         return 'FIT';
       case 'TODO_TACHE':
-      case 'NETTOYAGE_MAS':
         return 'TODOS';
+      case 'NETTOYAGE_MAS':
+        return 'NETTOYAGE';
       default:
         return 'BONS';
     }
@@ -206,6 +211,8 @@ export class MasSuiviComponent implements OnInit {
         return 'col-fit';
       case 'TODOS':
         return 'col-todos';
+      case 'NETTOYAGE':
+        return 'col-nettoyage';
       default:
         return '';
     }
@@ -220,8 +227,9 @@ export class MasSuiviComponent implements OnInit {
       case 'FIT':
         return 'type-fit';
       case 'TODO_TACHE':
-      case 'NETTOYAGE_MAS':
         return 'type-todo';
+      case 'NETTOYAGE_MAS':
+        return 'type-nettoyage';
       default:
         return 'type-default';
     }
@@ -261,6 +269,9 @@ export class MasSuiviComponent implements OnInit {
     }
     if (event.refType === 'FIT' && event.refId != null) {
       return `/mas/fit/${event.refId}`;
+    }
+    if (event.type === 'NETTOYAGE_MAS') {
+      return '/mas/nettoyage';
     }
     if (event.refType === 'TODO') {
       return '/todos';
