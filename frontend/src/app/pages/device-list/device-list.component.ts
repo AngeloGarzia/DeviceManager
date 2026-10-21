@@ -7,6 +7,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { TodoItem, TodoWeekCalendar, TodoWeekCalendarDay } from '../../models/models';
 import { TodoService } from '../../services/todo.service';
 import { TodoQuickModalComponent } from '../../shared/todo-quick-modal.component';
+import { TodoCreateModalComponent } from '../../shared/todo-create-modal.component';
 
 /**
  * Accueil : raccourci Signaler + calendrier hebdo + liste des tâches simples.
@@ -21,7 +22,8 @@ import { TodoQuickModalComponent } from '../../shared/todo-quick-modal.component
     MatIconModule,
     MatCardModule,
     MatButtonModule,
-    TodoQuickModalComponent
+    TodoQuickModalComponent,
+    TodoCreateModalComponent
   ],
   templateUrl: './device-list.component.html',
   styleUrl: './device-list.component.scss'
@@ -39,6 +41,7 @@ export class DeviceListComponent implements OnInit {
   /** false = date croissante (plus ancienne d’abord), true = décroissante. */
   readonly dateSortDesc = signal(false);
   readonly selectedTodo = signal<TodoItem | null>(null);
+  readonly showCreateModal = signal(false);
 
   private static readonly RECENT_DONE_LIMIT = 12;
 
@@ -140,6 +143,19 @@ export class DeviceListComponent implements OnInit {
 
   closeTodoModal(): void {
     this.selectedTodo.set(null);
+  }
+
+  openCreateModal(): void {
+    this.showCreateModal.set(true);
+  }
+
+  closeCreateModal(): void {
+    this.showCreateModal.set(false);
+  }
+
+  onTodoCreated(item: TodoItem): void {
+    this.todos.update((list) => [item, ...list.filter((t) => t.id !== item.id)]);
+    this.showCreateModal.set(false);
   }
 
   onTodoUpdated(updated: TodoItem): void {

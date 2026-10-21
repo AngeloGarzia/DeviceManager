@@ -1,0 +1,71 @@
+<div class="tcm-backdrop" (click)="onBackdropClick()"></div>
+<div
+  class="tcm"
+  role="dialog"
+  aria-modal="true"
+  aria-labelledby="tcm-title"
+  (click)="$event.stopPropagation()"
+>
+  <header class="tcm__head">
+    <div class="min-w-0">
+      <h2 id="tcm-title" class="tcm__title">Signaler une tâche</h2>
+      <p class="tcm__subtitle">Création rapide — tâche simple</p>
+    </div>
+    <button mat-icon-button type="button" (click)="close()" [disabled]="saving()" aria-label="Fermer">
+      <mat-icon>close</mat-icon>
+    </button>
+  </header>
+
+  <form class="tcm__body" [formGroup]="form" (ngSubmit)="submit()">
+    <mat-form-field appearance="outline" class="w-full" subscriptSizing="dynamic">
+      <mat-label>Titre</mat-label>
+      <input matInput formControlName="titre" maxlength="200" autocomplete="off" />
+      @if (form.controls.titre.invalid && form.controls.titre.touched) {
+        <mat-error>Titre obligatoire</mat-error>
+      }
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="w-full" subscriptSizing="dynamic">
+      <mat-label>Description (optionnel)</mat-label>
+      <textarea matInput rows="3" formControlName="description" maxlength="2000"></textarea>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="w-full" subscriptSizing="dynamic">
+      <mat-label>Urgence</mat-label>
+      <mat-select formControlName="severite">
+        <mat-option value="HIGH">Urgent</mat-option>
+        <mat-option value="MEDIUM">Normal</mat-option>
+        <mat-option value="LOW">Faible</mat-option>
+      </mat-select>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="w-full" subscriptSizing="dynamic">
+      <mat-label>MAS (optionnel)</mat-label>
+      <mat-select formControlName="masId">
+        <mat-option [value]="null">— Aucune —</mat-option>
+        @for (mas of masses(); track mas.id) {
+          <mat-option [value]="mas.id">{{ masOptionLabel(mas) }}</mat-option>
+        }
+      </mat-select>
+      @if (loadingMas()) {
+        <mat-hint>Chargement des MAS…</mat-hint>
+      }
+    </mat-form-field>
+
+    @if (error()) {
+      <p class="tcm__error">{{ error() }}</p>
+    }
+
+    <div class="tcm__actions">
+      <button mat-button type="button" (click)="close()" [disabled]="saving()">Annuler</button>
+      <button mat-flat-button color="primary" type="submit" [disabled]="saving() || form.invalid">
+        @if (saving()) {
+          <mat-spinner diameter="18"></mat-spinner>
+        } @else {
+          <mat-icon>add_task</mat-icon>
+        }
+        {{ saving() ? 'Création…' : 'Créer' }}
+      </button>
+    </div>
+  </form>
+</div>

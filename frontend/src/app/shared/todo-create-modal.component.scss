@@ -1,0 +1,75 @@
+:host {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: block;
+}
+
+.tcm-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgb(15 23 42 / 45%);
+}
+
+.tcm {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(28rem, calc(100vw - 1.5rem));
+  max-height: calc(100vh - 2rem);
+  overflow: auto;
+  border-radius: 1rem;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 24px 60px rgb(15 23 42 / 28%);
+  padding: 1rem 1.1rem 1.15rem;
+}
+
+.tcm__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.85rem;
+}
+
+.tcm__title {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.tcm__subtitle {
+  margin: 0.25rem 0 0;
+  font-size: 0.8rem;
+  color: #64748b;
+}
+
+.tcm__body {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.tcm__error {
+  margin: 0;
+  padding: 0.55rem 0.7rem;
+  border-radius: 0.55rem;
+  background: #fff1f2;
+  color: #be123c;
+  font-size: 0.85rem;
+}
+
+.tcm__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.45rem;
+  margin-top: 0.25rem;
+}
+
+.tcm__actions button mat-spinner {
+  display: inline-block;
+  margin-right: 0.35rem;
+}
