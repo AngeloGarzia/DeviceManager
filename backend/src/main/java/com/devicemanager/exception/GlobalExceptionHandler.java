@@ -11,7 +11,9 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.QueryTimeoutException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageConversionException;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.http.converter.HttpMessageNotWritableException;
 import org.springframework.jdbc.CannotGetJdbcConnectionException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
@@ -167,6 +169,23 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ApiError> handleNotReadable(HttpMessageNotReadableException ex, HttpServletRequest request) {
         log.debug("Corps de requête illisible sur {}: {}", request.getRequestURI(), ex.getMessage());
+        return build(HttpStatus.BAD_REQUEST.value(),
+                "Le corps de la requête est absent ou mal formé. Vérifiez le format JSON attendu.",
+                request.getRequestURI());
+    }
+
+    /**
+     * Échec de désérialisation Jackson hors {@link HttpMessageNotReadableException}
+     * (ex. DTO {@code @Builder} sans constructeur → {@code InvalidDefinitionException} → HTTP 500).
+     */
+    @ExceptionHandler(HttpMessageConversionException.class)
+    public ResponseEntity<ApiError> handleMessageConversion(HttpMessageConversionException ex,
+                                                            HttpServletRequest request) {
+        if (ex instanceof HttpMessageNotWritableException) {
+            log.error("Sérialisation réponse échouée sur {}: {}", request.getRequestURI(), ex.getMessage(), ex);
+            return build(HttpStatus.INTERNAL_SERVER_ERROR.value(), MSG_INTERNAL, request.getRequestURI());
+        }
+        log.warn("Conversion HTTP échouée sur {}: {}", request.getRequestURI(), ex.getMessage());
         return build(HttpStatus.BAD_REQUEST.value(),
                 "Le corps de la requête est absent ou mal formé. Vérifiez le format JSON attendu.",
                 request.getRequestURI());
