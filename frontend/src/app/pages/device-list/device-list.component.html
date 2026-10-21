@@ -140,6 +140,49 @@
     }
   </mat-card>
 
+  <mat-card class="home-done-tiles !rounded-xl !border !border-line !shadow-soft">
+    <div class="home-done-tiles__header">
+      <div class="min-w-0">
+        <h2 class="home-done-tiles__title">Récemment terminées</h2>
+        <p class="home-done-tiles__subtitle">Tâches simples et nettoyages clôturés</p>
+      </div>
+      <a mat-stroked-button routerLink="/todos" [queryParams]="{ filter: 'DONE' }">
+        Voir tout
+      </a>
+    </div>
+
+    @if (recentDoneLoading()) {
+      <p class="home-done-tiles__empty">Chargement…</p>
+    } @else if (recentDoneTiles().length === 0) {
+      <p class="home-done-tiles__empty">Aucune tâche ou nettoyage terminé pour le moment.</p>
+    } @else {
+      <ul class="home-done-tiles__grid">
+        @for (item of recentDoneTiles(); track item.id) {
+          <li>
+            <a
+              class="home-done-tile"
+              [class.home-done-tile--nettoyage]="isNettoyageDone(item)"
+              [routerLink]="doneLink(item)"
+              [queryParams]="doneQueryParams(item)"
+            >
+              <mat-icon class="home-done-tile__icon" aria-hidden="true">
+                {{ isNettoyageDone(item) ? 'cleaning_services' : 'task_alt' }}
+              </mat-icon>
+              <span class="home-done-tile__kind">
+                {{ isNettoyageDone(item) ? 'Nettoyage' : 'Tâche' }}
+              </span>
+              <span class="home-done-tile__title">{{ item.titre || item.title }}</span>
+              <span class="home-done-tile__meta">
+                {{ formatDate(item.completedAt || item.dateCloture) }}
+                · {{ doneMeta(item) }}
+              </span>
+            </a>
+          </li>
+        }
+      </ul>
+    }
+  </mat-card>
+
   @if (selectedTodo(); as todo) {
     <app-todo-quick-modal
       [todo]="todo"

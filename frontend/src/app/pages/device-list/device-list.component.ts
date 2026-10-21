@@ -31,11 +31,16 @@ export class DeviceListComponent implements OnInit {
 
   readonly todos = signal<TodoItem[]>([]);
   readonly todosLoading = signal(false);
+  /** Tâches / nettoyages clôturés récents (rappel Accueil). */
+  readonly recentDone = signal<TodoItem[]>([]);
+  readonly recentDoneLoading = signal(false);
   readonly weekCalendar = signal<TodoWeekCalendar | null>(null);
   readonly weekCalendarLoading = signal(false);
   /** false = date croissante (plus ancienne d’abord), true = décroissante. */
   readonly dateSortDesc = signal(false);
   readonly selectedTodo = signal<TodoItem | null>(null);
+
+  private static readonly RECENT_DONE_LIMIT = 12;
 
   readonly todayIso = computed(() => {
     const d = new Date();
@@ -69,8 +74,19 @@ export class DeviceListComponent implements OnInit {
     return this.todos().length;
   }
 
+  /**
+   * Petites tuiles : tâches simples + nettoyages DONE, plus récents d’abord.
+   */
+  readonly recentDoneTiles = computed(() => {
+    return [...this.recentDone()]
+      .filter((t) => t.statut === 'DONE' && !t.recurrenceId)
+      .sort((a, b) => this.doneDateMs(b) - this.doneDateMs(a))
+      .slice(0, DeviceListComponent.RECENT_DONE_LIMIT);
+  });
+
   ngOnInit(): void {
     this.loadTodos();
+    this.loadRecentDone();
     this.loadWeekCalendar();
   }
 
@@ -84,6 +100,22 @@ export class DeviceListComponent implements OnInit {
       error: () => {
         this.todos.set([]);
         this.todosLoading.set(false);
+      }
+    });
+  }
+
+  loadRecentDone(): void {
+    this.recentDoneLoading.set(true);
+    this.todoService.list(true).subscribe({
+      next: (data) => {
+        this.recentDone.set(
+          (data.items ?? []).filter((t) => t.statut === 'DONE' && !t.recurrenceId)
+        );
+        this.recentDoneLoading.set(false);
+      },
+      error: () => {
+        this.recentDone.set([]);
+        this.recentDoneLoading.set(false);
       }
     });
   }
@@ -117,9 +149,42 @@ export class DeviceListComponent implements OnInit {
     if (updated.statut === 'DONE' || updated.statut === 'CANCELLED') {
       this.todos.update((list) => list.filter((t) => t.id !== updated.id));
       this.selectedTodo.set(null);
+      if (updated.statut === 'DONE') {
+        this.recentDone.update((list) => {
+          const without = list.filter((t) => t.id !== updated.id);
+          return [updated, ...without];
+        });
+      }
     } else {
       this.selectedTodo.set(updated);
     }
+  }
+
+  isNettoyageDone(item: TodoItem): boolean {
+    return item.typeTache === 'NETTOYAGE_MAS' || item.type === 'NETTOYAGE_MAS';
+  }
+
+  doneLink(item: TodoItem): string {
+    return this.isNettoyageDone(item) ? '/mas/nettoyage' : '/todos';
+  }
+
+  doneQueryParams(item: TodoItem): Record<string, string> {
+    return this.isNettoyageDone(item) ? {} : { filter: 'DONE' };
+  }
+
+  doneMeta(item: TodoItem): string {
+    if (this.isNettoyageDone(item)) {
+      const n = item.nettoyageCocheCount;
+      const total = item.nettoyageTotalCount;
+      if (n != null && total != null && total > 0) {
+        return `${n}/${total} MAS`;
+      }
+      return 'Nettoyage';
+    }
+    if (item.masNumero) {
+      return `MAS ${item.masNumero}`;
+    }
+    return item.signataireClotureNom || item.responsableCloture || 'Terminée';
   }
 
   dayQueryParams(day: TodoWeekCalendarDay): Record<string, string> {
@@ -180,6 +245,15 @@ export class DeviceListComponent implements OnInit {
 
   private taskDateMs(item: TodoItem): number {
     const raw = this.taskDisplayDate(item);
+    if (!raw) {
+      return 0;
+    }
+    const t = new Date(raw).getTime();
+    return Number.isNaN(t) ? 0 : t;
+  }
+
+  private doneDateMs(item: TodoItem): number {
+    const raw = item.completedAt || item.dateCloture || item.updatedAt || null;
     if (!raw) {
       return 0;
     }
