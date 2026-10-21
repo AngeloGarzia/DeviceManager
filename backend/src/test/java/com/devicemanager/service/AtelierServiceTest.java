@@ -294,6 +294,32 @@ class AtelierServiceTest {
     }
 
     @Test
+    void update_rejectsActivateWhenCasinoDisabled() {
+        var user = TestFixtures.user("admin", Roles.ADMIN);
+        var atelier = TestFixtures.atelier();
+        atelier.setUtilise(false);
+        atelier.setResponsables(new HashSet<>());
+        var casino = atelier.getCasino();
+        casino.setUtilise(false);
+
+        when(userRepository.findByUsername("admin")).thenReturn(Optional.of(user));
+        when(atelierRepository.findByIdWithCasino(100L)).thenReturn(Optional.of(atelier));
+        when(casinoRepository.findByIdWithGroupe(casino.getId())).thenReturn(Optional.of(casino));
+        when(atelierRepository.findByNomIgnoreCaseAndCasinoId(atelier.getNom(), casino.getId()))
+                .thenReturn(Optional.of(atelier));
+
+        AtelierRequest req = new AtelierRequest();
+        req.setNom(atelier.getNom());
+        req.setCasinoId(casino.getId());
+        req.setUtilise(true);
+
+        assertThatThrownBy(() -> atelierService.update("admin", 100L, req))
+                .isInstanceOf(ResponseStatusException.class)
+                .extracting(ex -> ((ResponseStatusException) ex).getStatusCode().value())
+                .isEqualTo(400);
+    }
+
+    @Test
     void listForUser_excludesUnusedUnlessIncludeInactive() {
         var used = TestFixtures.atelier();
         used.setUtilise(true);

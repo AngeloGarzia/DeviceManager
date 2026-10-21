@@ -12,7 +12,7 @@ public final class TestFixtures {
     }
 
     public static Casino casino() {
-        return Casino.builder().id(10L).nom("Balaruc").groupe(groupe()).build();
+        return Casino.builder().id(10L).nom("Balaruc").groupe(groupe()).utilise(true).build();
     }
 
     public static Atelier atelier() {

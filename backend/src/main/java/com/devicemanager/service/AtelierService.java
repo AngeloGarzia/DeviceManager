@@ -333,9 +333,12 @@ public class AtelierService {
         saved.setUtilise(utilise);
         List<Long> preferes = utilise ? request.getUtilisateurPrefereIds() : List.of();
         applyUtilisateursPreferes(saved, user, preferes);
+        // Recharge après UPDATE JPQL pour un graphe managé cohérent (coordonnées, casino).
+        Atelier managed = atelierRepository.findByIdWithCasino(saved.getId()).orElse(saved);
+        managed.setUtilise(utilise);
         log.info("Création en base — Atelier id={} nom={} casino={} par={}",
-                saved.getId(), saved.getNom(), casino.getNom(), username);
-        return toSummary(saved);
+                managed.getId(), managed.getNom(), casino.getNom(), username);
+        return toSummary(managed);
     }
 
     /**
@@ -371,9 +374,12 @@ public class AtelierService {
         saved.setUtilise(utilise);
         List<Long> preferes = utilise ? request.getUtilisateurPrefereIds() : List.of();
         applyUtilisateursPreferes(saved, user, preferes);
+        // Recharge : après @Modifying, préférés + sérialisation doivent voir un atelier managé.
+        Atelier managed = atelierRepository.findByIdWithCasino(saved.getId()).orElse(saved);
+        managed.setUtilise(utilise);
         log.info("Modification en base — Atelier id={} nom={} casino={} utilise={} par={}",
-                saved.getId(), saved.getNom(), casino.getNom(), utilise, username);
-        return toSummary(saved);
+                managed.getId(), managed.getNom(), casino.getNom(), utilise, username);
+        return toSummary(managed);
     }
 
     /**

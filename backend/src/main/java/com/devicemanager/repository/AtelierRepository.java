@@ -64,7 +64,11 @@ public interface AtelierRepository extends JpaRepository<Atelier, Long> {
 
     boolean existsByNomIgnoreCaseAndCasinoIdAndIdNot(String nom, Long casinoId, Long id);
 
-    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    /**
+     * Ne pas clear le contexte : create/update enchaînent preferés + toSummary
+     * sur la même entité (sinon TransientObjectException / Lazy → HTTP 500).
+     */
+    @Modifying(clearAutomatically = false, flushAutomatically = true)
     @Query("UPDATE Atelier a SET a.utilise = :utilise WHERE a.id = :id")
     int updateUtilise(@Param("id") Long id, @Param("utilise") boolean utilise);
 
