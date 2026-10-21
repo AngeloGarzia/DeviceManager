@@ -1,4 +1,4 @@
-import { Component, ElementRef, OnInit, ViewChild, inject, signal } from '@angular/core';
+import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
@@ -26,8 +26,6 @@ import { masStatutBadgeClass, masStatutLabel } from '../../shared/mas-statut';
   styleUrl: './mas-detail.component.scss'
 })
 export class MasDetailComponent implements OnInit {
-  @ViewChild('qrCanvas') qrCanvas?: ElementRef<HTMLCanvasElement>;
-
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly masService = inject(MasService);
@@ -44,6 +42,7 @@ export class MasDetailComponent implements OnInit {
 
   readonly qrLoading = signal(false);
   readonly qrUrl = signal<string | null>(null);
+  readonly qrDataUrl = signal<string | null>(null);
   readonly qrVisible = signal(false);
 
   readonly nettoyageHistorique = signal<TodoNettoyageHistoriqueItem[]>([]);
@@ -141,15 +140,22 @@ export class MasDetailComponent implements OnInit {
       return;
     }
     this.qrLoading.set(true);
+    this.qrDataUrl.set(null);
     this.error.set(null);
     this.masService.ensurePublicAccessToken(mas.id).subscribe({
       next: async (res) => {
         this.item.update((cur) => (cur ? { ...cur, publicAccessToken: res.token } : cur));
         const url = this.buildPublicUrl(res.token, mas);
-        this.qrUrl.set(url);
-        this.qrVisible.set(true);
-        this.qrLoading.set(false);
-        await this.renderQr(url);
+        try {
+          const dataUrl = await this.renderQrDataUrl(url);
+          this.qrUrl.set(url);
+          this.qrDataUrl.set(dataUrl);
+          this.qrVisible.set(true);
+          this.qrLoading.set(false);
+        } catch {
+          this.qrLoading.set(false);
+          this.error.set('Impossible d’afficher le QR code.');
+        }
       },
       error: (err) => {
         this.qrLoading.set(false);
@@ -167,16 +173,23 @@ export class MasDetailComponent implements OnInit {
       return;
     }
     this.qrLoading.set(true);
+    this.qrDataUrl.set(null);
     this.error.set(null);
     this.masService.rotatePublicAccessToken(mas.id).subscribe({
       next: async (res) => {
         this.item.update((cur) => (cur ? { ...cur, publicAccessToken: res.token } : cur));
         const url = this.buildPublicUrl(res.token, mas);
-        this.qrUrl.set(url);
-        this.qrVisible.set(true);
-        this.qrLoading.set(false);
-        this.success.set('QR régénéré — réimprimez les supports.');
-        await this.renderQr(url);
+        try {
+          const dataUrl = await this.renderQrDataUrl(url);
+          this.qrUrl.set(url);
+          this.qrDataUrl.set(dataUrl);
+          this.qrVisible.set(true);
+          this.qrLoading.set(false);
+          this.success.set('QR régénéré — réimprimez les supports.');
+        } catch {
+          this.qrLoading.set(false);
+          this.error.set('Impossible d’afficher le QR code.');
+        }
       },
       error: (err) => {
         this.qrLoading.set(false);
@@ -208,13 +221,9 @@ export class MasDetailComponent implements OnInit {
     return `${origin}/public/r/${token}`;
   }
 
-  private async renderQr(url: string): Promise<void> {
-    await new Promise<void>((resolve) => setTimeout(resolve, 0));
-    const canvas = this.qrCanvas?.nativeElement;
-    if (!canvas) {
-      return;
-    }
-    await QRCode.toCanvas(canvas, url, {
+  /** Génère le QR hors DOM (évite la course ViewChild / @if / eventCoalescing). */
+  private renderQrDataUrl(url: string): Promise<string> {
+    return QRCode.toDataURL(url, {
       width: 220,
       margin: 2,
       color: { dark: '#0f172a', light: '#ffffff' }

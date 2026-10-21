@@ -116,7 +116,15 @@
             <div class="mt-4 flex justify-center"><mat-spinner diameter="28"></mat-spinner></div>
           } @else if (qrVisible()) {
             <div class="mas-public-qr mt-4">
-              <canvas #qrCanvas class="mas-public-qr__canvas" aria-label="QR code règles de jeux"></canvas>
+              @if (qrDataUrl(); as src) {
+                <img
+                  [src]="src"
+                  width="220"
+                  height="220"
+                  alt="QR code règles de jeux"
+                  class="mas-public-qr__canvas"
+                />
+              }
               @if (qrUrl()) {
                 <p class="mas-public-qr__url">{{ qrUrl() }}</p>
               }
