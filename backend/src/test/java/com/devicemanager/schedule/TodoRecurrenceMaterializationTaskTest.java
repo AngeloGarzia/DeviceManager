@@ -52,7 +52,7 @@ class TodoRecurrenceMaterializationTaskTest {
     void run_skipsWhenGloballyDisabled() {
         when(scheduledJobSupport.isSchedulingGloballyEnabled()).thenReturn(false);
         task.run();
-        verify(atelierRepository, never()).findAll();
+        verify(atelierRepository, never()).findAllActiveWithCasino();
     }
 
     @Test
@@ -60,7 +60,7 @@ class TodoRecurrenceMaterializationTaskTest {
         when(appSettingsService.getBoolean(AppSettingsService.SCHED_TODO_RECURRENCE_ENABLED, true))
                 .thenReturn(false);
         task.run();
-        verify(atelierRepository, never()).findAll();
+        verify(atelierRepository, never()).findAllActiveWithCasino();
     }
 
     @Test
@@ -70,19 +70,17 @@ class TodoRecurrenceMaterializationTaskTest {
                 AppSettingsService.SCHED_TODO_RECURRENCE_MINUTE,
                 6, 30)).thenReturn(false);
         task.run();
-        verify(atelierRepository, never()).findAll();
+        verify(atelierRepository, never()).findAllActiveWithCasino();
     }
 
     @Test
     void run_materializesAllActiveAteliersAndMarks() {
         Atelier a1 = Atelier.builder().id(1L).nom("A").utilise(true).build();
-        Atelier a2 = Atelier.builder().id(2L).nom("B").utilise(false).build();
-        when(atelierRepository.findAll()).thenReturn(List.of(a1, a2));
+        when(atelierRepository.findAllActiveWithCasino()).thenReturn(List.of(a1));
 
         task.run();
 
         verify(todoRecurrenceService).generateDueOccurrences(a1, now);
-        verify(todoRecurrenceService, never()).generateDueOccurrences(eq(a2), any());
         verify(scheduledJobSupport).markSent(
                 TodoRecurrenceMaterializationTask.JOB_KEY,
                 "2026-09-17",
@@ -96,14 +94,14 @@ class TodoRecurrenceMaterializationTaskTest {
                 "2026-09-17",
                 TodoRecurrenceMaterializationTask.IDEMPOTENCE_RECIPIENT)).thenReturn(true);
         task.run();
-        verify(atelierRepository, never()).findAll();
+        verify(atelierRepository, never()).findAllActiveWithCasino();
     }
 
     @Test
     void run_continuesWhenOneAtelierFails_withoutMarking() {
         Atelier a1 = Atelier.builder().id(1L).nom("A").utilise(true).build();
         Atelier a2 = Atelier.builder().id(2L).nom("B").utilise(true).build();
-        when(atelierRepository.findAll()).thenReturn(List.of(a1, a2));
+        when(atelierRepository.findAllActiveWithCasino()).thenReturn(List.of(a1, a2));
         doThrow(new RuntimeException("boom"))
                 .when(todoRecurrenceService).generateDueOccurrences(a1, now);
 
