@@ -89,7 +89,7 @@ export class QrLabelPdfService {
     let slotIndex = firstSlot - 1; // 0-based global
     let currentPage = 0;
 
-    for (let i = 0; i < slots.length; i++) {
+    for (const item of slots) {
       const pageIndex = Math.floor(slotIndex / QrLabelPdfService.SLOTS_PER_PAGE);
       while (currentPage < pageIndex) {
         doc.addPage();
@@ -117,7 +117,6 @@ export class QrLabelPdfService {
         );
       }
 
-      const item = slots[i];
       const qrDataUrl = await QRCode.toDataURL(item.url, {
         errorCorrectionLevel: 'M',
         margin: 1,

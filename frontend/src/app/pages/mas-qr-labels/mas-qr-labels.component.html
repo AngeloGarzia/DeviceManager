@@ -32,10 +32,9 @@
       <mat-label>Décalage Y (mm)</mat-label>
       <input matInput type="number" step="0.1" [(ngModel)]="offsetYMm" />
     </mat-form-field>
-    <label class="flex items-center gap-2 text-sm text-ink">
-      <mat-checkbox [(ngModel)]="drawOutlines" color="primary"></mat-checkbox>
+    <mat-checkbox class="text-sm text-ink" [(ngModel)]="drawOutlines" color="primary">
       Dessiner le contour des étiquettes
-    </label>
+    </mat-checkbox>
   </div>
 
   <div class="flex flex-wrap items-center gap-2">

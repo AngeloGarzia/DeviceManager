@@ -780,7 +780,7 @@
               mat-stroked-button
               type="button"
               (click)="previewPurge()"
-              [disabled]="purgeLoading() || purgeDeviceId() == null"
+              [disabled]="purgeLoading() || purgeDeviceId() === null"
             >
               <mat-icon>preview</mat-icon>
               Prévisualiser

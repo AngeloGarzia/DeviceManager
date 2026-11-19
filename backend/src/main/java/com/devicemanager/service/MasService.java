@@ -68,6 +68,9 @@ public class MasService {
     /** Libellé d'affichage pour une MAS multi-dénomination. */
     public static final String MULTI_DENO_LABEL = "MultiDéno";
 
+    /** RNG réutilisé pour les jetons publics (évite SpotBugs DMI_RANDOM_USED_ONLY_ONCE). */
+    private static final java.security.SecureRandom PUBLIC_TOKEN_RANDOM = new java.security.SecureRandom();
+
     private final MasRepository masRepository;
     private final MarqueMasRepository marqueMasRepository;
     private final DenoRepository denoRepository;
@@ -686,7 +689,7 @@ public class MasService {
 
     private static String newPublicToken() {
         byte[] bytes = new byte[24];
-        new java.security.SecureRandom().nextBytes(bytes);
+        PUBLIC_TOKEN_RANDOM.nextBytes(bytes);
         return java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
     }
 

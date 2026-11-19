@@ -63,7 +63,7 @@
       </article>
       <article class="nettoyage-stat">
         <p class="nettoyage-stat__value">
-          {{ d.moyenneJoursDepuis != null ? d.moyenneJoursDepuis : '—' }}
+          {{ d.moyenneJoursDepuis !== null ? d.moyenneJoursDepuis : '—' }}
         </p>
         <p class="nettoyage-stat__label">Moyenne jours depuis</p>
         <p class="nettoyage-stat__hint">parmi les MAS déjà nettoyées</p>
@@ -227,7 +227,15 @@
   }
 
   @if (modalOpen()) {
-    <div class="nettoyage-modal-backdrop" (click)="closeModal()"></div>
+    <div
+      class="nettoyage-modal-backdrop"
+      role="button"
+      tabindex="0"
+      aria-label="Fermer la fenêtre"
+      (click)="closeModal()"
+      (keydown.enter)="closeModal()"
+      (keydown.space)="closeModal(); $event.preventDefault()"
+    ></div>
     <div
       class="nettoyage-modal"
       role="dialog"

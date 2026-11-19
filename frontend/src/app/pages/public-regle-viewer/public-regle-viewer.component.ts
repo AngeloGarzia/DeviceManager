@@ -175,7 +175,7 @@ export class PublicRegleViewerComponent implements OnInit, OnDestroy {
   }
 }
 
-function firstNonBlank(...values: Array<string | null | undefined>): string | null {
+function firstNonBlank(...values: (string | null | undefined)[]): string | null {
   for (const v of values) {
     if (v && v.trim()) {
       return v.trim();

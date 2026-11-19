@@ -1,10 +1,19 @@
-<div class="tqm-backdrop" (click)="onBackdropClick()"></div>
+<div
+  class="tqm-backdrop"
+  role="button"
+  tabindex="0"
+  aria-label="Fermer la fenêtre"
+  (click)="onBackdropClick()"
+  (keydown.enter)="onBackdropClick()"
+  (keydown.space)="onBackdropClick(); $event.preventDefault()"
+></div>
 <div
   class="tqm"
   role="dialog"
   aria-modal="true"
   [attr.aria-labelledby]="'tqm-title-' + item().id"
   (click)="$event.stopPropagation()"
+  (keydown)="$event.stopPropagation()"
 >
   <header class="tqm__head">
     <div class="tqm__head-main min-w-0">
