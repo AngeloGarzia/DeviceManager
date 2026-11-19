@@ -7,7 +7,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>4.1.1</version>
+        <version>4.1.2</version>
         <relativePath/>
     </parent>
 
@@ -20,20 +20,20 @@
 
     <properties>
         <java.version>21</java.version>
-        <jjwt.version>0.12.7</jjwt.version>
-        <aws.sdk.version>2.31.78</aws.sdk.version>
-        <!-- Spring AI 2.0.1 — patch CVEs ONNX / model post-2.0.0. -->
-        <spring-ai.version>2.0.1</spring-ai.version>
-        <!-- Trivy CRITICAL : Tomcat CVE-2026-65182 / 65905 / 68525 (11.0.24 → 11.0.25). -->
-        <tomcat.version>11.0.25</tomcat.version>
-        <!-- OWASP : MySQL Connector/J CVE-2026-60586 / 60623. -->
-        <mysql.version>26.7.0</mysql.version>
-        <springdoc.version>3.1.1</springdoc.version>
-        <spotbugs-maven-plugin.version>4.10.3.0</spotbugs-maven-plugin.version>
-        <spotbugs.version>4.10.3</spotbugs.version>
-        <jacoco.version>0.8.15</jacoco.version>
+        <jjwt.version>0.13.0</jjwt.version>
+        <aws.sdk.version>2.59.4</aws.sdk.version>
+        <!-- Spring AI 2.0.2 — dernière stable 2.0.x (2.1.x encore RC). -->
+        <spring-ai.version>2.0.2</spring-ai.version>
+        <!-- Override Tomcat embarqué (dernier 11.0.x). -->
+        <tomcat.version>11.0.29</tomcat.version>
+        <!-- Override MySQL Connector/J (dernier 26.x). -->
+        <mysql.version>26.10.0</mysql.version>
+        <springdoc.version>3.2.0</springdoc.version>
+        <spotbugs-maven-plugin.version>4.10.5.0</spotbugs-maven-plugin.version>
+        <spotbugs.version>4.10.5</spotbugs.version>
+        <jacoco.version>0.8.16</jacoco.version>
         <maven-checkstyle-plugin.version>3.6.0</maven-checkstyle-plugin.version>
-        <checkstyle.version>13.8.0</checkstyle.version>
+        <checkstyle.version>14.4.0</checkstyle.version>
         <!-- Integration tests (*IT) via failsafe; off by default (needs Docker). -->
         <skipITs>true</skipITs>
     </properties>
@@ -146,7 +146,7 @@
         <dependency>
             <groupId>org.apache.tika</groupId>
             <artifactId>tika-core</artifactId>
-            <version>3.3.2</version>
+            <version>4.2.0</version>
         </dependency>
         <dependency>
             <groupId>org.projectlombok</groupId>
