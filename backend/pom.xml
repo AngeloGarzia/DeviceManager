@@ -7,7 +7,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>4.1.2</version>
+        <version>4.2.0</version>
         <relativePath/>
     </parent>
 
@@ -21,9 +21,9 @@
     <properties>
         <java.version>21</java.version>
         <jjwt.version>0.13.0</jjwt.version>
-        <aws.sdk.version>2.59.4</aws.sdk.version>
+        <aws.sdk.version>2.59.5</aws.sdk.version>
         <!-- Spring AI 2.0.2 — dernière stable 2.0.x (2.1.x encore RC). -->
-        <spring-ai.version>2.0.2</spring-ai.version>
+        <spring-ai.version>2.1.0</spring-ai.version>
         <!-- Override Tomcat embarqué (dernier 11.0.x). -->
         <tomcat.version>11.0.29</tomcat.version>
         <!-- Override MySQL Connector/J (dernier 26.x). -->
